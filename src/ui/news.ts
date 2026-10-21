@@ -1,0 +1,372 @@
+// Haberler (güncelleme notları): ana menünün sol üstünde en son haberin kutusu; tıklayınca bütün haberlerin listesi,
+// bir habere tıklayınca ayrıntı sayfası (metin ve diğer görseller). Görseller public/news altında.
+
+import { $, esc } from './dom';
+
+interface NewsSection {
+  heading?: string;
+  text?: string[];
+  bullets?: string[];
+}
+
+export interface NewsItem {
+  id: string;
+  /** Yayın günü (YYYY-AA-GG). */
+  date: string;
+  title: string;
+  summary: string;
+  cover: string;
+  images: { src: string; caption: string }[];
+  sections: NewsSection[];
+}
+
+const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
+
+/** En yeni en üstte. */
+export const NEWS: NewsItem[] = [
+  {
+    id: 'telefonda-oyna',
+    date: '2026-10-21',
+    title: 'Telefonda oyna',
+    summary: 'Yatay telefona uygun düzen, dokunmatik kamera, haberler ve geri bildirim.',
+    cover: img('telefon.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'WarSim artık telefonda da oynanıyor. Telefonu yan çevir: üst çubuk sıkışık düzene geçer, yan paneller kapalı başlar ve bir şey seçince ilgili panel açılır.',
+        ],
+      },
+      {
+        heading: 'Dokunmatik',
+        bullets: [
+          'Tek parmak haritayı kaydırır; iki parmak yakınlaştırır, çevirince döndürür, birlikte yukarı ya da aşağı kaydırınca eğer.',
+          'Dokun: seç · çift dokun: uçağı takip et · uzun bas: iptal.',
+          'İnşa ederken dokunuş yapının yerini gösterir; alttaki “Döndür”, “Yerleştir” ve “İptal” düğmeleriyle kurarsın.',
+          'Tarayıcıdan “Ana ekrana ekle” dersen oyun tarayıcı çubukları olmadan açılır.',
+        ],
+      },
+      {
+        heading: 'Ana menüde yeni',
+        bullets: [
+          'Sol üstte haberler: güncelleme notları ve görseller.',
+          'Sağda geri bildirim: görüşünü yaz, “Ben bu oyuna Steam’de … $ veririm” kısmını doldur; hesap açman gerekmez.',
+          'Bilgisayarda oyun başlarken tam ekrana geçer; ⛶ düğmesi tam ekranı açıp kapatır.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'son-kalan-kazanir',
+    date: '2026-10-21',
+    title: 'Son kalan kazanır',
+    summary: 'Harekâtın artık bir sonu var: elenme, zafer ve onarım.',
+    cover: img('zafer.jpg'),
+    images: [{ src: img('onarim.jpg'), caption: 'Hasarlı yapıyı seçip “Onar”a basman yeter.' }],
+    sections: [
+      {
+        text: [
+          'Harekât artık haritada tek bir ülke kalınca bitiyor. Hava üssü kalmayan ülkenin yenisini kurmaya başlamak için 5 dakikası var; kuramazsa elenir, kalan yapıları terk edilir ve havadaki uçakları tarafsız ülkelere iner.',
+          'Son hava üssün yıkılınca ekranın üstünde geri sayım çıkar. Elenince ya da zafer kazanınca harekâtın özeti açılır; istersen haritada kalıp izlemeyi sürdürebilirsin.',
+        ],
+      },
+      {
+        heading: 'Onarım',
+        text: [
+          'Hasarlı yapılar artık onarılabiliyor. Yapıyı seç ve “Onar”a bas: onarım yavaş ilerler, bedeli adım adım ödenir. Vurulan yapının onarımı 10 dakika bekler; baskınlar arasındaki hasar geri gelir ama süren bir kuşatma silinmez.',
+        ],
+      },
+      {
+        heading: 'Daha hızlı ilerleyen oyun',
+        bullets: [
+          'Uçak, bina, üs tesisi, uçaksavar ve araştırma fiyatları %30 indi.',
+          'Hava üssünün dayanıklılığı 3.000’den 1.600’e indi; tek bombayla yine yıkılmaz.',
+          'Bir ana üssü yıkmak önceki sürümün yaklaşık yarısı kadar sürüyor.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rakip-komutanlar',
+    date: '2026-10-21',
+    title: 'Rakip komutanlar akıllandı',
+    summary: 'Botlar bütçe yapıyor, genişliyor ve bir plana göre saldırıyor.',
+    cover: img('rakip-us.jpg'),
+    images: [{ src: img('genisleme.jpg'), caption: 'Botlar zamanla ikinci ve üçüncü hava üslerini kuruyor.' }],
+    sections: [
+      {
+        text: [
+          'Rakip ülkeler parasını artık bölerek harcıyor: bir payı yeni madenlere ve üslere, bir payı filoya ve savunmaya, kalanı araştırmaya. Eskiden maden parası biriktirirken araştırmayı ve üretimi tamamen durduruyorlardı.',
+        ],
+      },
+      {
+        heading: 'Savunma ve yerleşim',
+        bullets: [
+          'Uçaksavar bataryaları korudukları yerin dibine kuruluyor: pistin, fabrikanın ve madenlerin yanına.',
+          'Bataryalar artık hava üssünün tel örgüsünün hemen dışına kurulabiliyor; bu senin için de geçerli.',
+          'Madenler ve radar düşmana bakmayan tarafa kuruluyor.',
+        ],
+      },
+      {
+        heading: 'Genişleme',
+        text: [
+          'Botlar zamanla ikinci ve üçüncü hava üslerini kuruyor, yeni üslere fabrika ekliyor ve uçaklarını üsler arasında paylaştırıyor. Ana üssü yıkılan bot öbür üssüyle savaşmayı sürdürüyor.',
+        ],
+      },
+      {
+        heading: 'Saldırı planı',
+        text: [
+          'Her bot bir hedef ülke seçiyor: önce çevresini (uçaksavarlar, radar, fabrika, madenler) vuruyor, sonra ana üsse yükleniyor. Botlar hep aynı ülkeye toplanmamaya çalışıyor.',
+          'Alarm önleyicileri en az çift kalkıyor, kalabalık kola dörtlü; bombardıman uçaklarını önceliyor ve savunma bölgesinden çıkan düşmanı fazla kovalamıyor.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ucaksavar-dalas',
+    date: '2026-10-21',
+    title: 'Uçaksavar ve dalaş yapay zekâsı',
+    summary: 'Gerçekçi uçaksavar, kaçınma manevraları ve daha akıllı avcılar.',
+    cover: img('b17.jpg'),
+    images: [{ src: img('dalas.jpg'), caption: 'Alçakta bir it dalaşı: Spitfire’lar ve havada parçalanan bir Bf 109 F.' }],
+    sections: [
+      {
+        heading: 'Uçaksavar',
+        bullets: [
+          'Toplar hedefe dönme hızıyla sınırlı: alçaktan ve hızlı geçen uçağı ağır toplar izleyemez.',
+          'Ağır toplar hedefin gideceği yere ateş eder; telemetre, atış hesaplayıcı ve radar araştırmaları isabeti artırır.',
+          'Uçaklar uçaksavar bölgelerinden kaçınıyor, ateş altında yön ve irtifa değiştiriyor.',
+        ],
+      },
+      {
+        heading: 'Avcılar',
+        bullets: [
+          'Avcılar savunmalı bombardıman kutusuna arkadan sürünmek yerine önden saldırıyor.',
+          'Hızlı avcılar alçakta daha iyi dönen rakipten dönerek değil, zikzakla hız farkını açarak kaçıyor.',
+          'Eskortlar korudukları kolun yanında S dönüşleriyle uçup hızlarını koruyor.',
+        ],
+      },
+      {
+        heading: 'Nişancılar',
+        text: ['Bombardıman uçaklarının nişancıları gerçekçi isabetle ateş ediyor; motorlu taretler elle çevrilenlerden daha iyi izliyor.'],
+      },
+    ],
+  },
+  {
+    id: 'gorev-dagilimi',
+    date: '2026-10-20',
+    title: 'Görev planlayıcıda görev dağılımı',
+    summary: 'Kollarını ikiye böl, başarı tahminini yüküne göre gör.',
+    cover: img('planlayici.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Bir uçak tipini iki işe bölebiliyorsun: devriyede bir kısmı eskort avcılarına, bir kısmı bombardıman uçaklarına; pike bombardımanı ve taarruzda bir kısmı önce hedefin çevresindeki uçaksavarı bastırır.',
+        ],
+      },
+      {
+        bullets: [
+          'Başarı tahmini, taşıdığın yükün hedefi yıkmaya yetip yetmeyeceğini hesaplıyor (“Beklenen hasar ≈%21, gereken %12”).',
+          'Yakın eskort koruduğu kol düşerse paketteki diğer kolu korumaya geçiyor.',
+          'Aktif görevler panelinde her kolun görevi yazıyor.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'yeni-ucaklar',
+    date: '2026-10-19',
+    title: 'Görev sonuçları ve 16 yeni uçak',
+    summary: 'Görevler başarılı, başarısız ya da sonuçsuz biter; ödül yalnız başarıda.',
+    cover: img('arastirma.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Her görev uçuşta gerçekten olana göre sonuçlanıyor. Ödül yalnız başarılı görevde veriliyor; planlayıcı tahmini başarı şansını gösteriyor. Araştırma şansı artırır ama hiçbir görev kesin değildir.',
+        ],
+      },
+      {
+        heading: 'Yeni uçaklar',
+        text: [
+          'I-16, A6M2 Sıfır, Blenheim, P-40E, Pe-2, Yak-3, La-7, P-38J, F6F-5 Hellcat, Lancaster, Mosquito, He 162, F-80C, Vampire, Ar 234 ve Il-28 araştırma ağacına eklendi.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'yeni-haritalar',
+    date: '2026-10-19',
+    title: '300 km’lik iki yeni harita',
+    summary: 'Anakara ve Takımadalar: dört kat geniş savaş alanları.',
+    cover: img('harita.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Haritalar 300 × 300 km’ye büyüdü. Anakara dağlar ve körfezle ayrılmış geniş bir ülke; Takımadalar altı adadan ve ortadaki tarafsız volkan adasından oluşuyor. Ana menüden haritanı ve düşman sayısını (1–5) seçebilirsin.',
+        ],
+      },
+      {
+        bullets: [
+          'Pike bombardımanında nişan düzeltildi: bombaların çoğu artık hedefin 60 m yakınına düşüyor.',
+          'Yüksekten uçan jet bombardıman uçakları bombayı doğru mesafede bırakıyor.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ana-menu',
+    date: '2026-10-19',
+    title: 'Ana menü, hesaplar ve kayıtlar',
+    summary: 'Adınla giriş yap, oyununu kaydet, kaldığın yerden devam et.',
+    cover: img('menu.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Oyun artık ana menüyle açılıyor; arkada rakip ülkeler kendi aralarında savaşıyor. Sağ üstten yalnız bir adla giriş yapabilirsin; aynı adla tekrar girdiğinde kayıtların seni bekler.',
+        ],
+      },
+      {
+        bullets: [
+          'Esc ile duraklatma menüsü: devam, kaydet, kayıtlar ve görünüm ayarları.',
+          'Oyun akarken 5 dakikada bir otomatik kayıt alınır.',
+          'Misafir oyunlar kaydedilmez.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ekonomi',
+    date: '2026-10-19',
+    title: 'Ekonomi: para, madenler ve pazar',
+    summary: 'Her şeyin bir bedeli var; gelir madenlerden ve savaştan.',
+    cover: img('pazar.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Uçak üretmek, bina kurmak ve araştırma yapmak para istiyor. Gelir dört yerden geliyor: maden ocakları, düşürülen düşman uçakları, yıkılan düşman yapıları ve tarafsız ülkelere uçak satışı.',
+        ],
+      },
+      {
+        bullets: [
+          'Maden verimi yerden yere çok değişir ve haritada görünmez; kurmadan bilinmez.',
+          'Pazarda İsveç, İsviçre, İspanya, Portekiz, Arjantin ve Türkiye uçak satıyor.',
+          'Üst çubuktaki hazine çipinden kasanı ve defterini görebilirsin.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'gercek-ucaklar',
+    date: '2026-10-18',
+    title: 'Gerçek uçaklar, gerçek fizik',
+    summary: 'Gerçek verilerle uçan uçaklar ve ayrıntılı hasar modeli.',
+    cover: img('ucus.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'Her uçak gerçek kütlesi, kanat alanı, motor gücü ve silahlarıyla tanımlandı; atmosfer, Mach etkileri, pervane ve jet itkisi hesaplanıyor.',
+        ],
+      },
+      {
+        bullets: [
+          'Bileşen hasarı: motor, yakıt, kumandalar, yangın ve infilak.',
+          'Düşen uçağın mürettebatı paraşütle atlayabilir; kendi bölgesine inenler geri döner.',
+          'Serbest mühimmat düzeni: askı noktası başına bomba, roket ya da yakıt tankı.',
+        ],
+      },
+    ],
+  },
+];
+
+const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+function fmtDate(d: string): string {
+  const [y, m, day] = d.split('-').map(Number);
+  return `${day} ${MONTHS[m - 1]} ${y}`;
+}
+
+/** Görsel ve üstünde tabana ortalanmış başlık (kutu, listede de aynı). */
+export function newsCard(n: NewsItem, attrs: string, small = false): string {
+  return `<button class="news-card${small ? ' small' : ''}" ${attrs}>
+    <img src="${n.cover}" alt="" loading="lazy">
+    <span class="news-cap"><b>${esc(n.title)}</b><small>${fmtDate(n.date)}</small></span>
+  </button>`;
+}
+
+/** Haberler penceresi: liste ya da tek haber. */
+export class NewsView {
+  isOpen = false;
+  private el = $('news');
+  private current: string | null = null;
+
+  constructor() {
+    this.el.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      if (t === this.el) {
+        this.close();
+        return;
+      }
+      const b = t.closest<HTMLElement>('[data-nw]');
+      if (!b) return;
+      if (b.dataset.nw === 'close') this.close();
+      else if (b.dataset.nw === 'back') this.show(null);
+      else if (b.dataset.nw === 'open') this.show(b.dataset.id ?? null);
+    });
+    this.el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.current) this.show(null);
+        else this.close();
+      }
+      e.stopPropagation();
+    });
+  }
+
+  /** Listeyi (id yoksa) ya da bir haberi aç. */
+  open(id: string | null = null): void {
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.show(id);
+  }
+
+  close(): void {
+    this.isOpen = false;
+    this.el.classList.add('hidden');
+  }
+
+  private show(id: string | null): void {
+    this.current = id;
+    const n = id ? NEWS.find((x) => x.id === id) : undefined;
+    this.el.innerHTML = `<div class="news-sheet" tabindex="-1">${n ? this.article(n) : this.list()}</div>`;
+    const sheet = this.el.querySelector<HTMLElement>('.news-sheet');
+    sheet?.focus();
+    if (sheet) sheet.scrollTop = 0;
+  }
+
+  private list(): string {
+    return `<div class="news-head"><h2>Haberler</h2><button class="icon" data-nw="close" title="Kapat (Esc)">✕</button></div>
+      <div class="news-list">${NEWS.map((n) => newsCard(n, `data-nw="open" data-id="${n.id}"`)).join('')}</div>`;
+  }
+
+  private article(n: NewsItem): string {
+    const sec = n.sections.map((s) => `
+      ${s.heading ? `<h3>${esc(s.heading)}</h3>` : ''}
+      ${(s.text ?? []).map((p) => `<p>${esc(p)}</p>`).join('')}
+      ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}`).join('');
+    const gallery = n.images.map((g) => `<figure><img src="${g.src}" alt="" loading="lazy"><figcaption>${esc(g.caption)}</figcaption></figure>`).join('');
+    return `<div class="news-head"><button class="news-back" data-nw="back">‹ Haberler</button><button class="icon" data-nw="close" title="Kapat (Esc)">✕</button></div>
+      <article class="news-article">
+        <img class="news-hero" src="${n.cover}" alt="">
+        <div class="news-date">${fmtDate(n.date)}</div>
+        <h2>${esc(n.title)}</h2>
+        <p class="news-lead">${esc(n.summary)}</p>
+        ${sec}
+        ${gallery ? `<div class="news-gallery">${gallery}</div>` : ''}
+      </article>`;
+  }
+}

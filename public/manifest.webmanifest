@@ -1,0 +1,11 @@
+{
+  "name": "WarSim — Hava Harbi",
+  "short_name": "WarSim",
+  "lang": "tr",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#dde9ec",
+  "theme_color": "#86b3a2",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
