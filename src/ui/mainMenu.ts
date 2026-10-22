@@ -10,7 +10,7 @@ import { mapPreview } from './mapPreview';
 import { NAME_MAX, cleanName, currentAccount, logout, nameError } from '../persist';
 import { SavesPanel } from './savesList';
 import { NEWS, newsCard } from './news';
-import { enterFullscreen, isFullscreen, toggleFullscreen } from './fullscreen';
+import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
 import { $, esc } from './dom';
 
 type Tab = 'new' | 'saves';
@@ -151,7 +151,9 @@ export class MainMenu {
   render(): void {
     if (!this.isOpen) return;
     const acc = currentAccount();
-    const fs = `<button class="mm-login" data-mm="fullscreen" title="Tam ekran">${isFullscreen() ? 'Tam ekrandan çık' : '⛶ Tam ekran'}</button>`;
+    const fs = fullscreenSupported()
+      ? `<button class="mm-login" data-mm="fullscreen" title="Tam ekran">${isFullscreen() ? 'Tam ekrandan çık' : '⛶ Tam ekran'}</button>`
+      : '';
     // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
     const newsBtn = '<button class="mm-login mm-news-btn" data-mm="news">Haberler</button><button class="mm-login mm-fb-btn" data-mm="feedback">Geri bildirim</button>';
     const top = acc
@@ -198,7 +200,7 @@ export class MainMenu {
         </div>`;
     this.el.innerHTML = `
       <div class="mm-veil"></div>
-      <div class="mm-top"><div class="mm-brand">WarSim<span>hava harbi</span></div>${top}</div>
+      <div class="mm-top"><div class="mm-brand">WarSimBox</div>${top}</div>
       <div class="mm-news">
         <div class="mm-label">Haberler</div>
         ${newsCard(NEWS[0], 'data-mm="news" title="Bütün haberler"', true)}

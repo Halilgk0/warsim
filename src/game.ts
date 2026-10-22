@@ -82,6 +82,8 @@ export class Game {
   private lastScale = 1;
   private acc = 0;
   private last = performance.now();
+  private lastErrorLog = 0;
+  private errorShown = false;
 
   constructor() {
     this.renderer = new GameRenderer(document.getElementById('viewport')!, document.getElementById('labels')!);
@@ -246,7 +248,7 @@ export class Game {
     this.hud.onScenarioChanged();
     this.left.render(true);
     const sub = document.querySelector('.brand span');
-    if (sub) sub.textContent = w.playerName ? `Komutan ${w.playerName}` : 'hava harbi prototipi';
+    if (sub) sub.textContent = w.playerName ? `Komutan ${w.playerName}` : '';
   }
 
   /** Kamera oyuncunun ana üssüne. */
@@ -618,7 +620,30 @@ export class Game {
     });
   }
 
+  /** Kare döngüsü: bir sonraki kare önce istenir, karedeki hata oyunu dondurmaz. */
   private loop = (now: number): void => {
+    requestAnimationFrame(this.loop);
+    try {
+      this.tick(now);
+    } catch (e) {
+      this.reportError(e);
+    }
+  };
+
+  /** Hata konsola yazılır (en çok 5 sn'de bir), oyuncuya bir kez bildirilir. */
+  private reportError(e: unknown): void {
+    const now = performance.now();
+    if (now - this.lastErrorLog > 5000) {
+      this.lastErrorLog = now;
+      console.error(e);
+    }
+    if (!this.errorShown) {
+      this.errorShown = true;
+      this.toast('Beklenmeyen bir hata oldu; oyun sürüyor. Sorun devam ederse kaydedip sayfayı yenile.', true);
+    }
+  }
+
+  private tick(now: number): void {
     const real = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
     this.acc += real * this.timeScale;
@@ -630,17 +655,20 @@ export class Game {
       steps++;
     }
     if (steps >= maxSteps) this.acc = 0;
-    // Sesler render'dan önce: dünya olaylarını render tüketip siler
+    // Sesler render'dan önce: dünya olaylarını render tüketip siler. Sesteki bir hata görüntüyü durdurmasın.
     const rig = this.renderer.rig;
-    const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
-    const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
-    this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, this.timeScale, listener, (ac) => this.renderer.isVisible(ac));
-    if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
+    try {
+      const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
+      const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
+      this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, this.timeScale, listener, (ac) => this.renderer.isVisible(ac));
+      if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
+    } catch (e) {
+      this.reportError(e);
+    }
     if (this.mode === 'menu') {
       // Arka plan: harita yavaşça döner; oyun arayüzü gizli
       rig.yaw += real * 0.025;
       this.renderer.frame(real, Math.min(this.acc / STEP, 1));
-      requestAnimationFrame(this.loop);
       return;
     }
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
@@ -661,6 +689,5 @@ export class Game {
     this.planner.update();
     this.build.update();
     this.modals.update();
-    requestAnimationFrame(this.loop);
-  };
+  }
 }

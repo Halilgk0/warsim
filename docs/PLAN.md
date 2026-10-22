@@ -1,4 +1,4 @@
-# WarSim — Tasarım ve Yol Haritası
+# WarSimBox — Tasarım ve Yol Haritası
 
 ## Vizyon
 
@@ -403,10 +403,11 @@ src/
   tıklanınca haber sayfası (metin ve diğer görseller). Yeni not `NEWS` dizisinin başına eklenir. Görseller oyundan
   1280×720 ekran görüntüsü. Dar ekranda (≤1060 px) kutu yerine üst çubukta "Haberler" düğmesi.
 - **Geri bildirim** (`src/ui/feedback.ts`): sağda düğme (ve duraklatma menüsünde): görüş ve öneri, "Ben bu oyuna _ $
-  veririm" (Steam'de) ve zorunlu gönderen adı (hesap gerekmez); görüş ya da fiyattan biri dolu olmalı. Alıcı adres derlemede
-  `VITE_FEEDBACK_URL` ile verilir (JSON POST: name, message, price, sentAt); verilmemişse ya da gönderilemezse bu
-  cihazda `warsim.feedback.v1` altında saklanır. **Henüz alıcı adres yok:** bir hizmet (form servisi ya da kendi
-  sunucumuz) seçilince bağlanacak.
+  veririm" (Steam'de) ve zorunlu gönderen adı (hesap gerekmez); görüş ya da fiyattan biri dolu olmalı. Gönderilen
+  geri bildirim geliştiricinin **Google Formu**'na gider ("WarSimBox geri bildirim"; oyuncu formu görmez, yanıtlar
+  formun "Yanıtlar" sekmesinde). Alan kimlikleri `feedback.ts` `FORM`'da (form değişirse sayfasındaki
+  `FB_PUBLIC_LOAD_DATA_`'dan yeniden alınır). Gönderilemezse cihazda `warsim.feedback.v1` altında saklanır, oyun
+  sonraki açılışta yeniden gönderir.
 - **Tam ekran:** oyuna başlarken ya da kayıt yüklerken tarayıcının tam ekranına geçilir; ana menüde "Tam ekran" ve oyun
   içinde ⛶ düğmesi aç/kapar. Dizüstü genişliklerinde üst çubuk sıkışır (1440 px altında 2× ve 8× gizli, 1260 px
   altında Senaryo, 1100 px altında marka ve araştırma çipi): 1280 px'de Araştırma, Hangar ve Görünüm ekran dışında kalıyordu.

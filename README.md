@@ -1,4 +1,4 @@
-# WarSim
+# WarSimBox
 
 Yukarıdan bakılan, pastel ve sade bir hava harbi strateji oyunu: üs kur, üret, araştır, savaş. Gerçek uçak verileriyle
 uçan uçaklar, gerçekçi it dalaşı, uçaksavar, görev planlama ve rakip ülkelerle herkes-herkese harekât. Tarayıcıda

@@ -4,6 +4,11 @@ export function isFullscreen(): boolean {
   return !!document.fullscreenElement;
 }
 
+/** Tarayıcı tam ekranı destekliyor mu (iPhone Safari desteklemez: düğmeler gizlenir). */
+export function fullscreenSupported(): boolean {
+  return !!document.documentElement.requestFullscreen && document.fullscreenEnabled !== false;
+}
+
 export function enterFullscreen(): void {
   const el = document.documentElement;
   if (document.fullscreenElement || !el.requestFullscreen) return;

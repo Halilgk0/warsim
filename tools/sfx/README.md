@@ -1,4 +1,4 @@
-# WarSim sesleri
+# WarSimBox sesleri
 
 Oyundaki bütün sesler gerçek kayıtlardan üretilir (Freesound.org, yalnız CC0 ve CC BY: ticari kullanıma açık).
 Çıktı `public/sounds/*.mp3` + `manifest.json` + `CREDITS.txt` ve `src/audio/credits.ts` (oyundaki künye listesi).

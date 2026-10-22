@@ -13,7 +13,7 @@ import { techName } from './research';
 import { groundLevel } from '../sim/terrain';
 import { PALETTE } from '../render/palette';
 import { onSettingsChange, settings, type InfoField } from './settings';
-import { toggleFullscreen } from './fullscreen';
+import { fullscreenSupported, toggleFullscreen } from './fullscreen';
 import { sound } from '../audio/sound';
 import { $, bar, esc, fmtTime, hpColor, nf } from './dom';
 
@@ -65,6 +65,7 @@ export class Hud {
     this.researchChip.addEventListener('click', () => game.modals.open('research'));
     this.renderSoundButton();
     onSettingsChange(() => this.renderSoundButton());
+    document.querySelector('.fs-btn')?.classList.toggle('hidden', !fullscreenSupported());
     // Alt çubuktaki inşa ve haritadan seçim düğmeleri (klavyesiz kullanım: R, Esc yerine)
     this.hint.addEventListener('click', (e) => {
       const act = (e.target as HTMLElement).closest<HTMLElement>('[data-hint]')?.dataset.hint;

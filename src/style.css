@@ -122,6 +122,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
   letter-spacing: 0.3px;
 }
 .brand span { font-weight: 600; color: var(--muted); font-size: calc(12px * var(--ui)); margin-left: calc(8px * var(--ui)); }
+.brand span:empty { display: none; }
 .timebar, .top-actions {
   display: flex;
   gap: calc(4px * var(--ui));
@@ -760,7 +761,6 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 }
 .mm-top { position: absolute; top: calc(18px * var(--ui)); left: calc(24px * var(--ui)); right: calc(24px * var(--ui)); display: flex; align-items: center; justify-content: space-between; }
 .mm-brand { font-size: calc(26px * var(--ui)); font-weight: 800; letter-spacing: 0.4px; color: var(--ink); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
-.mm-brand span { font-size: calc(13px * var(--ui)); font-weight: 700; color: var(--muted); margin-left: calc(10px * var(--ui)); letter-spacing: 1.2px; text-transform: uppercase; }
 .mm-acc { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
 .mm-login { background: var(--panel); box-shadow: var(--shadow); padding: calc(9px * var(--ui)) calc(16px * var(--ui)); border-radius: calc(12px * var(--ui)); }
 .mm-user { font-size: calc(13px * var(--ui)); background: var(--panel); box-shadow: var(--shadow); padding: calc(7px * var(--ui)) calc(14px * var(--ui)); border-radius: calc(12px * var(--ui)); font-weight: 800; display: inline-flex; align-items: center; gap: calc(7px * var(--ui)); }
@@ -994,10 +994,7 @@ button.danger:hover { background: #ecc7bf; }
   .mm-map { justify-self: center; }
   .mm-row { flex-direction: column; }
 }
-/* Küçük telefonda (667 px yatay) üst çubuk sığsın: alt başlık gizli, uzun hesap adı kısalır */
-@media (max-width: 720px) {
-  .mm-brand span { display: none; }
-}
+/* Küçük telefonda (667 px yatay) üst çubuk sığsın: uzun hesap adı kısalır */
 .mm-acc { min-width: 0; }
 .mm-user { min-width: 0; max-width: calc(170px * var(--ui)); }
 .mm-user b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

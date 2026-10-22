@@ -37,7 +37,7 @@ export const NEWS: NewsItem[] = [
     sections: [
       {
         text: [
-          'WarSim artık sesli ve seslerin hepsi gerçek kayıt: hava gösterilerinde uçan savaş uçakları, atış alanları, top atışları ve gerçek bir hava saldırısı sireni. Yakınlaştıkça savaşın içine girersin; uzaklaştıkça çatışma uzaktan, boğuk ve yankılı duyulur, strateji görünümünde harita sessizleşir. Önemli olaylar ise kamera nerede olursa olsun duyulur.',
+          'WarSimBox artık sesli ve seslerin hepsi gerçek kayıt: hava gösterilerinde uçan savaş uçakları, atış alanları, top atışları ve gerçek bir hava saldırısı sireni. Yakınlaştıkça savaşın içine girersin; uzaklaştıkça çatışma uzaktan, boğuk ve yankılı duyulur, strateji görünümünde harita sessizleşir. Önemli olaylar ise kamera nerede olursa olsun duyulur.',
         ],
       },
       {
@@ -88,7 +88,7 @@ export const NEWS: NewsItem[] = [
     sections: [
       {
         text: [
-          'WarSim artık telefonda da oynanıyor. Telefonu yan çevir: üst çubuk sıkışık düzene geçer, yan paneller kapalı başlar ve bir şey seçince ilgili panel açılır.',
+          'WarSimBox artık telefonda da oynanıyor. Telefonu yan çevir: üst çubuk sıkışık düzene geçer, yan paneller kapalı başlar ve bir şey seçince ilgili panel açılır.',
         ],
       },
       {

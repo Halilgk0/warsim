@@ -314,7 +314,7 @@ for (const c of credits) if (!/^(CC0 1\.0|CC BY [\d.]+)$/.test(c.license)) throw
 if (!only) {
   writeFileSync(`${OUT}/manifest.json`, JSON.stringify(manifest, null, 1));
   const lines = credits.map((c) => `"${c.title}" — ${c.user} — ${c.license} — ${c.url}`);
-  writeFileSync(`${OUT}/CREDITS.txt`, `WarSim ses kayıtları (Freesound.org)\n\n${lines.join('\n')}\n`);
+  writeFileSync(`${OUT}/CREDITS.txt`, `WarSimBox ses kayıtları (Freesound.org)\n\n${lines.join('\n')}\n`);
   const ts = credits.map((c) => `  { title: ${JSON.stringify(c.title)}, user: ${JSON.stringify(c.user)}, license: ${JSON.stringify(c.license)}, url: ${JSON.stringify(c.url)} },`).join('\n');
   writeFileSync('../../src/audio/credits.ts', `// Ses kayıtlarının künyesi (Freesound.org; lisanslar sayfalarından doğrulandı). tools/sfx/build.mjs üretir.
 

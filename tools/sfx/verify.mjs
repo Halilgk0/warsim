@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const sources = JSON.parse(readFileSync('sources.json', 'utf8'));
 let bad = 0;
 for (const [id, s] of Object.entries(sources)) {
-  const html = await (await fetch(s.url, { headers: { 'User-Agent': 'Mozilla/5.0 (WarSim sound build)' } })).text();
+  const html = await (await fetch(s.url, { headers: { 'User-Agent': 'Mozilla/5.0 (WarSimBox sound build)' } })).text();
   const m = html.match(/creativecommons\.org\/(licenses|publicdomain)\/([a-z-]+)\/([\d.]+)\//);
   const code = m ? `${m[2]}/${m[3]}` : '?';
   const name = code === 'zero/1.0' ? 'CC0 1.0' : code.startsWith('by/') ? `CC BY ${m[3]}` : code;

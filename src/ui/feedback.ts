@@ -1,11 +1,17 @@
 // Geri bildirim penceresi: görüş ve öneri, "Ben bu oyuna Steam'de _ $ veririm" ve gönderen adı (zorunlu; hesap gerekmez).
-// Alıcı adres derlemede VITE_FEEDBACK_URL ile verilir (JSON POST). Verilmemişse ya da gönderim başarısızsa
-// geri bildirim bu cihazda saklanır (warsim.feedback.v1).
+// Gönderilen geri bildirim geliştiricinin Google Formu'na gider (oyuncu formu görmez; yanıtlar formun "Yanıtlar"
+// sekmesinde). Gönderilemezse bu cihazda saklanır (warsim.feedback.v1) ve oyun bir sonraki açılışta yeniden dener.
 
 import { NAME_MAX } from '../persist';
 import { $, esc } from './dom';
 
-const ENDPOINT = (import.meta.env.VITE_FEEDBACK_URL as string | undefined) ?? '';
+/** Google Formu: yanıt adresi ve soruların alan kimlikleri (formun sayfasından). */
+const FORM = {
+  action: 'https://docs.google.com/forms/d/e/1FAIpQLSd0aiDv4VFn00-Qzycad3bG4pObjaSC1gV0Cyt0Cu2rW-IiBQ/formResponse',
+  name: 'entry.1906610939',
+  message: 'entry.1709181954',
+  price: 'entry.625710882',
+};
 const OUTBOX_KEY = 'warsim.feedback.v1';
 const MESSAGE_MAX = 2000;
 
@@ -17,14 +23,50 @@ interface FeedbackEntry {
   sentAt: string;
 }
 
-function keepLocally(e: FeedbackEntry): void {
+/**
+ * Forma gönder. Google başka siteden gelen isteğin cevabını göstermez (no-cors): ağ hatası olmadıysa ulaştı sayılır.
+ */
+async function post(e: FeedbackEntry): Promise<void> {
+  const body = new URLSearchParams({
+    [FORM.name]: e.name,
+    [FORM.message]: e.message,
+    [FORM.price]: e.price === null ? '' : String(e.price),
+  });
+  await fetch(FORM.action, { method: 'POST', mode: 'no-cors', body });
+}
+
+function readOutbox(): FeedbackEntry[] {
   try {
-    const list = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as FeedbackEntry[];
-    list.push(e);
-    localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-50)));
+    return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as FeedbackEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function writeOutbox(list: FeedbackEntry[]): void {
+  try {
+    if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-50)));
+    else localStorage.removeItem(OUTBOX_KEY);
   } catch {
     // Depolama kapalıysa yapacak bir şey yok
   }
+}
+
+function keepLocally(e: FeedbackEntry): void {
+  writeOutbox([...readOutbox(), e]);
+}
+
+/** Önceden gönderilemeyip saklananları sessizce yeniden gönder (gidemeyen kalır). */
+async function flushOutbox(): Promise<void> {
+  const left: FeedbackEntry[] = [];
+  for (const e of readOutbox()) {
+    try {
+      await post(e);
+    } catch {
+      left.push(e);
+    }
+  }
+  writeOutbox(left);
 }
 
 export class FeedbackBox {
@@ -69,6 +111,8 @@ export class FeedbackBox {
       else if (e.key === 'Enter' && (e.target as HTMLElement).matches('input')) void this.send();
       e.stopPropagation();
     });
+    // Önceki oturumda gönderilemeyenler
+    if (navigator.onLine !== false) void flushOutbox();
   }
 
   /** defaultName: hesap ya da komutan adı (boş alanı doldurmak için). */
@@ -101,22 +145,12 @@ export class FeedbackBox {
       return;
     }
     const entry: FeedbackEntry = { name: name.slice(0, NAME_MAX * 2), message: message.slice(0, MESSAGE_MAX), price, sentAt: new Date().toISOString() };
-    if (!ENDPOINT) {
-      keepLocally(entry);
-      this.done = 'Teşekkürler! Geri bildirimin kaydedildi.';
-      this.render();
-      return;
-    }
     this.sending = true;
     this.render();
     try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ game: 'WarSim', ...entry }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
+      await post(entry);
       this.done = 'Teşekkürler! Geri bildirimin bize ulaştı.';
+      void flushOutbox();
     } catch {
       keepLocally(entry);
       this.error = 'Şu an gönderilemedi; bu cihazda saklandı. Biraz sonra yeniden dene.';

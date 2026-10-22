@@ -2,7 +2,7 @@
   "name": "warsim-sfx",
   "private": true,
   "type": "module",
-  "description": "WarSim seslerini gerçek kayıtlardan üretir (ffmpeg gerekir; oyunun kendisi bu klasöre bağlı değildir).",
+  "description": "WarSimBox seslerini gerçek kayıtlardan üretir (ffmpeg gerekir; oyunun kendisi bu klasöre bağlı değildir).",
   "scripts": {
     "fetch": "node fetch.mjs",
     "build": "node build.mjs",

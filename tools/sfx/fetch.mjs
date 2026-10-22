@@ -8,7 +8,7 @@ let i = 0;
 async function worker() {
   while (i < ids.length) {
     const id = ids[i++];
-    const r = await fetch(sources[id].ogg, { headers: { 'User-Agent': 'Mozilla/5.0 (WarSim sound build)' } });
+    const r = await fetch(sources[id].ogg, { headers: { 'User-Agent': 'Mozilla/5.0 (WarSimBox sound build)' } });
     if (!r.ok) { console.log('indirilemedi', id, r.status); continue; }
     writeFileSync(`raw/${id}.ogg`, Buffer.from(await r.arrayBuffer()));
     console.log('ok', id, sources[id].title);
