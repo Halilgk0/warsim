@@ -29,11 +29,16 @@ import { NewsView } from './ui/news';
 import { FeedbackBox } from './ui/feedback';
 import { isFullscreen, onFullscreenChange } from './ui/fullscreen';
 import { $, fmtTime } from './ui/dom';
+import { sound } from './audio/sound';
+import { BattleSound } from './audio/battle';
+import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
 
 const STEP = 1 / 60;
 /** Otomatik kayıt aralığı (gerçek zaman, oyun akarken). */
 const AUTOSAVE_SEC = 300;
+/** Sekme arka plana geçince kayıt: son kayıttan bu kadar oyun saniyesi geçmişse. */
+const HIDE_SAVE_MIN = 30;
 
 export type Interaction =
   | { mode: 'none' }
@@ -58,6 +63,11 @@ export class Game {
   readonly pause: PauseMenu;
   /** Harekât sonu (zafer / yenilgi) ve son üs geri sayımı. */
   readonly end: EndScreen;
+  /** Savaş sesleri (yakınlaştıkça) ve oyuncuya uyarılar. */
+  private readonly battle = new BattleSound();
+  private readonly alerts = new AlertSound();
+  /** Kameranın takip ettiği uçak (motor seslerinde Doppler dinleyicisi). */
+  private followId: number | null = null;
   /** Ana menü ya da oyun. */
   mode: 'menu' | 'play' = 'menu';
   /** Son kayıt (gerçek zaman, oyun zamanı, tür). */
@@ -93,6 +103,8 @@ export class Game {
       this.menu.render();
     });
     this.bindKeys();
+    this.bindPageLifecycle();
+    sound.install();
     this.showMainMenu();
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');
@@ -217,6 +229,7 @@ export class Game {
   private attachWorld(w: World, scenarioId: string): void {
     this.scenarioId = scenarioId;
     this.world = w;
+    this.battle.reset();
     this.renderer.setWorld(w);
     this.hangar.hasAircraft = (id) => !aircraftNode(id) || this.world.teams[this.playerTeam].research.hasAircraft(id);
     this.hangar.research = () => this.world.teams[this.playerTeam]?.research ?? null;
@@ -394,6 +407,7 @@ export class Game {
   }
 
   follow(id: number): void {
+    this.followId = id;
     const rig = this.renderer.rig;
     rig.followFn = () => {
       const a = this.world.aircraftById(id);
@@ -469,9 +483,17 @@ export class Game {
   /** İnşa: hayaletin durduğu yere kur (tıklama ya da "Yerleştir"). */
   placeBuild(): void {
     const it = this.interaction;
-    if (it.mode !== 'build' || !it.ok) return;
+    if (it.mode !== 'build') return;
+    if (!it.ok) {
+      sound.play('error', 'ui');
+      return;
+    }
     const s = this.world.placeStructure(this.playerTeam, it.kind, it.x, it.z, it.heading);
-    if (!s) return;
+    if (!s) {
+      sound.play('error', 'ui');
+      return;
+    }
+    sound.play('place', 'ui');
     // Şehir binaları art arda yerleştirilir (Esc ya da sağ tık bitirir)
     if (s.def.category === 'city') {
       this.refreshBuild();
@@ -551,6 +573,7 @@ export class Game {
         case 'KeyT': this.modals.open('research'); break;
         case 'KeyV': this.modals.open('settings'); break;
         case 'KeyM': this.modals.open('market'); break;
+        case 'KeyN': sound.toggleMute(); break;
         case 'KeyP': {
           const s = this.selectedStructure;
           if (s?.airbase && s.team === this.playerTeam) this.planner.open(s.airbase);
@@ -578,6 +601,23 @@ export class Game {
     });
   }
 
+  /**
+   * Telefonda uygulama değiştirince ya da ekran kilitlenince tarayıcı sekmeyi her an kapatabilir: arka plana geçerken
+   * otomatik kayıt al. Kaydedilmemiş ilerlemeyle sayfa kapatılırken tarayıcı onay sorar.
+   */
+  private bindPageLifecycle(): void {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden' || this.mode !== 'play' || !currentAccount()) return;
+      if (this.lastSave && this.world.time - this.lastSave.gameTime < HIDE_SAVE_MIN) return;
+      void this.saveNow('auto', `Otomatik · ${this.defaultSaveTitle()}`);
+    });
+    window.addEventListener('beforeunload', (e) => {
+      if (this.mode !== 'play' || !this.unsavedProgress()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+  }
+
   private loop = (now: number): void => {
     const real = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
@@ -590,9 +630,14 @@ export class Game {
       steps++;
     }
     if (steps >= maxSteps) this.acc = 0;
+    // Sesler render'dan önce: dünya olaylarını render tüketip siler
+    const rig = this.renderer.rig;
+    const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
+    const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
+    this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, this.timeScale, listener, (ac) => this.renderer.isVisible(ac));
+    if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
     if (this.mode === 'menu') {
       // Arka plan: harita yavaşça döner; oyun arayüzü gizli
-      const rig = this.renderer.rig;
       rig.yaw += real * 0.025;
       this.renderer.frame(real, Math.min(this.acc / STEP, 1));
       requestAnimationFrame(this.loop);

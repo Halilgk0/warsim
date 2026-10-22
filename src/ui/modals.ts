@@ -1,8 +1,9 @@
-// Pencereler: senaryolar, araştırma ağacı, hazine ve pazar, görünüm ayarları.
+// Pencereler: senaryolar, araştırma ağacı, hazine ve pazar, ayarlar (ses, görünüm).
 
 import type { Game } from '../game';
 import { SCENARIOS, SCENARIO_GROUPS, type ScenarioGroup } from '../sim/scenarios';
-import { INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, saveSettings, settings } from './settings';
+import { INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, SOUND_LEVELS, onSettingsChange, saveSettings, settings, type SoundLevel } from './settings';
+import { sound } from '../audio/sound';
 import { defaultSelection, researchBody, stageOf, type ResearchStage, type ResearchTab } from './research';
 import { TECH_BY_ID } from '../sim/tech';
 import { marketBody, sellCandidate } from './market';
@@ -30,6 +31,19 @@ export class Modals {
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
     this.el.addEventListener('change', (e) => this.onChange(e));
+    // N tuşu ya da üst çubuktaki hoparlör: açık penceredeki "Sessiz" kutusu da değişsin
+    onSettingsChange(() => {
+      const cb = this.el.querySelector<HTMLInputElement>('input[data-set="muted"]');
+      if (cb) cb.checked = settings.sound.muted;
+    });
+    // Ses düzeyi sürüklerken hemen duyulur (kayıt bırakınca)
+    this.el.addEventListener('input', (e) => {
+      const el = e.target as HTMLInputElement;
+      if (el.dataset.set !== 'sound') return;
+      sound.setLevel(el.dataset.k as SoundLevel, Number(el.value));
+      const out = el.nextElementSibling;
+      if (out) out.textContent = String(Math.round(Number(el.value) * 100));
+    });
     this.el.addEventListener('scroll', () => (this.lastScroll = performance.now()), true);
   }
 
@@ -79,7 +93,7 @@ export class Modals {
       title = 'Araştırma';
       body = this.research();
     } else if (this.kind === 'settings') {
-      title = 'Görünüm ayarları';
+      title = 'Ayarlar';
       body = this.settingsBody();
     } else if (this.kind === 'market') {
       title = 'Hazine ve pazar';
@@ -126,8 +140,18 @@ export class Modals {
       `<label class="check"><input type="checkbox" data-set="info" data-k="${f.id}" ${settings.info[f.id] ? 'checked' : ''}> ${f.name}</label>`).join('');
     const log = LOG_CATEGORIES.map((c) =>
       `<label class="check"><input type="checkbox" data-set="log" data-k="${c.id}" ${settings.log[c.id] ? 'checked' : ''}> ${c.name}</label>`).join('');
+    const snd = SOUND_LEVELS.map((l) => `<div class="snd-row" ${l.desc ? `title="${l.desc}"` : ''}>
+        <span>${l.name}</span>
+        <input type="range" min="0" max="1" step="0.05" value="${settings.sound[l.id]}" data-set="sound" data-k="${l.id}">
+        <b>${Math.round(settings.sound[l.id] * 100)}</b>
+      </div>`).join('');
     return `
       <div class="set-grid">
+        <div><h3>Ses</h3>
+          <label class="check"><input type="checkbox" data-set="muted" ${settings.sound.muted ? 'checked' : ''}> Sessiz <span class="muted small">— N tuşu ya da üst çubuktaki hoparlör</span></label>
+          ${snd}
+          <p class="muted small">Savaş sesleri kamera yaklaştıkça duyulur; uyarılar her zaman. Telefonda sessiz düğmesi açıksa ses gelmeyebilir. Seslerin hepsi gerçek kayıt; künyesi Haberler → “Sesler geldi”de.</p>
+        </div>
         <div><h3>Harita</h3>${map}
           <div class="form-row"><span>Radar kapsama yüksekliği</span><select data-set="radarAgl">${[100, 200, 300, 600, 1500, 3000].map((v) =>
             `<option value="${v}" ${v === settings.radarAgl ? 'selected' : ''}>${v} m</option>`).join('')}</select></div>
@@ -231,6 +255,17 @@ export class Modals {
     else if (set === 'log') settings.log[k as keyof typeof settings.log] = (el as HTMLInputElement).checked;
     else if (set === 'radarAgl') settings.radarAgl = Number(el.value);
     else if (set === 'tracerScale') settings.tracerScale = Number(el.value);
+    else if (set === 'muted') settings.sound.muted = (el as HTMLInputElement).checked;
+    else if (set === 'sound') {
+      const id = k as SoundLevel;
+      settings.sound[id] = Number(el.value);
+      saveSettings();
+      // Örnek: arayüzde tıklama, savaşta uzak flak patlaması (oyun duraklatılmışsa duyulmaz), diğerlerinde daktilo zili
+      if (id === 'ui') sound.play('tap', 'ui');
+      else if (id === 'world') sound.play('flak', 'world', { gain: 0.5, lowpass: 3000 });
+      else sound.play('typewriter', 'alerts');
+      return;
+    }
     saveSettings();
   }
 }

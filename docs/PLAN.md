@@ -438,9 +438,10 @@ src/
 - **Hesap:** sağ üstte giriş; yalnız bir ad (şifre yok), aynı adla tekrar girilir (büyük/küçük harf fark etmez). Hesaplar
   tarayıcıda (localStorage), kayıtlar IndexedDB'de. Misafir oyun kaydedilmez, kapanınca silinir; oyun ortasında
   duraklatma menüsünden giriş yapılıp kaydedilebilir.
-- **Duraklatma menüsü** (Esc / ☰ Menü): devam, adlandırılmış elle kayıt, kayıtlar (yükle/sil), görünüm ayarları, ana
+- **Duraklatma menüsü** (Esc / ☰ Menü): devam, adlandırılmış elle kayıt, kayıtlar (yükle/sil), ayarlar (ses, görünüm), ana
   menüye dön (kaydedilmemiş ilerleme varsa sorar). **Otomatik kayıt** oyun akarken her 5 dakikada (gerçek zaman),
-  en yeni 3 otomatik kayıt tutulur.
+  en yeni 3 otomatik kayıt tutulur. Sekme arka plana geçince de (telefonda uygulama değiştirme, ekran kilidi) son
+  kayıttan 30 oyun saniyesi geçmişse otomatik kayıt alınır; kaydedilmemiş ilerlemeyle sayfa kapatılırken tarayıcı sorar.
 - **Kaydedilenler:** zaman, taraflar (araştırma, kasa, defter, personel), tüm yapılar (inşaat, hasar, hangar, tesisler,
   batarya silahları, fabrika sırası, maden verimi), yapay zekâ zamanlayıcıları, pazar, olay günlüğü, kamera. Havadaki
   uçaklar kayıtta üslerine dönmüş sayılır (hangarda bakımda); mermi, bomba, paraşüt saklanmaz. Arazi düzleştirmeleri
@@ -465,6 +466,36 @@ src/
 - Arazi örtüsü: ormanlar (uzakta koyu yeşil leke, yakında 3B ağaç; yükseldikçe iğne yapraklı), ovalarda tarla parselleri,
   dik yamaçta kaya rengi ve kaya kümeleri, şehir zemini. Yollar geçitlerden kıvrılarak şehirleri ve üsleri bağlar; yol
   boyunca köyler, tarlalarda çiftlikler. Kurulan yapıların tabanı ağaç ve evlerden temizlenir. Görünüm ayarlarından kapatılabilir.
+
+## Ses
+
+- **Bütün sesler gerçek kayıt** (Freesound.org; yalnız CC0 ve CC BY, ticari kullanıma açık; künye oyunda Haberler →
+  "Sesler geldi"). `tools/sfx` ham kayıtları indirir ve oyun seslerini üretir (54 kısa MP3, ≈2,3 MB, `public/sounds`).
+  İlk sentezlenmiş sesler yapay bulundu ("eski 2D oyun gibi"), kayıtlarla değiştirildi. NC lisanslı kayıtlar elendi.
+- Tarayıcı ilk dokunuştan önce ses çalmaz: bağlam ilk dokunuş ya da tuşta kurulur, kayıtlar önem sırasıyla arka planda
+  yüklenir (arayüz ve uyarılar önce). MP3 çözücüsünün başa eklediği sessizlik döngülerde atlanır. Sekme gizlenince durur.
+- Üç kanal ve düzeyleri Ayarlar → Ses'te (genel, savaş, uyarılar, arayüz), sessiz: üst çubuktaki hoparlör ya da N.
+  Çıkışta sıkıştırıcı (aynı anda çok patlamada bozulma olmaz).
+- **Savaş sesleri** (`battle.ts`): dinleyici kamera; uzaklık oyun için sıkıştırılır (bakış uzaklığı ≈150 m sayılır):
+  takipte gerçeğe yakın, taktik görünümde uzaktan, boğuk ve yankılı, 70 km'den uzakta susar. Sağ-sol yön kameraya göre,
+  uzak patlamanın sesi ışığından biraz sonra gelir (en çok 0,6 sn), açık hava yankısı.
+  - Motorlar (en yakın 6, tipe göre döngü): sıra motor Bf 109E DB 601 yer çalıştırması, yıldız Fw 190A BMW 801,
+    çok motorlu dört motorlu pervaneli, jet J79. Devir gaza göre, perde Doppler'le kayar (takip edilen uçak dinleyiciyle
+    birlikte gider). Hasarlı motor tekler, duran motor susar. Ju 87 B dalışta siren (gerçek siren kaydı, hızla tizleşir).
+  - Yakın geçiş: kameraya en yakın geleceği an ve uzaklık hesaplanır; yakından geçecekse tipine göre gerçek geçiş kaydı
+    (Spitfire, Bf 109, P-47, Fw 190, Lancaster, jet), kaydın en gürültülü anı o ana denk gelecek şekilde, sağ-sol kayarak
+    çalar; o sırada motor döngüsü kısılır. Yalnız yakın planda ve en çok 2× zamanda.
+  - Silahlar: kalibre ve namlu sayısına göre seri döngüsü (tüfek çapı Maxim, 12,7 mm .50 BMG, 20 mm Lahti L-39, 30 mm
+    25 mm otomatik toptan pes; gerçek atışlar gerçek ateş hızında üst üste), seri bitince yankı; taretler; uçaksavarda
+    12,7 / 20 mm seri, dörtlü 20 mm, 37–40 mm tek tek, 88–128 mm gerçek top atışı.
+  - Olaylar: havada şarapnel (havai fişek kabuğu), infilak, yakın ve uzak bomba / çakılma, yakında metal isabet, roket,
+    yapı yıkılması. Duraklatınca ve ana menüde savaş kanalı kapanır; 8× ve üstünde biraz kısılır.
+- **Uyarılar** (`alerts.ts`, kamera nerede olursa olsun): düşman yapılarımıza 35 km'den yakın görülünce gerçek hava
+  saldırısı sireni (Prag; en çok 2 dakikada bir) ve son üs gidince; yapı vurulunca elle çevrilen yangın zili (25 sn'de
+  bir); yapı yıkılınca uzaktan patlama (kamera yakındaysa savaş sesi zaten çalar); araştırma raporu daktilo zili, uçak
+  teslimi ve inşaat bitince daha pes zil; görev raporu telsizden Mors; zaferde süvari hücumu borazanı, yenilgide trompetle
+  "Taps". Yüklenen oyunun eski olayları çalmaz.
+- Arayüz: şalter tıklaması (birincil düğmede tok), yerleştirme "güm"ü, yerleştirilemeyen yerde çift tık.
 
 ## Araştırma ekranı
 
@@ -503,6 +534,8 @@ src/
       P-38J, F6F-5, Lancaster, Mosquito, He 162, F-80C, Vampire, Ar 234, Il-28). Yüksek ve hızlı jet bombardıman
       uçakları bombayı geç bırakıyordu (sabit 9 km bırakış sınırı; 10 km'den atılan bomba ~10 km ileri gider): sınır artık
       tahmini atım mesafesine göre büyüyor.
+- [x] **Faz 2.4** — sesler (gerçek kayıtlar): motor (tipe göre, Doppler), yakın geçiş, kalibreye göre silahlar, uçaksavar, patlamalar, Ju 87 B
+      sireni; hava saldırısı sireni, üs alarmı, çanlar, görev sonucu, zafer/yenilgi borazanı; ses ayarları ve sessiz düğmesi.
 - [ ] **Faz 5 — Kampanya**: havadaki görevlerin de kaydı, ülke yapay zekâsı (ittifaklar), ülkeye özel ağaçlar
 
 ## Ayar notları

@@ -2,11 +2,14 @@
 // bir habere tıklayınca ayrıntı sayfası (metin ve diğer görseller). Görseller public/news altında.
 
 import { $, esc } from './dom';
+import { SOUND_CREDITS } from '../audio/credits';
 
 interface NewsSection {
   heading?: string;
   text?: string[];
   bullets?: string[];
+  /** Bağlantılı liste (yeni sekmede açılır): kaynak künyeleri. */
+  links?: { text: string; href: string }[];
 }
 
 export interface NewsItem {
@@ -24,6 +27,57 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 
 /** En yeni en üstte. */
 export const NEWS: NewsItem[] = [
+  {
+    id: 'sesler',
+    date: '2026-10-22',
+    title: 'Sesler geldi',
+    summary: 'Gerçek kayıtlar: savaş uçağı motorları, makineli ve toplar, flak, patlamalar, hava saldırısı sireni.',
+    cover: img('sesler.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'WarSim artık sesli ve seslerin hepsi gerçek kayıt: hava gösterilerinde uçan savaş uçakları, atış alanları, top atışları ve gerçek bir hava saldırısı sireni. Yakınlaştıkça savaşın içine girersin; uzaklaştıkça çatışma uzaktan, boğuk ve yankılı duyulur, strateji görünümünde harita sessizleşir. Önemli olaylar ise kamera nerede olursa olsun duyulur.',
+        ],
+      },
+      {
+        heading: 'Uçaklar',
+        bullets: [
+          'Sıra motorlular Bf 109E’nin Daimler-Benz DB 601’i, yıldız motorlular Fw 190A’nın BMW 801’i, çok motorlular dört motorlu bir pervaneli uçak, jetler J79 turbojeti ile duyulur; devir gaza göre değişir, perde Doppler’le kayar.',
+          'Yanından bir uçak geçerken tipine göre gerçek geçiş kaydı çalar: Spitfire, Bf 109, P-47, Fw 190, Lancaster, jet.',
+          'Ju 87 B dalışa geçince sireni öter, hızlandıkça tizleşir.',
+        ],
+      },
+      {
+        heading: 'Silahlar ve patlamalar',
+        bullets: [
+          'Silahlar kalibreye ve namlu sayısına göre: tüfek çaplı makineliler İkinci Dünya Savaşı Maxim’inden, 12,7 mm .50 BMG atışlarından, 20 mm Lahti L-39’dan; atışlar gerçek ateş hızında dizilir, seri bitince yankısı duyulur.',
+          'Uçaksavarda 37–40 mm “pom-pom”, 88–128 mm ağır top; havada patlayan şarapnel.',
+          'Yakın ve uzak bomba patlamaları ayrı; uzaktaki patlamanın sesi ışığından biraz sonra gelir.',
+        ],
+      },
+      {
+        heading: 'Uyarılar',
+        bullets: [
+          'Düşman uçakları bölgene yaklaşınca hava saldırısı sireni çalar, yapın vurulunca elle çevrilen yangın zili.',
+          'Araştırma raporu daktilo ziliyle, görev raporu telsizden Mors’la gelir; zaferde süvari hücumu borazanı, yenilgide “Taps”.',
+        ],
+      },
+      {
+        heading: 'Ayarlar',
+        bullets: [
+          'Sağ üstteki hoparlör (ya da N tuşu) sesi kapatıp açar.',
+          'Ayarlar → Ses: genel ses, savaş sesleri, uyarılar ve arayüz ayrı ayrı ayarlanır.',
+          'Telefonda ses gelmiyorsa telefonun sessiz düğmesine bak.',
+        ],
+      },
+      {
+        heading: 'Ses kayıtları',
+        text: ['Kayıtlar Freesound.org’dan; hepsi ticari kullanıma açık (CC0 ya da CC BY). Kaydedenlere teşekkürler:'],
+        links: SOUND_CREDITS.map((c) => ({ text: `${c.title.replace(/\.(wav|mp3|flac|aif|ogg)$/i, '')} — ${c.user} (${c.license})`, href: c.url })),
+      },
+    ],
+  },
   {
     id: 'telefonda-oyna',
     date: '2026-10-21',
@@ -357,7 +411,8 @@ export class NewsView {
     const sec = n.sections.map((s) => `
       ${s.heading ? `<h3>${esc(s.heading)}</h3>` : ''}
       ${(s.text ?? []).map((p) => `<p>${esc(p)}</p>`).join('')}
-      ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}`).join('');
+      ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+      ${s.links ? `<ul class="news-links">${s.links.map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}`).join('');
     const gallery = n.images.map((g) => `<figure><img src="${g.src}" alt="" loading="lazy"><figcaption>${esc(g.caption)}</figcaption></figure>`).join('');
     return `<div class="news-head"><button class="news-back" data-nw="back">‹ Haberler</button><button class="icon" data-nw="close" title="Kapat (Esc)">✕</button></div>
       <article class="news-article">

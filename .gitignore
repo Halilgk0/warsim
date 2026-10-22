@@ -3,3 +3,5 @@ dist
 *.log
 .playwright-mcp
 tools/sim/.out
+tools/sfx/raw
+tools/sfx/node_modules

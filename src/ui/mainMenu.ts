@@ -152,9 +152,10 @@ export class MainMenu {
     if (!this.isOpen) return;
     const acc = currentAccount();
     const fs = `<button class="mm-login" data-mm="fullscreen" title="Tam ekran">${isFullscreen() ? 'Tam ekrandan çık' : '⛶ Tam ekran'}</button>`;
-    const newsBtn = '<button class="mm-login mm-news-btn" data-mm="news">Haberler</button>';
+    // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
+    const newsBtn = '<button class="mm-login mm-news-btn" data-mm="news">Haberler</button><button class="mm-login mm-fb-btn" data-mm="feedback">Geri bildirim</button>';
     const top = acc
-      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user"><i></i>${esc(acc.name)}</span><button class="mini" data-mm="logout">Çıkış yap</button></div>`
+      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" title="${esc(acc.name)}"><i></i><b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">Çıkış yap</button></div>`
       : `<div class="mm-acc">${newsBtn}${fs}<button class="mm-login" data-mm="login">Giriş yap</button></div>`;
     const foes = TEAM_SITES.slice(1, this.enemies + 1)
       .map((t) => `<span class="mm-foe"><i style="background:${t.color}"></i>${t.name}</span>`).join('');

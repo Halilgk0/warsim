@@ -12,8 +12,9 @@ import { fmtMoney } from '../sim/economy';
 import { techName } from './research';
 import { groundLevel } from '../sim/terrain';
 import { PALETTE } from '../render/palette';
-import { settings, type InfoField } from './settings';
+import { onSettingsChange, settings, type InfoField } from './settings';
 import { toggleFullscreen } from './fullscreen';
+import { sound } from '../audio/sound';
 import { $, bar, esc, fmtTime, hpColor, nf } from './dom';
 
 export function skillName(skill: number): string {
@@ -56,11 +57,14 @@ export class Hud {
       const what = b.dataset.open!;
       if (what === 'hangar') game.hangar.toggle();
       else if (what === 'fullscreen') toggleFullscreen();
+      else if (what === 'sound') sound.toggleMute();
       else if (what === 'build') game.build.toggle();
       else if (what === 'pause') game.pause.open();
       else game.modals.open(what as 'scenarios' | 'research' | 'settings' | 'market');
     });
     this.researchChip.addEventListener('click', () => game.modals.open('research'));
+    this.renderSoundButton();
+    onSettingsChange(() => this.renderSoundButton());
     // Alt çubuktaki inşa ve haritadan seçim düğmeleri (klavyesiz kullanım: R, Esc yerine)
     this.hint.addEventListener('click', (e) => {
       const act = (e.target as HTMLElement).closest<HTMLElement>('[data-hint]')?.dataset.hint;
@@ -93,6 +97,17 @@ export class Hud {
       } else game.selectFlight(fl);
       this.lastMissionKey = '';
     });
+  }
+
+  /** Üst çubuktaki ses düğmesi: hoparlör, sessizde çarpı. */
+  private renderSoundButton(): void {
+    const b = document.querySelector<HTMLElement>('.snd-btn');
+    if (!b) return;
+    const muted = settings.sound.muted;
+    b.classList.toggle('muted', muted);
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5v5h3.6L12.5 19V5L7.6 9.5H4z"/>${muted
+      ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>'
+      : '<path d="M15.6 9a4.2 4.2 0 0 1 0 6"/><path d="M18.4 6.4a8 8 0 0 1 0 11.2"/>'}</svg>`;
   }
 
   onScenarioChanged(): void {
@@ -178,7 +193,7 @@ export class Hud {
         <div class="info-empty">
           <div class="info-title">Seçim yok</div>
           <p class="muted">Uçağa tıkla ya da <b>Tab</b> ile gez. Üsse tıklayıp <b>görev planla</b>.
-          <b>F</b> takip, <b>B</b> inşa, <b>T</b> araştırma, <b>V</b> görünüm ayarları.</p>
+          <b>F</b> takip, <b>B</b> inşa, <b>T</b> araştırma, <b>V</b> ayarlar, <b>N</b> ses.</p>
         </div>`;
       return;
     }

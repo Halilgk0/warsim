@@ -1,4 +1,4 @@
-// Duraklatma menüsü (Esc ya da ☰ Menü): devam, elle kayıt, kayıtlar, görünüm ayarları, ana menüye dönüş.
+// Duraklatma menüsü (Esc ya da ☰ Menü): devam, elle kayıt, kayıtlar, ayarlar (ses, görünüm), ana menüye dönüş.
 // Açıkken oyun durur; kapanınca önceki hıza döner.
 
 import type { Game } from '../game';
@@ -168,7 +168,7 @@ export class PauseMenu {
         <p class="muted small pm-last">${last}${auto}</p>
         <div class="pm-col">
           ${acc ? '<button data-pm="saves">Kayıtlar</button>' : ''}
-          <button data-pm="settings">Görünüm ayarları</button>
+          <button data-pm="settings">Ayarlar (ses, görünüm)</button>
           <button data-pm="feedback">Geri bildirim gönder</button>
           <button data-pm="exit">Ana menüye dön</button>
         </div>`;

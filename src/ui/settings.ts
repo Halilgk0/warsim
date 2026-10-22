@@ -1,4 +1,4 @@
-// Görünüm ayarları: haritada ne çizileceği, bilgi panelinde hangi değerlerin görüneceği, günlük filtreleri.
+// Ayarlar: ses düzeyleri, haritada ne çizileceği, bilgi panelinde hangi değerlerin görüneceği, günlük filtreleri.
 // Tarayıcıda saklanır (yalnız bu tarayıcıya özel tercih).
 
 import type { LogCategory } from '../sim/world';
@@ -58,7 +58,18 @@ export const LOG_CATEGORIES: { id: LogCategory; name: string }[] = [
   { id: 'info', name: 'Genel' },
 ];
 
+export type SoundLevel = 'master' | 'world' | 'alerts' | 'ui';
+
+export const SOUND_LEVELS: { id: SoundLevel; name: string; desc: string }[] = [
+  { id: 'master', name: 'Genel ses', desc: '' },
+  { id: 'world', name: 'Savaş sesleri', desc: 'Motor, silah, uçaksavar, patlama (yakınlaştıkça duyulur)' },
+  { id: 'alerts', name: 'Uyarılar', desc: 'Hava saldırısı sireni, üs alarmı, araştırma ve görev sonuçları' },
+  { id: 'ui', name: 'Arayüz', desc: 'Düğme tıklamaları' },
+];
+
 export interface Settings {
+  /** Ses düzeyleri (0..1) ve sessiz kip. */
+  sound: Record<SoundLevel, number> & { muted: boolean };
   map: Record<MapLayer, boolean>;
   info: Record<InfoField, boolean>;
   log: Record<LogCategory, boolean>;
@@ -76,6 +87,7 @@ function defaults(): Settings {
   map.fogOfWar = false;
   map.aaRanges = false;
   return {
+    sound: { master: 0.9, world: 0.9, alerts: 0.85, ui: 0.6, muted: false },
     map,
     info: Object.fromEntries(INFO_FIELDS.map((f) => [f.id, true])) as Record<InfoField, boolean>,
     log: Object.fromEntries(LOG_CATEGORIES.map((c) => [c.id, true])) as Record<LogCategory, boolean>,
@@ -91,6 +103,7 @@ function load(): Settings {
     if (!raw) return d;
     const s = JSON.parse(raw) as Partial<Settings>;
     return {
+      sound: { ...d.sound, ...(s.sound ?? {}) },
       map: { ...d.map, ...(s.map ?? {}) },
       info: { ...d.info, ...(s.info ?? {}) },
       log: { ...d.log, ...(s.log ?? {}) },

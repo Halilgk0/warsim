@@ -498,7 +498,14 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .scen { text-align: left; display: flex; flex-direction: column; gap: calc(3px * var(--ui)); padding: calc(10px * var(--ui)) calc(12px * var(--ui)); line-height: 1.3; }
 .scen small { font-weight: 600; color: var(--muted); font-size: calc(11.5px * var(--ui)); }
 .scen.active small { color: rgba(255, 255, 255, 0.88); }
-.set-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(20px * var(--ui)); }
+.set-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(20px * var(--ui)); }
+/* Ses: üst çubuktaki hoparlör düğmesi ve ayarlardaki düzey kaydırıcıları */
+.snd-btn svg { width: calc(17px * var(--ui)); height: calc(17px * var(--ui)); display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.snd-btn svg .spk { fill: currentColor; stroke-width: 1.2; }
+.snd-btn.muted { color: #a8473c; }
+.snd-row { display: grid; grid-template-columns: calc(92px * var(--ui)) 1fr calc(26px * var(--ui)); align-items: center; gap: calc(8px * var(--ui)); font-size: calc(12px * var(--ui)); margin: calc(7px * var(--ui)) 0; }
+.snd-row input { width: 100%; min-width: 0; }
+.snd-row b { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: calc(11.5px * var(--ui)); }
 .rcur { font-size: calc(13px * var(--ui)); padding: calc(10px * var(--ui)) calc(12px * var(--ui)); background: var(--accent-soft); border-radius: calc(12px * var(--ui)); margin-bottom: calc(8px * var(--ui)); }
 .rgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(16px * var(--ui)); }
 .rcol { display: flex; flex-direction: column; gap: calc(8px * var(--ui)); }
@@ -757,7 +764,7 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .mm-acc { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
 .mm-login { background: var(--panel); box-shadow: var(--shadow); padding: calc(9px * var(--ui)) calc(16px * var(--ui)); border-radius: calc(12px * var(--ui)); }
 .mm-user { font-size: calc(13px * var(--ui)); background: var(--panel); box-shadow: var(--shadow); padding: calc(7px * var(--ui)) calc(14px * var(--ui)); border-radius: calc(12px * var(--ui)); font-weight: 800; display: inline-flex; align-items: center; gap: calc(7px * var(--ui)); }
-.mm-user i { width: calc(8px * var(--ui)); height: calc(8px * var(--ui)); border-radius: 50%; background: var(--accent); }
+.mm-user i { width: calc(8px * var(--ui)); height: calc(8px * var(--ui)); border-radius: 50%; background: var(--accent); flex: none; }
 .mm-card {
   position: relative; width: min(calc(560px * var(--ui)), calc(100vw - calc(32px * var(--ui)))); max-height: calc(100vh - calc(120px * var(--ui))); overflow: auto;
   background: var(--panel); border-radius: calc(22px * var(--ui)); box-shadow: 0 18px 50px rgba(80, 70, 60, 0.18), 0 2px 6px rgba(80, 70, 60, 0.08);
@@ -817,17 +824,18 @@ button.danger:hover { background: #ecc7bf; }
 /* Ana menü: haber kutusu (sol üst) ve geri bildirim düğmesi (sağ) */
 .mm-news { position: absolute; top: calc(72px * var(--ui)); left: calc(24px * var(--ui)); width: clamp(calc(220px * var(--ui)), 22vw, calc(320px * var(--ui))); }
 .mm-news .mm-label { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8); }
-.mm-news-btn { display: none; }
+.mm-news-btn, .mm-fb-btn { display: none; }
 .mm-fb {
   /* transform ile ortalanmaz: basılınca button:active onu ezip düğmeyi aşağı kaydırıyordu */
   position: absolute; right: calc(24px * var(--ui)); top: calc(50% - calc(21px * var(--ui)));
   background: var(--panel); box-shadow: var(--shadow); padding: calc(11px * var(--ui)) calc(16px * var(--ui)); border-radius: calc(14px * var(--ui)); font-size: calc(13.5px * var(--ui));
 }
-.mm-fb::before { content: ''; display: inline-block; width: calc(8px * var(--ui)); height: calc(8px * var(--ui)); border-radius: 50%; background: var(--accent); margin-right: calc(8px * var(--ui)); vertical-align: 1px; }
+.mm-fb::before, .mm-fb-btn::before { content: ''; display: inline-block; width: calc(8px * var(--ui)); height: calc(8px * var(--ui)); border-radius: 50%; background: var(--accent); margin-right: calc(8px * var(--ui)); vertical-align: 1px; }
 @media (max-width: 1060px) {
   .mm-news { display: none; }
-  .mm-news-btn { display: inline-block; }
-  .mm-fb { top: auto; bottom: calc(18px * var(--ui)); }
+  /* Dar ekranda menü kartı sağ kenara yaklaşır (Kayıtlar sekmesinde düğmeyi örtüyordu): düğme üst çubukta */
+  .mm-news-btn, .mm-fb-btn { display: inline-block; }
+  .mm-fb { display: none; }
 }
 
 /* Haber kartı: görsel ve üstünde tabana ortalanmış başlık (kutu ve liste aynı) */
@@ -865,6 +873,10 @@ button.danger:hover { background: #ecc7bf; }
 .news-article p, .news-article li { font-size: calc(14px * var(--ui)); line-height: 1.55; }
 .news-article p { margin: calc(6px * var(--ui)) 0; }
 .news-article ul { margin: calc(6px * var(--ui)) 0; padding-left: calc(20px * var(--ui)); }
+/* Kaynak künyeleri: küçük, soluk, tıklanabilir */
+.news-article .news-links li { font-size: calc(12px * var(--ui)); line-height: 1.45; }
+.news-links a { color: var(--muted); text-decoration: none; }
+.news-links a:hover { color: var(--accent-ink); text-decoration: underline; }
 .news-hero { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: calc(16px * var(--ui)); display: block; margin-bottom: calc(12px * var(--ui)); }
 .news-date { font-size: calc(11px * var(--ui)); font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); }
 .news-lead { font-weight: 700; color: var(--muted); }
@@ -909,6 +921,8 @@ button.danger:hover { background: #ecc7bf; }
 /* Klavye kısayolu etiketleri ("(P)", "Esc") dokunmatikte anlamsız */
 @media (pointer: coarse) {
   .kbd { display: none !important; }
+  /* Parmakla basılacak küçük düğmeler: kayıt satırı (Yükle / Sil) ve hesaptan çıkış */
+  .sv-act button.mini, .mm-acc button.mini { padding: calc(8px * var(--ui)) calc(12px * var(--ui)); }
 }
 
 /* iOS yazı kutusuna odaklanınca sayfayı büyütür (16 px altı yazıda); yalnız orada 16 px (main.ts .ios sınıfı) */
@@ -979,8 +993,14 @@ button.danger:hover { background: #ecc7bf; }
   .mm-enemy { grid-template-columns: 1fr; }
   .mm-map { justify-self: center; }
   .mm-row { flex-direction: column; }
+}
+/* Küçük telefonda (667 px yatay) üst çubuk sığsın: alt başlık gizli, uzun hesap adı kısalır */
+@media (max-width: 720px) {
   .mm-brand span { display: none; }
 }
+.mm-acc { min-width: 0; }
+.mm-user { min-width: 0; max-width: calc(170px * var(--ui)); }
+.mm-user b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Dar ekran: yatay telefon ve küçük pencere (layout.ts isCompact ile aynı eşik). Arayüz --ui ile orantılı küçülür
    (telefonda yazılar, düğmeler ve paneller masaüstü ölçüsünde gereksiz büyük duruyordu); burada yalnız yerleşim. */
@@ -1021,7 +1041,6 @@ button.danger:hover { background: #ecc7bf; }
   .mm-foot { grid-area: foot; margin-top: calc(8px * var(--ui)); }
   .mm-sep, .mm-map, .mm-enemy p { display: none; }
   .mm-maps { grid-template-columns: 1fr; margin-bottom: 0; }
-  .mm-fb { bottom: 10px; right: 12px; }
   .news, .fb { padding: 8px; }
   /* Haberler: kartlar dar (alt alta, ortalı), büyük görsel ekran yüksekliğini aşmasın */
   .news-list .news-card { width: min(calc(400px * var(--ui)), 100%); }

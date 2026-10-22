@@ -1,0 +1,391 @@
+{
+ "eng_inline": {
+  "len": 4,
+  "loop": true,
+  "src": [
+   142898
+  ]
+ },
+ "eng_radial": {
+  "len": 4,
+  "loop": true,
+  "src": [
+   143556
+  ]
+ },
+ "eng_bomber": {
+  "len": 5,
+  "loop": true,
+  "src": [
+   437863
+  ]
+ },
+ "eng_jet": {
+  "len": 4,
+  "loop": true,
+  "src": [
+   704945
+  ]
+ },
+ "fly_inline1": {
+  "len": 10,
+  "loop": false,
+  "peak": 4.25,
+  "src": [
+   142901
+  ]
+ },
+ "fly_inline2": {
+  "len": 9.75,
+  "loop": false,
+  "peak": 4.45,
+  "src": [
+   143558
+  ]
+ },
+ "fly_radial1": {
+  "len": 8.7282,
+  "loop": false,
+  "peak": 4.55,
+  "src": [
+   143560
+  ]
+ },
+ "fly_radial2": {
+  "len": 8.3,
+  "loop": false,
+  "peak": 1.05,
+  "src": [
+   143562
+  ]
+ },
+ "fly_bomber1": {
+  "len": 10,
+  "loop": false,
+  "peak": 4.55,
+  "src": [
+   325563
+  ]
+ },
+ "fly_bomber2": {
+  "len": 10,
+  "loop": false,
+  "peak": 4.45,
+  "src": [
+   162240
+  ]
+ },
+ "fly_jet1": {
+  "len": 7.1543,
+  "loop": false,
+  "peak": 0.45,
+  "src": [
+   536809
+  ]
+ },
+ "fly_jet2": {
+  "len": 10,
+  "loop": false,
+  "peak": 4.45,
+  "src": [
+   40625
+  ]
+ },
+ "fly_inline3": {
+  "len": 10,
+  "loop": false,
+  "peak": 4.45,
+  "src": [
+   170477
+  ]
+ },
+ "rocket": {
+  "len": 1.3,
+  "loop": false,
+  "src": [
+   536809
+  ]
+ },
+ "gun_mg4": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   160773
+  ]
+ },
+ "gun_mg1": {
+  "len": 1.2,
+  "loop": true,
+  "src": [
+   160773
+  ]
+ },
+ "gun_hmg4": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   668071,
+   169170
+  ]
+ },
+ "gun_hmg1": {
+  "len": 1.2,
+  "loop": true,
+  "src": [
+   668071,
+   169170
+  ]
+ },
+ "gun_c20x2": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   843412
+  ]
+ },
+ "gun_c20x1": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   843412
+  ]
+ },
+ "gun_c20x4": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   843412
+  ]
+ },
+ "gun_c30x2": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   854186
+  ]
+ },
+ "gun_tail_mg": {
+  "len": 1.33,
+  "loop": false,
+  "src": [
+   160773
+  ]
+ },
+ "gun_tail_can": {
+  "len": 1.455,
+  "loop": false,
+  "src": [
+   843412
+  ]
+ },
+ "aa_pom1": {
+  "len": 0.3649,
+  "loop": false,
+  "src": [
+   854186
+  ]
+ },
+ "aa_pom2": {
+  "len": 0.3857,
+  "loop": false,
+  "src": [
+   854186
+  ]
+ },
+ "aa_heavy1": {
+  "len": 3.5,
+  "loop": false,
+  "src": [
+   187767
+  ]
+ },
+ "aa_heavy2": {
+  "len": 3.24,
+  "loop": false,
+  "src": [
+   187767
+  ]
+ },
+ "aa_heavy3": {
+  "len": 1.81,
+  "loop": false,
+  "src": [
+   182822
+  ]
+ },
+ "expl_bomb1": {
+  "len": 2.95,
+  "loop": false,
+  "src": [
+   182432
+  ]
+ },
+ "expl_bomb2": {
+  "len": 3.93,
+  "loop": false,
+  "src": [
+   108641
+  ]
+ },
+ "expl_bomb3": {
+  "len": 3.2,
+  "loop": false,
+  "src": [
+   486018
+  ]
+ },
+ "expl_far1": {
+  "len": 3.45,
+  "loop": false,
+  "src": [
+   438693
+  ]
+ },
+ "expl_far2": {
+  "len": 3.7,
+  "loop": false,
+  "src": [
+   438693
+  ]
+ },
+ "expl_far3": {
+  "len": 2.45,
+  "loop": false,
+  "src": [
+   438693
+  ]
+ },
+ "expl_air1": {
+  "len": 1.92,
+  "loop": false,
+  "src": [
+   189778
+  ]
+ },
+ "expl_air2": {
+  "len": 2.02,
+  "loop": false,
+  "src": [
+   189778
+  ]
+ },
+ "expl_huge": {
+  "len": 8.55,
+  "loop": false,
+  "src": [
+   182797
+  ]
+ },
+ "flak1": {
+  "len": 1.75,
+  "loop": false,
+  "src": [
+   736643
+  ]
+ },
+ "flak2": {
+  "len": 1.43,
+  "loop": false,
+  "src": [
+   718960
+  ]
+ },
+ "flak3": {
+  "len": 1.4,
+  "loop": false,
+  "src": [
+   616286
+  ]
+ },
+ "hit1": {
+  "len": 0.275,
+  "loop": false,
+  "src": [
+   410364
+  ]
+ },
+ "hit2": {
+  "len": 0.4,
+  "loop": false,
+  "src": [
+   406562
+  ]
+ },
+ "siren": {
+  "len": 11,
+  "loop": false,
+  "src": [
+   382611
+  ]
+ },
+ "bell": {
+  "len": 3.1,
+  "loop": false,
+  "src": [
+   675682
+  ]
+ },
+ "typewriter": {
+  "len": 1.67,
+  "loop": false,
+  "src": [
+   444813
+  ]
+ },
+ "taps": {
+  "len": 7,
+  "loop": false,
+  "src": [
+   651204
+  ]
+ },
+ "bugle": {
+  "len": 4.9,
+  "loop": false,
+  "src": [
+   438633
+  ]
+ },
+ "morse": {
+  "len": 1.9,
+  "loop": false,
+  "src": [
+   343740
+  ]
+ },
+ "stuka_siren": {
+  "len": 1.6,
+  "loop": true,
+  "src": [
+   382611
+  ]
+ },
+ "ui_click": {
+  "len": 0.08,
+  "loop": false,
+  "src": [
+   423512
+  ]
+ },
+ "ui_tap": {
+  "len": 0.11,
+  "loop": false,
+  "src": [
+   423512
+  ]
+ },
+ "ui_place": {
+  "len": 0.42,
+  "loop": false,
+  "src": [
+   342535
+  ]
+ },
+ "ui_error": {
+  "len": 0.4,
+  "loop": false,
+  "src": [
+   423512
+  ]
+ }
+}
