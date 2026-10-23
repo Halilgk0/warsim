@@ -88,6 +88,11 @@ export const STRUCTURE_DEFS: Record<StructureKind, StructureDef> = {
 
 let nextId = 1;
 
+/** Video kaydı: aynı dünya yeniden kurulunca kimlikler de aynı olsun (yalnız dünya yokken çağrılır). */
+export function resetStructureIds(): void {
+  nextId = 1;
+}
+
 export class Structure {
   readonly id: number;
   hp: number;

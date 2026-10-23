@@ -89,7 +89,9 @@ export interface PlayOpts {
 type AudioCtor = typeof AudioContext;
 
 class SoundEngine {
-  ctx: AudioContext | null = null;
+  ctx: BaseAudioContext | null = null;
+  /** Video kaydı: ses gerçek zamanda değil, kare kare (OfflineAudioContext) üretiliyor. */
+  private offline = false;
   private master: GainNode | null = null;
   private readonly buses = {} as Record<Bus, GainNode>;
   /** Savaş kanalını duraklatmada ve ana menüde kısan kapı. */
@@ -106,7 +108,7 @@ class SoundEngine {
     for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) window.addEventListener(ev, unlock, { capture: true, passive: true });
     document.addEventListener('click', (e) => this.uiClick(e), { capture: true });
     document.addEventListener('visibilitychange', () => {
-      if (!this.ctx) return;
+      if (!(this.ctx instanceof AudioContext)) return;
       if (document.visibilityState === 'hidden') void this.ctx.suspend();
       else void this.ctx.resume();
     });
@@ -116,7 +118,7 @@ class SoundEngine {
   private unlock(): void {
     if (!this.ctx) this.init();
     const ctx = this.ctx;
-    if (ctx && ctx.state !== 'running' && document.visibilityState === 'visible') void ctx.resume();
+    if (ctx instanceof AudioContext && ctx.state !== 'running' && document.visibilityState === 'visible') void ctx.resume();
   }
 
   private init(): void {
@@ -129,6 +131,24 @@ class SoundEngine {
     } catch {
       return;
     }
+    this.connect(ctx);
+    void this.loadAll();
+  }
+
+  /**
+   * Video kaydı: sesler verilen çevrimdışı bağlama çizilir (savaş kanalı açık). Kayıtlar ilk seferde yüklenir;
+   * sonraki çekimlerde aynı kayıtlar kullanılır.
+   */
+  async startOffline(ctx: BaseAudioContext): Promise<void> {
+    this.offline = true;
+    this.active = 0;
+    this.connect(ctx);
+    this.gate!.gain.value = 1;
+    if (!this.samples.size) await this.loadAll();
+  }
+
+  /** Kanallar, sıkıştırıcı ve yankı. */
+  private connect(ctx: BaseAudioContext): void {
     this.ctx = ctx;
     // Ana çıkış: sıkıştırıcı aynı anda çok patlamada bozulmayı önler, ardından düzey biraz yükseltilir
     const comp = ctx.createDynamicsCompressor();
@@ -161,7 +181,6 @@ class SoundEngine {
     this.reverbIn.connect(conv);
     conv.connect(this.buses.world);
     this.applyLevels();
-    void this.loadAll();
   }
 
   /** Kayıtları önem sırasıyla yükle (aynı anda birkaç tane). */
@@ -256,7 +275,7 @@ class SoundEngine {
   /** Bu kanal duyuluyor mu (kapalıysa ses hiç kurulmaz). */
   audible(bus: Bus): boolean {
     const s = settings.sound;
-    return !!this.ctx && this.ctx.state === 'running' && !s.muted && s.master > 0 && s[bus] > 0;
+    return !!this.ctx && (this.offline || this.ctx.state === 'running') && !s.muted && s.master > 0 && s[bus] > 0;
   }
 
   bus(b: Bus): GainNode | null {

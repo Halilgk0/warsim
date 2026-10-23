@@ -6,3 +6,5 @@ tools/sim/.out
 tools/sfx/raw
 tools/sfx/node_modules
 release
+tools/rec/out
+tools/rec/node_modules

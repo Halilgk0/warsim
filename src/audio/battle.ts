@@ -73,7 +73,7 @@ class LoopVoice {
   private readonly pan: StereoPannerNode | null;
   alive = true;
 
-  constructor(protected readonly ctx: AudioContext, smp: Sample, dest: AudioNode, reverb: AudioNode | null, send: number, fadeIn = 0.15) {
+  constructor(protected readonly ctx: BaseAudioContext, smp: Sample, dest: AudioNode, reverb: AudioNode | null, send: number, fadeIn = 0.15) {
     this.src = ctx.createBufferSource();
     this.src.buffer = smp.buffer;
     this.src.loop = true;
@@ -120,10 +120,11 @@ class LoopVoice {
     this.out.gain.cancelScheduledValues(t);
     this.out.gain.setTargetAtTime(0, t, release);
     this.src.stop(t + release * 6);
-    window.setTimeout(() => {
+    // Bağlam saatine göre (video kaydında ses gerçek zamandan yavaş üretilir)
+    this.src.onended = () => {
       this.out.disconnect();
       this.pan?.disconnect();
-    }, release * 6000 + 200);
+    };
   }
 }
 
@@ -136,7 +137,7 @@ class EngineVoice {
   /** Yakın geçiş kaydı çalarken motor döngüsü kısılır. */
   duckUntil = 0;
 
-  constructor(private readonly ctx: AudioContext, readonly ac: Aircraft, smp: Sample, dest: AudioNode, reverb: AudioNode | null) {
+  constructor(private readonly ctx: BaseAudioContext, readonly ac: Aircraft, smp: Sample, dest: AudioNode, reverb: AudioNode | null) {
     this.loop = new LoopVoice(ctx, smp, dest, reverb, 0.18);
     const s = ac.spec;
     const jet = s.engine.kind === 'jet';
@@ -212,9 +213,10 @@ export class BattleSound {
   /**
    * Her karede (render olayları tüketmeden önce). active: oyun akıyor ve oyun kipinde.
    * listener: takip edilen uçak (kamera onunla birlikte gider: Doppler ve yakın geçiş buna göre).
+   * listenerVel: kendi başına hareket eden kameranın hızı (sinematik kayıt); verilirse listener'ınkinin yerine geçer.
    */
   frame(w: World, camera: THREE.PerspectiveCamera, camDist: number, active: boolean, timeScale: number,
-    listener: Aircraft | null, visible: (ac: Aircraft) => boolean): void {
+    listener: Aircraft | null, visible: (ac: Aircraft) => boolean, listenerVel?: THREE.Vector3): void {
     const ctx = sound.ctx;
     // Hızlandırılmış zamanda savaş sesleri biraz kısılır (karışım kalabalıklaşır)
     const open = active ? (timeScale > 4 ? 0.7 : 1) : 0;
@@ -230,7 +232,8 @@ export class BattleSound {
     }
     this.camera = camera;
     this.camPos.copy(camera.position);
-    if (listener) listener.velocity(this.camVel);
+    if (listenerVel) this.camVel.copy(listenerVel);
+    else if (listener) listener.velocity(this.camVel);
     else this.camVel.set(0, 0, 0);
     this.dist = camDist;
     this.zoom = camDist <= FULL_DIST ? 1 : Math.max(0, 1 - Math.log(camDist / FULL_DIST) / Math.log(MUTE_DIST / FULL_DIST));
@@ -276,7 +279,11 @@ export class BattleSound {
     return out;
   }
 
-  /** Doppler: kaynak ve dinleyicinin aradaki doğrultudaki hızları. */
+  /**
+   * Doppler: kaynak ve dinleyicinin aradaki doğrultudaki hızları. Motor döngüsü durağan bir kayıt: tam kayma onu
+   * hızlandırılmış bant gibi inceltir (dalan uçakta vızıltı). Kaymanın yarısı uygulanır, yakın geçişte gerçek geçiş
+   * kaydı kendi Doppler'iyle çalar.
+   */
   private doppler(ac: Aircraft): number {
     _v.subVectors(ac.pos, this.camPos);
     const d = _v.length();
@@ -285,7 +292,8 @@ export class BattleSound {
     ac.velocity(_w);
     const vs = _w.dot(_v);
     const vl = this.camVel.dot(_v);
-    return Math.min(1.35, Math.max(0.75, (C_SOUND + vl) / (C_SOUND + vs)));
+    const full = (C_SOUND + vl) / (C_SOUND + vs);
+    return Math.min(1.16, Math.max(0.87, 1 + (full - 1) * 0.5));
   }
 
   private updateEngines(w: World, visible: (ac: Aircraft) => boolean): void {
@@ -468,9 +476,8 @@ export class BattleSound {
           break;
         case 'hit': {
           // Yalnız yakında ve seyrek (çok isabette tıkırtı yağmuru olmasın)
-          const t = performance.now();
-          if (h.gain < 0.08 || t - this.lastHit < 35) break;
-          this.lastHit = t;
+          if (h.gain < 0.08 || now - this.lastHit < 0.035) break;
+          this.lastHit = now;
           sound.play('hit', 'world', { ...base, gain: h.gain * 0.8, rate: 0.85 + Math.random() * 0.3, when: now });
           break;
         }

@@ -1,5 +1,5 @@
-// Görsel efektler: low-poly duman/ateş "ponponları" (tek InstancedMesh), kalın iz mermileri (InstancedMesh)
-// ve roketler.
+// Görsel efektler: low-poly duman/ateş "ponponları" ve ışıktan etkilenmeyen parlamalar (iki InstancedMesh), kalın iz
+// mermileri (InstancedMesh) ve roketler.
 
 import * as THREE from 'three';
 import type { Bullet, Parachute, Rocket } from '../sim/world';
@@ -28,6 +28,8 @@ export interface PuffOpts {
   grow?: number;
   drag?: number;
   rise?: number;
+  /** Parlama (namlu alevi, kıvılcım): ışıktan etkilenmez, düz parlak renkte görünür. */
+  glow?: boolean;
 }
 
 const _m = new THREE.Matrix4();
@@ -37,17 +39,15 @@ const _e = new THREE.Euler();
 const _p = new THREE.Vector3();
 const _z = new THREE.Vector3(0, 0, 1);
 const _dir = new THREE.Vector3();
+const _v = new THREE.Vector3();
 
-export class Effects {
+/** Ponpon katmanı: tek InstancedMesh; ömrü dolan ponpon düşer. */
+class PuffLayer {
   readonly mesh: THREE.InstancedMesh;
-  private puffs: Puff[] = [];
+  readonly puffs: Puff[] = [];
 
-  constructor(private readonly max = 5000) {
-    this.mesh = new THREE.InstancedMesh(
-      new THREE.IcosahedronGeometry(1, 0),
-      new THREE.MeshLambertMaterial({ flatShading: true }),
-      max,
-    );
+  constructor(material: THREE.Material, readonly max: number) {
+    this.mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), material, max);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -57,22 +57,6 @@ export class Effects {
   clear(): void {
     this.puffs.length = 0;
     this.mesh.count = 0;
-  }
-
-  spawn(pos: THREE.Vector3, o: PuffOpts): void {
-    if (this.puffs.length >= this.max) return;
-    this.puffs.push({
-      pos: pos.clone(),
-      vel: o.vel ? o.vel.clone() : new THREE.Vector3(),
-      age: 0,
-      life: o.life,
-      size: o.size,
-      grow: o.grow ?? 1,
-      drag: o.drag ?? 1.5,
-      rise: o.rise ?? 0,
-      color: new THREE.Color(o.color),
-      rot: Math.random() * 10,
-    });
   }
 
   update(dt: number): void {
@@ -104,6 +88,46 @@ export class Effects {
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
+}
+
+export class Effects {
+  /** Duman ve ateş (ışıkla gölgelenir) ile parlamalar (ışıktan etkilenmez) birlikte. */
+  readonly mesh = new THREE.Group();
+  private readonly lit: PuffLayer;
+  private readonly glow: PuffLayer;
+
+  constructor(max = 5000) {
+    this.lit = new PuffLayer(new THREE.MeshLambertMaterial({ flatShading: true }), max);
+    this.glow = new PuffLayer(new THREE.MeshBasicMaterial(), 800);
+    this.mesh.add(this.lit.mesh, this.glow.mesh);
+  }
+
+  clear(): void {
+    this.lit.clear();
+    this.glow.clear();
+  }
+
+  spawn(pos: THREE.Vector3, o: PuffOpts): void {
+    const layer = o.glow ? this.glow : this.lit;
+    if (layer.puffs.length >= layer.max) return;
+    layer.puffs.push({
+      pos: pos.clone(),
+      vel: o.vel ? o.vel.clone() : new THREE.Vector3(),
+      age: 0,
+      life: o.life,
+      size: o.size,
+      grow: o.grow ?? 1,
+      drag: o.drag ?? 1.5,
+      rise: o.rise ?? 0,
+      color: new THREE.Color(o.color),
+      rot: Math.random() * 10,
+    });
+  }
+
+  update(dt: number): void {
+    this.lit.update(dt);
+    this.glow.update(dt);
+  }
 
   // --- Hazır efektler -------------------------------------------------------
 
@@ -118,7 +142,7 @@ export class Effects {
         color: PALETTE.fire[i % 3], grow: 1.3, drag: 2.5,
       });
     }
-    this.spawn(pos, { size: 8 * k + 3 * s, life: 0.3, color: 0xfff3c4, grow: 0.6 });
+    this.spawn(pos, { size: 8 * k + 3 * s, life: 0.3, color: 0xfff3c4, grow: 0.6, glow: true });
     for (let i = 0; i < 12; i++) {
       this.spawn(pos, {
         vel: randDir().multiplyScalar(rand(5, 14) * k + s),
@@ -128,16 +152,32 @@ export class Effects {
     }
   }
 
+  /** Yerde patlama: parlama, ateş topu, yere yayılan toz halkası, fışkırıp geri düşen toprak, yükselen duman. */
   groundExplosion(pos: THREE.Vector3, size: number): void {
-    for (let i = 0; i < 12; i++) {
+    this.spawn(_p.copy(pos).setY(pos.y + size * 0.25), { size: size * 0.45, life: 0.09, color: 0xfff3c4, grow: 0.6, glow: true });
+    for (let i = 0; i < 18; i++) {
       const v = randDir();
-      v.y = Math.abs(v.y) * 1.5;
+      v.y = Math.abs(v.y) * 1.6 + 0.15;
       this.spawn(pos, {
-        vel: v.multiplyScalar(rand(0.6, 1.4) * size), size: size * rand(0.25, 0.45),
-        life: rand(0.5, 1.0), color: PALETTE.fire[i % 3], grow: 1, drag: 3,
+        vel: v.multiplyScalar(rand(0.5, 1.5) * size), size: size * rand(0.18, 0.45),
+        life: rand(0.45, 1.1), color: PALETTE.fire[i % 3], grow: 1, drag: 3,
       });
     }
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + rand(-0.2, 0.2);
+      this.spawn(_p.copy(pos).setY(pos.y + size * 0.08), {
+        vel: _v.set(Math.cos(a), 0.06, Math.sin(a)).multiplyScalar(rand(1.6, 2.5) * size), size: size * rand(0.16, 0.28),
+        life: rand(1.2, 2.2), color: PALETTE.dust, grow: 1.7, drag: 2.2,
+      });
+    }
+    for (let i = 0; i < 9; i++) {
+      const v = _v.set(rand(-0.3, 0.3), 1, rand(-0.3, 0.3)).normalize();
+      this.spawn(pos, {
+        vel: v.multiplyScalar(rand(1.4, 2.8) * size), size: size * rand(0.08, 0.16),
+        life: rand(0.9, 1.5), color: i % 2 ? PALETTE.smokeDark : PALETTE.dust, grow: 1.1, drag: 1.4, rise: -size * 0.9,
+      });
+    }
+    for (let i = 0; i < 14; i++) {
       const v = randDir();
       v.y = Math.abs(v.y);
       this.spawn(pos, {
@@ -154,7 +194,7 @@ export class Effects {
   /** size: 1 ağır flak, 0.5 orta kalibre kendini imha. */
   flak(pos: THREE.Vector3, vis: number, size = 1): void {
     const s = Math.min(Math.max(vis, 1), 4) * size;
-    this.spawn(pos, { size: 3 * s, life: 0.15, color: PALETTE.fire[0] });
+    this.spawn(pos, { size: 3 * s, life: 0.15, color: PALETTE.fire[0], glow: true });
     const n = size >= 1 ? 3 : 1;
     for (let i = 0; i < n; i++) {
       this.spawn(pos.clone().add(randDir().multiplyScalar(2.5 * s)), {
@@ -164,7 +204,7 @@ export class Effects {
   }
 
   hit(pos: THREE.Vector3, vis: number): void {
-    this.spawn(pos, { size: 1.6 * Math.min(vis, 8), life: 0.18, color: 0xfff0b0 });
+    this.spawn(pos, { size: 1.6 * Math.min(vis, 8), life: 0.18, color: 0xfff0b0, glow: true });
   }
 
   /** Yere düşen mermi: toz ya da su sıçraması. */
@@ -177,7 +217,7 @@ export class Effects {
   }
 
   muzzle(pos: THREE.Vector3, vis: number): void {
-    this.spawn(pos, { size: 0.9 * Math.min(vis, 6), life: 0.06, color: 0xfff3c4 });
+    this.spawn(pos, { size: 0.9 * Math.min(vis, 6), life: 0.06, color: 0xfff3c4, glow: true });
   }
 
   rocketTrail(pos: THREE.Vector3, vis: number): void {

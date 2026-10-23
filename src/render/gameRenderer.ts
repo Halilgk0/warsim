@@ -74,6 +74,8 @@ export class GameRenderer {
   plannerRoute: THREE.Vector3[] | null = null;
   ghost: Ghost | null = null;
   playerTeam = 0;
+  /** Yapıların takım halkaları (sinematik kayıtta kapalı). */
+  rings = true;
 
   private world: World | null = null;
   private lastTime = 0;
@@ -116,9 +118,10 @@ export class GameRenderer {
   private teamColors = PALETTE.teamTrail.map((c) => new THREE.Color(c));
   private iconColors = PALETTE.team.map((c) => new THREE.Color(c));
 
-  constructor(container: HTMLElement, private readonly labelLayer: HTMLElement) {
+  /** preserveBuffer: çizilen kare sonradan okunabilsin (video kaydı). */
+  constructor(container: HTMLElement, private readonly labelLayer: HTMLElement, opts: { preserveBuffer?: boolean } = {}) {
     // Ölçek 40 m'den 90 km'ye kadar değiştiği için logaritmik derinlik (uzakta z-fighting olmasın)
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
 
@@ -388,6 +391,7 @@ export class GameRenderer {
         this.structLabels.set(s.id, lbl);
       }
       v.sync(simDt);
+      v.ring.visible = this.rings;
       // Hasarlı yapı tüter
       const ratio = s.hp / s.maxHp;
       if (ratio < 0.7 && w.time >= v.nextSmoke && settings.map.effects) {

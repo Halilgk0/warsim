@@ -14,6 +14,8 @@ export class CameraRig {
   yaw = 0;
   pitch = 58 * DEG;
   followFn: (() => THREE.Vector3 | null) | null = null;
+  /** Kayıt kipi (sinematik çekim): kamerayı bu işlev yönetir; klavye, takip ve yörünge devre dışı. */
+  director: ((dt: number) => void) | null = null;
   onClick: ((x: number, y: number) => void) | null = null;
   /** Çift tık (sürüklemeden). */
   onDoubleClick: ((x: number, y: number) => void) | null = null;
@@ -140,6 +142,10 @@ export class CameraRig {
   }
 
   update(dt: number): void {
+    if (this.director) {
+      this.director(dt);
+      return;
+    }
     const k = this.keys;
     let right = 0;
     let up = 0;

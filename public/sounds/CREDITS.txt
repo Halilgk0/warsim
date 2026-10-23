@@ -17,6 +17,7 @@ WarSimBox ses kayıtları (Freesound.org)
 "Artillery Shots.flac" — qubodup — CC0 1.0 — https://freesound.org/people/qubodup/sounds/182822/
 "Cannon Shot" — qubodup — CC0 1.0 — https://freesound.org/people/qubodup/sounds/187767/
 "Explosive.flac" — qubodup — CC0 1.0 — https://freesound.org/people/qubodup/sounds/189778/
+"antiair.ogg" — PicassoCT — CC0 1.0 — https://freesound.org/people/PicassoCT/sounds/260939/
 "AIR Lancaster By1.wav" — Geldart — CC BY 4.0 — https://freesound.org/people/Geldart/sounds/325563/
 "Medium Thud 1" — sgrowe — CC0 1.0 — https://freesound.org/people/sgrowe/sounds/342535/
 "Radio transmission morse code @4606.2kHz Poland" — NebulousRoyale — CC0 1.0 — https://freesound.org/people/NebulousRoyale/sounds/343740/
@@ -37,5 +38,4 @@ WarSimBox ses kayıtları (Freesound.org)
 "Jet Engine Start Cart.wav" — C-V — CC0 1.0 — https://freesound.org/people/C-V/sounds/704945/
 "Distant Explosion with echo" — TB0Y298 — CC BY 4.0 — https://freesound.org/people/TB0Y298/sounds/718960/
 "Fireworks3" — vialgames — CC0 1.0 — https://freesound.org/people/vialgames/sounds/736643/
-"Lahti L-39 panssarintorjuntakivaari Norsupyssy" — ertzsi — CC0 1.0 — https://freesound.org/people/ertzsi/sounds/843412/
 "Autocannon Three Shot Burst" — qubodup — CC0 1.0 — https://freesound.org/people/qubodup/sounds/854186/

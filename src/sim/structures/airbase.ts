@@ -59,6 +59,11 @@ export interface ApproachPlan {
 
 let nextAirframeId = 1;
 
+/** Video kaydı: aynı dünya yeniden kurulunca kimlikler de aynı olsun (yalnız dünya yokken çağrılır). */
+export function resetAirframeIds(): void {
+  nextAirframeId = 1;
+}
+
 /** Kayıttan yüklenen uçak gövdelerinin kimlikleriyle çakışmasın. */
 export function reserveAirframeIds(maxId: number): void {
   nextAirframeId = Math.max(nextAirframeId, maxId + 1);

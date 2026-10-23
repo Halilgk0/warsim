@@ -25,6 +25,7 @@ export const SOUND_CREDITS: SoundCredit[] = [
   { title: "Artillery Shots.flac", user: "qubodup", license: "CC0 1.0", url: "https://freesound.org/people/qubodup/sounds/182822/" },
   { title: "Cannon Shot", user: "qubodup", license: "CC0 1.0", url: "https://freesound.org/people/qubodup/sounds/187767/" },
   { title: "Explosive.flac", user: "qubodup", license: "CC0 1.0", url: "https://freesound.org/people/qubodup/sounds/189778/" },
+  { title: "antiair.ogg", user: "PicassoCT", license: "CC0 1.0", url: "https://freesound.org/people/PicassoCT/sounds/260939/" },
   { title: "AIR Lancaster By1.wav", user: "Geldart", license: "CC BY 4.0", url: "https://freesound.org/people/Geldart/sounds/325563/" },
   { title: "Medium Thud 1", user: "sgrowe", license: "CC0 1.0", url: "https://freesound.org/people/sgrowe/sounds/342535/" },
   { title: "Radio transmission morse code @4606.2kHz Poland", user: "NebulousRoyale", license: "CC0 1.0", url: "https://freesound.org/people/NebulousRoyale/sounds/343740/" },
@@ -45,6 +46,5 @@ export const SOUND_CREDITS: SoundCredit[] = [
   { title: "Jet Engine Start Cart.wav", user: "C-V", license: "CC0 1.0", url: "https://freesound.org/people/C-V/sounds/704945/" },
   { title: "Distant Explosion with echo", user: "TB0Y298", license: "CC BY 4.0", url: "https://freesound.org/people/TB0Y298/sounds/718960/" },
   { title: "Fireworks3", user: "vialgames", license: "CC0 1.0", url: "https://freesound.org/people/vialgames/sounds/736643/" },
-  { title: "Lahti L-39 panssarintorjuntakivaari Norsupyssy", user: "ertzsi", license: "CC0 1.0", url: "https://freesound.org/people/ertzsi/sounds/843412/" },
   { title: "Autocannon Three Shot Burst", user: "qubodup", license: "CC0 1.0", url: "https://freesound.org/people/qubodup/sounds/854186/" },
 ];

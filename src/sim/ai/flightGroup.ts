@@ -34,6 +34,11 @@ const _est = new Vector3();
 
 let nextId = 1;
 
+/** Video kaydı: aynı dünya yeniden kurulunca kimlikler de aynı olsun (yalnız dünya yokken çağrılır). */
+export function resetFlightIds(): void {
+  nextId = 1;
+}
+
 export class FlightGroup {
   readonly id = nextId++;
   readonly members: Aircraft[] = [];

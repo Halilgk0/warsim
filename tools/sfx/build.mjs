@@ -216,9 +216,16 @@ save('rocket', levelPeak(fade(biquad(cut(load(536809), 0.0, 1.3), 'hp', 300), 0.
   // 12,7 mm (.50 BMG tek atışlar)
   const b1 = biquad(load(668071), 'hp', 45), b2 = biquad(load(169170), 'hp', 45);
   const hmgBank = [shot(b1, 0.03, 0.22), shot(b2, 14.21, 0.22), shot(b2, 25.265, 0.22), shot(b2, 14.445, 0.22)];
-  // 20 mm (Lahti L-39 tek atışlar)
-  const lx = biquad(load(843412), 'hp', 40);
-  const c20Bank = onsets(lx, 0.6, 7.2, 12, 0.15).slice(0, 8).map((t) => shot(lx, t, 0.3));
+  // 20 mm: uçaksavar serisi kaydının (~0,9 sn'de 8 atış) tek atışları; kaydın seri sonu yankısı ayrıca kullanılır.
+  // (Önceki kaynağın arka planında konuşma vardı.)
+  const fx = biquad(load(260939), 'hp', 40);
+  const c20On = onsets(fx, 0, 1.2, 7, 0.07);
+  // Atış, bir sonrakinin hemen öncesine kadar (seri kaydında atışlar 0,08–0,14 sn arayla)
+  const c20All = c20On.map((t, i) => shot(fx, t, Math.min(0.11, (c20On[i + 1] ?? t + 1) - t - 0.006)));
+  // Kayıttaki yankı "atışları" (en güçlüden 10 dB'den kısık) seride eksik atış gibi duyulur: çıkarılır
+  const rms = (y) => Math.sqrt(y.reduce((a, v) => a + v * v, 0) / y.length);
+  const loud = Math.max(...c20All.map(rms));
+  const c20Bank = c20All.filter((y) => rms(y) > loud * 0.32);
   // 25 mm otomatik top → 30 mm ve 37–40 mm için pes
   const ax = biquad(load(854186), 'hp', 35);
   const acBank = [0.0, 0.28, 0.555].map((t) => shot(ax, t + 0.005, 0.26));
@@ -229,13 +236,13 @@ save('rocket', levelPeak(fade(biquad(cut(load(536809), 0.0, 1.3), 'hp', 300), 0.
   loop('gun_mg1', mgBank, 1, 1000, 1.2, -15, [160773]);
   loop('gun_hmg4', hmgBank, 4, 800, 1.6, -12, [668071, 169170]);
   loop('gun_hmg1', hmgBank, 1, 550, 1.2, -14, [668071, 169170]);
-  loop('gun_c20x2', c20Bank, 2, 650, 1.6, -12, [843412]);
-  loop('gun_c20x1', c20Bank, 1, 450, 1.6, -13, [843412]);
-  loop('gun_c20x4', c20Bank, 4, 450, 1.6, -11, [843412]);
+  loop('gun_c20x2', c20Bank, 2, 650, 1.6, -12, [260939]);
+  loop('gun_c20x1', c20Bank, 1, 450, 1.6, -13, [260939]);
+  loop('gun_c20x4', c20Bank, 4, 450, 1.6, -11, [260939]);
   loop('gun_c30x2', acBank.map((b) => resample(b, 0.82)), 2, 620, 1.6, -11, [854186]);
   // Seri sonu yankısı: tek atışın uzun kuyruğu
   save('gun_tail_mg', levelPeak(fade(cut(mx, 1.85 + 0.02, 3.2), 0.02, 0.8), -6), { src: [160773] });
-  save('gun_tail_can', levelPeak(fade(cut(lx, 3.725 + 0.02, 5.2), 0.02, 0.9), -6), { src: [843412] });
+  save('gun_tail_can', levelPeak(fade(cut(fx, c20On[c20On.length - 1] + 0.1, 2.9), 0.02, 0.9), -6), { src: [260939] });
   // 37–40 mm "pom": tek atış
   save('aa_pom1', levelPeak(fade(resample(cut(ax, 0.0, 0.27), 0.74), 0.002, 0.15), -1), { src: [854186] });
   save('aa_pom2', levelPeak(fade(resample(cut(ax, 0.28, 0.55), 0.7), 0.002, 0.15), -1), { src: [854186] });

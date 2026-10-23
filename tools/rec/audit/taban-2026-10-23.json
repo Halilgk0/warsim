@@ -1,0 +1,1236 @@
+{
+ "tarih": "2026-10-23",
+ "not": "Grafik güncellemesi öncesi taban. Makine: Intel Arc B580, 180 Hz ekran. render_ms işlemci (yavaşlatılmış), gpu_ms ekran kartı; gpu için yavaşlatmasız koşuyu oku. Karşılaştırma: node audit/perf.mjs <etiket> tel 4 ve node audit/stills.mjs <etiket>.",
+ "perf_tel_x4": [
+  {
+   "sahne": "menu",
+   "fps": 44.2,
+   "p50": 22.2,
+   "p95": 27.8,
+   "p99": 28,
+   "render_ms": 21.6,
+   "gpu_ms": 13.7,
+   "gpu95_ms": 15.4,
+   "sim_ms": 0.2,
+   "cagri": 1496,
+   "ucgen": 570746,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "harekat_anakara",
+   "fps": 100.3,
+   "p50": 11.1,
+   "p95": 11.3,
+   "p99": 16.7,
+   "render_ms": 8.3,
+   "gpu_ms": 1.9,
+   "gpu95_ms": 3.3,
+   "sim_ms": 0.1,
+   "cagri": 256,
+   "ucgen": 329260,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "harekat_takimada",
+   "fps": 97.6,
+   "p50": 11.1,
+   "p95": 11.4,
+   "p99": 16.7,
+   "render_ms": 8.3,
+   "gpu_ms": 1.8,
+   "gpu95_ms": 3.2,
+   "sim_ms": 0.1,
+   "cagri": 255,
+   "ucgen": 326956,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "stuka_taktik",
+   "fps": 144.8,
+   "p50": 5.6,
+   "p95": 11.3,
+   "p99": 11.4,
+   "render_ms": 5.2,
+   "gpu_ms": 2.4,
+   "gpu95_ms": 2.5,
+   "sim_ms": 0.3,
+   "cagri": 43,
+   "ucgen": 1221408,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "stuka_takip",
+   "fps": 106.3,
+   "p50": 11.1,
+   "p95": 11.3,
+   "p99": 16.6,
+   "render_ms": 7.5,
+   "gpu_ms": 5.5,
+   "gpu95_ms": 6.2,
+   "sim_ms": 0.3,
+   "cagri": 154,
+   "ucgen": 2619370,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "b17_takip",
+   "fps": 77.6,
+   "p50": 11.2,
+   "p95": 16.7,
+   "p99": 16.8,
+   "render_ms": 10.4,
+   "gpu_ms": 7.8,
+   "gpu95_ms": 8.3,
+   "sim_ms": 0.7,
+   "cagri": 264,
+   "ucgen": 3437879,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "dalas_8v8",
+   "fps": 151.8,
+   "p50": 5.6,
+   "p95": 11.2,
+   "p99": 11.3,
+   "render_ms": 5,
+   "gpu_ms": 3.6,
+   "gpu95_ms": 3.6,
+   "sim_ms": 0.3,
+   "cagri": 51,
+   "ucgen": 2297100,
+   "tuval": "1688×780"
+  }
+ ],
+ "perf_tel_x1": [
+  {
+   "sahne": "menu",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.8,
+   "render_ms": 3.6,
+   "gpu_ms": 2.9,
+   "gpu95_ms": 3,
+   "sim_ms": 0,
+   "cagri": 1464,
+   "ucgen": 568518,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "harekat_anakara",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.8,
+   "render_ms": 1.4,
+   "gpu_ms": 1.8,
+   "gpu95_ms": 1.9,
+   "sim_ms": 0,
+   "cagri": 256,
+   "ucgen": 329260,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "harekat_takimada",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.8,
+   "render_ms": 1.4,
+   "gpu_ms": 1.8,
+   "gpu95_ms": 1.8,
+   "sim_ms": 0,
+   "cagri": 255,
+   "ucgen": 326956,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "stuka_taktik",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.2,
+   "gpu_ms": 2.4,
+   "gpu95_ms": 2.4,
+   "sim_ms": 0,
+   "cagri": 43,
+   "ucgen": 1221408,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "stuka_takip",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.4,
+   "gpu_ms": 4.1,
+   "gpu95_ms": 4.2,
+   "sim_ms": 0.1,
+   "cagri": 154,
+   "ucgen": 2619370,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "b17_takip",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.9,
+   "gpu_ms": 4.2,
+   "gpu95_ms": 4.2,
+   "sim_ms": 0.1,
+   "cagri": 264,
+   "ucgen": 3437879,
+   "tuval": "1688×780"
+  },
+  {
+   "sahne": "dalas_8v8",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.1,
+   "gpu_ms": 3.6,
+   "gpu95_ms": 3.6,
+   "sim_ms": 0.1,
+   "cagri": 51,
+   "ucgen": 2297100,
+   "tuval": "1688×780"
+  }
+ ],
+ "perf_pc_x1": [
+  {
+   "sahne": "menu",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 3.6,
+   "gpu_ms": 2.8,
+   "gpu95_ms": 2.9,
+   "sim_ms": 0,
+   "cagri": 1447,
+   "ucgen": 557638,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "harekat_anakara",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.7,
+   "render_ms": 1.5,
+   "gpu_ms": 1.4,
+   "gpu95_ms": 1.5,
+   "sim_ms": 0,
+   "cagri": 250,
+   "ucgen": 283436,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "harekat_takimada",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.8,
+   "render_ms": 1.4,
+   "gpu_ms": 1.4,
+   "gpu95_ms": 1.4,
+   "sim_ms": 0,
+   "cagri": 248,
+   "ucgen": 272428,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "stuka_taktik",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.7,
+   "p99": 5.8,
+   "render_ms": 1.2,
+   "gpu_ms": 2.2,
+   "gpu95_ms": 2.3,
+   "sim_ms": 0,
+   "cagri": 42,
+   "ucgen": 1212704,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "stuka_takip",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.5,
+   "gpu_ms": 3.7,
+   "gpu95_ms": 4.1,
+   "sim_ms": 0,
+   "cagri": 138,
+   "ucgen": 2563466,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "b17_takip",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.8,
+   "gpu_ms": 4.1,
+   "gpu95_ms": 4.1,
+   "sim_ms": 0.1,
+   "cagri": 237,
+   "ucgen": 3382599,
+   "tuval": "1280×720"
+  },
+  {
+   "sahne": "dalas_8v8",
+   "fps": 180.1,
+   "p50": 5.6,
+   "p95": 5.6,
+   "p99": 5.7,
+   "render_ms": 1.2,
+   "gpu_ms": 3.6,
+   "gpu95_ms": 3.6,
+   "sim_ms": 0.1,
+   "cagri": 48,
+   "ucgen": 2288356,
+   "tuval": "1280×720"
+  }
+ ],
+ "kareler": {
+  "anakara_strateji_pc.jpg": {
+   "calls": 490,
+   "tris": 525896,
+   "parca": {
+    "toplam": {
+     "calls": 490,
+     "tris": 525896
+    },
+    "arazi": {
+     "calls": 104,
+     "tris": 514816
+    },
+    "sus": {
+     "calls": 1,
+     "tris": 0
+    },
+    "yapilar": {
+     "calls": 348,
+     "tris": 8324
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     69,
+     280,
+     675
+    ]
+   }
+  },
+  "anakara_taktik_pc.jpg": {
+   "calls": 336,
+   "tris": 3597298,
+   "parca": {
+    "toplam": {
+     "calls": 336,
+     "tris": 3597298
+    },
+    "arazi": {
+     "calls": 15,
+     "tris": 130560
+    },
+    "sus": {
+     "calls": 35,
+     "tris": 3451390
+    },
+    "yapilar": {
+     "calls": 144,
+     "tris": 4052
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     116,
+     245,
+     663
+    ]
+   }
+  },
+  "anakara_yakin_ucak_pc.jpg": {
+   "calls": 238,
+   "tris": 2897950,
+   "parca": {
+    "toplam": {
+     "calls": 238,
+     "tris": 2897950
+    },
+    "arazi": {
+     "calls": 74,
+     "tris": 367232
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 2525578
+    },
+    "yapilar": {
+     "calls": 117,
+     "tris": 2596
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     121,
+     252,
+     651
+    ]
+   }
+  },
+  "anakara_yakin_avci_pc.jpg": {
+   "calls": 294,
+   "tris": 2588242,
+   "parca": {
+    "toplam": {
+     "calls": 294,
+     "tris": 2588242
+    },
+    "arazi": {
+     "calls": 58,
+     "tris": 383232
+    },
+    "sus": {
+     "calls": 17,
+     "tris": 2194650
+    },
+    "yapilar": {
+     "calls": 144,
+     "tris": 4052
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     124,
+     257,
+     643
+    ]
+   }
+  },
+  "anakara_yakin_ates_pc.jpg": {
+   "calls": 243,
+   "tris": 2929594,
+   "parca": {
+    "toplam": {
+     "calls": 243,
+     "tris": 2929594
+    },
+    "arazi": {
+     "calls": 91,
+     "tris": 404736
+    },
+    "sus": {
+     "calls": 18,
+     "tris": 2519134
+    },
+    "yapilar": {
+     "calls": 87,
+     "tris": 2252
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     124,
+     257,
+     643
+    ]
+   }
+  },
+  "anakara_ufuk_pc.jpg": {
+   "calls": 269,
+   "tris": 2828874,
+   "parca": {
+    "toplam": {
+     "calls": 269,
+     "tris": 2828874
+    },
+    "arazi": {
+     "calls": 105,
+     "tris": 484864
+    },
+    "sus": {
+     "calls": 20,
+     "tris": 2337142
+    },
+    "yapilar": {
+     "calls": 99,
+     "tris": 2784
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     127,
+     257,
+     640
+    ]
+   }
+  },
+  "anakara_arazi_yakin_pc.jpg": {
+   "calls": 54,
+   "tris": 2649860,
+   "parca": {
+    "toplam": {
+     "calls": 54,
+     "tris": 2649860
+    },
+    "arazi": {
+     "calls": 18,
+     "tris": 156672
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 2491908
+    },
+    "yapilar": {
+     "calls": 1,
+     "tris": 12
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     131,
+     256,
+     637
+    ]
+   }
+  },
+  "takimada_strateji_pc.jpg": {
+   "calls": 315,
+   "tris": 305248,
+   "parca": {
+    "toplam": {
+     "calls": 315,
+     "tris": 305248
+    },
+    "arazi": {
+     "calls": 292,
+     "tris": 305024
+    },
+    "sus": {
+     "calls": 1,
+     "tris": 0
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     0,
+     233,
+     791
+    ]
+   }
+  },
+  "takimada_taktik_pc.jpg": {
+   "calls": 55,
+   "tris": 1121826,
+   "parca": {
+    "toplam": {
+     "calls": 55,
+     "tris": 1121826
+    },
+    "arazi": {
+     "calls": 27,
+     "tris": 235008
+    },
+    "sus": {
+     "calls": 6,
+     "tris": 886594
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     114,
+     294,
+     616
+    ]
+   }
+  },
+  "takimada_yakin_ucak_pc.jpg": {
+   "calls": 130,
+   "tris": 1992029,
+   "parca": {
+    "toplam": {
+     "calls": 130,
+     "tris": 1992029
+    },
+    "arazi": {
+     "calls": 84,
+     "tris": 430336
+    },
+    "sus": {
+     "calls": 11,
+     "tris": 1560232
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     292,
+     609
+    ]
+   }
+  },
+  "takimada_deniz_yakin_pc.jpg": {
+   "calls": 120,
+   "tris": 1822478,
+   "parca": {
+    "toplam": {
+     "calls": 120,
+     "tris": 1822478
+    },
+    "arazi": {
+     "calls": 101,
+     "tris": 416128
+    },
+    "sus": {
+     "calls": 8,
+     "tris": 1406342
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     293,
+     608
+    ]
+   }
+  },
+  "takimada_ufuk_pc.jpg": {
+   "calls": 145,
+   "tris": 2031268,
+   "parca": {
+    "toplam": {
+     "calls": 145,
+     "tris": 2031268
+    },
+    "arazi": {
+     "calls": 115,
+     "tris": 473728
+    },
+    "sus": {
+     "calls": 10,
+     "tris": 1557352
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     293,
+     608
+    ]
+   }
+  },
+  "yuksek_yakin_b17_pc.jpg": {
+   "calls": 312,
+   "tris": 3424391,
+   "parca": {
+    "toplam": {
+     "calls": 312,
+     "tris": 3424391
+    },
+    "arazi": {
+     "calls": 81,
+     "tris": 410624
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 3006686
+    },
+    "yapilar": {
+     "calls": 117,
+     "tris": 2596
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     116,
+     286,
+     622
+    ]
+   }
+  },
+  "yuksek_yakin_p51_pc.jpg": {
+   "calls": 298,
+   "tris": 3421370,
+   "parca": {
+    "toplam": {
+     "calls": 298,
+     "tris": 3421370
+    },
+    "arazi": {
+     "calls": 80,
+     "tris": 408320
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 3006686
+    },
+    "yapilar": {
+     "calls": 117,
+     "tris": 2596
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     116,
+     286,
+     622
+    ]
+   }
+  },
+  "yuksek_kol_pc.jpg": {
+   "calls": 767,
+   "tris": 2892505,
+   "parca": {
+    "toplam": {
+     "calls": 767,
+     "tris": 2892505
+    },
+    "arazi": {
+     "calls": 98,
+     "tris": 435072
+    },
+    "sus": {
+     "calls": 16,
+     "tris": 2427348
+    },
+    "yapilar": {
+     "calls": 275,
+     "tris": 7192
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     119,
+     287,
+     618
+    ]
+   }
+  },
+  "anakara_strateji_tel.jpg": {
+   "calls": 510,
+   "tris": 584776,
+   "parca": {
+    "toplam": {
+     "calls": 510,
+     "tris": 584776
+    },
+    "arazi": {
+     "calls": 124,
+     "tris": 573696
+    },
+    "sus": {
+     "calls": 1,
+     "tris": 0
+    },
+    "yapilar": {
+     "calls": 348,
+     "tris": 8324
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     69,
+     280,
+     675
+    ]
+   }
+  },
+  "anakara_taktik_tel.jpg": {
+   "calls": 232,
+   "tris": 3722770,
+   "parca": {
+    "toplam": {
+     "calls": 232,
+     "tris": 3722770
+    },
+    "arazi": {
+     "calls": 17,
+     "tris": 147968
+    },
+    "sus": {
+     "calls": 37,
+     "tris": 3568570
+    },
+    "yapilar": {
+     "calls": 144,
+     "tris": 4052
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     116,
+     245,
+     663
+    ]
+   }
+  },
+  "anakara_yakin_ucak_tel.jpg": {
+   "calls": 249,
+   "tris": 2954358,
+   "parca": {
+    "toplam": {
+     "calls": 249,
+     "tris": 2954358
+    },
+    "arazi": {
+     "calls": 84,
+     "tris": 414208
+    },
+    "sus": {
+     "calls": 20,
+     "tris": 2535010
+    },
+    "yapilar": {
+     "calls": 117,
+     "tris": 2596
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     121,
+     252,
+     651
+    ]
+   }
+  },
+  "anakara_yakin_avci_tel.jpg": {
+   "calls": 305,
+   "tris": 2624102,
+   "parca": {
+    "toplam": {
+     "calls": 305,
+     "tris": 2624102
+    },
+    "arazi": {
+     "calls": 68,
+     "tris": 419072
+    },
+    "sus": {
+     "calls": 17,
+     "tris": 2194650
+    },
+    "yapilar": {
+     "calls": 144,
+     "tris": 4052
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     124,
+     257,
+     643
+    ]
+   }
+  },
+  "anakara_yakin_ates_tel.jpg": {
+   "calls": 269,
+   "tris": 3049318,
+   "parca": {
+    "toplam": {
+     "calls": 269,
+     "tris": 3049318
+    },
+    "arazi": {
+     "calls": 116,
+     "tris": 518016
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 2525578
+    },
+    "yapilar": {
+     "calls": 87,
+     "tris": 2252
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     124,
+     257,
+     643
+    ]
+   }
+  },
+  "anakara_ufuk_tel.jpg": {
+   "calls": 345,
+   "tris": 2879710,
+   "parca": {
+    "toplam": {
+     "calls": 345,
+     "tris": 2879710
+    },
+    "arazi": {
+     "calls": 117,
+     "tris": 533120
+    },
+    "sus": {
+     "calls": 20,
+     "tris": 2337142
+    },
+    "yapilar": {
+     "calls": 144,
+     "tris": 4052
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     127,
+     257,
+     640
+    ]
+   }
+  },
+  "anakara_arazi_yakin_tel.jpg": {
+   "calls": 61,
+   "tris": 2711516,
+   "parca": {
+    "toplam": {
+     "calls": 61,
+     "tris": 2711516
+    },
+    "arazi": {
+     "calls": 24,
+     "tris": 208896
+    },
+    "sus": {
+     "calls": 20,
+     "tris": 2501340
+    },
+    "yapilar": {
+     "calls": 1,
+     "tris": 12
+    },
+    "efekt": {
+     "calls": 1,
+     "tris": 660
+    },
+    "arazi_parca": [
+     131,
+     256,
+     637
+    ]
+   }
+  },
+  "takimada_strateji_tel.jpg": {
+   "calls": 375,
+   "tris": 356960,
+   "parca": {
+    "toplam": {
+     "calls": 375,
+     "tris": 356960
+    },
+    "arazi": {
+     "calls": 352,
+     "tris": 356736
+    },
+    "sus": {
+     "calls": 1,
+     "tris": 0
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     0,
+     233,
+     791
+    ]
+   }
+  },
+  "takimada_taktik_tel.jpg": {
+   "calls": 59,
+   "tris": 1150242,
+   "parca": {
+    "toplam": {
+     "calls": 59,
+     "tris": 1150242
+    },
+    "arazi": {
+     "calls": 31,
+     "tris": 263424
+    },
+    "sus": {
+     "calls": 6,
+     "tris": 886594
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     114,
+     294,
+     616
+    ]
+   }
+  },
+  "takimada_yakin_ucak_tel.jpg": {
+   "calls": 143,
+   "tris": 2029789,
+   "parca": {
+    "toplam": {
+     "calls": 143,
+     "tris": 2029789
+    },
+    "arazi": {
+     "calls": 97,
+     "tris": 468096
+    },
+    "sus": {
+     "calls": 11,
+     "tris": 1560232
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     292,
+     609
+    ]
+   }
+  },
+  "takimada_deniz_yakin_tel.jpg": {
+   "calls": 136,
+   "tris": 1871886,
+   "parca": {
+    "toplam": {
+     "calls": 136,
+     "tris": 1871886
+    },
+    "arazi": {
+     "calls": 117,
+     "tris": 465536
+    },
+    "sus": {
+     "calls": 8,
+     "tris": 1406342
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     293,
+     608
+    ]
+   }
+  },
+  "takimada_ufuk_tel.jpg": {
+   "calls": 164,
+   "tris": 2080932,
+   "parca": {
+    "toplam": {
+     "calls": 164,
+     "tris": 2080932
+    },
+    "arazi": {
+     "calls": 134,
+     "tris": 523392
+    },
+    "sus": {
+     "calls": 10,
+     "tris": 1557352
+    },
+    "yapilar": {
+     "calls": 0,
+     "tris": 0
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     123,
+     293,
+     608
+    ]
+   }
+  },
+  "yuksek_yakin_b17_tel.jpg": {
+   "calls": 407,
+   "tris": 3491648,
+   "parca": {
+    "toplam": {
+     "calls": 407,
+     "tris": 3491648
+    },
+    "arazi": {
+     "calls": 96,
+     "tris": 459392
+    },
+    "sus": {
+     "calls": 20,
+     "tris": 3022058
+    },
+    "yapilar": {
+     "calls": 170,
+     "tris": 3496
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     116,
+     286,
+     622
+    ]
+   }
+  },
+  "yuksek_yakin_p51_tel.jpg": {
+   "calls": 320,
+   "tris": 3468370,
+   "parca": {
+    "toplam": {
+     "calls": 320,
+     "tris": 3468370
+    },
+    "arazi": {
+     "calls": 94,
+     "tris": 454784
+    },
+    "sus": {
+     "calls": 19,
+     "tris": 3006686
+    },
+    "yapilar": {
+     "calls": 117,
+     "tris": 2596
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     116,
+     286,
+     622
+    ]
+   }
+  },
+  "yuksek_kol_tel.jpg": {
+   "calls": 783,
+   "tris": 2941913,
+   "parca": {
+    "toplam": {
+     "calls": 783,
+     "tris": 2941913
+    },
+    "arazi": {
+     "calls": 114,
+     "tris": 484480
+    },
+    "sus": {
+     "calls": 16,
+     "tris": 2427348
+    },
+    "yapilar": {
+     "calls": 275,
+     "tris": 7192
+    },
+    "efekt": {
+     "calls": 0,
+     "tris": 0
+    },
+    "arazi_parca": [
+     119,
+     287,
+     618
+    ]
+   }
+  }
+ }
+}

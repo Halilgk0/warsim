@@ -1,0 +1,17 @@
+{
+  "name": "warsim-rec",
+  "private": true,
+  "type": "module",
+  "description": "WarSimBox tanıtım videoları: oyunun kayıt kipinden (?rec) sinematik çekimler ve kurgu (ffmpeg). Oyunun kendisi bu klasöre bağlı değildir.",
+  "scripts": {
+    "record": "node record.mjs",
+    "edit": "node edit.mjs"
+  },
+  "dependencies": {
+    "ffmpeg-static": "5.2.0",
+    "playwright-core": "1.56.1"
+  },
+  "allowScripts": {
+    "ffmpeg-static@5.2.0": true
+  }
+}

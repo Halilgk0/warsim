@@ -23,7 +23,10 @@ function webgl2(): boolean {
   }
 }
 
-if (!webgl2()) {
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('rec')) {
+  // Video kaydı (yalnız geliştirme sunucusunda; tools/rec)
+  void import('./rec/recorder').then((m) => m.startRecorder());
+} else if (!webgl2()) {
   fail('Bu tarayıcı 3B grafiği (WebGL 2) desteklemiyor ya da grafik hızlandırması kapalı. Güncel Chrome, Safari, Edge ya da Firefox ile dene.');
 } else {
   try {

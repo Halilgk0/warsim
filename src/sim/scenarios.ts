@@ -50,7 +50,7 @@ interface TheaterOptions {
   redFactoryLevel?: number;
 }
 
-function stock(base: Airbase, specId: string, n: number): void {
+export function stock(base: Airbase, specId: string, n: number): void {
   for (let i = 0; i < n; i++) base.addAirframe(newAirframe(specId, base.s.team));
 }
 
@@ -66,7 +66,7 @@ function aaSite(w: World, team: number, x: number, z: number, weapons?: AAWeapon
   return s;
 }
 
-function theater(w: World, o: TheaterOptions = {}): Theater {
+export function theater(w: World, o: TheaterOptions = {}): Theater {
   w.addTeam('Mavi', '#5b7ec9', o.blueTech ?? []);
   w.addTeam('Kırmızı', '#d9725f', o.redTech ?? ['hd_20'], o.redAI ?? false);
   const fwd = o.forward !== false;
@@ -93,16 +93,16 @@ function theater(w: World, o: TheaterOptions = {}): Theater {
   return { blueMain, blueFwd, redMain, redFwd, blueFactory, redFactory, redRadar, redAA, blueAA };
 }
 
-function plan(type: MissionType, specId: string, edit: Partial<MissionPlan> = {}): MissionPlan {
+export function plan(type: MissionType, specId: string, edit: Partial<MissionPlan> = {}): MissionPlan {
   return { ...defaultPlan(type, SPECS[specId]), ...edit };
 }
 
-function sweep(center: Vector3, alt: number, radius = 6000, formation: FormationType = 'finger4'): Partial<MissionPlan> {
+export function sweep(center: Vector3, alt: number, radius = 6000, formation: FormationType = 'finger4'): Partial<MissionPlan> {
   return { targetPos: center.clone().setY(0), altitude: alt, patrolRadius: radius, stationTime: 1800, formation, roe: 'free' };
 }
 
 /** Dalaş için kara üstünde bir merkez (batı ovası). */
-function landCenter(): Vector3 {
+export function landCenter(): Vector3 {
   for (const [x, z] of [[-60000, 24000], [-24000, -20000], [-68000, -40000], [60000, -32000]]) {
     if (!isWater(x, z) && footprintStats(x, z, 4000, 4000, 0).max < 900) return new Vector3(x, 0, z);
   }

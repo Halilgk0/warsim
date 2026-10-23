@@ -79,6 +79,11 @@ export interface AircraftOptions {
 
 let nextId = 1;
 
+/** Video kaydı: aynı dünya yeniden kurulunca kimlikler de aynı olsun (yalnız dünya yokken çağrılır). */
+export function resetAircraftIds(): void {
+  nextId = 1;
+}
+
 /** Yük seçeneğine ve araştırmaya göre uçağın gerçek silah grupları. */
 function effectiveGuns(spec: AircraftSpec, lo: Loadout, mods: ModEffects): GunSpec[] {
   const base = lo.replaceGuns ?? spec.guns;
