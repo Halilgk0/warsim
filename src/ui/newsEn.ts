@@ -12,6 +12,125 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'yeni-gorunum': {
+    title: 'A new look: sky, clouds and sunsets',
+    summary: 'A day cycle, clouds, a rolling sea and contrails; aircraft in their real paint schemes and rebuilt structures.',
+    captions: [
+      'B-17s at 8.6 km at sunset: contrails behind the engines of high-flying aircraft.',
+      'Clouds drift with the wind and cast shadows on the ground.',
+      'A rolling sea that reflects the sky, with the sun’s glitter path.',
+      'A P-51D in its real paint: canopy reflections, exhausts, a spinning propeller disc.',
+      'A night raid: lit factory windows and tracers in the sky.',
+      'Smoke columns rising from bombed buildings, bent by the wind.',
+    ],
+    sections: [
+      {
+        text: [
+          'WarSimBox has a whole new look. The simple low-poly style stays; light, sky, water and detail are much richer.',
+        ],
+      },
+      {
+        heading: 'Sky and weather',
+        bullets: [
+          'Sky, sun and haze that thins with height: light mist in the valleys, clear air up high; the map is visible all the way to the horizon.',
+          'Day cycle: one game day lasts 48 minutes. Sunrise, golden hour, sunset and a starry, moonlit night.',
+          'Clouds: cumulus and stratocumulus down low, cirrus up high. They drift with the wind, cast shadows and glow at sunset. They fade out in the strategy view so the map stays readable.',
+          'Sea: waves, water that reflects the sky, the glitter path of the sun (the moon at night) and foam along the shore.',
+        ],
+      },
+      {
+        heading: 'Aircraft',
+        bullets: [
+          'Every aircraft wears its real factory paint: camouflage patterns and national markings. Only those that were really unpainted (P-51D, B-17G, MiG-15…) are bare metal.',
+          'Wood, fabric and metal surfaces, panel lines, rivets and exhaust stains; canopy reflections, a pilot, the aerial wire and a spinning propeller disc.',
+          'Team colours are gone: tell friend from foe by the label colour, and in the distant view by the team-coloured arrows.',
+          'Engines flying high (above 6.8 km) leave contrails, which glow orange and pink at sunset. The AI sees them too: an aircraft trailing a contrail is spotted from far away.',
+        ],
+      },
+      {
+        heading: 'Smoke, fire and buildings',
+        bullets: [
+          'Soft smoke and fireballs that cool to embers. Bomb smoke rises like a mushroom, and burning buildings send up black columns bent by the wind.',
+          'Buildings rebuilt: brick, plaster, concrete and corrugated iron; sawtooth-roofed factories, airbases with hangars and a control tower, sandbagged flak positions and a Freya radar. Windows light up at night, and bombed buildings turn dark.',
+          'Field strips, forest patches and rock layers on the terrain.',
+        ],
+      },
+      {
+        heading: 'Graphics settings',
+        bullets: [
+          'Settings → Graphics → Quality: Low, Medium or High. The default is Low, so phones run smoothly.',
+          'Clouds, the rolling sea and the fine aircraft details appear on Medium and High. If your device is powerful, try High.',
+          'The day cycle and the clouds can each be turned off (with the day cycle off it is always daytime).',
+        ],
+      },
+    ],
+  },
+  ogretici: {
+    title: 'Tutorial: learn the game step by step',
+    summary: 'A short tutorial for new players: we plan your first mission together.',
+    captions: ['It asks when you press “Start game”: start the tutorial, close it, or don’t ask again.'],
+    sections: [
+      {
+        text: [
+          'New players were finding the game confusing, so there is now a short tutorial. It asks when you press “Start game” and takes about 5 minutes.',
+        ],
+      },
+      {
+        heading: 'Five parts',
+        bullets: [
+          'Main menu: language, map and map size, account, news, social media and feedback.',
+          'Map: panning, zooming and rotating the camera, and speeding up time.',
+          'First mission: select your base, check your hangar, plan and launch your first combat air patrol together, and follow your flight.',
+          'Grow your country: treasury, building, the factory and research.',
+          'War: enemy targets, the alert flight and how to win.',
+        ],
+      },
+      {
+        heading: 'How it works',
+        bullets: [
+          'Everything except the part being shown is dimmed, and only that part can be tapped. The game pauses while you read.',
+          'Skip a part with “Next part ›”, or leave with “End tutorial”.',
+          'If you tick “Don’t ask again”, it is saved to your account when you are logged in, otherwise in this browser.',
+          'You can also start it from inside a campaign: ☰ Menu → Tutorial.',
+        ],
+      },
+      {
+        heading: 'Also',
+        bullets: [
+          'Follow us: Instagram, YouTube and TikTok links are in the main menu and at the top of the News; that is where we post new videos.',
+        ],
+      },
+    ],
+  },
+  'harita-buyuklugu': {
+    title: 'Faster wars: map size and 2× on the open road',
+    summary: 'Pick a Small 150, Medium 200 or Large 300 km map; while your flights are on the road, the game runs at 2× by itself.',
+    captions: ['While a flight is on the road, the 1× button turns warm and reads “2×”.'],
+    sections: [
+      {
+        text: [
+          'On the big map, aircraft took a long time to reach their targets, and speeding the game up spoiled the fighting. Here are two fixes.',
+        ],
+      },
+      {
+        heading: 'Map size',
+        bullets: [
+          'In the main menu, below the map: Small 150 km, Medium 200 km (default), Large 300 km. The distance to the nearest enemy base is shown next to it.',
+          'On the small map the bases are close together and the war starts quickly; on the large one, flights take longer.',
+          'The terrain has the same shape at every size; runways, towns and close-up detail stay at real scale.',
+          'Older saves open on the 300 km map.',
+        ],
+      },
+      {
+        heading: 'Automatic 2× on the open road',
+        bullets: [
+          'At 1×, if your flights are only on the road (forming up, heading to the target or returning), the game runs at 2× by itself; the 1× button turns warm and reads “2×”.',
+          'It drops back to 1× at once when a mission starts (patrol, bombing, ground attack, interception), in combat, for take-off and landing, or when a known enemy comes near your flights or buildings.',
+          'If you pick another speed, it is left alone. Turn it off in Settings → Game → “Automatic 2× on the open road”.',
+        ],
+      },
+    ],
+  },
   ingilizce: {
     title: 'Now in English',
     summary: 'Switch the whole game between English and Turkish with one tap on the EN | TR button in the main menu.',

@@ -31,6 +31,134 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'yeni-gorunum',
+    date: '2026-10-28',
+    title: 'Yeni görünüm: gökyüzü, bulutlar ve gün batımı',
+    summary: 'Gün döngüsü, bulutlar, dalgalı deniz, yoğuşma izleri; uçaklar gerçek boyalarında, yapılar baştan yapıldı.',
+    cover: img('grafik.jpg'),
+    images: [
+      { src: img('grafik-iz.jpg'), caption: 'Gün batımında 8,6 km’de B-17’ler: yüksekte uçan motorların arkasında yoğuşma izi.' },
+      { src: img('grafik-bulut.jpg'), caption: 'Bulutlar rüzgârla sürüklenir ve araziye gölge düşürür.' },
+      { src: img('grafik-deniz.jpg'), caption: 'Dalgalı, göğü yansıtan deniz ve güneşin parıltı yolu.' },
+      { src: img('grafik-ucak.jpg'), caption: 'P-51D gerçek boyasında: kanopi yansıması, egzozlar, dönen pervane diski.' },
+      { src: img('grafik-gece.jpg'), caption: 'Gece baskını: fabrikanın pencerelerinde ışık, gökte iz mermileri.' },
+      { src: img('grafik-duman.jpg'), caption: 'Bombalanan yapılardan yükselen, rüzgârla bükülen duman sütunları.' },
+    ],
+    sections: [
+      {
+        text: [
+          'WarSimBox’ın görünümü baştan yenilendi. Sade, low-poly üslup aynı kaldı; ışık, gökyüzü, su ve ayrıntılar çok daha zengin.',
+        ],
+      },
+      {
+        heading: 'Gök ve hava',
+        bullets: [
+          'Gökyüzü, güneş ve yükseklikle azalan pus: vadilerde hafif sis, yüksekte berrak hava; harita ufka kadar görünür.',
+          'Gün döngüsü: bir oyun günü 48 dakika sürer. Gün doğumu, altın saat, gün batımı ve yıldızlı, ay ışıklı gece.',
+          'Bulutlar: alçakta kümülüs ve stratokümülüs, yüksekte sirrüs. Rüzgârla sürüklenir, araziye gölge düşürür, gün batımında kızarır. Strateji görünümünde söner, harita okunur kalır.',
+          'Deniz: dalgalar, göğü yansıtan su, güneşin (gece ayın) parıltı yolu, kıyıda köpük.',
+        ],
+      },
+      {
+        heading: 'Uçaklar',
+        bullets: [
+          'Her uçak gerçek fabrika boyasında: kamuflaj desenleri ve millî işaretler. Yalnız gerçekte boyasız olanlar (P-51D, B-17G, MiG-15…) metal.',
+          'Ahşap, kumaş ve metal yüzeyler, panel çizgileri, perçinler, egzoz isi; kanopi yansıması, pilot, anten teli, dönen pervane diski.',
+          'Takım rengi kalktı: dostu ve düşmanı etiket renginden, uzak görünümde takım renkli oklardan ayırırsın.',
+          'Yüksekte (6,8 km üstü) uçan motorların arkasında yoğuşma izi oluşur, gün batımında turuncu-pembe ışır. Yapay zekâ da bu izi görür: izli uçak uzaktan fark edilir.',
+        ],
+      },
+      {
+        heading: 'Duman, ateş ve yapılar',
+        bullets: [
+          'Yumuşak duman ve kora dönen ateş topu. Bomba dumanı mantar gibi yükselir, yanan yapılardan rüzgârla bükülen kara sütunlar çıkar.',
+          'Yapılar baştan: tuğla, sıva, beton ve oluklu sac; testere dişi çatılı fabrikalar, hangarlı ve kuleli hava üsleri, kum torbalı uçaksavar mevzileri, Freya radarı. Gece pencerelerde ışık yanar, bombalanan yapı kararır.',
+          'Arazide tarla izleri, orman benekleri ve kaya katmanları.',
+        ],
+      },
+      {
+        heading: 'Grafik ayarları',
+        bullets: [
+          'Ayarlar → Grafik → Kalite: Düşük, Orta ya da Yüksek. Telefonlar akıcı oynasın diye varsayılan Düşük.',
+          'Bulutlar, dalgalı deniz ve uçakların ince ayrıntıları Orta ve Yüksek kalitede görünür. Cihazın güçlüyse Yüksek’i dene.',
+          'Gün döngüsü ve bulutlar ayrı ayrı kapatılabilir (gün döngüsü kapalıyken hep gündüz).',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ogretici',
+    date: '2026-10-28',
+    title: 'Öğretici: oyunu adım adım öğren',
+    summary: 'Yeni başlayanlar için kısa bir öğretici: ilk görevini birlikte planlıyoruz.',
+    cover: img('ogretici.jpg'),
+    images: [{ src: img('ogretici-soru.jpg'), caption: '“Oyuna başla”ya basınca sorar: öğreticiyi başlat, kapat ya da bir daha sorma.' }],
+    sections: [
+      {
+        text: [
+          'Oyuna ilk girenlerin kafası karışıyordu; artık kısa bir öğretici var. “Oyuna başla”ya basınca sorar, yaklaşık 5 dakika sürer.',
+        ],
+      },
+      {
+        heading: 'Beş bölüm',
+        bullets: [
+          'Ana menü: dil, harita ve büyüklüğü, hesap, haberler, sosyal medya ve geri bildirim.',
+          'Harita: kamerayı kaydırma, yakınlaştırma, döndürme ve zamanı hızlandırma.',
+          'İlk görev: üssünü seçer, hangarına bakar, ilk hava devriyeni birlikte planlayıp kaldırır, kolunu takip edersin.',
+          'Ülkeni büyüt: hazine, inşa, fabrika ve araştırma.',
+          'Savaş: düşman hedefleri, alarm kolu ve nasıl kazanılır.',
+        ],
+      },
+      {
+        heading: 'Nasıl çalışır',
+        bullets: [
+          'Gösterilen yer dışında ekran kararır; yalnız o yere dokunabilirsin. Sen okurken oyun durur.',
+          '“Sonraki bölüm” ile bir bölümü atlar, “Öğreticiyi bitir” ile çıkarsın.',
+          '“Bir daha sorma”yı işaretlersen hesabın açıksa hesabına, değilse bu tarayıcıya kaydedilir.',
+          'Harekâtın içinden de başlatılabilir: ☰ Menü → Öğretici.',
+        ],
+      },
+      {
+        heading: 'Ayrıca',
+        bullets: [
+          'Bizi takip et: ana menüde ve Haberler’in başında Instagram, YouTube ve TikTok bağlantıları var; yeni videoları orada paylaşıyoruz.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'harita-buyuklugu',
+    date: '2026-10-28',
+    title: 'Daha hızlı savaş: harita büyüklüğü ve boş yolda 2×',
+    summary: 'Küçük 150, Orta 200 ya da Büyük 300 km harita seç; kolların yoldayken oyun kendiliğinden 2× akar.',
+    cover: img('harita-boyut.jpg'),
+    images: [{ src: img('otomatik-2x.jpg'), caption: 'Kol yoldayken 1× düğmesi sıcak renkte “2×” olur.' }],
+    sections: [
+      {
+        text: [
+          'Büyük haritada uçaklar hedefe uzun yol gidiyordu; oyunu hızlandırınca da savaşın tadı kaçıyordu. İki çözüm geldi.',
+        ],
+      },
+      {
+        heading: 'Harita büyüklüğü',
+        bullets: [
+          'Ana menüde haritanın altında: Küçük 150 km, Orta 200 km (varsayılan), Büyük 300 km. Yanında en yakın düşman üssünün uzaklığı yazar.',
+          'Küçük haritada üsler birbirine yakın, savaş çabuk başlar; büyükte uçuşlar uzun sürer.',
+          'Arazinin biçimi her büyüklükte aynı; pistler, şehirler ve yakın ayrıntı gerçek boyda kalır.',
+          'Eski kayıtlar 300 km haritada açılır.',
+        ],
+      },
+      {
+        heading: 'Boş yolda otomatik 2×',
+        bullets: [
+          'Oyun 1×’teyken kolların yalnız yoldaysa (toplanma, hedefe gidiş, dönüş) oyun kendiliğinden 2× akar; 1× düğmesi sıcak renkte “2×” olur.',
+          'Görev başlayınca (devriye, bombalama, taarruz, önleme), çatışmada, kalkış ve inişte ya da bilinen bir düşman kollarına veya yapılarına yaklaşınca hemen 1×’e döner.',
+          'Başka bir hız seçersen ona dokunulmaz. Ayarlar → Oyun → “Boş yolda otomatik 2×” ile kapatılır.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'ingilizce',
     date: '2026-10-28',
     title: 'Artık İngilizce de var',
