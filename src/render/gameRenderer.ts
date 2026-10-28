@@ -8,14 +8,19 @@ import { RUNWAY_HALF, corridorMargin } from '../sim/structures/airbase';
 import { turretWorldPos } from '../sim/ai/gunner';
 import { groundLevel, terrainEdits } from '../sim/terrain';
 import { CameraRig } from './camera';
-import { TerrainView } from './terrain';
+import { TerrainView, waterU } from './terrain';
 import { StructureView } from './structures';
-import { buildAircraftModel, buildStoreMeshes, type AircraftModel } from './models';
+import { buildAircraftModel, buildStoreMeshes, propU, type AircraftModel } from './models';
 import { Scenery } from './scenery';
 import { computeLandcover, setClearings } from './landcover';
 import { Debris, Effects, ParachuteViews, RocketViews, Tracers } from './effects';
 import { PALETTE } from './palette';
-import { settings } from '../ui/settings';
+import { Atmosphere, FIXED_HOUR, dayHour } from './atmosphere';
+import { Contrails, contrailAmount } from './contrails';
+import { Clouds } from './clouds';
+import { archU } from './arch';
+import { onSettingsChange, quality, settings } from '../ui/settings';
+import { L } from '../i18n';
 
 const TRAIL_N = 90;
 const TRAIL_DT = 0.12;
@@ -43,7 +48,16 @@ interface AircraftView {
   trailColor: THREE.Color;
   label: HTMLDivElement;
   visible: boolean;
+  /** Küçük ayrıntılar çiziliyor mu (ekrandaki boyuta göre, eşikte gidip gelmesin diye payla). */
+  fine: boolean;
 }
+
+/**
+ * Küçük ayrıntıların (cam, koyu parçalar, pilot, lambalar, küçük eklemler) çizildiği en küçük ekran yarıçapı
+ * (CSS piksel). Bu boyutta kanopi ve namlular 1–2 pikselin altında kalır; gizlenince fark görünmez, kalabalık kolda
+ * çizim sayısı yarıya iner. Video kaydında yarısı.
+ */
+const FINE_PX = 10;
 
 export interface Ghost {
   kind: StructureKind;
@@ -60,6 +74,7 @@ const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _white = new THREE.Color(0xffffff);
+const _glow = new THREE.Color();
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -82,9 +97,25 @@ export class GameRenderer {
   /** Son simülasyon adımından bu yana geçen oran (0..1). */
   private alpha = 1;
   private terrain: TerrainView;
+  readonly atmosphere: Atmosphere;
+  readonly clouds: Clouds;
+  /** Cihazın piksel oranı (en çok 2); çözünürlük ayarı bunun katı. */
+  private readonly baseRatio = Math.min(window.devicePixelRatio, 2);
+  /** Otomatik çözünürlük: geçerli çarpan, kare süresi ortalaması (ms), son değişimden beri süre (s). */
+  private readonly resAuto = { scale: 1, ema: 16.7, t: 0 };
+  /** Video kaydı: çözünürlük sabit. */
+  private fixedBuffer = false;
+  /** Günün saatine eklenen kaydırma (saat; kayıt kipi çekimin saatini ayarlar). */
+  clockShift = 0;
   private scenery: Scenery;
   private clearKey = '';
   private views = new Map<number, AircraftView>();
+  /** Uçak modeli ayrıntısı (kalite ayarı: 0 low-poly, 1 yüksek çözünürlük). */
+  private modelDetail = 1;
+  /** Sinematik çekimde de kamera ile baktığı nokta arasındaki bulut açılsın (kayıt kipi, çekim seçeneği). */
+  cinemaClearClouds = false;
+  /** Yapı duman sütunlarının ömür çarpanı (kayıt kipi, çekim seçeneği; oyunda 1). */
+  cinemaSmoke = 1;
   private structViews = new Map<number, StructureView>();
   private structLabels = new Map<number, HTMLDivElement>();
   private structGroup = new THREE.Group();
@@ -93,6 +124,7 @@ export class GameRenderer {
   private tracers = new Tracers();
   private rockets = new RocketViews();
   private debris = new Debris();
+  private contrails = new Contrails();
   private chutes = new ParachuteViews();
   /** Uzak görünümde uçak simgeleri (takım renginde yön okları). */
   private icons: THREE.InstancedMesh;
@@ -122,21 +154,20 @@ export class GameRenderer {
   constructor(container: HTMLElement, private readonly labelLayer: HTMLElement, opts: { preserveBuffer?: boolean } = {}) {
     // Ölçek 40 m'den 90 km'ye kadar değiştiği için logaritmik derinlik (uzakta z-fighting olmasın)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this.baseRatio);
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(PALETTE.sky);
-    this.scene.fog = new THREE.Fog(PALETTE.sky, 30000, 150000);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d0c2, 1.6));
-    const sun = new THREE.DirectionalLight(0xfff8ee, 1.8);
-    sun.position.set(-0.5, 1, -0.35);
-    this.scene.add(sun);
+    // Ton eşleme: renkler pastel kalır (Neutral orta tonlara dokunmaz), yalnız parlaklar yumuşakça sıkışır
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1;
+    this.atmosphere = new Atmosphere(this.scene);
+    this.clouds = new Clouds(this.scene);
 
     computeLandcover();
     this.terrain = new TerrainView(this.scene);
     this.scenery = new Scenery(this.scene);
     this.scene.add(this.structGroup, this.effects.mesh, this.tracers.mesh, this.rockets.mesh, this.ghostGroup, this.aaRings);
-    this.scene.add(this.debris.mesh, this.chutes.group);
+    this.scene.add(this.debris.mesh, this.chutes.group, this.contrails.mesh);
     // Ok biçimli simge: burun +Z, XZ düzleminde
     const arrow = new THREE.Shape();
     arrow.moveTo(0, 1);
@@ -209,6 +240,55 @@ export class GameRenderer {
     this.rig = new CameraRig(this.camera, this.renderer.domElement);
     window.addEventListener('resize', () => this.resize());
     this.resize();
+    this.fixedBuffer = !!opts.preserveBuffer;
+    this.applyGraphics();
+    onSettingsChange(() => this.applyGraphics());
+  }
+
+  /** Grafik kalitesi ve çözünürlük ayarını uygula (ayar değişince de çağrılır). */
+  applyGraphics(): void {
+    const q = quality();
+    this.scenery.setQuality(q.treeNear, q.treeThin, q.treeFade, q.settle);
+    this.effects.setLimit(q.puffs);
+    this.clouds.setDensity(settings.graphics.clouds ? q.clouds : 0);
+    waterU.waterQ.value = q.water ? 1 : 0;
+    waterU.terrDetail.value = q.ground;
+    // Model ayrıntısı değişince uçaklar yeniden kurulur (sonraki karede yeni ayrıntıyla)
+    if (q.models !== this.modelDetail) {
+      this.modelDetail = q.models;
+      for (const v of this.views.values()) this.removeView(v);
+      this.views.clear();
+    }
+    this.applyResolution();
+  }
+
+  private applyResolution(): void {
+    const r = settings.graphics.resolution;
+    const k = r === 'auto' ? this.resAuto.scale : Number(r);
+    const ratio = this.baseRatio * k;
+    if (Math.abs(this.renderer.getPixelRatio() - ratio) < 1e-3) return;
+    this.renderer.setPixelRatio(ratio);
+    this.resize();
+  }
+
+  /**
+   * Otomatik çözünürlük: kare süresinin ortalaması 2 sn boyunca 21 ms'yi aşarsa çözünürlük kademeli düşer, 6 sn boyunca
+   * 13 ms altında kalırsa geri çıkar. Video kaydında kapalı (kareler zaten zamandan bağımsız).
+   */
+  private autoResolution(realDt: number): void {
+    if (this.fixedBuffer || settings.graphics.resolution !== 'auto' || realDt <= 0 || realDt > 0.1) return;
+    const a = this.resAuto;
+    a.ema += (realDt * 1000 - a.ema) * 0.05;
+    a.t += realDt;
+    // Yüksek piksel oranlı telefonda yarıya kadar, masaüstünde %75'e kadar
+    const min = this.baseRatio >= 1.5 ? 0.55 : 0.75;
+    let next = a.scale;
+    if (a.t > 2 && a.ema > 21 && a.scale > min) next = Math.max(min, a.scale - 0.15);
+    else if (a.t > 6 && a.ema < 13 && a.scale < 1) next = Math.min(1, a.scale + 0.1);
+    if (next === a.scale) return;
+    a.scale = next;
+    a.t = 0;
+    this.applyResolution();
   }
 
   get dom(): HTMLCanvasElement {
@@ -234,6 +314,7 @@ export class GameRenderer {
     this.structLabels.clear();
     this.structGroup.clear();
     this.effects.clear();
+    this.contrails.clear();
     this.debris.clear();
     this.coverageKey = '';
     this.aaKey = '';
@@ -260,19 +341,34 @@ export class GameRenderer {
     this.alpha = alpha;
     const simDt = Math.max(0, w.time - this.lastTime);
     this.lastTime = w.time;
+    this.autoResolution(realDt);
     this.rig.update(realDt);
     this.updateClearings(w);
     // Harita değiştiyse önce arazi örtüsü, sonra arazi ve süs yeniden kurulur
     computeLandcover();
     this.terrain.update(this.camera);
     this.scenery.rebuild();
-    this.scenery.update(this.rig.target, this.rig.distance, settings.map.scenery);
+    this.scenery.update(this.rig.distance, settings.map.scenery, this.camera.position);
     const vis = this.rig.fxScale;
     const ms = this.rig.modelScale;
-    const fog = this.scene.fog as THREE.Fog;
-    const viewDist = Math.max(this.rig.distance, this.camera.position.y - groundLevel(this.camera.position.x, this.camera.position.z));
-    fog.near = viewDist * 1.6;
-    fog.far = viewDist * 6 + 20000;
+    // Gün döngüsü: dünya zamanından saat (ayar kapalıysa hep gündüz)
+    const hour = settings.graphics.dayCycle ? dayHour(w.time, this.clockShift) : FIXED_HOUR;
+    if (hour !== this.atmosphere.hour) {
+      this.atmosphere.setTime(hour);
+      this.scenery.setLight(this.atmosphere.skyLight);
+    }
+    this.atmosphere.update(this.camera);
+    waterU.waterTime.value = w.time;
+    archU.archNight.value = this.atmosphere.night;
+    this.clouds.update(
+      this.camera, w.time, this.rig.distance, this.rig.target, this.atmosphere.sunDir, this.atmosphere.skyLight,
+      this.atmosphere.cloudGlow, !this.rig.director || this.cinemaClearClouds,
+    );
+    // Yoğuşma izi ışıksız: gök kararınca o da kararır (gece yalnız ay ışığında soluk görünür). Gün batımında yüksek
+    // bulutlar gibi güneşin son ışığını alır: beyazdan turuncu-pembeye döner
+    const glow = this.atmosphere.glow;
+    (this.contrails.mesh.material as THREE.MeshBasicMaterial).color.setScalar(0.98 * this.atmosphere.skyLight ** 2 * (1 - 0.55 * glow))
+      .add(_glow.copy(this.atmosphere.cloudGlow).multiplyScalar(1.3));
 
     this.syncStructures(w, simDt);
     this.syncAircraft(w, simDt, vis, ms);
@@ -282,10 +378,10 @@ export class GameRenderer {
     this.debris.update(simDt, this.effects, simDt > 0 && settings.map.effects, ms);
     this.chutes.update(w.parachutes, ms);
     this.tracers.mesh.visible = settings.map.tracers;
-    if (settings.map.tracers) this.tracers.update(w.bullets, vis, settings.tracerScale);
+    if (settings.map.tracers) this.tracers.update(w.bullets, settings.tracerScale, this.camera, this.renderer.domElement.clientHeight);
     this.rockets.update(w.rockets, vis, this.effects, simDt > 0 && settings.map.effects);
     this.effects.mesh.visible = settings.map.effects;
-    this.effects.update(simDt);
+    this.effects.update(simDt, this.camera);
     this.syncOverlays(w);
     this.updateLabels(ms);
     this.renderer.render(this.scene, this.camera);
@@ -395,20 +491,30 @@ export class GameRenderer {
       // Hasarlı yapı tüter
       const ratio = s.hp / s.maxHp;
       if (ratio < 0.7 && w.time >= v.nextSmoke && settings.map.effects) {
-        v.nextSmoke = w.time + 0.25 + ratio * 0.6;
-        const a = Math.random() * Math.PI * 2;
-        const r = Math.random() * s.def.radius * 0.6;
-        _v.set(s.pos.x + Math.cos(a) * r, s.pos.y + 15, s.pos.z + Math.sin(a) * r);
-        this.effects.buildingSmoke(_v, ratio < 0.3);
+        // Yangın noktaları ilk dumanda seçilir (büyük yapıda üç, küçükte bir); her sütun kendi noktasından
+        if (!v.firePts) {
+          v.firePts = Array.from({ length: s.def.radius > 60 ? 3 : 1 }, () => {
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.random() * s.def.radius * 0.55;
+            return [Math.cos(a) * r, Math.sin(a) * r];
+          });
+        }
+        v.nextSmoke = w.time + (0.25 + ratio * 0.6) / v.firePts.length;
+        const [fx, fz] = v.firePts[Math.floor(Math.random() * v.firePts.length)];
+        _v.set(s.pos.x + fx + (Math.random() - 0.5) * 8, s.pos.y + 15, s.pos.z + fz + (Math.random() - 0.5) * 8);
+        this.effects.buildingSmoke(_v, ratio < 0.3, this.cinemaSmoke);
       }
       // Uçaksavar namlu alevleri
       if (s.aa && settings.map.effects) {
         s.aa.mounts.forEach((m, i) => {
           if (w.time - m.lastFire < simDt + 1e-4 && simDt > 0) {
-            const [ox, oz] = AASite.mountOffset(i);
+            // Alev modeldeki namlu ucundan (yükseliş açısı dahil); model yoksa yuvanın önünden
             const wd = AA_WEAPONS[m.weapon];
-            const reach = m.weapon === 'aa128' ? 8 : wd.medium ? 5 : 3;
-            _v.set(s.pos.x + ox + Math.sin(m.yaw) * reach, s.pos.y + 3, s.pos.z + oz - Math.cos(m.yaw) * reach);
+            if (!v.muzzleWorld(i, _v)) {
+              const [ox, oz] = AASite.mountOffset(i);
+              const reach = m.weapon === 'aa128' ? 8 : wd.medium ? 5 : 3;
+              _v.set(s.pos.x + ox + Math.sin(m.yaw) * reach, s.pos.y + 3, s.pos.z + oz - Math.cos(m.yaw) * reach);
+            }
             this.effects.muzzle(_v, Math.min(this.rig.fxScale, 4) * (m.weapon === 'aa128' ? 4 : wd.medium ? 3 : 1.5));
           }
         });
@@ -419,10 +525,11 @@ export class GameRenderer {
   // --- Uçaklar ---------------------------------------------------------------
 
   private createView(ac: Aircraft): AircraftView {
-    const model = buildAircraftModel(ac.spec.model, PALETTE.team[ac.team] ?? PALETTE.neutralModel);
+    // Gerçek boya (takım rengi yok: dost ve düşman etiket renginden); ayrıntı kaliteye göre
+    const model = buildAircraftModel(ac.spec.model, { detail: this.modelDetail });
     const root = new THREE.Group();
     root.add(model.root);
-    const stores = buildStoreMeshes(ac.spec.model, ac.spec, ac.stores.slots);
+    const stores = buildStoreMeshes(ac.spec.model, ac.spec, ac.stores.slots, this.modelDetail);
     for (const sm of stores) if (sm) model.root.add(sm);
     this.scene.add(root);
     const shadow = new THREE.Mesh(this.shadowGeo, this.shadowMat);
@@ -442,7 +549,7 @@ export class GameRenderer {
       trailBuf: new Float32Array(TRAIL_N * 3), trailHead: 0, trailCount: 0,
       lastSample: -1, lastSmoke: -1, lastMuzzle: -1,
       trailColor: this.teamColors[ac.team] ?? this.teamColors[0],
-      label, visible: true,
+      label, visible: true, fine: true,
     };
   }
 
@@ -458,7 +565,12 @@ export class GameRenderer {
     const dlCol = this.dropLines.geometry.attributes.color.array as Float32Array;
     let dl = 0;
     const m = settings.map;
+    // Ekran yarıçapı (CSS piksel) = metre × pxPerM / uzaklık
+    const pxPerM = this.renderer.domElement.clientHeight / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
+    const finePx = this.rig.director ? FINE_PX / 2 : FINE_PX;
+    propU.discSpin.value += simDt * 1.7;
 
+    this.contrails.begin();
     for (const ac of w.aircraft) {
       let v = this.views.get(ac.id);
       if (!v) {
@@ -482,8 +594,28 @@ export class GameRenderer {
       v.root.position.copy(v.ip);
       v.root.quaternion.copy(v.iq);
       v.root.scale.setScalar(scale);
-      const spin = ac.status === 'flying' && ac.totalFuel > 0 ? 45 + ac.controls.throttle * 30 : 6;
+      const running = ac.status === 'flying' && ac.totalFuel > 0;
+      const spin = running ? 45 + ac.controls.throttle * 30 : 6;
       for (const p of v.model.props) p.rotation.z += simDt * spin;
+      // Hızlı dönen pervane: palalar yerine bulanık disk (60 kare/sn'de palalar zaten kareden kareye atlar)
+      const blur = spin > 20;
+      for (const p of v.model.props) p.visible = !blur;
+      if (v.model.disc) v.model.disc.visible = blur;
+      // Ekranda küçük kalan uçakta küçük ayrıntılar çizilmez (gövde, pervane diski ve askılar kalır)
+      const px = (v.model.radius * scale * pxPerM) / Math.max(1, this.camera.position.distanceTo(v.ip));
+      const fine = v.fine ? px > finePx : px > finePx * 1.25;
+      if (fine !== v.fine) {
+        v.fine = fine;
+        for (const o of v.model.fine) o.visible = fine;
+      }
+      // Yoğuşma izi: her motorun arkasından (irtifaya göre; motor çalışmıyorsa yok)
+      if (m.effects && v.visible) {
+        const k = running ? contrailAmount(ac.pos.y) : 0;
+        v.model.emitters.forEach((e, i) => {
+          _w.copy(e).applyQuaternion(v.iq).add(v.ip);
+          this.contrails.feed(`${ac.id}:${i}`, _w, k, w.time);
+        });
+      }
       // Askılardaki mühimmat: kalan adet kadar
       ac.stores.slots.forEach((sl, i) => {
         const sm = v.stores[i];
@@ -550,6 +682,8 @@ export class GameRenderer {
         this.views.delete(id);
       }
     }
+    this.contrails.mesh.visible = m.effects;
+    if (m.effects) this.contrails.end(this.camera, w.time);
     const dg = this.dropLines.geometry;
     dg.setDrawRange(0, dl * 2);
     dg.attributes.position.needsUpdate = true;
@@ -688,7 +822,7 @@ export class GameRenderer {
       }
       lbl.style.display = '';
       lbl.style.transform = `translate(${(((_v.x + 1) / 2) * r.width).toFixed(1)}px, ${(((1 - _v.y) / 2) * r.height).toFixed(1)}px) translate(-50%, -50%)`;
-      const pct = s.build < 1 ? ` · inşaat %${Math.round(s.build * 100)}` : s.destroyed ? ' · yıkık' : '';
+      const pct = s.build < 1 ? L(` · inşaat %${Math.round(s.build * 100)}`, ` · building ${Math.round(s.build * 100)}%`) : s.destroyed ? L(' · yıkık', ' · destroyed') : '';
       const txt = named ? `${STRUCT_GLYPH[s.kind]} ${s.name}${pct}` : STRUCT_GLYPH[s.kind];
       if (lbl.textContent !== txt) lbl.textContent = txt;
       lbl.classList.toggle('sel', id === this.selectedStructureId);

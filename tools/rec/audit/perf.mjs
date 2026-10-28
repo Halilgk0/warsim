@@ -2,6 +2,7 @@
 // (başsız tarayıcı rAF'yi yavaşlatır). Telefon taklidinde işlemci CDP ile yavaşlatılır (Emulation.setCPUThrottlingRate).
 //
 //   node audit/perf.mjs <etiket> [tel|pc] [yavaşlatma]     ör. node audit/perf.mjs sonra tel 4
+//   KALITE=low|medium|high (varsayılan high); çözünürlük hep tam
 //
 // Her sahnede 3 sn ısınma + 8 sn ölçüm. Satır başına:
 //   render_ms  kare başına sahne güncellemesi + çizim komutları (işlemci, yavaşlatılmış); bütçe 16,7 ms
@@ -128,6 +129,10 @@ async function main() {
   const results = [];
   try {
     const ctx = await browser.newContext(PROFILES[prof]);
+    // Ölçüm karşılaştırılabilir kalsın: çözünürlük sabit (otomatik çözünürlük ölçerken değişmesin), kalite seçilebilir
+    await ctx.addInitScript((q) => {
+      localStorage.setItem('warsim.settings.v2', JSON.stringify({ graphics: { quality: q, resolution: '1' } }));
+    }, process.env.KALITE || 'high');
     for (const sc of SCENES) {
       const page = await ctx.newPage();
       page.on('pageerror', (e) => console.log(`[sayfa hata] ${e.message}`));

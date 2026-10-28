@@ -12,6 +12,8 @@
 
 import { computeMods, type ModEffects } from './mods';
 import type { AircraftSpec } from './aircraft/specs';
+import { EN, L } from '../i18n';
+import { TECH_EN } from './techEn';
 
 export type TechKind = 'mod' | 'aircraft' | 'aa' | 'radar';
 export type ModCategory = 'motor' | 'govde' | 'silah' | 'nisan' | 'menzil';
@@ -46,38 +48,41 @@ export interface TechNode {
 }
 
 export const ERA_NAMES: Record<Era, string> = {
-  1: 'Erken pervaneli dönem · 1936–1941',
-  2: 'Gelişmiş pervaneli dönem · 1941–1945',
-  3: 'İlk jetler · 1944–1955',
-  4: 'Sonraki aşama · radar ve füze',
+  1: L('Erken pervaneli dönem · 1936–1941', 'Early piston era · 1936–1941'),
+  2: L('Gelişmiş pervaneli dönem · 1941–1945', 'Late piston era · 1941–1945'),
+  3: L('İlk jetler · 1944–1955', 'First jets · 1944–1955'),
+  4: L('Sonraki aşama · radar ve füze', 'Next stage · radar and missiles'),
 };
 
 export const CAT_NAMES: Record<ModCategory, string> = {
-  motor: 'Motor',
-  govde: 'Gövde ve zırh',
-  silah: 'Silah',
-  nisan: 'Nişan ve elektronik',
-  menzil: 'Yakıt ve menzil',
+  motor: L('Motor', 'Engine'),
+  govde: L('Gövde ve zırh', 'Airframe and armour'),
+  silah: L('Silah', 'Weapons'),
+  nisan: L('Nişan ve elektronik', 'Sights and electronics'),
+  menzil: L('Yakıt ve menzil', 'Fuel and range'),
 };
 
 export const CAT_ICONS: Record<ModCategory, string> = { motor: '⚙', govde: '⛨', silah: '✦', nisan: '◎', menzil: '⛽' };
 
 export const LINE_NAMES: Record<AircraftLine, string> = {
-  hafif: 'Avcı · dönüş',
-  enerji: 'Avcı · enerji',
-  agir: 'Ağır avcı · avcı-bombardıman',
-  taarruz: 'Taarruz',
-  pike: 'Pike bombardıman',
-  bombardiman: 'Bombardıman',
+  hafif: L('Avcı · dönüş', 'Fighter · turn'),
+  enerji: L('Avcı · enerji', 'Fighter · energy'),
+  agir: L('Ağır avcı · avcı-bombardıman', 'Heavy fighter · fighter-bomber'),
+  taarruz: L('Taarruz', 'Ground attack'),
+  pike: L('Pike bombardıman', 'Dive bomber'),
+  bombardiman: L('Bombardıman', 'Bomber'),
 };
 
 export const LINE_ORDER: AircraftLine[] = ['hafif', 'enerji', 'agir', 'taarruz', 'pike', 'bombardiman'];
 
 export const RANK_NAMES: Record<number, string> = {
-  1: 'I · 1936–40', 2: 'II · 1940–42', 3: 'III · 1942–44', 4: 'IV · 1944–45', 5: 'V · ilk jetler', 6: 'VI · ok kanat', 7: 'Sonraki aşama',
+  1: 'I · 1936–40', 2: 'II · 1940–42', 3: 'III · 1942–44', 4: 'IV · 1944–45', 5: L('V · ilk jetler', 'V · first jets'), 6: L('VI · ok kanat', 'VI · swept wing'),
+  7: L('Sonraki aşama', 'Next stage'),
 };
 
-export const AA_GROUP_NAMES: Record<AAGroup, string> = { silah: 'Silahlar', nisan: 'Nişan ve atış kontrolü', tahkimat: 'Tahkimat' };
+export const AA_GROUP_NAMES: Record<AAGroup, string> = {
+  silah: L('Silahlar', 'Guns'), nisan: L('Nişan ve atış kontrolü', 'Sighting and fire control'), tahkimat: L('Tahkimat', 'Fortification'),
+};
 
 const mod = (
   id: string, name: string, era: Era, cat: ModCategory, time: number, requires: string[], desc: string, effect: string,
@@ -289,6 +294,8 @@ export const TECH: TechNode[] = [
 // Zorluk: yukarıdaki süreler taban değerdir. Gerçek süre dönemle (modifikasyon, hava savunma, radar) ya da
 // rütbeyle (uçak) büyür: erken pervaneli 3-5 dk, ilk jetler 10-20 dk, F-86 / MiG-15 yarım saati bulur.
 for (const t of TECH) {
+  const en = EN ? TECH_EN[t.id] : undefined;
+  if (en) [t.name, t.desc, t.effect] = en;
   if (t.kind === 'aircraft') t.time = Math.round(t.time * (2 + 0.6 * (t.rank ?? 1)));
   else t.time = Math.round(t.time * ([0, 3, 4, 5, 5][t.era] ?? 4));
 }

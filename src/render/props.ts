@@ -71,6 +71,20 @@ export function broadleafGeo(crown: number): THREE.BufferGeometry {
   return mergeGeometries(parts)!;
 }
 
+/** Uzak yapraklı ağaç: yakın modelin tacı, gövdesiz (geçişte biçim değişmesin; 1,3 km ötede gövde görünmez). */
+export function broadleafFarGeo(crown: number): THREE.BufferGeometry {
+  return clean(new THREE.IcosahedronGeometry(0.36, 0).scale(1, 0.85, 1).translate(0, 0.66, 0), new THREE.Color(crown));
+}
+
+/** Uzak iğne yapraklı ağaç: yakın modelin iki konisi, gövdesiz. */
+export function coniferFarGeo(crown: number): THREE.BufferGeometry {
+  const c = new THREE.Color(crown);
+  return mergeGeometries([
+    clean(new THREE.ConeGeometry(0.3, 0.6, 5, 1, true).translate(0, 0.48, 0), c),
+    clean(new THREE.ConeGeometry(0.2, 0.45, 5, 1, true).translate(0, 0.77, 0), c.clone().multiplyScalar(1.08)),
+  ])!;
+}
+
 /** Kaya (birim boyut), köşe renkli. */
 export function rockGeo(color: number): THREE.BufferGeometry {
   const g = new THREE.DodecahedronGeometry(0.5, 0);
@@ -83,6 +97,18 @@ export function rockGeo(color: number): THREE.BufferGeometry {
   }
   g.computeVertexNormals();
   return clean(g, new THREE.Color(color));
+}
+
+/**
+ * Sabit nesne: konum matrisini bir kez hesapla, her karedeki matris güncellemesinden çıkar (arazi ve süs binlerce
+ * nesne; her kare hepsinin matrisi baştan hesaplanıyordu). Üst grup dünyanın başlangıcında olmalı.
+ */
+export function freeze(o: THREE.Object3D): void {
+  o.updateMatrixWorld(true);
+  o.traverse((c) => {
+    c.matrixAutoUpdate = false;
+    c.matrixWorldAutoUpdate = false;
+  });
 }
 
 /** Malzeme başına parça biriktirip tek ağa birleştirir. */

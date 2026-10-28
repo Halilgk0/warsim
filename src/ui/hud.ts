@@ -12,26 +12,30 @@ import { fmtMoney } from '../sim/economy';
 import { techName } from './research';
 import { groundLevel } from '../sim/terrain';
 import { PALETTE } from '../render/palette';
+import { dayHour, sunAt } from '../render/atmosphere';
 import { onSettingsChange, settings, type InfoField } from './settings';
 import { fullscreenSupported, toggleFullscreen } from './fullscreen';
 import { sound } from '../audio/sound';
-import { $, bar, esc, fmtTime, hpColor, nf } from './dom';
+import { $, bar, esc, fmtTime, hpColor, nf, pct } from './dom';
+import { L, lower } from '../i18n';
 
 export function skillName(skill: number): string {
-  if (skill > 1.25) return 'As';
-  if (skill > 1.0) return 'Tecrübeli';
-  if (skill > 0.8) return 'Ortalama';
-  return 'Acemi';
+  if (skill > 1.25) return L('As', 'Ace');
+  if (skill > 1.0) return L('Tecrübeli', 'Veteran');
+  if (skill > 0.8) return L('Ortalama', 'Average');
+  return L('Acemi', 'Rookie');
 }
 
 const STAGE_NAMES: Record<string, string> = {
-  hold: 'bekleme', toIaf: 'yaklaşma', final: 'son yaklaşma', flare: 'düzleştirme', rollout: 'iniş koşusu',
+  hold: L('bekleme', 'holding'), toIaf: L('yaklaşma', 'approach'), final: L('son yaklaşma', 'final'),
+  flare: L('düzleştirme', 'flare'), rollout: L('iniş koşusu', 'rollout'),
 };
 
 export class Hud {
   private info = $('info');
   private log = $('log');
   private clock = $('clock');
+  private dayclock = $('dayclock');
   private hint = $('hint');
   private timebar = $('timebar');
   private researchChip = $('research-chip');
@@ -126,7 +130,7 @@ export class Hud {
       if (r.id <= this.lastReportId) continue;
       this.lastReportId = r.id;
       if (r.team !== g.playerTeam) continue;
-      const word = r.outcome === 'success' ? 'başarılı' : r.outcome === 'fail' ? 'başarısız' : 'sonuçsuz';
+      const word = r.outcome === 'success' ? L('başarılı', 'succeeded') : r.outcome === 'fail' ? L('başarısız', 'failed') : L('sonuçsuz', 'inconclusive');
       const icon = r.outcome === 'success' ? '✓' : r.outcome === 'fail' ? '✗' : '–';
       g.toast(`${icon} ${r.flight} · ${MISSION_NAMES[r.type]} ${word}${r.reward > 0 ? ` (+${fmtMoney(r.reward)})` : ''}`, r.outcome === 'fail');
     }
@@ -135,8 +139,27 @@ export class Hud {
   update(): void {
     const g = this.game;
     this.clock.textContent = fmtTime(g.world.time);
+    // Günün saati: güneş ufkun üstündeyse güneş, değilse ay
+    this.dayclock.classList.toggle('hidden', !settings.graphics.dayCycle);
+    if (settings.graphics.dayCycle) {
+      const h = dayHour(g.world.time);
+      const up = sunAt(h).elevation > -1;
+      this.dayclock.textContent = `${up ? '☀' : '☾'} ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
+    }
     for (const b of this.timebar.querySelectorAll<HTMLButtonElement>('button')) {
-      b.classList.toggle('active', Number(b.dataset.speed) === g.timeScale);
+      const sp = Number(b.dataset.speed);
+      b.classList.toggle('active', sp === g.timeScale);
+      // Boş yolda otomatik 2×: 1× düğmesi "2×" olur, rengi değişir
+      if (sp === 1) {
+        const auto = g.autoFast.active && g.timeScale === 1;
+        if (auto !== b.classList.contains('auto')) {
+          b.classList.toggle('auto', auto);
+          b.textContent = auto ? '2×' : '1×';
+          b.title = auto
+            ? L('Boş yol: otomatik 2× (çatışma ve görevde 1×) · Ayarlar\'dan kapatılır', 'Open road: automatic 2× (1× in combat and missions) · can be turned off in Settings')
+            : '1';
+        }
+      }
     }
     const now = performance.now();
     if (now < this.throttle) return;
@@ -159,7 +182,7 @@ export class Hud {
     const t = w.teams[me];
     const rate = w.incomeRate(me);
     this.moneyChip.innerHTML = `<div class="mc-top"><span class="mc-coin">◈</span><b>${fmtMoney(t.money)}</b></div>
-      <div class="mc-sub"><span class="pos">+${fmtMoney(rate)}/dk</span><span class="muted-ink">maden ${fmtMoney(w.mineRate(me))}/dk</span></div>`;
+      <div class="mc-sub"><span class="pos">+${fmtMoney(rate)}/${L('dk', 'min')}</span><span class="muted-ink">${L('maden', 'mines')} ${fmtMoney(w.mineRate(me))}/${L('dk', 'min')}</span></div>`;
   }
 
   private renderResearch(): void {
@@ -168,19 +191,19 @@ export class Hud {
     const line = (k: 'tech' | 'vehicle', label: string) => {
       const c = r.slots[k].current;
       const wt = r.waiting[k];
-      if (!c && wt) return `<div class="rc-line" title="Sıradaki araştırmanın parası birikince başlar"><span class="muted-ink">${label}</span><span class="warn-ink">para bekleniyor · ${esc(techName(TECH_BY_ID[wt]))}</span></div>`;
+      if (!c && wt) return `<div class="rc-line" title="${L('Sıradaki araştırmanın parası birikince başlar', 'The next project starts once its cost is saved up')}"><span class="muted-ink">${label}</span><span class="warn-ink">${L('para bekleniyor', 'awaiting funds')} · ${esc(techName(TECH_BY_ID[wt]))}</span></div>`;
       const q0 = r.slots[k].queue[0];
-      if (!c && q0) return `<div class="rc-line" title="Sıradaki iş önkoşullarını bekliyor"><span class="muted-ink">${label}</span><span class="rc-name muted-ink">sırada · ${esc(techName(TECH_BY_ID[q0]))}</span></div>`;
-      if (!c) return `<div class="rc-line"><span class="muted-ink">${label}</span><span class="muted-ink">boşta</span></div>`;
+      if (!c && q0) return `<div class="rc-line" title="${L('Sıradaki iş önkoşullarını bekliyor', 'The next project is waiting for its prerequisites')}"><span class="muted-ink">${label}</span><span class="rc-name muted-ink">${L('sırada', 'queued')} · ${esc(techName(TECH_BY_ID[q0]))}</span></div>`;
+      if (!c) return `<div class="rc-line"><span class="muted-ink">${label}</span><span class="muted-ink">${L('boşta', 'idle')}</span></div>`;
       return `<div class="rc-line"><span class="muted-ink">${label}</span><span class="rc-name">${esc(techName(TECH_BY_ID[c.id]))}</span></div>${bar(c.progress * 100, 'var(--accent)', true)}`;
     };
     const w = this.game.world;
     const p = w.teams[this.game.playerTeam].personnel;
     const crew = w.personnelEnabled
-      ? `<div class="rc-line" title="Evler personel barındırır (1 ev = 4 kişi). Uçaklar mürettebatı kadar kişiyle kalkar."><span class="muted-ink">Personel</span><span class="${w.crewFree(this.game.playerTeam) <= 0 ? 'bad' : ''}">${w.crewFree(this.game.playerTeam)} boşta · ${p.people}/${p.capacity}</span></div>`
+      ? `<div class="rc-line" title="${L('Evler personel barındırır (1 ev = 4 kişi). Uçaklar mürettebatı kadar kişiyle kalkar.', 'Houses hold personnel (1 house = 4 people). An aircraft takes off only with its full crew.')}"><span class="muted-ink">${L('Personel', 'Personnel')}</span><span class="${w.crewFree(this.game.playerTeam) <= 0 ? 'bad' : ''}">${w.crewFree(this.game.playerTeam)} ${L('boşta', 'free')} · ${p.people}/${p.capacity}</span></div>`
       : '';
-    this.researchChip.innerHTML = `${line('tech', 'Teknoloji')}${line('vehicle', 'Araç')}
-      <div class="rc-line"><span class="muted-ink">Savaş puanı</span><span class="${r.boosting ? 'rc-boost' : ''}">${nf.format(r.points)}${r.boosting ? ' · ×2' : ''}</span></div>${crew}`;
+    this.researchChip.innerHTML = `${line('tech', L('Teknoloji', 'Technology'))}${line('vehicle', L('Araç', 'Aircraft'))}
+      <div class="rc-line"><span class="muted-ink">${L('Savaş puanı', 'War points')}</span><span class="${r.boosting ? 'rc-boost' : ''}">${nf.format(r.points)}${r.boosting ? ' · ×2' : ''}</span></div>${crew}`;
   }
 
   private row(f: InfoField, k: string, v: string): string {
@@ -192,9 +215,11 @@ export class Hud {
     if (!ac) {
       this.info.innerHTML = `
         <div class="info-empty">
-          <div class="info-title">Seçim yok</div>
-          <p class="muted">Uçağa tıkla ya da <b>Tab</b> ile gez. Üsse tıklayıp <b>görev planla</b>.
-          <b>F</b> takip, <b>B</b> inşa, <b>T</b> araştırma, <b>V</b> ayarlar, <b>N</b> ses.</p>
+          <div class="info-title">${L('Seçim yok', 'Nothing selected')}</div>
+          <p class="muted">${L(
+            'Uçağa tıkla ya da <b>Tab</b> ile gez. Üsse tıklayıp <b>görev planla</b>. <b>F</b> takip, <b>B</b> inşa, <b>T</b> araştırma, <b>V</b> ayarlar, <b>N</b> ses.',
+            'Click an aircraft or cycle with <b>Tab</b>. Click a base to <b>plan a mission</b>. <b>F</b> follow, <b>B</b> build, <b>T</b> research, <b>V</b> settings, <b>N</b> sound.',
+          )}</p>
         </div>`;
       return;
     }
@@ -203,70 +228,70 @@ export class Hud {
     const own = ac.team === this.game.playerTeam;
     const fl = ac.flight;
     const hpPct = Math.max(0, (ac.hp / ac.hpMax) * 100);
-    const status = ac.status === 'falling' ? 'Vuruldu, düşüyor' : ac.brain.status;
-    const warn = ac.groundAvoid ? ' <span class="warn">YER! Toparlanıyor</span>' : '';
+    const status = ac.status === 'falling' ? L('Vuruldu, düşüyor', 'Hit, going down') : ac.brain.status;
+    const warn = ac.groundAvoid ? ` <span class="warn">${L('YER! Toparlanıyor', 'GROUND! Pulling up')}</span>` : '';
     const agl = ac.pos.y - groundLevel(ac.pos.x, ac.pos.z);
     const d = ac.damage;
     const dmg: string[] = [];
     d.engines.forEach((e, i) => {
-      if (e > 0.05) dmg.push(`${d.engines.length > 1 ? `${i + 1}. motor` : 'Motor'} %${Math.round(e * 100)}`);
+      if (e > 0.05) dmg.push(`${d.engines.length > 1 ? L(`${i + 1}. motor`, `engine ${i + 1}`) : L('Motor', 'Engine')} ${pct(e)}`);
     });
-    if (d.fire > 0) dmg.push('<b class="bad">YANGIN</b>');
-    if (d.fuelLeak > 0.05) dmg.push('yakıt sızıntısı');
-    if (d.coolant > 0) dmg.push(`hararet %${Math.round(d.heat * 100)}`);
-    if (d.controls > 0.05) dmg.push(`kumanda %${Math.round(d.controls * 100)}`);
-    if (d.wings > 0.05) dmg.push(`kanat %${Math.round(d.wings * 100)}`);
+    if (d.fire > 0) dmg.push(`<b class="bad">${L('YANGIN', 'FIRE')}</b>`);
+    if (d.fuelLeak > 0.05) dmg.push(L('yakıt sızıntısı', 'fuel leak'));
+    if (d.coolant > 0) dmg.push(`${L('hararet', 'overheat')} ${pct(d.heat)}`);
+    if (d.controls > 0.05) dmg.push(`${L('kumanda', 'controls')} ${pct(d.controls)}`);
+    if (d.wings > 0.05) dmg.push(`${L('kanat', 'wings')} ${pct(d.wings)}`);
     const burn = currentFuelFlow(ac) + d.fuelLeak * s.cruiseFlow;
     const fuelMin = ac.totalFuel / Math.max(burn, 1e-4) / 60;
     const stores: string[] = [];
     for (const sl of ac.stores.slots) if (sl.n > 0) stores.push(`${sl.n} × ${sl.store.short}`);
     const turretAmmo = ac.turrets.reduce((a, t) => a + t.ammo, 0);
     const ammo = [
-      ac.guns.length ? `%${Math.round(ac.ammoFrac * 100)} · ${ac.belt.name.toLowerCase()}` : '',
-      ac.turrets.length ? `taret ${turretAmmo}` : '',
+      ac.guns.length ? `${pct(ac.ammoFrac)} · ${lower(ac.belt.name)}` : '',
+      ac.turrets.length ? `${L('taret', 'turrets')} ${turretAmmo}` : '',
     ].filter(Boolean).join(' · ') || '—';
     const ctl = ac.controls;
-    const wep = ac.engine.wep ? `acil güç (${Math.round((WEP_LIMIT - ac.wepTime) / 60)} dk)` : '';
-    const ab = ac.engine.afterburner ? 'art yakıcı' : '';
-    const extras = [wep, ab, ctl.flaps ? 'flap' : '', ctl.diveBrake ? 'pike freni' : '', ctl.brake ? 'fren' : ''].filter(Boolean).join(', ');
-    const spool = s.engine.kind === 'jet' ? ` · devir %${Math.round(ac.engine.spool * 100)}` : '';
-    const role = fl ? (fl.wingLeaderOf(ac) ? 'kanat adamı' : ac.slot === 0 ? 'lider' : 'eleman lideri') : '';
+    const wep = ac.engine.wep ? `${L('acil güç', 'WEP')} (${Math.round((WEP_LIMIT - ac.wepTime) / 60)} ${L('dk', 'min')})` : '';
+    const ab = ac.engine.afterburner ? L('art yakıcı', 'afterburner') : '';
+    const extras = [wep, ab, ctl.flaps ? L('flap', 'flaps') : '', ctl.diveBrake ? L('pike freni', 'dive brakes') : '', ctl.brake ? L('fren', 'brakes') : ''].filter(Boolean).join(', ');
+    const spool = s.engine.kind === 'jet' ? ` · ${L('devir', 'rpm')} ${pct(ac.engine.spool)}` : '';
+    const role = fl ? (fl.wingLeaderOf(ac) ? L('kanat adamı', 'wingman') : ac.slot === 0 ? L('lider', 'leader') : L('eleman lideri', 'element lead')) : '';
     const flightTxt = fl
-      ? `${fl.name} · ${role}${ac.brain.detached ? ` (koptu: ${ac.brain.detachReason})` : ''} · ${FORMATION_NAMES[fl.plan.formation]}`
+      ? `${fl.name} · ${role}${ac.brain.detached ? ` (${L('koptu', 'detached')}: ${ac.brain.detachReason})` : ''} · ${FORMATION_NAMES[fl.plan.formation]}`
       : '—';
     const task = fl?.plan.task && fl.plan.task !== 'auto' ? ` (${TASK_NAMES[fl.plan.task]})` : '';
     let missionTxt = fl ? `${MISSION_NAMES[fl.plan.type]}${task} · ${PHASE_NAMES[fl.phase]}` : '—';
     if (ac.brain.ops.mode === 'landing') missionTxt += ` · ${STAGE_NAMES[ac.brain.ops.stage]}`;
-    if (ac.onGround && ac.brain.ops.mode === 'takeoff') missionTxt += ' · kalkış';
-    const pilot = `${skillName(ac.skill)}${d.pilot === 1 ? ', yaralı' : ''}${ac.fatigue > 0.25 ? `, yorgun %${Math.round(ac.fatigue * 100)}` : ''}`;
+    if (ac.onGround && ac.brain.ops.mode === 'takeoff') missionTxt += ` · ${L('kalkış', 'takeoff')}`;
+    const pilot = `${skillName(ac.skill)}${d.pilot === 1 ? L(', yaralı', ', wounded') : ''}${ac.fatigue > 0.25 ? `, ${L('yorgun', 'fatigue')} ${pct(ac.fatigue)}` : ''}`;
     const following = this.game.renderer.rig.following;
 
     this.info.innerHTML = `
       <div class="info-title"><span class="dot" style="background:${PALETTE.teamCss[ac.team]}"></span>${esc(ac.callsign)}<span class="abbr">${s.abbr}</span></div>
-      <div class="badges"><span class="badge">${esc(s.name)}</span><span class="badge">${gen.label}</span><span class="badge">${ROLE_NAMES[s.role]}</span>${own ? '' : '<span class="badge enemy">düşman</span>'}</div>
+      <div class="badges"><span class="badge">${esc(s.name)}</span><span class="badge">${gen.label}</span><span class="badge">${ROLE_NAMES[s.role]}</span>${own ? '' : `<span class="badge enemy">${L('düşman', 'enemy')}</span>`}</div>
       ${settings.info.status ? `<div class="status">${esc(status)}${warn}</div>` : ''}
       <div class="kv">
-        ${this.row('flight', 'Kol', esc(flightTxt))}
-        ${this.row('mission', 'Görev', esc(missionTxt))}
-        ${this.row('speed', 'Hız', `${nf.format(ac.speed * 3.6)} km/sa · gösterge ${nf.format(iasOf(ac) * 3.6)} · M ${machOf(ac).toFixed(2)}`)}
-        ${this.row('alt', 'İrtifa', `${nf.format(ac.pos.y)} m`)}
-        ${this.row('agl', 'Yerden', `${nf.format(Math.max(0, agl))} m`)}
-        ${this.row('g', 'Yük', `${ac.n.toFixed(1)} G`)}
-        ${this.row('heading', 'Yön', `${String(Math.round(ac.headingDeg)).padStart(3, '0')}°`)}
-        ${this.row('attitude', 'Yatış / yunuslama', `${Math.round(ac.bankDeg)}° / ${Math.round(ac.pitchDeg)}°`)}
-        ${this.row('throttle', 'Gaz', `%${Math.round(ctl.throttle * 100)}${spool}${extras ? ` · ${extras}` : ''}`)}
-        ${this.row('fuel', 'Yakıt', `${nf.format(ac.totalFuel)} kg · ~${Math.round(fuelMin)} dk`)}
-        ${this.row('mass', 'Kütle', `${nf.format(ac.mass)} kg`)}
-        ${this.row('ammo', 'Mühimmat', ammo)}
-        ${this.row('stores', 'Dış yük', stores.join(', ') || '—')}
-        ${this.row('damage', 'Hasar', dmg.join(', ') || 'yok')}
-        ${this.row('pilot', 'Pilot', pilot)}
-        ${this.row('kills', 'Düşürülen', String(ac.kills + (ac.airframe?.kills ?? 0)))}
+        ${this.row('flight', L('Kol', 'Flight'), esc(flightTxt))}
+        ${this.row('mission', L('Görev', 'Mission'), esc(missionTxt))}
+        ${this.row('speed', L('Hız', 'Speed'), `${nf.format(ac.speed * 3.6)} km/${L('sa', 'h')} · ${L('gösterge', 'IAS')} ${nf.format(iasOf(ac) * 3.6)} · M ${machOf(ac).toFixed(2)}`)}
+        ${this.row('alt', L('İrtifa', 'Altitude'), `${nf.format(ac.pos.y)} m`)}
+        ${this.row('agl', L('Yerden', 'Above ground'), `${nf.format(Math.max(0, agl))} m`)}
+        ${this.row('g', L('Yük', 'Load'), `${ac.n.toFixed(1)} G`)}
+        ${this.row('heading', L('Yön', 'Heading'), `${String(Math.round(ac.headingDeg)).padStart(3, '0')}°`)}
+        ${this.row('attitude', L('Yatış / yunuslama', 'Bank / pitch'), `${Math.round(ac.bankDeg)}° / ${Math.round(ac.pitchDeg)}°`)}
+        ${this.row('throttle', L('Gaz', 'Throttle'), `${pct(ctl.throttle)}${spool}${extras ? ` · ${extras}` : ''}`)}
+        ${this.row('fuel', L('Yakıt', 'Fuel'), `${nf.format(ac.totalFuel)} kg · ~${Math.round(fuelMin)} ${L('dk', 'min')}`)}
+        ${this.row('mass', L('Kütle', 'Mass'), `${nf.format(ac.mass)} kg`)}
+        ${this.row('ammo', L('Mühimmat', 'Ammo'), ammo)}
+        ${this.row('stores', L('Dış yük', 'Stores'), stores.join(', ') || '—')}
+        ${this.row('damage', L('Hasar', 'Damage'), dmg.join(', ') || L('yok', 'none'))}
+        ${this.row('pilot', L('Pilot', 'Pilot'), pilot)}
+        ${this.row('kills', L('Düşürülen', 'Kills'), String(ac.kills + (ac.airframe?.kills ?? 0)))}
       </div>
-      <div class="hp"><span>Gövde sağlamlığı</span>${bar(hpPct, hpColor(hpPct))}</div>
+      <div class="hp"><span>${L('Gövde sağlamlığı', 'Airframe integrity')}</span>${bar(hpPct, hpColor(hpPct))}</div>
       <div class="btn-row">
-        <button class="${following ? 'active' : ''}" data-act="follow">${following ? 'Takibi bırak' : 'Takip et'}<span class="kbd"> (F)</span></button>
-        ${own && fl && fl.phase !== 'landing' && fl.phase !== 'rtb' ? '<button data-act="rtb">Kolu geri çağır</button>' : ''}
+        <button class="${following ? 'active' : ''}" data-act="follow">${following ? L('Takibi bırak', 'Stop following') : L('Takip et', 'Follow')}<span class="kbd"> (F)</span></button>
+        ${own && fl && fl.phase !== 'landing' && fl.phase !== 'rtb' ? `<button data-act="rtb">${L('Kolu geri çağır', 'Recall flight')}</button>` : ''}
       </div>`;
   }
 
@@ -300,14 +325,14 @@ export class Hud {
     if (key === this.lastMissionKey) return;
     this.lastMissionKey = key;
     // Biten görevler: sonuç, neden ve ödül
-    const done = reports.length ? `<div class="mrep-h">Son görevler</div>${reports.map((r) => {
+    const done = reports.length ? `<div class="mrep-h">${L('Son görevler', 'Recent missions')}</div>${reports.map((r) => {
       const cls = r.outcome === 'success' ? 'ok' : r.outcome === 'fail' ? 'bad' : 'none';
       const icon = r.outcome === 'success' ? '✓' : r.outcome === 'fail' ? '✗' : '–';
       return `<div class="mrep ${cls}"><span class="mrep-i">${icon}</span><div><div class="mrep-t"><b>${esc(r.flight)}</b> ${MISSION_NAMES[r.type]}${r.reward > 0 ? ` <b class="pos">+${fmtMoney(r.reward)}</b>` : ''}</div>
         <small>${esc(r.reason)} · ${esc(r.aircraft)} · ${fmtTime(r.time)}</small></div></div>`;
     }).join('')}` : '';
     if (!flights.length) {
-      this.missions.innerHTML = '<p class="muted small">Havada görev yok. Bir hava üssünü seçip görev planla<span class="kbd"> (P)</span>.</p>' + done;
+      this.missions.innerHTML = `<p class="muted small">${L('Havada görev yok. Bir hava üssünü seçip görev planla', 'No missions in the air. Select an airbase and plan one')}<span class="kbd"> (P)</span>.</p>` + done;
       return;
     }
     const targetName = (f: (typeof flights)[number]): string => {
@@ -315,11 +340,11 @@ export class Hud {
       if (p.targetStructureId !== null) return w.structureById(p.targetStructureId)?.name ?? '';
       if (p.targetAircraftId !== null) {
         const a = w.aircraftById(p.targetAircraftId);
-        return a ? `${a.flight?.name ?? a.callsign} (${a.spec.abbr})` : 'hedef';
+        return a ? `${a.flight?.name ?? a.callsign} (${a.spec.abbr})` : L('hedef', 'target');
       }
-      if (p.targetFlightId !== null) return `${w.flightById(p.targetFlightId)?.name ?? ''} kolu`;
+      if (p.targetFlightId !== null) return L(`${w.flightById(p.targetFlightId)?.name ?? ''} kolu`, `${w.flightById(p.targetFlightId)?.name ?? ''} flight`);
       if (p.targetBaseId !== null) return w.structureById(p.targetBaseId)?.name ?? '';
-      return p.targetPos ? 'devriye bölgesi' : '';
+      return p.targetPos ? L('devriye bölgesi', 'patrol area') : '';
     };
     const row = (f: (typeof flights)[number]) => {
       const lead = f.members[0];
@@ -327,9 +352,9 @@ export class Hud {
       const recall = f.phase !== 'landing' && f.phase !== 'rtb' && f.phase !== 'ground';
       return `<div class="mrow ${f.id === selFl ? 'sel' : ''} ${f.engaged ? 'hot' : ''}" data-fl="${f.id}">
         <div class="mr-top"><span class="mi">${MISSION_ICONS[f.plan.type]}</span><b>${f.name}</b><span class="mr-n">${f.alive.length}/${f.expected} ${esc(lead?.spec.abbr ?? '')}</span><span class="ph ph-${f.phase}">${PHASE_NAMES[f.phase]}</span></div>
-        <div class="mr-sub">${MISSION_NAMES[f.plan.type]}${f.plan.task && f.plan.task !== 'auto' ? ` (${TASK_NAMES[f.plan.task]})` : ''}${targetName(f) ? ` → ${esc(targetName(f))}` : ''}${f.alive.length ? ` · yakıt %${fuel}` : ''}${f.engaged ? ' · <b class="bad">çatışmada</b>' : ''}</div>
+        <div class="mr-sub">${MISSION_NAMES[f.plan.type]}${f.plan.task && f.plan.task !== 'auto' ? ` (${TASK_NAMES[f.plan.task]})` : ''}${targetName(f) ? ` → ${esc(targetName(f))}` : ''}${f.alive.length ? ` · ${L('yakıt', 'fuel')} ${pct(fuel / 100)}` : ''}${f.engaged ? ` · <b class="bad">${L('çatışmada', 'engaged')}</b>` : ''}</div>
         ${f.alive.length ? `<div class="mr-fuel">${bar(fuel, fuel < 30 ? 'var(--red)' : fuel < 50 ? 'var(--warn)' : 'var(--accent)', true)}</div>` : ''}
-        <div class="mr-act"><button class="mini" data-mact="follow">Takip</button>${recall ? '<button class="mini" data-mact="rtb">Geri çağır</button>' : ''}</div>
+        <div class="mr-act"><button class="mini" data-mact="follow">${L('Takip', 'Follow')}</button>${recall ? `<button class="mini" data-mact="rtb">${L('Geri çağır', 'Recall')}</button>` : ''}</div>
       </div>`;
     };
     // Paket kolları birlikte
@@ -341,7 +366,7 @@ export class Hud {
       groups.set(k, list);
     }
     this.missions.innerHTML = [...groups.values()].map((list) => list.length > 1
-      ? `<div class="mpk"><div class="mpk-h">Paket · ${MISSION_NAMES[list[0].plan.type]}${targetName(list[0]) ? ` → ${esc(targetName(list[0]))}` : ''}</div>${list.map(row).join('')}</div>`
+      ? `<div class="mpk"><div class="mpk-h">${L('Paket', 'Package')} · ${MISSION_NAMES[list[0].plan.type]}${targetName(list[0]) ? ` → ${esc(targetName(list[0]))}` : ''}</div>${list.map(row).join('')}</div>`
       : row(list[0])).join('') + done;
   }
 
@@ -362,17 +387,24 @@ export class Hud {
     const btn = (act: string, label: string, on = true) => `<button data-hint="${act}" ${on ? '' : 'disabled'}>${label}</button>`;
     let html: string;
     if (it.mode === 'build') {
-      const msg = it.ok ? (touch ? 'Uygun yer' : 'Uygun yer — tıkla ve inşa et') : it.reason ?? (touch ? 'Yer seçmek için haritaya dokun' : 'Yer seç');
-      html = `<span>${esc(msg)}${touch ? '' : ' · R: döndür · Sağ tık / Esc: iptal'}</span>${btn('rotate', '↻ Döndür')}${btn('place', '✓ Yerleştir', it.ok)}${btn('cancel', '✕ İptal')}`;
+      const msg = it.ok
+        ? (touch ? L('Uygun yer', 'Good spot') : L('Uygun yer — tıkla ve inşa et', 'Good spot — click to build'))
+        : it.reason ?? (touch ? L('Yer seçmek için haritaya dokun', 'Tap the map to choose a spot') : L('Yer seç', 'Choose a spot'));
+      html = `<span>${esc(msg)}${touch ? '' : L(' · R: döndür · Sağ tık / Esc: iptal', ' · R: rotate · Right click / Esc: cancel')}</span>${btn('rotate', L('↻ Döndür', '↻ Rotate'))}${btn('place', L('✓ Yerleştir', '✓ Place'), it.ok)}${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
     } else if (it.mode === 'pickTarget') {
       const pick = this.game.planner.pickHint();
-      html = `<span>${esc(touch ? pick.replace(/tıkla/g, 'dokun') : pick)}${touch ? '' : ' · Sağ tık / Esc: iptal'}</span>${btn('cancel', '✕ İptal')}`;
+      html = `<span>${esc(touch ? pick.replace(/tıkla/g, 'dokun').replace(/\bclick/g, 'tap').replace(/\bClick/g, 'Tap') : pick)}${touch ? '' : L(' · Sağ tık / Esc: iptal', ' · Right click / Esc: cancel')}</span>${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
     } else if (it.mode === 'pickWaypoint') {
-      html = `<span>Ara nokta eklemek için haritaya ${touch ? 'dokun' : 'tıkla'} (birden çok eklenebilir)</span>${btn('cancel', '✓ Bitir')}`;
+      html = `<span>${touch
+        ? L('Ara nokta eklemek için haritaya dokun (birden çok eklenebilir)', 'Tap the map to add waypoints (you can add several)')
+        : L('Ara nokta eklemek için haritaya tıkla (birden çok eklenebilir)', 'Click the map to add waypoints (you can add several)')}</span>${btn('cancel', L('✓ Bitir', '✓ Done'))}`;
     } else {
       html = touch
-        ? '<span>Dokun: seç · Sürükle: kaydır · İki parmak: yakınlaş, çevir, eğ · Çift dokun: takip</span>'
-        : '<span>Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · Tab: sıradaki · Boşluk: duraklat · 1-6: hız · T: araştırma</span>';
+        ? `<span>${L('Dokun: seç · Sürükle: kaydır · İki parmak: yakınlaş, çevir, eğ · Çift dokun: takip', 'Tap: select · Drag: pan · Two fingers: zoom, rotate, tilt · Double tap: follow')}</span>`
+        : `<span>${L(
+          'Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · Tab: sıradaki · Boşluk: duraklat · 1-6: hız · T: araştırma',
+          'Click: select · Drag: pan · Right drag: rotate · Wheel: zoom · F: follow · Tab: next · Space: pause · 1-6: speed · T: research',
+        )}</span>`;
     }
     // Her karede yeniden yazılırsa düğmeye dokunuş kaçıyor
     if (html === this.lastHint) return;

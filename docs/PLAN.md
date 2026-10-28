@@ -467,6 +467,19 @@ src/
 - Arazi örtüsü: ormanlar (uzakta koyu yeşil leke, yakında 3B ağaç; yükseldikçe iğne yapraklı), ovalarda tarla parselleri,
   dik yamaçta kaya rengi ve kaya kümeleri, şehir zemini. Yollar geçitlerden kıvrılarak şehirleri ve üsleri bağlar; yol
   boyunca köyler, tarlalarda çiftlikler. Kurulan yapıların tabanı ağaç ve evlerden temizlenir. Görünüm ayarlarından kapatılabilir.
+- **Grafik güncellemesi 1 (2026-10-23)**, ölçüm `tools/rec/audit` (taban `taban-2026-10-23.json`):
+  - Atmosfer (`render/atmosphere.ts`): gök kubbesi (tepeden ufka renk geçişi, güneş diski ve halesi), yükseklikle
+    üstel azalan sis (vadide pus, 7 km'de berrak; three.js sis parçalarının yerine), sis ve gök aynı işlevle boyanır.
+    Güneş kuzeybatıdan 44° (`setSun`; gün döngüsü buna bağlanabilir), Neutral ton eşleme, ortam ışığı kısık. Uzak
+    düzlem kameranın yüksekliğiyle büyür (7 km'den ufka kadar arazi). Kendi `onBeforeCompile`'ı olan malzeme
+    `linkAtmosphere` çağırmalı.
+  - Arazi: parça sınırlarındaki koyu çizgiler eteklerden geliyordu (uzakta derinlik hassasiyeti yetmeyince eteğin
+    üst kenarı sızıyor, çift yüzlü çizimde arkadan görülen eteğin normali ters dönüyordu). Etekler artık yüzeyin
+    normali ve rengiyle; yakın düzeyin köşeli gölgesi 2,5–12 km'de yumuşak gölgeye geçer (testere dişi sırtlar ve
+    çapraz şeritler söner).
+  - Ağaçlar: kameranın 1,3 km yakınındakiler tam model, ötesi gövdesiz taç (2,5 km ötesinde dörtte biri, 5,5–8,5 km'de
+    söner); bloklar kameraya uzaklığa göre çizilir. Köy ve dekor şehirleri 9,35 km'lik bloklarda, kameranın 12 km
+    yakınında (eskiden bütün haritanınki birlikte). Yakın ve taktik görünümde üçgen 2,6–3,7 milyondan 0,3–0,8 milyona.
 
 ## Ses
 

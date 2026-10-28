@@ -4,6 +4,7 @@ import type { Game } from '../game';
 import type { World } from '../sim/world';
 import { fmtMoney } from '../sim/economy';
 import { $, esc, fmtTime } from './dom';
+import { L, count } from '../i18n';
 
 type Outcome = 'win' | 'lose';
 
@@ -38,7 +39,8 @@ export class EndScreen {
     }
     this.setBanner(
       !me.eliminated && me.lastStand !== null
-        ? `Son hava üssün yıkıldı! Yeni üs kur (İnşa · B, ${fmtMoney(w.structureCost(me.id, 'airbase'))}): elenmeye ${fmtTime(Math.max(0, me.lastStand))}`
+        ? L(`Son hava üssün yıkıldı! Yeni üs kur (İnşa · B, ${fmtMoney(w.structureCost(me.id, 'airbase'))}): elenmeye ${fmtTime(Math.max(0, me.lastStand))}`,
+          `Your last airbase is gone! Build a new one (Build · B, ${fmtMoney(w.structureCost(me.id, 'airbase'))}): eliminated in ${fmtTime(Math.max(0, me.lastStand))}`)
         : '',
     );
     if (this.isOpen) return;
@@ -74,21 +76,21 @@ export class EndScreen {
       fail += v.fail;
     }
     const head = kind === 'win'
-      ? `<h2>Zafer!</h2>
-        <p>Haritada son kalan ülke sensin: ${out} düşman ülke elendi.</p>`
-      : `<h2>Harekât kaybedildi</h2>
-        <p>Son hava üssün yıkıldı ve yenisi kurulmadı.${left.length ? ` ${left.join(', ')} savaşmayı sürdürüyor.` : ''}</p>`;
+      ? `<h2>${L('Zafer!', 'Victory!')}</h2>
+        <p>${L(`Haritada son kalan ülke sensin: ${out} düşman ülke elendi.`, `You are the last nation standing: ${count(out, 'enemy nation')} eliminated.`)}</p>`
+      : `<h2>${L('Harekât kaybedildi', 'Campaign lost')}</h2>
+        <p>${L('Son hava üssün yıkıldı ve yenisi kurulmadı.', 'Your last airbase was destroyed and no new one was built.')}${left.length ? L(` ${left.join(', ')} savaşmayı sürdürüyor.`, ` ${left.join(', ')} fight on.`) : ''}</p>`;
     this.el.innerHTML = `<div class="pm-card end-card ${kind}">
       ${head}
       <div class="end-stats">
-        <div><b>${fmtTime(w.time)}</b><span>oyun süresi</span></div>
-        <div><b>${out}/${foes.length}</b><span>elenen düşman</span></div>
-        <div><b>${ok} / ${fail}</b><span>başarılı / başarısız görev</span></div>
-        <div><b>${me.research.done.size}</b><span>araştırma</span></div>
+        <div><b>${fmtTime(w.time)}</b><span>${L('oyun süresi', 'game time')}</span></div>
+        <div><b>${out}/${foes.length}</b><span>${L('elenen düşman', 'enemies eliminated')}</span></div>
+        <div><b>${ok} / ${fail}</b><span>${L('başarılı / başarısız görev', 'missions won / lost')}</span></div>
+        <div><b>${me.research.done.size}</b><span>${L('araştırma', 'research')}</span></div>
       </div>
       <div class="pm-col">
-        <button class="primary big" data-end="watch">${kind === 'win' ? 'Haritada kal' : 'İzlemeye devam et'}</button>
-        <button data-end="menu">Ana menüye dön</button>
+        <button class="primary big" data-end="watch">${kind === 'win' ? L('Haritada kal', 'Stay on the map') : L('İzlemeye devam et', 'Keep watching')}</button>
+        <button data-end="menu">${L('Ana menüye dön', 'Back to main menu')}</button>
       </div>
     </div>`;
     this.el.classList.remove('hidden');

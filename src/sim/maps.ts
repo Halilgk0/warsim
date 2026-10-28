@@ -1,10 +1,13 @@
 // Haritalar: doğal yükseklik fonksiyonu, tarafların ana üs yerleri, dekor şehirleri ve düzleştirilecek ovalar.
-// İki harita da 300 × 300 km; araziyi terrain.ts bu tanımlardan üretir (harita değişince yeniden).
+// Tanımlar 300 × 300 km (taban) için; küçük haritada (150, 200 km) büyük şekiller ve yerler k = büyüklük / 300 km
+// oranında küçülür, yerel ayrıntı (tepeler, sırtlar, nehir genişliği) gerçek ölçüde kalır. k = 1'de arazi değişmez.
+// Araziyi terrain.ts bu tanımlardan üretir (harita ya da büyüklük değişince yeniden).
 
 import { makeFbm } from '../core/noise';
 import { clamp, smoothstep } from '../core/math';
+import { L } from '../i18n';
 import {
-  BLUE_FACTORY, BLUE_FORWARD, BLUE_MAIN, MAP_SIZE, RED_FACTORY, RED_FORWARD, RED_MAIN, type CityDef, type LandPoint, type SiteDef,
+  BLUE_FACTORY, BLUE_FORWARD, BLUE_MAIN, MAP_BASE, RED_FACTORY, RED_FORWARD, RED_MAIN, type CityDef, type LandPoint, type SiteDef,
 } from './mapData';
 
 export interface MapDef {
@@ -16,11 +19,12 @@ export interface MapDef {
   cities: CityDef[];
   /** Ayrıca düzleştirilecek noktalar (test senaryolarının tesisleri vb.). */
   extraLand: LandPoint[];
-  /** Düzleştirme öncesi doğal yükseklik (m). */
-  natural(x: number, z: number): number;
+  /** Düzleştirme öncesi doğal yükseklik (m). k: harita büyüklüğü / 300 km (x, z gerçek konum). */
+  natural(x: number, z: number, k?: number): number;
 }
 
-const HALF = MAP_SIZE / 2;
+/** Taban haritanın yarı kenarı (tanımların ölçeği). */
+const HALF = MAP_BASE / 2;
 
 const fbmBase = makeFbm(1337, 5);
 const fbmHill = makeFbm(4242, 5);
@@ -45,45 +49,51 @@ function riverDist(x: number, z: number, x0: number, amp: number, z0: number, z1
 /** Eski 150 km haritanın büyük şekilleri 2 kat ölçekte; yerel tepe ayrıntısı aynı ölçekte kalır. */
 const S = 2;
 
-function anakara(x: number, z: number): number {
-  const wx = x + fbmWarp(x / 60000, z / 60000) * 12000;
-  const wz = z + fbmWarp(x / 60000 + 5.3, z / 60000 - 3.1) * 12000;
+function anakara(x: number, z: number, k = 1): number {
+  // Büyük şekiller taban koordinatında (X, Z), yerel ayrıntı gerçek koordinatta (lx, lz)
+  const X = x / k;
+  const Z = z / k;
+  const wx = X + fbmWarp(X / 60000, Z / 60000) * 12000;
+  const wz = Z + fbmWarp(X / 60000 + 5.3, Z / 60000 - 3.1) * 12000;
+  const lx = wx * k;
+  const lz = wz * k;
   let h = fbmBase(wx / 62000, wz / 62000) * 0.5 + 0.2;
-  h += fbmHill(wx / 9000, wz / 9000) * 0.15;
-  const ridge = clamp(1 - Math.abs(fbmRidge(wx / 7500, wz / 7500)) * 2.3, 0, 1);
+  h += fbmHill(lx / 9000, lz / 9000) * 0.15;
+  const ridge = clamp(1 - Math.abs(fbmRidge(lx / 7500, lz / 7500)) * 2.3, 0, 1);
   // Orta silsile (kuzey–güney) ve iki geçit
-  const cx = S * (7000 * Math.sin(z / (26000 * S)) + 3500 * Math.sin(z / (9500 * S) + 1.1));
-  const dr = (x - cx) / 22000;
+  const cx = S * (7000 * Math.sin(Z / (26000 * S)) + 3500 * Math.sin(Z / (9500 * S) + 1.1));
+  const dr = (X - cx) / 22000;
   const range = Math.exp(-dr * dr);
-  const passes = 1 - 0.8 * Math.exp(-(((z + 26000 * S) / (5500 * S)) ** 2)) - 0.78 * Math.exp(-(((z - 30000 * S) / (5000 * S)) ** 2));
+  const passes = 1 - 0.8 * Math.exp(-(((Z + 26000 * S) / (5500 * S)) ** 2)) - 0.78 * Math.exp(-(((Z - 30000 * S) / (5000 * S)) ** 2));
   h += range * passes * (0.3 + ridge * ridge * 0.62);
   // Kuzey yaylaları
-  const north = smoothstep(-36000 * S, -64000 * S, z);
+  const north = smoothstep(-36000 * S, -64000 * S, Z);
   h += north * (0.1 + ridge * ridge * ridge * 0.38);
   // Dağınık sırtlar (iki ölçekte)
-  const mask = smoothstep(0.05, 0.35, fbmMask(x / 40000, z / 40000));
-  const mask2 = smoothstep(0.15, 0.42, fbmMask2(x / 18000, z / 18000));
+  const mask = smoothstep(0.05, 0.35, fbmMask(X / 40000, Z / 40000));
+  const mask2 = smoothstep(0.15, 0.42, fbmMask2(X / 18000, Z / 18000));
   h += Math.max(mask, mask2 * 0.7) * ridge * ridge * ridge * 0.42;
-  // Körfeze akan iki nehir
+  // Körfeze akan iki nehir (yatak genişliği gerçek ölçüde)
   const rv = Math.min(
-    riverDist(x, z, -20000 * S, 5000 * S, -42000 * S, 60000 * S, 11000 * S),
-    riverDist(x, z, 24000 * S, 4500 * S, -45000 * S, 60000 * S, 11000 * S),
-  );
+    riverDist(X, Z, -20000 * S, 5000 * S, -42000 * S, 60000 * S, 11000 * S),
+    riverDist(X, Z, 24000 * S, 4500 * S, -45000 * S, 60000 * S, 11000 * S),
+  ) * k;
   h -= 0.2 * Math.exp(-((rv / 1300) ** 2));
   // Güney körfezi
-  const gx = (x - 6000 * S - 6000 * S * Math.sin(z / (14000 * S))) / (21000 * S);
-  const gz = (z - 72000 * S) / (34000 * S);
+  const gx = (X - 6000 * S - 6000 * S * Math.sin(Z / (14000 * S))) / (21000 * S);
+  const gz = (Z - 72000 * S) / (34000 * S);
   h -= 1.45 * Math.exp(-(gx * gx + gz * gz));
   // Kenarlar açık deniz
-  const e = Math.max(Math.abs(x), Math.abs(z)) / HALF;
+  const e = Math.max(Math.abs(X), Math.abs(Z)) / HALF;
   h -= smoothstep(0.86, 1.0, e) * 1.4;
   return toMeters(h);
 }
 
 const ANAKARA: MapDef = {
   id: 'anakara',
-  name: 'Anakara',
-  desc: 'Ortada iki geçitli dağ silsilesi, kuzeyde yaylalar, güneyde körfez; iki yanda geniş ovalar ve nehirler.',
+  name: L('Anakara', 'Mainland'),
+  desc: L('Ortada iki geçitli dağ silsilesi, kuzeyde yaylalar, güneyde körfez; iki yanda geniş ovalar ve nehirler.',
+    'A mountain range with two passes in the middle, uplands to the north, a gulf to the south; wide plains and rivers on both sides.'),
   sites: [BLUE_MAIN, RED_MAIN,
     { x: 92000, z: 108000, heading: 75 }, { x: -108000, z: -88000, heading: 15 },
     { x: 102000, z: -108000, heading: 150 }, { x: -104000, z: 98000, heading: 90 }],
@@ -119,9 +129,14 @@ const ISLANDS: Island[] = [
   ...[30, 90, 150, 210, 270, 330].map((a) => ({ x: Math.cos((a * Math.PI) / 180) * 98000, z: Math.sin((a * Math.PI) / 180) * 98000, r: 9000, mountain: 0.6 })),
 ];
 
-function takimada(x: number, z: number): number {
-  const wx = x + fbmWarp(x / 40000, z / 40000) * 7000;
-  const wz = z + fbmWarp(x / 40000 + 5.3, z / 40000 - 3.1) * 7000;
+function takimada(x: number, z: number, k = 1): number {
+  // Adalar ve büyük kıyı şekilleri taban koordinatında (X, Z), yerel ayrıntı gerçek koordinatta
+  const X = x / k;
+  const Z = z / k;
+  const wx = X + fbmWarp(X / 40000, Z / 40000) * 7000;
+  const wz = Z + fbmWarp(X / 40000 + 5.3, Z / 40000 - 3.1) * 7000;
+  const lx = wx * k;
+  const lz = wz * k;
   let land = -2;
   let best: Island = ISLANDS[0];
   let ox = 0;
@@ -139,12 +154,12 @@ function takimada(x: number, z: number): number {
   }
   // Koylar ve burunlar: iki ölçekte kıyı gürültüsü (kıyıya yakın yerde etkili)
   const coast = 1 - smoothstep(0.25, 0.6, land);
-  land += (fbmCoast(x / 16000 - 3, z / 16000 + 2) * 0.26 + fbmCoast(x / 6000, z / 6000) * 0.14) * coast + fbmCoast(x / 2200 + 7, z / 2200) * 0.04;
+  land += (fbmCoast(X / 16000 - 3, Z / 16000 + 2) * 0.26 + fbmCoast(x / 6000, z / 6000) * 0.14) * coast + fbmCoast(x / 2200 + 7, z / 2200) * 0.04;
   if (land <= 0) return toMeters(Math.max(land * 1.5, -1.1) - 0.04);
   // Kıyıda kumsal ve ova, içeride tepeler; dağlar adanın dış (açık deniz) yüzünde
   let h = 0.035 + smoothstep(0, 0.4, land) * 0.16;
-  h += fbmHill(wx / 9000, wz / 9000) * 0.12 * smoothstep(0, 0.25, land);
-  const ridge = clamp(1 - Math.abs(fbmRidge(wx / 7000, wz / 7000)) * 2.2, 0, 1);
+  h += fbmHill(lx / 9000, lz / 9000) * 0.12 * smoothstep(0, 0.25, land);
+  const ridge = clamp(1 - Math.abs(fbmRidge(lx / 7000, lz / 7000)) * 2.2, 0, 1);
   const rl = Math.hypot(best.x, best.z);
   const outward = rl > 1 ? (ox * best.x + oz * best.z) / rl : 0.35;
   const mount = smoothstep(0.18, 0.65, land) * smoothstep(-0.1, 0.45, outward) * best.mountain;
@@ -176,8 +191,9 @@ const islandCities = (): CityDef[] => {
 
 const TAKIMADA: MapDef = {
   id: 'takimada',
-  name: 'Takımadalar',
-  desc: 'İç denizin çevresinde altı büyük ada; her ülke kendi adasında başlar. Ortada volkanlı tarafsız ada. Her baskın deniz aşar.',
+  name: L('Takımadalar', 'Archipelago'),
+  desc: L('İç denizin çevresinde altı büyük ada; her ülke kendi adasında başlar. Ortada volkanlı tarafsız ada. Her baskın deniz aşar.',
+    'Six large islands around an inland sea; each nation starts on its own island. A neutral volcanic island in the middle. Every raid crosses water.'),
   sites: [islandSite(0, 90), islandSite(1, 90), islandSite(2, 150), islandSite(3, 150), islandSite(4, 30), islandSite(5, 30)],
   cities: islandCities(),
   extraLand: [],

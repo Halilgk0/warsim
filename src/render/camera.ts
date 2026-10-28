@@ -198,7 +198,10 @@ export class CameraRig {
     if (this.camera.position.y < gy) this.camera.position.y = gy;
     this.camera.lookAt(this.target);
     const near = Math.max(0.5, d * 0.004);
-    const far = d * 6 + 80000;
+    // Yükseldikçe ufuk uzaklaşır: 2 km üstünde uzak düzlem kameranın yerden yüksekliğiyle büyür (arazi ufuktan önce
+    // kesilmesin). Alçakta uzak arazi zaten pusun içinde; büyütmek yalnız çizim çağrısı ekler.
+    const agl = Math.max(0, this.camera.position.y - gy);
+    const far = d * 6 + 80000 + Math.min(Math.max(0, agl - 2000) * 35, 250000);
     if (Math.abs(near - this.camera.near) > 1e-3 || Math.abs(far - this.camera.far) > 1) {
       this.camera.near = near;
       this.camera.far = far;

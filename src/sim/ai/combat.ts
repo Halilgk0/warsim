@@ -24,6 +24,7 @@ import { cornerSpeed, machOf, stallSpeed, sustainedG } from '../aircraft/flightM
 import { isCrippled } from '../aircraft/damage';
 import { groundLevel } from '../terrain';
 import { DEG, G, UP, angleBetween, clamp } from '../../core/math';
+import { L } from '../../i18n';
 
 const _rel = new Vector3();
 const _los = new Vector3();
@@ -195,7 +196,7 @@ function extendFrom(ac: Aircraft, brain: Brain, opp: Aircraft, R: number, cmd: F
   if (cs.zoom) {
     cmd.dir.set(hx * 0.75, 0.66, hz * 0.75);
     cmd.maxG = Math.min(3.5, s.nMax);
-    brain.status = 'Enerji taktiği: hızını irtifaya çeviriyor';
+    brain.status = L('Enerji taktiği: hızını irtifaya çeviriyor', 'Energy tactics: trading speed for height');
   } else {
     // İrtifa enerji avcısının sermayesidir: takipçi atış menzilinin dışındayken alçalarak uzaklaşılmaz (savaşı
     // alçağa, ağır avcının zayıf, rakibin güçlü olduğu irtifaya taşıyordu); burada daha iyi tırmanıyorsa hızı
@@ -206,7 +207,7 @@ function extendFrom(ac: Aircraft, brain: Brain, opp: Aircraft, R: number, cmd: F
     else if (vf < 0.8 && agl > 1500 && R < 1500) y = -0.08;
     cmd.dir.set(hx, y, hz);
     cmd.maxG = Math.min(2.5, energyG(ac));
-    brain.status = 'Enerji taktiği: hızlanıp uzaklaşıyor';
+    brain.status = L('Enerji taktiği: hızlanıp uzaklaşıyor', 'Energy tactics: extending away');
   }
 }
 
@@ -371,7 +372,7 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
     const zoom = vf > 0.92;
     cmd.dir.set(hx, zoom ? 0.45 : vf > 0.82 ? 0.22 : vf > 0.72 ? 0.08 : -0.03, hz);
     cmd.maxG = Math.min(2.5, s.nMax);
-    brain.status = 'Enerji taktiği: hızını koruyarak tırmanıyor';
+    brain.status = L('Enerji taktiği: hızını koruyarak tırmanıyor', 'Energy tactics: climbing, keeping speed');
     if (dh > 800 || eAdv > 1100 || cs.phaseTime > 70) setPhase(brain, 'attack');
     else if (!zoom && R < 2000 && tgtPointing) setPhase(brain, 'extend');
   } else if (energyFighter && cs.phase === 'extend') {
@@ -445,17 +446,17 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
       cmd.dir.subVectors(_aim, ac.pos).normalize();
       cmd.maxG = Math.min(cmd.maxG, energyG(ac));
       cmd.liftUse = 0.85;
-      brain.status = `Bombardıman kutusu: önden saldırı için öne geçiyor (${tgt.callsign})`;
+      brain.status = `${L('Bombardıman kutusu: önden saldırı için öne geçiyor', 'Bomber box: moving ahead for a head-on pass')} (${tgt.callsign})`;
     } else if (fortress && cs.boxRun === 2) {
       cmd.dir.copy(cs.boxDir);
       cmd.maxG = Math.min(cmd.maxG, s.nMax * 0.8);
-      brain.status = 'Bombardıman kutusu: geçişten sonra aşağı kopuyor';
+      brain.status = L('Bombardıman kutusu: geçişten sonra aşağı kopuyor', 'Bomber box: diving away after the pass');
     } else if (fortress && R > 1300 && ata > 30 * DEG) {
       // Karşıya dönüş: hız kaybetmeden (dönüş çapı yandaki mesafeye göre hesaplandı)
       cmd.dir.copy(_los);
       cmd.maxG = Math.min(cmd.maxG, energyG(ac));
       cmd.liftUse = 0.85;
-      brain.status = `Bombardıman kutusu: karşıdan saldırıya dönüyor (${tgt.callsign})`;
+      brain.status = `${L('Bombardıman kutusu: karşıdan saldırıya dönüyor', 'Bomber box: turning in for a head-on attack')} (${tgt.callsign})`;
     } else if (energyFighter && eAdv > 250 && R > 1500 && tailAspect < 0.35) {
       // Dal-vur için arkaya dönüş: hedefin 1,5 km arkasına, irtifayı koruyarak
       _tmp.set(tgt.fwd.x, 0, tgt.fwd.z);
@@ -470,7 +471,7 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
       }
       cmd.maxG = Math.min(3, s.nMax, energyG(ac));
       cmd.liftUse = 0.85;
-      brain.status = `Dal-vur: ${tgt.callsign} arkasına dönüyor`;
+      brain.status = L(`Dal-vur: ${tgt.callsign} arkasına dönüyor`, `Boom and zoom: turning onto ${tgt.callsign}'s tail`);
     } else if (R > 1300) {
       cmd.dir.copy(ata < 30 * DEG ? _aimDir : _los);
       // Uzaktaki hedefe dönerken acele yok: tutunma eşiğinde çekilmez (vrille riski). Üstteki hedefe tırmanış açısı
@@ -486,7 +487,7 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
         cmd.maxG = Math.min(cmd.maxG, energyG(ac));
         if (ata > 60 * DEG && ac.speed > vmaxHere(ac) * 0.85) cmd.dir.y = Math.max(cmd.dir.y, 0.3);
       }
-      brain.status = `Hedefe yaklaşıyor: ${tgt.callsign}`;
+      brain.status = `${L('Hedefe yaklaşıyor', 'Closing on target')}: ${tgt.callsign}`;
     } else if (!energyFighter && R < 450 && closure > 35 && ata > 12 * DEG && tailAspect > 0.3) {
       // (Enerji avcısı hızlı geçişte ateş eder, geçince dikine uzaklaşır; yo-yo dönüş savaşçısının işidir)
       // Aşırı yaklaşma: hedefin arkasına (gecikmeli) nişan al ve düzlem dışına tırman
@@ -495,39 +496,39 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
       cmd.dir.y += 0.4;
       // Enerji avcısı (özellikle jet: motoru yavaş toparlanır) gaz kesmez, hızını yukarı çevirir
       throttle = energyFighter ? 1 : 0.25;
-      brain.status = 'Aşırı yaklaşma riski: yüksek yo-yo';
+      brain.status = L('Aşırı yaklaşma riski: yüksek yo-yo', 'Overshoot risk: high yo-yo');
     } else if (headOn && R < 230 && closure > 60) {
       // Çarpışmadan kaçın: sağa kır (iki taraf da sağa kırınca "sol sola" geçerler)
       _tmp.crossVectors(ac.fwd, ac.upv);
       cmd.dir.copy(ac.fwd).addScaledVector(_tmp, 0.9).addScaledVector(ac.upv, 0.25);
-      brain.status = 'Kafa kafaya: çarpışmamak için kır';
+      brain.status = L('Kafa kafaya: çarpışmamak için kır', 'Head-on: breaking to avoid a collision');
     } else if (headOn && cs.headOnShoot === false && R > 350 && energyFighter) {
       // Enerji avcısı öne dönüşe girmez (dönüş savaşını başlatır, hız yakar): hafif yukarıdan geçer, geçişte uzaklaşır
       cmd.dir.copy(_los);
       cmd.dir.y += 0.2;
       cmd.maxG = Math.min(cmd.maxG, energyG(ac));
-      brain.status = 'Kafa kafaya: yukarıdan geçiş';
+      brain.status = L('Kafa kafaya: yukarıdan geçiş', 'Head-on: passing above');
     } else if (headOn && cs.headOnShoot === false && R > 350) {
       // Öne dönüş: yana açıl, geçişte karşının arkasına dönebilecek yer bırak
       _tmp.crossVectors(_los, UP).normalize().multiplyScalar(cs.leadSide);
       cmd.dir.copy(_los).addScaledVector(_tmp, 0.55);
       cmd.dir.y += 0.12;
       cmd.liftUse = 0.85;
-      brain.status = 'Kafa kafaya: yana açılıp öne dönüş';
+      brain.status = L('Kafa kafaya: yana açılıp öne dönüş', 'Head-on: offsetting, then turning in');
     } else if (headOn) {
       cmd.dir.copy(_aimDir);
-      brain.status = 'Kafa kafaya geçiş';
+      brain.status = L('Kafa kafaya geçiş', 'Head-on pass');
     } else if (tgtTurning && R > 650 && closure < 15 && ata < 70 * DEG && ac.pos.y > tgt.pos.y - 200) {
       // Alçak yo-yo: dönüşün içine ve biraz aşağı dalarak hız kazan, mesafeyi kapat
       cmd.dir.copy(_aimDir);
       cmd.dir.y -= 0.35;
-      brain.status = 'Alçak yo-yo: dönüşün içine dal';
+      brain.status = L('Alçak yo-yo: dönüşün içine dal', 'Low yo-yo: diving inside the turn');
     } else if (ata > 60 * DEG) {
       cmd.dir.copy(_los);
-      brain.status = 'Dönüş savaşı: burnu hedefe çevir';
+      brain.status = L('Dönüş savaşı: burnu hedefe çevir', 'Turn fight: pulling the nose onto the target');
     } else {
       cmd.dir.copy(_aimDir);
-      brain.status = 'Önden takip (lead pursuit)';
+      brain.status = L('Önden takip (lead pursuit)', 'Lead pursuit');
     }
     // Atış mesafesini koru: kanat silahları yakınsama mesafesi civarında (~200 m) en etkili; çok yakına sokulan
     // avcının kanat mermileri hedefin iki yanından geçer
@@ -559,13 +560,13 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
     cmd.maxG = Math.min(cmd.maxG, 1.4);
     cmd.dir.y = Math.min(cmd.dir.y, -0.2);
     throttle = 1;
-    brain.status = 'Hız çok düştü: burun aşağı, hız kazanıyor';
+    brain.status = L('Hız çok düştü: burun aşağı, hız kazanıyor', 'Too slow: nose down, regaining speed');
   }
   cmd.throttle = throttle;
   // Önden geçişte liderin yanından gelen kanat adamı bombardıman uçağını tam karşıdan değil ~50° açıyla görür: bu da
   // önden saldırıdır, ateş erken açılır (yoksa 450 m'de açıp 380 m'de kopuyor, hiç ateş edemiyordu)
   const frontal = headOn || (fortress && cs.boxRun === 1 && tailAspect < -0.3);
-  if (tryFire(ac, brain, tgt, aimErr, R, frontal)) brain.status = `Ateş! ${tgt.callsign} — ${Math.round(R)} m`;
+  if (tryFire(ac, brain, tgt, aimErr, R, frontal)) brain.status = `${L('Ateş!', 'Firing!')} ${tgt.callsign} — ${Math.round(R)} m`;
 }
 
 function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, dt: number, cmd: FlyCommand): void {
@@ -618,7 +619,7 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
     const hz = _home.z - ac.pos.z;
     const l = Math.hypot(hx, hz) || 1;
     cmd.dir.set(hx / l - _los.x * 0.6, -0.15, hz / l - _los.z * 0.6);
-    brain.status = 'Hasarlı: savaştan kopuyor';
+    brain.status = L('Hasarlı: savaştan kopuyor', 'Damaged: disengaging');
   } else if (runWeave) {
     let hx = ac.fwd.x;
     let hz = ac.fwd.z;
@@ -642,14 +643,14 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
     cmd.dir.set(hx * c - hz * sn, agl > 400 ? -0.06 : 0.02, hx * sn + hz * c);
     cmd.maxG = Math.min(2.5, s.nMax);
     cmd.liftUse = 0.8;
-    brain.status = 'Savunma: zikzakla kaçış (hız farkını açıyor)';
+    brain.status = L('Savunma: zikzakla kaçış (hız farkını açıyor)', 'Defensive: weaving away (using its speed edge)');
     if (tactic === 'energy' && cs.phase === 'attack') setPhase(brain, 'extend');
   } else if (negGFirst) {
     cmd.dir.set(ac.fwd.x * 0.35, -0.94, ac.fwd.z * 0.35);
     cmd.allowPush = true;
     cmd.forcePush = true;
     cmd.maxG = s.nMax * 0.8;
-    brain.status = 'Savunma: eksi G ile dalış (karbüratörlü takipçi izleyemez)';
+    brain.status = L('Savunma: eksi G ile dalış (karbüratörlü takipçi izleyemez)', 'Defensive: negative-G dive (a carbureted chaser cannot follow)');
     if (tactic === 'energy' && cs.phase === 'attack') setPhase(brain, 'extend');
   } else if (faster) {
     // Takipçi şu an daha hızlıysa yatay kaçış işe yaramaz: irtifa varsa dik dalışla hızlan (ağır, az sürüklemeli
@@ -662,10 +663,10 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
       const l = Math.hypot(hx, hz) || 1;
       cmd.dir.set(hx / l, -0.55, hz / l);
       cmd.maxG = s.nMax * 0.75;
-      brain.status = 'Savunma: dik dalışla kopma';
+      brain.status = L('Savunma: dik dalışla kopma', 'Defensive: steep dive to break away');
     } else {
       extendFrom(ac, brain, threat, R, cmd);
-      brain.status = cs.zoom ? 'Savunma: hızını irtifaya çeviriyor' : 'Savunma: hız avantajıyla kopma';
+      brain.status = cs.zoom ? L('Savunma: hızını irtifaya çeviriyor', 'Defensive: zoom climbing') : L('Savunma: hız avantajıyla kopma', 'Defensive: escaping on speed');
     }
     // Tehdit geçince taarruz uzaklaşmayla sürer (hemen geri dönüp takipçinin önüne girmez)
     if (tactic === 'energy' && cs.phase === 'attack') {
@@ -679,14 +680,14 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
     cmd.allowPush = true;
     cmd.forcePush = true;
     cmd.maxG = s.nMax * 0.8;
-    brain.status = 'Savunma: eksi G ile dalış (karbüratörlü takipçi izleyemez)';
+    brain.status = L('Savunma: eksi G ile dalış (karbüratörlü takipçi izleyemez)', 'Defensive: negative-G dive (a carbureted chaser cannot follow)');
   } else if (diveAway && !climbAway) {
     const hx = -_los.x;
     const hz = -_los.z;
     const l = Math.hypot(hx, hz) || 1;
     cmd.dir.set(hx / l, agl > 1800 ? -0.6 : -0.3, hz / l);
     cmd.maxG = s.nMax * 0.7;
-    brain.status = 'Savunma: dalarak uzaklaşıyor';
+    brain.status = L('Savunma: dalarak uzaklaşıyor', 'Defensive: diving away');
     if (cs.phase === 'attack') setPhase(brain, 'extend');
   } else if (climbAway) {
     // Hafif sarmal tırmanış: daha kötü tırmanan takipçi nişanı tutamaz
@@ -694,17 +695,17 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
     cmd.dir.copy(ac.fwd).addScaledVector(_tmp, 0.25);
     cmd.dir.y = ac.speed > s.vStall * 2.2 ? 0.75 : 0.45;
     cmd.maxG = s.nMax * 0.7;
-    brain.status = 'Savunma: tırmanarak kopma';
+    brain.status = L('Savunma: tırmanarak kopma', 'Defensive: climbing away');
   } else if (ac.speed < vCorner * 0.7 && ac.pos.y - groundLevel(ac.pos.x, ac.pos.z) > 1200) {
     cmd.dir.set(ac.fwd.x, -0.9, ac.fwd.z);
-    brain.status = 'Savunma: dalışla hız kazan';
+    brain.status = L('Savunma: dalışla hız kazan', 'Defensive: diving for speed');
   } else if (s.role === 'bomber') {
     // Bombardıman uçağı manevra yapmaz, nişancılar savunur
     return;
   } else {
     cmd.dir.copy(_los);
     cmd.dir.y = clamp(cmd.dir.y, -0.3, 0.25);
-    brain.status = 'Savunma: kırılma dönüşü';
+    brain.status = L('Savunma: kırılma dönüşü', 'Defensive: break turn');
   }
 
   // Saldırgan nişan aldıysa kaçamak manevra
@@ -720,7 +721,7 @@ function defensive(ac: Aircraft, brain: Brain, threat: Aircraft, world: World, d
       cs.jinkDir.normalize();
     }
     cmd.dir.copy(ac.fwd).addScaledVector(cs.jinkDir, 2);
-    brain.status = 'Savunma: kaçamak manevra (jink)';
+    brain.status = L('Savunma: kaçamak manevra (jink)', 'Defensive: jinking');
   }
 }
 
@@ -743,7 +744,7 @@ export function coverCommand(ac: Aircraft, brain: Brain, lead: Aircraft, world: 
   if (attacker && ac.armed) {
     brain.target = attacker;
     offensive(ac, brain, attacker, dt, cmd);
-    if (!brain.fireGuns) brain.status = `Lideri koruyor: ${attacker.callsign}`;
+    if (!brain.fireGuns) brain.status = `${L('Lideri koruyor', 'Covering the leader')}: ${attacker.callsign}`;
     return;
   }
   // Bombardıman kutusuna önden saldırıda çift (ve dörtlü) yan yana girer: lider karşıya dönünce kanat adamı da kendi
@@ -779,13 +780,13 @@ export function coverCommand(ac: Aircraft, brain: Brain, lead: Aircraft, world: 
   cmd.maxG = ac.spec.nMax * 0.85;
   cmd.turnGain = 2.5;
   cmd.minAlt = COMBAT_AGL;
-  brain.status = `Lideri koruyor (${lead.callsign})`;
+  brain.status = `${L('Lideri koruyor', 'Covering the leader')} (${lead.callsign})`;
   const lt = lead.brain.target;
   if (lt && lt.airborne && ac.armed) {
     const R = lt.pos.distanceTo(ac.pos);
     const err = gunSolution(ac, brain, lt, dt, _aimDir);
     if (tryFire(ac, brain, lt, err, R, lt.fwd.dot(_los.subVectors(lt.pos, ac.pos).normalize()) < -0.6)) {
-      brain.status = `Fırsat atışı: ${lt.callsign}`;
+      brain.status = `${L('Fırsat atışı', 'Snap shot')}: ${lt.callsign}`;
     }
   }
 }

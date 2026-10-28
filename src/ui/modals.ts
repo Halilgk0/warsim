@@ -2,12 +2,16 @@
 
 import type { Game } from '../game';
 import { SCENARIOS, SCENARIO_GROUPS, type ScenarioGroup } from '../sim/scenarios';
-import { INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, SOUND_LEVELS, onSettingsChange, saveSettings, settings, type SoundLevel } from './settings';
+import {
+  INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, QUALITY, RESOLUTIONS, SOUND_LEVELS, onSettingsChange, saveSettings, settings,
+  type GraphicsQuality, type Resolution, type SoundLevel,
+} from './settings';
 import { sound } from '../audio/sound';
 import { defaultSelection, researchBody, stageOf, type ResearchStage, type ResearchTab } from './research';
 import { TECH_BY_ID } from '../sim/tech';
 import { marketBody, sellCandidate } from './market';
 import { $, esc } from './dom';
+import { L } from '../i18n';
 
 export type ModalKind = 'scenarios' | 'research' | 'settings' | 'market';
 
@@ -87,21 +91,21 @@ export class Modals {
     let body = '';
     let title = '';
     if (this.kind === 'scenarios') {
-      title = 'Senaryolar';
+      title = L('Senaryolar', 'Scenarios');
       body = this.scenarios();
     } else if (this.kind === 'research') {
-      title = 'Araştırma';
+      title = L('Araştırma', 'Research');
       body = this.research();
     } else if (this.kind === 'settings') {
-      title = 'Ayarlar';
+      title = L('Ayarlar', 'Settings');
       body = this.settingsBody();
     } else if (this.kind === 'market') {
-      title = 'Hazine ve pazar';
+      title = L('Hazine ve pazar', 'Treasury and market');
       body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase);
     }
     this.el.innerHTML = `
       <div class="modal-card ${this.kind}">
-        <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="Kapat (Esc)">✕</button></div>
+        <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
     const mb = this.el.querySelector('.modal-body');
@@ -147,18 +151,37 @@ export class Modals {
       </div>`).join('');
     return `
       <div class="set-grid">
-        <div><h3>Ses</h3>
-          <label class="check"><input type="checkbox" data-set="muted" ${settings.sound.muted ? 'checked' : ''}> Sessiz <span class="muted small">— N tuşu ya da üst çubuktaki hoparlör</span></label>
+        <div><h3>${L('Ses', 'Sound')}</h3>
+          <label class="check"><input type="checkbox" data-set="muted" ${settings.sound.muted ? 'checked' : ''}> ${L('Sessiz', 'Mute')} <span class="muted small">— ${L('N tuşu ya da üst çubuktaki hoparlör', 'N key or the speaker in the top bar')}</span></label>
           ${snd}
-          <p class="muted small">Savaş sesleri kamera yaklaştıkça duyulur; uyarılar her zaman. Telefonda sessiz düğmesi açıksa ses gelmeyebilir. Seslerin hepsi gerçek kayıt; künyesi Haberler → “Sesler geldi”de.</p>
+          <p class="muted small">${L(
+            'Savaş sesleri kamera yaklaştıkça duyulur; uyarılar her zaman. Telefonda sessiz düğmesi açıksa ses gelmeyebilir. Seslerin hepsi gerçek kayıt; künyesi Haberler → “Sesler geldi”de.',
+            'Battle sounds are heard as the camera gets closer; alerts always. On a phone with the silent switch on, you may hear nothing. Every sound is a real recording; credits are in News → “Sounds are here”.',
+          )}</p>
+          <h3>${L('Grafik', 'Graphics')}</h3>
+          <div class="form-row"><span>${L('Kalite', 'Quality')}</span><select data-set="quality">${(Object.keys(QUALITY) as GraphicsQuality[]).map((q) =>
+            `<option value="${q}" ${q === settings.graphics.quality ? 'selected' : ''}>${QUALITY[q].name}</option>`).join('')}</select></div>
+          <div class="form-row"><span>${L('Çözünürlük', 'Resolution')}</span><select data-set="resolution">${RESOLUTIONS.map((r) =>
+            `<option value="${r.id}" ${r.id === settings.graphics.resolution ? 'selected' : ''}>${r.name}</option>`).join('')}</select></div>
+          <label class="check"><input type="checkbox" data-set="dayCycle" ${settings.graphics.dayCycle ? 'checked' : ''}> ${L('Gün döngüsü', 'Day cycle')} <span class="muted small">— ${L('oyunda 48 dakikada bir gün; kapalıyken hep gündüz', 'one day every 48 minutes in game; always daytime when off')}</span></label>
+          <label class="check"><input type="checkbox" data-set="clouds" ${settings.graphics.clouds ? 'checked' : ''}> ${L('Bulutlar', 'Clouds')} <span class="muted small">— ${L('düşük kalitede yok; uzaktan bakınca söner', 'none on low quality; they fade when zoomed out')}</span></label>
+          <p class="muted small">${L(
+            'Telefon ısınır ya da takılırsa kaliteyi düşür. Düşük: sade uçaklar, bulut yok. Orta: ayrıntılı uçaklar, az bulut. Yüksek: ayrıca yakın arazi ayrıntısı, tam bulut, daha uzaktaki ağaç ve köyler. Otomatik çözünürlük kare hızı düşünce görüntüyü biraz yumuşatır.',
+            'If your phone gets hot or stutters, lower the quality. Low: simple aircraft, no clouds. Medium: detailed aircraft, a few clouds. High: also close-up ground detail, full clouds, trees and villages farther out. Auto resolution softens the image slightly when the frame rate drops.',
+          )}</p>
         </div>
-        <div><h3>Harita</h3>${map}
-          <div class="form-row"><span>Radar kapsama yüksekliği</span><select data-set="radarAgl">${[100, 200, 300, 600, 1500, 3000].map((v) =>
+        <div><h3>${L('Oyun', 'Game')}</h3>
+          <label class="check"><input type="checkbox" data-set="autoFast" ${settings.game.autoFast ? 'checked' : ''}> ${L('Boş yolda otomatik 2×', 'Automatic 2× on the open road')} <span class="muted small">— ${L(
+            '1× seçiliyken kolların yalnız yoldaysa; çatışma, görev, kalkış ve inişte 1×',
+            'while 1× is selected and your flights are only travelling; 1× in combat, missions, takeoff and landing',
+          )}</span></label>
+          <h3>${L('Harita', 'Map')}</h3>${map}
+          <div class="form-row"><span>${L('Radar kapsama yüksekliği', 'Radar coverage height')}</span><select data-set="radarAgl">${[100, 200, 300, 600, 1500, 3000].map((v) =>
             `<option value="${v}" ${v === settings.radarAgl ? 'selected' : ''}>${v} m</option>`).join('')}</select></div>
-          <div class="form-row"><span>Mermi izi kalınlığı</span><input type="range" min="0.4" max="2.5" step="0.1" value="${settings.tracerScale}" data-set="tracerScale"></div>
+          <div class="form-row"><span>${L('Mermi izi kalınlığı', 'Tracer thickness')}</span><input type="range" min="0.4" max="2.5" step="0.1" value="${settings.tracerScale}" data-set="tracerScale"></div>
         </div>
-        <div><h3>Bilgi paneli</h3>${info}</div>
-        <div><h3>Olay günlüğü</h3>${log}</div>
+        <div><h3>${L('Bilgi paneli', 'Info panel')}</h3>${info}</div>
+        <div><h3>${L('Olay günlüğü', 'Event log')}</h3>${log}</div>
       </div>`;
   }
 
@@ -255,6 +278,11 @@ export class Modals {
     else if (set === 'log') settings.log[k as keyof typeof settings.log] = (el as HTMLInputElement).checked;
     else if (set === 'radarAgl') settings.radarAgl = Number(el.value);
     else if (set === 'tracerScale') settings.tracerScale = Number(el.value);
+    else if (set === 'quality') settings.graphics.quality = el.value as GraphicsQuality;
+    else if (set === 'resolution') settings.graphics.resolution = el.value as Resolution;
+    else if (set === 'dayCycle') settings.graphics.dayCycle = (el as HTMLInputElement).checked;
+    else if (set === 'clouds') settings.graphics.clouds = (el as HTMLInputElement).checked;
+    else if (set === 'autoFast') settings.game.autoFast = (el as HTMLInputElement).checked;
     else if (set === 'muted') settings.sound.muted = (el as HTMLInputElement).checked;
     else if (set === 'sound') {
       const id = k as SoundLevel;

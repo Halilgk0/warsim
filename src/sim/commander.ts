@@ -10,6 +10,7 @@ import { flakTarget } from './ai/strike';
 import { TECH_BY_ID, type Research } from './tech';
 import { rand } from '../core/math';
 import { BASE_UPGRADE_COST, aircraftPrice } from './economy';
+import { L } from '../i18n';
 
 const TECH_PRIORITY = [
   'hd_20', 'observer', 'radio', 'self_sealing', 'm_vp_prop', 'n_reflector', 'hd_fort1', 'pilot_armor', 'w_mg8', 'm_v12',
@@ -247,7 +248,7 @@ export class Commander {
       const h = Math.floor(Math.random() * 12) * (Math.PI / 12);
       if (!world.checkPlacement(this.team, 'airbase', x, z, h).ok) continue;
       if (world.placeStructure(this.team, 'airbase', x, z, h)) {
-        world.log(`${world.teams[this.team].name} komuta: yeni hava üssü kuruluyor`, this.team, 'build');
+        world.log(L(`${world.teams[this.team].name} komuta: yeni hava üssü kuruluyor`, `${world.teams[this.team].name} command: building a new airbase`), this.team, 'build');
         return true;
       }
     }
@@ -468,7 +469,7 @@ export class Commander {
     plan.altitude = dst.s.pos.y + Math.min(spec.cruiseAlt, 4000);
     const n = Math.min(pick[1], Math.floor(gap / 2), dst.freeSlots, 4);
     if (n >= 2 && world.launch(src, pick[0], n, plan).length) {
-      world.log(`${world.teams[this.team].name} komuta: ${n} × ${spec.abbr} ${dst.s.name} üssüne intikal ediyor`, this.team, 'ops');
+      world.log(L(`${world.teams[this.team].name} komuta: ${n} × ${spec.abbr} ${dst.s.name} üssüne intikal ediyor`, `${world.teams[this.team].name} command: ${n} × ${spec.abbr} transferring to ${dst.s.name}`), this.team, 'ops');
     }
   }
 
@@ -681,7 +682,7 @@ export class Commander {
       this.stage = 'base';
       this.stageRaids = 0;
       this.stageStart = world.time;
-      world.log(`${world.teams[this.team].name} komuta: ${world.teams[foe].name} ana üssüne yükleniyor`, this.team, 'info');
+      world.log(L(`${world.teams[this.team].name} komuta: ${world.teams[foe].name} ana üssüne yükleniyor`, `${world.teams[this.team].name} command: pressing the ${world.teams[foe].name} main base`), this.team, 'info');
     }
     const focus = this.focusId !== null ? world.structureById(this.focusId) : undefined;
     const home = world.airbasesOf(this.team)[0]?.s.pos;
@@ -756,7 +757,7 @@ export class Commander {
           }
         }
         world.launchPackage(b, plan, groups, escort ? [{ specId: escort.specId, count: escort.count, split: escort.split }] : []);
-        world.log(`${world.teams[this.team].name} komuta: ${tgt.name} hedefine baskın emri`, this.team, 'info');
+        world.log(L(`${world.teams[this.team].name} komuta: ${tgt.name} hedefine baskın emri`, `${world.teams[this.team].name} command: raid ordered on ${tgt.name}`), this.team, 'info');
         if (tgt.team === this.foe) {
           this.focusId = tgt.id;
           this.stageRaids++;
@@ -843,7 +844,7 @@ export function alertScramble(world: World, team: number, alwaysOn: boolean, dt:
     const fl = world.launch(b, specId, count, plan);
     // Savunma kalkışı: hedef savunma bölgesinden çıkınca bırakılır
     for (const f of fl) f.leash = b.alert.radius + 15000;
-    if (fl.length) world.log(`${b.s.name}: alarm! ${count} × ${spec.abbr} önlemeye kalkıyor (${target.callsign})`, team, 'defense');
+    if (fl.length) world.log(L(`${b.s.name}: alarm! ${count} × ${spec.abbr} önlemeye kalkıyor (${target.callsign})`, `${b.s.name}: scramble! ${count} × ${spec.abbr} taking off to intercept (${target.callsign})`), team, 'defense');
     b.alert.cooldown = 40;
   }
 }

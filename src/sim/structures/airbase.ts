@@ -7,6 +7,7 @@ import type { FlightGroup } from '../ai/flightGroup';
 import { SPECS, type Loadout } from '../aircraft/specs';
 import type { BeltId } from '../aircraft/ammo';
 import { footprintStats, groundLevel, terrainEdits } from '../terrain';
+import { L } from '../../i18n';
 
 export type AirframeStatus = 'ready' | 'servicing' | 'airborne';
 
@@ -14,9 +15,9 @@ export type AirframeStatus = 'ready' | 'servicing' | 'airborne';
 export type BaseUpgrade = 'workshop' | 'hangars' | 'revetments';
 
 export const BASE_UPGRADES: Record<BaseUpgrade, { name: string; desc: string; time: number }> = {
-  workshop: { name: 'Bakım atölyesi', desc: 'Onarım ve bakım süresi %40 kısalır.', time: 90 },
-  hangars: { name: 'Ek hangarlar', desc: 'Hangar kapasitesi +12 uçak.', time: 120 },
-  revetments: { name: 'Toprak siperler', desc: 'Apronda bekleyen uçaklar bombardımanda çok daha az zarar görür.', time: 80 },
+  workshop: { name: L('Bakım atölyesi', 'Maintenance workshop'), desc: L('Onarım ve bakım süresi %40 kısalır.', 'Repair and servicing take 40% less time.'), time: 90 },
+  hangars: { name: L('Ek hangarlar', 'Extra hangars'), desc: L('Hangar kapasitesi +12 uçak.', 'Hangar capacity +12 aircraft.'), time: 120 },
+  revetments: { name: L('Toprak siperler', 'Earth revetments'), desc: L('Apronda bekleyen uçaklar bombardımanda çok daha az zarar görür.', 'Aircraft parked on the apron take far less damage from bombing.'), time: 80 },
 };
 
 /** Hangardaki tek bir uçak gövdesi ve pilotu. Görevden göreve tecrübe ve aşınma taşır. */
@@ -378,7 +379,7 @@ export class Airbase {
       this.job.left -= dt;
       if (this.job.left <= 0) {
         this.upgrades.add(this.job.key);
-        world.log(`${this.s.name}: ${BASE_UPGRADES[this.job.key].name} tamamlandı`, this.s.team, 'build');
+        world.log(L(`${this.s.name}: ${BASE_UPGRADES[this.job.key].name} tamamlandı`, `${this.s.name}: ${BASE_UPGRADES[this.job.key].name} complete`), this.s.team, 'build');
         this.job = null;
       }
     }

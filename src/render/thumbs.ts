@@ -35,7 +35,7 @@ export function aircraftThumb(specId: string, color = 0x6f86b8): string {
   const r = renderer!;
   const sc = scene!;
   const cam = camera!;
-  const model = buildAircraftModel(spec.model, color);
+  const model = buildAircraftModel(spec.model);
   const root = model.root;
   root.rotation.set(0.32, -0.75, 0.08);
   for (const p of model.props) p.rotation.z = 0.4;
@@ -69,8 +69,8 @@ export function aircraftPlan(specId: string, ink = 0x56607a): string {
   }
   const sc = new THREE.Scene();
   sc.overrideMaterial = new THREE.MeshBasicMaterial({ color: ink, side: THREE.DoubleSide });
-  const model = buildAircraftModel(spec.model, 0xffffff);
-  for (const p of model.props) if (p.parent) p.parent.visible = false;
+  const model = buildAircraftModel(spec.model, { detail: 0 });
+  for (const p of model.props) p.visible = false;
   sc.add(model.root);
   const r = model.radius * 1.02;
   const cam = new THREE.OrthographicCamera(-r, r, r, -r, 0.1, 200);

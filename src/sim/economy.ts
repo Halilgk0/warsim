@@ -14,6 +14,7 @@ import type { TechNode } from './tech';
 import { MAP_SIZE } from './mapData';
 import { makeFbm, terrainHeight } from './terrain';
 import { clamp, smoothstep } from '../core/math';
+import { L, LOCALE } from '../i18n';
 
 export const CURRENCY = 'kr';
 
@@ -97,16 +98,16 @@ export function richnessTier(r: number): number {
 }
 
 export function richnessName(r: number): string {
-  if (r >= 1.5) return 'Zengin damar';
-  if (r >= 0.9) return 'Verimli';
-  if (r >= 0.5) return 'Orta';
-  if (r >= 0.25) return 'Zayıf';
-  return 'Çok zayıf';
+  if (r >= 1.5) return L('Zengin damar', 'Rich vein');
+  if (r >= 0.9) return L('Verimli', 'Good');
+  if (r >= 0.5) return L('Orta', 'Average');
+  if (r >= 0.25) return L('Zayıf', 'Poor');
+  return L('Çok zayıf', 'Very poor');
 }
 
 // ---------------------------------------------------------------- pazar
 
-export const SELLERS = ['İsveç', 'İsviçre', 'İspanya', 'Portekiz', 'Arjantin', 'Türkiye'];
+export const SELLERS = [L('İsveç', 'Sweden'), L('İsviçre', 'Switzerland'), L('İspanya', 'Spain'), L('Portekiz', 'Portugal'), L('Arjantin', 'Argentina'), L('Türkiye', 'Türkiye')];
 
 export interface MarketOffer {
   id: number;
@@ -119,6 +120,8 @@ export interface MarketOffer {
   expires: number;
 }
 
+const MONEY_NF = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+
 export interface LedgerEntry {
   time: number;
   amount: number;
@@ -126,5 +129,5 @@ export interface LedgerEntry {
 }
 
 export function fmtMoney(v: number): string {
-  return `${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(Math.round(v))} ${CURRENCY}`;
+  return `${MONEY_NF.format(Math.round(v))} ${CURRENCY}`;
 }

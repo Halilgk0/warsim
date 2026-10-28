@@ -5,7 +5,9 @@ import type { Game } from '../game';
 import { NAME_MAX, currentAccount } from '../persist';
 import { SavesPanel } from './savesList';
 import { mapById } from '../sim/maps';
+import { SCENARIOS } from '../sim/scenarios';
 import { $, esc, fmtTime } from './dom';
+import { L } from '../i18n';
 
 type View = 'main' | 'saves' | 'exit';
 
@@ -59,7 +61,7 @@ export class PauseMenu {
     this.render();
     const ok = await this.game.saveNow('manual', this.title.trim() || this.game.defaultSaveTitle());
     this.busy = false;
-    this.msg = ok ? 'Kaydedildi.' : 'Kaydedilemedi.';
+    this.msg = ok ? L('Kaydedildi.', 'Saved.') : L('Kaydedilemedi.', 'Could not save.');
     if (ok) this.title = this.game.defaultSaveTitle();
     this.render();
   }
@@ -84,7 +86,9 @@ export class PauseMenu {
         return;
       case 'login':
         g.login.open((a, created) => {
-          this.msg = created ? `Hesap oluşturuldu (${a.name}). Artık kaydedebilirsin.` : `Giriş yapıldı: ${a.name}.`;
+          this.msg = created
+            ? L(`Hesap oluşturuldu (${a.name}). Artık kaydedebilirsin.`, `Account created (${a.name}). You can save now.`)
+            : L(`Giriş yapıldı: ${a.name}.`, `Logged in: ${a.name}.`);
           this.render();
         });
         return;
@@ -98,6 +102,10 @@ export class PauseMenu {
         return;
       case 'feedback':
         g.feedback.open(g.world.playerName || acc?.name || '');
+        return;
+      case 'tutorial':
+        this.close(false);
+        g.tutorial.begin(false);
         return;
       case 'back':
         this.view = 'main';
@@ -115,7 +123,7 @@ export class PauseMenu {
         void g.saveNow('manual', this.game.defaultSaveTitle()).then((ok) => {
           if (ok) g.exitToMenu();
           else {
-            this.msg = 'Kaydedilemedi.';
+            this.msg = L('Kaydedilemedi.', 'Could not save.');
             this.view = 'main';
             this.render();
           }
@@ -132,45 +140,50 @@ export class PauseMenu {
     const g = this.game;
     const w = g.world;
     const acc = currentAccount();
+    // Öğretici harekât içindir (it dalaşı ve saldırı senaryolarında hangar boş, kurulacak görev yok)
+    const tutorial = (SCENARIOS.find((s) => s.id === g.scenarioId)?.group ?? 'harekat') === 'harekat';
     let body = '';
     if (this.view === 'saves') {
-      body = `<div class="pm-head"><button class="icon" data-pm="back" title="Geri">‹</button><h2>Kayıtlar</h2></div>
-        <p class="muted small">Yüklenen kayıt şu anki oyunun yerini alır.</p>
+      body = `<div class="pm-head"><button class="icon" data-pm="back" title="${L('Geri', 'Back')}">‹</button><h2>${L('Kayıtlar', 'Saves')}</h2></div>
+        <p class="muted small">${L('Yüklenen kayıt şu anki oyunun yerini alır.', 'Loading a save replaces the current game.')}</p>
         ${this.saves.html()}`;
     } else if (this.view === 'exit') {
-      body = `<h2>Ana menüye dön</h2>
-        <p class="muted">${acc ? 'Son kayıttan sonraki ilerleme kaydedilmedi.' : 'Misafir oyun kaydedilmez: çıkınca bu harekât silinir.'}</p>
+      body = `<h2>${L('Ana menüye dön', 'Back to main menu')}</h2>
+        <p class="muted">${acc
+          ? L('Son kayıttan sonraki ilerleme kaydedilmedi.', 'Progress since the last save has not been saved.')
+          : L('Misafir oyun kaydedilmez: çıkınca bu harekât silinir.', 'Guest games are not saved: this campaign is lost when you leave.')}</p>
         <div class="pm-col">
-          ${acc ? '<button class="primary" data-pm="exit-save">Kaydet ve çık</button>' : ''}
-          <button class="${acc ? '' : 'danger'}" data-pm="exit-now">${acc ? 'Kaydetmeden çık' : 'Yine de çık'}</button>
-          <button data-pm="back">Vazgeç</button>
+          ${acc ? `<button class="primary" data-pm="exit-save">${L('Kaydet ve çık', 'Save and quit')}</button>` : ''}
+          <button class="${acc ? '' : 'danger'}" data-pm="exit-now">${acc ? L('Kaydetmeden çık', 'Quit without saving') : L('Yine de çık', 'Quit anyway')}</button>
+          <button data-pm="back">${L('Vazgeç', 'Cancel')}</button>
         </div>`;
     } else {
-      const who = w.playerName ? `Komutan ${esc(w.playerName)}` : 'Senaryo';
+      const who = w.playerName ? `${L('Komutan', 'Commander')} ${esc(w.playerName)}` : L('Senaryo', 'Scenario');
       const foes = w.teams.length - 1;
       const last = g.lastSave
-        ? `Son kayıt ${g.ago(g.lastSave.real)} (${g.lastSave.kind === 'auto' ? 'otomatik' : 'elle'})`
-        : 'Bu oyun henüz kaydedilmedi';
-      const auto = acc ? ` · sıradaki otomatik kayıt ≈ ${Math.max(0, Math.ceil(g.autosaveLeft() / 60))} dk` : '';
+        ? L(`Son kayıt ${g.ago(g.lastSave.real)}`, `Last saved ${g.ago(g.lastSave.real)}`) + ` (${g.lastSave.kind === 'auto' ? L('otomatik', 'auto') : L('elle', 'manual')})`
+        : L('Bu oyun henüz kaydedilmedi', 'This game has not been saved yet');
+      const auto = acc ? L(` · sıradaki otomatik kayıt ≈ ${Math.max(0, Math.ceil(g.autosaveLeft() / 60))} dk`, ` · next autosave ≈ ${Math.max(0, Math.ceil(g.autosaveLeft() / 60))} min`) : '';
       const saveBlock = acc
         ? `<div class="pm-save">
-            <input name="stitle" maxlength="${NAME_MAX * 2}" value="${esc(this.title)}" placeholder="Kayıt adı" ${this.busy ? 'disabled' : ''}>
-            <button class="primary" data-pm="save" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Kaydediliyor…' : 'Kaydet'}</button>
+            <input name="stitle" maxlength="${NAME_MAX * 2}" value="${esc(this.title)}" placeholder="${L('Kayıt adı', 'Save name')}" ${this.busy ? 'disabled' : ''}>
+            <button class="primary" data-pm="save" ${this.busy ? 'disabled' : ''}>${this.busy ? L('Kaydediliyor…', 'Saving…') : L('Kaydet', 'Save')}</button>
           </div>`
-        : `<div class="pm-guest"><span>Misafir oyun kaydedilmez.</span><button data-pm="login">Giriş yap ve kaydet</button></div>`;
-      body = `<h2>Duraklatıldı</h2>
-        <p class="muted small">${who} · ${esc(mapById(w.mapId).name)} · oyun süresi ${fmtTime(w.time)}${foes > 0 ? ` · ${foes} düşman` : ''}${acc ? ` · hesap ${esc(acc.name)}` : ''}</p>
+        : `<div class="pm-guest"><span>${L('Misafir oyun kaydedilmez.', 'Guest games are not saved.')}</span><button data-pm="login">${L('Giriş yap ve kaydet', 'Log in and save')}</button></div>`;
+      body = `<h2>${L('Duraklatıldı', 'Paused')}</h2>
+        <p class="muted small">${who} · ${esc(mapById(w.mapId).name)} ${w.mapSize / 1000} km · ${L('oyun süresi', 'game time')} ${fmtTime(w.time)}${foes > 0 ? ` · ${foes} ${L('düşman', foes === 1 ? 'enemy' : 'enemies')}` : ''}${acc ? ` · ${L('hesap', 'account')} ${esc(acc.name)}` : ''}</p>
         ${this.msg ? `<div class="mm-note">${esc(this.msg)}</div>` : ''}
         <div class="pm-col">
-          <button class="primary big" data-pm="resume">Devam et <small class="kbd">Esc</small></button>
+          <button class="primary big" data-pm="resume">${L('Devam et', 'Resume')} <small class="kbd">Esc</small></button>
         </div>
         ${saveBlock}
         <p class="muted small pm-last">${last}${auto}</p>
         <div class="pm-col">
-          ${acc ? '<button data-pm="saves">Kayıtlar</button>' : ''}
-          <button data-pm="settings">Ayarlar (ses, görünüm)</button>
-          <button data-pm="feedback">Geri bildirim gönder</button>
-          <button data-pm="exit">Ana menüye dön</button>
+          ${acc ? `<button data-pm="saves">${L('Kayıtlar', 'Saves')}</button>` : ''}
+          <button data-pm="settings">${L('Ayarlar (ses, görünüm)', 'Settings (sound, display)')}</button>
+          ${tutorial ? `<button data-pm="tutorial">${L('Öğretici', 'Tutorial')}</button>` : ''}
+          <button data-pm="feedback">${L('Geri bildirim gönder', 'Send feedback')}</button>
+          <button data-pm="exit">${L('Ana menüye dön', 'Back to main menu')}</button>
         </div>`;
     }
     this.el.innerHTML = `<div class="pm-card">${body}</div>`;

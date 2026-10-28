@@ -2,16 +2,18 @@
 // render (3B arazi ağı) aynı ızgarayı ve aynı üçgenlemeyi kullanır; uçağın "gördüğü" zemin ekrandakiyle aynıdır.
 
 import { clamp, smoothstep } from '../core/math';
-import { LAND_POINTS, MAP_SIZE, setMapPlaces } from './mapData';
+import { LAND_POINTS, MAP_BASE, MAP_HALF as HALF, MAP_SCALE, MAP_SIZE, setMapPlaces } from './mapData';
 import { MAPS, mapById, type MapDef } from './maps';
 
 export { makeFbm } from '../core/noise';
 
-/** Izgara: 2048 hücre (≈146 m) — 300 km haritada önceki ayrıntı korunur. */
+/**
+ * Izgara: her büyüklükte 2048 hücre. Hücre haritayla ölçeklenir (300 km'de ≈146 m, 150 km'de ≈73 m): çizim ve bellek
+ * aynı kalır, küçük haritada arazi daha ayrıntılı. Canlı bağ (harita yüklenince değişir).
+ */
 export const TERRAIN_N = 2048;
-export const TERRAIN_CELL = MAP_SIZE / TERRAIN_N;
+export let TERRAIN_CELL = MAP_BASE / TERRAIN_N;
 export const TERRAIN_W = TERRAIN_N + 1;
-const HALF = MAP_SIZE / 2;
 /** Etkin dünya yarıçapı (4/3 kuralı) — radar ufku için. */
 const EARTH_R_EFF = 8.5e6;
 
@@ -20,19 +22,24 @@ export const heights = new Float32Array(TERRAIN_W * TERRAIN_W);
 /** Düzenlenmemiş arazi (yeni oyun ya da kayıt yüklenince düzleştirmeler geri alınır). */
 const pristine = new Float32Array(TERRAIN_W * TERRAIN_W);
 
-/** Yüklü harita; sürüm her yeni haritada artar (render katmanı her şeyi yeniden kurar). */
-export const terrainMap = { id: '', version: 0 };
+/** Yüklü harita (kimlik, büyüklük, ikisinin anahtarı); sürüm her yeni haritada artar (render katmanı her şeyi yeniden kurar). */
+export const terrainMap = { id: '', size: MAP_BASE, key: '', version: 0 };
+
+/** Harita + büyüklük anahtarı ("anakara@150000"). */
+export const mapKey = (id: string, size: number): string => `${id}@${size}`;
 
 /** Haritanın arazisini üret: doğal yükseklik + üs/şehir ovalarının düzleştirilmesi. */
-function generate(def: MapDef): void {
-  setMapPlaces(def.id, def.sites, def.cities, def.extraLand);
+function generate(def: MapDef, size: number): void {
+  setMapPlaces(def.id, size, def.sites, def.cities, def.extraLand);
+  TERRAIN_CELL = MAP_SIZE / TERRAIN_N;
+  const k = MAP_SCALE;
   const pts = LAND_POINTS;
-  const targets = pts.map((p) => clamp(def.natural(p.x, p.z), 40, 320));
+  const targets = pts.map((p) => clamp(def.natural(p.x, p.z, k), 40, 320));
   for (let j = 0; j < TERRAIN_W; j++) {
     const z = -HALF + j * TERRAIN_CELL;
     for (let i = 0; i < TERRAIN_W; i++) {
       const x = -HALF + i * TERRAIN_CELL;
-      let m = def.natural(x, z);
+      let m = def.natural(x, z, k);
       for (let q = 0; q < pts.length; q++) {
         const p = pts[q];
         const dx = x - p.x;
@@ -52,14 +59,16 @@ function generate(def: MapDef): void {
   terrainEdits.dirty.length = 0;
   terrainEdits.version++;
   terrainMap.id = def.id;
+  terrainMap.size = size;
+  terrainMap.key = mapKey(def.id, size);
   terrainMap.version++;
 }
 
-/** Haritayı yükle (zaten yüklüyse bir şey yapmaz). Yeni dünya kurulmadan önce çağrılır. */
-export function loadMap(id: string): void {
+/** Haritayı verilen büyüklükte yükle (zaten yüklüyse bir şey yapmaz). Yeni dünya kurulmadan önce çağrılır. */
+export function loadMap(id: string, size: number = MAP_BASE): void {
   const def = mapById(id);
-  if (terrainMap.id === def.id) return;
-  generate(def);
+  if (terrainMap.key === mapKey(def.id, size)) return;
+  generate(def, size);
 }
 
 /** Arazi düzenlendiğinde (inşaat) render katmanına haber vermek için. */
@@ -71,8 +80,8 @@ export const terrainEdits = {
 /** Bu oyunda düzenlenen bölgeler. */
 let edited: { i0: number; j0: number; i1: number; j1: number }[] = [];
 
-// Açılışta ilk harita
-generate(MAPS[0]);
+// Açılışta ilk harita (taban büyüklükte)
+generate(MAPS[0], MAP_BASE);
 
 /** Tüm inşaat düzleştirmelerini geri al (her yeni dünya temiz araziyle başlar). */
 export function resetTerrainEdits(): void {

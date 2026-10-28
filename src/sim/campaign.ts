@@ -4,9 +4,10 @@
 import type { World } from './world';
 import { Commander } from './commander';
 import { START_MONEY, fmtMoney, oreRichness } from './economy';
-import { MAP_ID, TEAM_SITES } from './mapData';
+import { MAP_ID, MAP_SIZE, TEAM_SITES } from './mapData';
 import { newAirframe, type Airbase } from './structures/airbase';
 import { clamp } from '../core/math';
+import { L, count } from '../i18n';
 
 export const MAX_ENEMIES = 5;
 
@@ -42,7 +43,7 @@ function startingFactory(w: World, base: Airbase): void {
   const chk = w.checkBaseFactory(base);
   if (chk.ok) {
     const p = base.factoryPad();
-    const f = w.addStructure(team, 'factory', `${base.s.name} fabrikası`, p.x, p.z, (base.s.heading * 180) / Math.PI);
+    const f = w.addStructure(team, 'factory', L(`${base.s.name} fabrikası`, `${base.s.name} factory`), p.x, p.z, (base.s.heading * 180) / Math.PI);
     f.attachedTo = base.s.id;
     return;
   }
@@ -55,6 +56,7 @@ export function setupCampaign(w: World, o: CampaignOptions): void {
   w.playerName = o.playerName;
   w.setup = { enemies: n };
   w.mapId = MAP_ID;
+  w.mapSize = MAP_SIZE;
   w.personnelEnabled = true;
   w.economyEnabled = true;
   for (let i = 0; i <= n; i++) {
@@ -62,7 +64,7 @@ export function setupCampaign(w: World, o: CampaignOptions): void {
     const ai = i > 0 || !!o.demo;
     const t = w.addTeam(ts.name, ts.color, [], ai);
     t.money = START_MONEY;
-    const base = w.addStructure(i, 'airbase', `${ts.name} ana üs`, ts.site.x, ts.site.z, ts.site.heading).airbase!;
+    const base = w.addStructure(i, 'airbase', L(`${ts.name} ana üs`, `${ts.name} main base`), ts.site.x, ts.site.z, ts.site.heading).airbase!;
     startingFactory(w, base);
     startingMine(w, base);
     for (let k = 0; k < 2; k++) {
@@ -80,7 +82,9 @@ export function setupCampaign(w: World, o: CampaignOptions): void {
   }
   if (o.demo) return;
   const foes = w.teams.slice(1).map((t) => t.name).join(', ');
-  w.log(`Harekât başladı: ${n} düşman ülke (${foes}) — herkes herkese karşı.`, null, 'info');
-  w.log(`Başlangıç: ana hava üssü, uçak fabrikası, 1 maden ocağı, 2 ev (8 kişi), 4 avcı ve 2 pike bombardıman. Hazine ${fmtMoney(START_MONEY)}.`, 0, 'info');
-  w.log('Ana üssü seçip görev planla; İnşa, Araştırma ve Pazar üst çubukta (klavyede B, T, M). Duraklatma menüsü: ☰ Menü ya da Esc.', 0, 'info');
+  w.log(L(`Harekât başladı: ${n} düşman ülke (${foes}) — herkes herkese karşı.`, `Campaign started: ${count(n, 'enemy nation')} (${foes}) — free for all.`), null, 'info');
+  w.log(L(`Başlangıç: ana hava üssü, uçak fabrikası, 1 maden ocağı, 2 ev (8 kişi), 4 avcı ve 2 pike bombardıman. Hazine ${fmtMoney(START_MONEY)}.`,
+    `Start: main airbase, aircraft factory, 1 mine, 2 houses (8 people), 4 fighters and 2 dive bombers. Treasury ${fmtMoney(START_MONEY)}.`), 0, 'info');
+  w.log(L('Ana üssü seçip görev planla; İnşa, Araştırma ve Pazar üst çubukta (klavyede B, T, M). Duraklatma menüsü: ☰ Menü ya da Esc.',
+    'Select the main base to plan a mission; Build, Research and Market are in the top bar (B, T, M on the keyboard). Pause menu: ☰ Menu or Esc.'), 0, 'info');
 }

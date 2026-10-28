@@ -21,6 +21,11 @@ import { groundLevel } from '../sim/terrain';
 import type { LaunchGroup } from '../sim/world';
 import { aircraftThumb } from '../render/thumbs';
 import { $, bar, esc, fmtDur, nf } from './dom';
+import { L, count } from '../i18n';
+
+/** Yüzde metni (Türkçede "%40", İngilizcede "40%"). */
+const P = (n: number): string => L(`%${n}`, `${n}%`);
+const KMH = L('km/sa', 'km/h');
 
 const TYPES: MissionType[] = ['cap', 'sweep', 'intercept', 'escort', 'levelBomb', 'diveBomb', 'attack', 'ferry'];
 
@@ -56,8 +61,8 @@ interface State {
 
 /** Dağılım seçeneklerindeki kısa iş adları. */
 const TASK_SHORT: Record<FlightTask, string> = {
-  auto: 'asıl hedefe', fighters: 'eskort avcılarına', bombers: 'bombardımana', flak: 'uçaksavara', close: 'yakın eskort',
-  free: 'serbest avcı',
+  auto: L('asıl hedefe', 'main target'), fighters: L('eskort avcılarına', 'escort fighters'), bombers: L('bombardımana', 'bombers'),
+  flak: L('uçaksavara', 'flak'), close: L('yakın eskort', 'close escort'), free: L('serbest avcı', 'free hunt'),
 };
 
 /** Küçük çizgi simgeleri. */
@@ -165,9 +170,9 @@ export class Planner {
 
   private splitLabel(type: MissionType, n: number, k: number | null): string {
     const sp = TASK_SPLIT[type]!;
-    if (k === null) return 'Otomatik: kol duruma göre böler';
-    if (k <= 0) return `Tümü ${TASK_SHORT[sp.main]}`;
-    if (k >= n) return `Tümü ${TASK_SHORT[sp.side]}`;
+    if (k === null) return L('Otomatik: kol duruma göre böler', 'Automatic: the flight splits as needed');
+    if (k <= 0) return `${L('Tümü', 'All on')} ${TASK_SHORT[sp.main]}`;
+    if (k >= n) return `${L('Tümü', 'All on')} ${TASK_SHORT[sp.side]}`;
     return `${n - k} ${TASK_SHORT[sp.main]} · ${k} ${TASK_SHORT[sp.side]}`;
   }
 
@@ -187,7 +192,7 @@ export class Planner {
     const spec = SPECS[pk.specId];
     if (pk.custom) {
       const kit = pk.kit ? spec.loadouts.find((l) => l.id === pk.kit) : undefined;
-      return makeLoadout(spec, `custom:${pk.specId}`, 'Serbest yük', pk.custom, kit?.replaceGuns, kit?.reqs[0]);
+      return makeLoadout(spec, `custom:${pk.specId}`, L('Serbest yük', 'Custom load'), pk.custom, kit?.replaceGuns, kit?.reqs[0]);
     }
     return spec.loadouts.find((l) => l.id === pk.loadoutId) ?? spec.loadouts[0];
   }
@@ -260,13 +265,18 @@ export class Planner {
     st.plan.altitude = Math.round((ground + (st.type === 'attack' ? 900 : cruise)) / 100) * 100;
   }
 
+  /** Hedef seçildi mi (öğretici). */
+  hasTarget(): boolean {
+    return !!this.st && this.targetPos() !== null;
+  }
+
   pickHint(): string {
     if (!this.st) return '';
     switch (targetKind(this.st.type)) {
-      case 'point': return 'Görev bölgesinin merkezine tıkla';
-      case 'structure': return 'Düşman yapısına tıkla (fabrika, üs, uçaksavar, radar)';
-      case 'aircraft': return 'Önlenecek düşman uçağına tıkla';
-      default: return 'Hedef seç';
+      case 'point': return L('Görev bölgesinin merkezine tıkla', 'Click the centre of the mission area');
+      case 'structure': return L('Düşman yapısına tıkla (fabrika, üs, uçaksavar, radar)', 'Click an enemy structure (factory, base, flak, radar)');
+      case 'aircraft': return L('Önlenecek düşman uçağına tıkla', 'Click the enemy aircraft to intercept');
+      default: return L('Hedef seç', 'Choose a target');
     }
   }
 
@@ -319,15 +329,15 @@ export class Planner {
     const p = st.plan;
     const w = this.game.world;
     switch (targetKind(st.type)) {
-      case 'point': return p.targetPos ? `Bölge (${(p.targetPos.x / 1000).toFixed(1)}, ${(p.targetPos.z / 1000).toFixed(1)} km)` : '';
+      case 'point': return p.targetPos ? `${L('Bölge', 'Area')} (${(p.targetPos.x / 1000).toFixed(1)}, ${(p.targetPos.z / 1000).toFixed(1)} km)` : '';
       case 'structure': return p.targetStructureId !== null ? w.structureById(p.targetStructureId)?.name ?? '' : '';
       case 'aircraft': {
         const a = p.targetAircraftId !== null ? w.aircraftById(p.targetAircraftId) : undefined;
-        return a ? `${a.flight ? `${a.flight.name} kolu · ` : ''}${a.callsign} (${a.spec.abbr})` : '';
+        return a ? `${a.flight ? L(`${a.flight.name} kolu · `, `${a.flight.name} flight · `) : ''}${a.callsign} (${a.spec.abbr})` : '';
       }
       case 'flight': {
         const f = p.targetFlightId !== null ? w.flightById(p.targetFlightId) : undefined;
-        return f ? `${f.name} kolu` : '';
+        return f ? L(`${f.name} kolu`, `${f.name} flight`) : '';
       }
       case 'base': return p.targetBaseId !== null ? w.structureById(p.targetBaseId)?.name ?? '' : '';
     }
@@ -340,11 +350,14 @@ export class Planner {
     const id = st.plan.targetAircraftId;
     if (id === null) return '';
     const c = w.teams[this.game.playerTeam].intel.contacts.get(id);
-    if (c && w.time - c.lastRadar < 10) return '<span class="tag ok">Radar izinde</span> Rota sürekli güncellenir.';
-    if (c) return '<span class="tag ok">Gözcü izinde</span> Görüldükçe rota güncellenir.';
+    if (c && w.time - c.lastRadar < 10) return `<span class="tag ok">${L('Radar izinde', 'Radar track')}</span> ${L('Rota sürekli güncellenir.', 'The course updates continuously.')}`;
+    if (c) return `<span class="tag ok">${L('Gözcü izinde', 'Observer track')}</span> ${L('Görüldükçe rota güncellenir.', 'The course updates whenever it is seen.')}`;
     const seen = w.flights.some((f) => f.team === this.game.playerTeam && f.contacts.has(id));
-    if (seen) return '<span class="tag ok">Kollarımız görüyor</span>';
-    return '<span class="tag warn">İz yok</span> Kol hedefin görüldüğü rotayı kestirip gider; bulamazsa son görülen yerde 3 dk arar.';
+    if (seen) return `<span class="tag ok">${L('Kollarımız görüyor', 'Our flights can see it')}</span>`;
+    return `<span class="tag warn">${L('İz yok', 'No track')}</span> ${L(
+      'Kol hedefin görüldüğü rotayı kestirip gider; bulamazsa son görülen yerde 3 dk arar.',
+      'The flight heads for where the target\'s last course leads; if it finds nothing, it searches the last known position for 3 min.',
+    )}`;
   }
 
   /** Önlemeye uygun düşman kolları (bilinen ya da görünen). */
@@ -405,10 +418,10 @@ export class Planner {
     const st = this.st!;
     const warns: string[] = [];
     const errs: string[] = [];
-    if (st.force.length === 0 || st.force.every((p) => p.count === 0)) errs.push('Kuvvete en az bir uçak ekle');
+    if (st.force.length === 0 || st.force.every((p) => p.count === 0)) errs.push(L('Kuvvete en az bir uçak ekle', 'Add at least one aircraft to the force'));
     const tp = this.targetPos();
     const kind = targetKind(st.type);
-    if (!tp) errs.push(kind === 'flight' ? 'Eskort edilecek kol seçilmedi' : kind === 'base' ? 'Hedef üs seçilmedi' : 'Hedef seçilmedi');
+    if (!tp) errs.push(kind === 'flight' ? L('Eskort edilecek kol seçilmedi', 'No flight chosen to escort') : kind === 'base' ? L('Hedef üs seçilmedi', 'No destination base chosen') : L('Hedef seçilmedi', 'No target chosen'));
     const pts = this.routePoints();
     let dist = 0;
     for (let i = 1; i < pts.length; i++) dist += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
@@ -432,37 +445,39 @@ export class Planner {
       if (pk.custom) {
         const chk = checkStores(spec, pk.custom, this.has);
         for (const e of chk.errors) errs.push(`${spec.abbr}: ${e}`);
-        if (chk.missing.length) errs.push(`${spec.abbr}: araştırma gerekli — ${chk.missing.map((r) => TECH_BY_ID[r]?.name ?? r).join(', ')}`);
+        if (chk.missing.length) errs.push(`${spec.abbr}: ${L('araştırma gerekli', 'research required')} — ${chk.missing.map((r) => TECH_BY_ID[r]?.name ?? r).join(', ')}`);
       }
       const pct = Math.round((needKg / Math.max(haveKg, 1)) * 100);
-      if (needKg > haveKg) warns.push(`${spec.abbr}: yakıt yetmeyebilir (gereken ≈${nf.format(needKg)} kg, mevcut ${nf.format(haveKg)} kg)`);
-      rows.push(`<div class="srow"><span>${pk.count} × ${esc(spec.abbr)}</span><div class="fuelbar"><i style="width:${Math.min(100, pct)}%" class="${pct > 100 ? 'over' : pct > 85 ? 'tight' : ''}"></i></div><b>%${pct}</b></div>`);
+      if (needKg > haveKg) warns.push(L(`${spec.abbr}: yakıt yetmeyebilir (gereken ≈${nf.format(needKg)} kg, mevcut ${nf.format(haveKg)} kg)`, `${spec.abbr}: fuel may run short (needs ≈${nf.format(needKg)} kg, has ${nf.format(haveKg)} kg)`));
+      rows.push(`<div class="srow"><span>${pk.count} × ${esc(spec.abbr)}</span><div class="fuelbar"><i style="width:${Math.min(100, pct)}%" class="${pct > 100 ? 'over' : pct > 85 ? 'tight' : ''}"></i></div><b>${P(pct)}</b></div>`);
     }
     // Personel
     const crewNeed = [...st.force, ...st.escort].reduce((a, x) => a + x.count * SPECS[x.specId].crew, 0);
     const crewFree = this.game.world.crewFree(st.base.s.team);
     if (Number.isFinite(crewFree) && crewNeed > crewFree) {
-      errs.push(`Personel yetmiyor: ${crewNeed} kişi gerekli, ${crewFree} kişi boşta. İnşa › Şehir'den ev kur ya da uçak sayısını azalt.`);
+      errs.push(L(`Personel yetmiyor: ${crewNeed} kişi gerekli, ${crewFree} kişi boşta. İnşa › Şehir'den ev kur ya da uçak sayısını azalt.`,
+        `Not enough personnel: ${crewNeed} needed, ${crewFree} free. Build houses from Build › City or send fewer aircraft.`));
     }
     const tg = tp ? groundLevel(tp.x, tp.z) : 0;
     if (MISSION_FIELDS[st.type].altitude && !(MISSION_FIELDS[st.type].lowLevel && p.lowLevel) && tp && p.altitude < tg + 300) {
-      warns.push(`İrtifa hedef bölgedeki araziye çok yakın (arazi ${nf.format(tg)} m)`);
+      warns.push(L(`İrtifa hedef bölgedeki araziye çok yakın (arazi ${nf.format(tg)} m)`, `Altitude is too close to the terrain at the target (ground ${nf.format(tg)} m)`));
     }
     const notes: string[] = [];
     const kinds = new Set(st.force.filter((x) => x.count > 0).map((x) => x.specId));
     if (kinds.size > 1) {
       const slow = st.force.reduce((a, b) => (speedFor(SPECS[a.specId], p.speed) < speedFor(SPECS[b.specId], p.speed) ? a : b));
-      notes.push(`Görev paketi: ${kinds.size} tip birlikte toplanır, ${SPECS[slow.specId].abbr} hızında (${Math.round(v * 3.6)} km/sa) uçar; her tip kendi kolunda saldırır.`);
+      notes.push(L(`Görev paketi: ${kinds.size} tip birlikte toplanır, ${SPECS[slow.specId].abbr} hızında (${Math.round(v * 3.6)} km/sa) uçar; her tip kendi kolunda saldırır.`,
+        `Strike package: ${kinds.size} types form up together and fly at the ${SPECS[slow.specId].abbr}'s speed (${Math.round(v * 3.6)} km/h); each type attacks in its own flight.`));
     }
-    if (st.escort.some((x) => x.count > 0)) notes.push('Eskort kolları saldırı kollarına sırayla dağıtılır.');
+    if (st.escort.some((x) => x.count > 0)) notes.push(L('Eskort kolları saldırı kollarına sırayla dağıtılır.', 'Escort flights are shared out among the strike flights in turn.'));
     const splitNote = (list: Pick[], type: MissionType) => list.filter((x) => this.splittable(x, type) && x.split !== null && x.split > 0 && x.split < x.count)
       .map((x) => `${SPECS[x.specId].abbr}: ${this.splitLabel(type, x.count, x.split)}`);
     const sn = [...splitNote(st.force, st.type), ...splitNote(st.escort, 'escort')];
-    if (sn.length) notes.push(`Görev dağılımı (ayrı kollar): ${sn.join('; ')}.`);
+    if (sn.length) notes.push(`${L('Görev dağılımı (ayrı kollar)', 'Task split (separate flights)')}: ${sn.join('; ')}.`);
     // Zaman çizelgesi
     const backT = st.type === 'ferry' ? 0 : back / v;
     const segs: [string, number, string][] = [
-      ['Kalkış', 150, 'k'], ['İntikal', outT, 'i'], [st.type === 'ferry' ? 'İniş' : 'Görev', Math.max(actionT, 60), 'g'], ['Dönüş', backT, 'd'],
+      [L('Kalkış', 'Takeoff'), 150, 'k'], [L('İntikal', 'Transit'), outT, 'i'], [st.type === 'ferry' ? L('İniş', 'Landing') : L('Görev', 'Mission'), Math.max(actionT, 60), 'g'], [L('Dönüş', 'Return'), backT, 'd'],
     ];
     const total = segs.reduce((a, s) => a + s[1], 0);
     const line = segs.filter((s) => s[1] > 0).map(([n, t, c]) =>
@@ -471,12 +486,12 @@ export class Planner {
       ${this.oddsHtml()}
       <div class="timeline">${line}</div>
       <div class="kv">
-        <span>Rota</span><span>${(dist / 1000).toFixed(1)} km</span>
-        <span>Hedefe varış</span><span>~${fmtDur(outT + 150)}</span>
-        <span>Toplam süre</span><span>~${fmtDur(total)}</span>
-        <span>Seyir hızı</span><span>${Math.round(v * 3.6)} km/sa</span>
+        <span>${L('Rota', 'Route')}</span><span>${(dist / 1000).toFixed(1)} km</span>
+        <span>${L('Hedefe varış', 'Time to target')}</span><span>~${fmtDur(outT + 150)}</span>
+        <span>${L('Toplam süre', 'Total time')}</span><span>~${fmtDur(total)}</span>
+        <span>${L('Seyir hızı', 'Cruise speed')}</span><span>${Math.round(v * 3.6)} ${KMH}</span>
       </div>
-      <div class="srows"><div class="srow head"><span>Yakıt kullanımı</span></div>${rows.join('')}</div>
+      <div class="srows"><div class="srow head"><span>${L('Yakıt kullanımı', 'Fuel use')}</span></div>${rows.join('')}</div>
       ${errs.map((w) => `<p class="warnbox bad">${esc(w)}</p>`).join('')}
       ${warns.map((w) => `<p class="warnbox">${esc(w)}</p>`).join('')}
       ${notes.map((w) => `<p class="infobox">${esc(w)}</p>`).join('')}`;
@@ -495,17 +510,17 @@ export class Planner {
     const o = missionOdds(w, team, plan, force, st.escort, st.base.s.pos);
     const tally = w.missionTally.get(`${team}:${st.type}`);
     const hist = tally && tally.success + tally.fail > 0
-      ? `<div class="odds-hist">Bu tür görevlerin: <b class="pos">${tally.success} başarılı</b> · <b class="neg">${tally.fail} başarısız</b>${tally.none ? ` · ${tally.none} sonuçsuz` : ''}</div>`
+      ? `<div class="odds-hist">${L('Bu tür görevlerin', 'Missions of this type')}: <b class="pos">${tally.success} ${L('başarılı', 'won')}</b> · <b class="neg">${tally.fail} ${L('başarısız', 'lost')}</b>${tally.none ? ` · ${tally.none} ${L('sonuçsuz', 'inconclusive')}` : ''}</div>`
       : '';
     const col = o.pct >= 65 ? 'var(--accent)' : o.pct >= 40 ? 'var(--warn)' : 'var(--red)';
     const f = o.factors.map((x) => `<li class="${x.delta >= 0 ? 'up' : 'dn'}"><span>${esc(x.label)}</span><b>${x.delta >= 0 ? '+' : '−'}${Math.abs(x.delta)}</b></li>`).join('');
     const miss = o.missing.slice(0, 4).map((x) => `${esc(x.label)} <b>+${x.delta}</b>`).join(' · ');
     return `<div class="odds">
-      <div class="odds-top"><span>Tahmini başarı</span><b style="color:${col}">%${o.pct}</b></div>
+      <div class="odds-top"><span>${L('Tahmini başarı', 'Estimated success')}</span><b style="color:${col}">${P(o.pct)}</b></div>
       ${bar(o.pct, col, true)}
-      <div class="odds-crit"><b>Başarı ölçütü:</b> ${esc(o.criterion)}. <b>Ödül:</b> ${esc(o.rewardText)} — yalnız başarıda.</div>
+      <div class="odds-crit"><b>${L('Başarı ölçütü', 'Success criterion')}:</b> ${esc(o.criterion)}. <b>${L('Ödül', 'Reward')}:</b> ${esc(o.rewardText)} — ${L('yalnız başarıda', 'only on success')}.</div>
       ${f ? `<ul class="odds-f">${f}</ul>` : ''}
-      ${miss ? `<div class="odds-miss"><b>Araştırılırsa artar:</b> ${miss}</div>` : ''}
+      ${miss ? `<div class="odds-miss"><b>${L('Araştırılırsa artar', 'Research would raise it')}:</b> ${miss}</div>` : ''}
       ${hist}
     </div>`;
   }
@@ -531,7 +546,7 @@ export class Planner {
     if (l.tankFuel) icons += ICO.tank;
     if (l.extraGuns || l.replaceGuns) icons += ICO.gun;
     const text = loadoutSummary(spec, l);
-    if (!icons) return { icons: ICO.clean, text: spec.guns.map((g) => g.name).join(', ') || 'yalnız savunma silahları' };
+    if (!icons) return { icons: ICO.clean, text: spec.guns.map((g) => g.name).join(', ') || L('yalnız savunma silahları', 'defensive guns only') };
     return { icons, text };
   }
 
@@ -541,9 +556,9 @@ export class Planner {
     const dv = spec.vMax * (1 - Math.pow(1 + l.drag / Math.max(spec.cd0 * 40, 0.4), -1 / 3)) + spec.vMax * (m / (spec.massEmpty + spec.fuelKg)) * 0.04;
     const out: string[] = [];
     if (m > 0) out.push(`+${nf.format(m)} kg`);
-    if (dv > 0.5) out.push(`azami hız ≈ −${Math.round(dv * 3.6)} km/sa`);
-    if (l.tankFuel) out.push(`menzil ≈ +%${Math.round((l.tankFuel / spec.fuelKg) * 85)}`);
-    return out.join(' · ') || 'temiz uçak: tam performans';
+    if (dv > 0.5) out.push(`${L('azami hız', 'top speed')} ≈ −${Math.round(dv * 3.6)} ${KMH}`);
+    if (l.tankFuel) out.push(`${L('menzil', 'range')} ≈ +${P(Math.round((l.tankFuel / spec.fuelKg) * 85))}`);
+    return out.join(' · ') || L('temiz uçak: tam performans', 'clean aircraft: full performance');
   }
 
   /** Serbest yükleme: askı başına mühimmat ve adet, toplam yük çubuğu. */
@@ -554,9 +569,9 @@ export class Planner {
     const rows = spec.hardpoints.map((h) => {
       const cur = place.find((x) => x.hp === h.id);
       const opts = Object.values(STORES).filter((st) => fits(spec, h, st) && (ordOk || st.kind === 'tank' || st.kind === 'gunpod'));
-      const sel = `<select data-act="${k}hp" data-spec="${spec.id}" data-hp="${h.id}"><option value="">— boş —</option>${opts.map((st) => {
+      const sel = `<select data-act="${k}hp" data-spec="${spec.id}" data-hp="${h.id}"><option value="">— ${L('boş', 'empty')} —</option>${opts.map((st) => {
         const locked = (st.requires ?? []).some((r) => !this.has(r));
-        return `<option value="${st.id}" ${cur?.store === st.id ? 'selected' : ''} ${locked ? 'disabled' : ''}>${esc(st.name)}${locked ? ' (araştırma)' : ''}</option>`;
+        return `<option value="${st.id}" ${cur?.store === st.id ? 'selected' : ''} ${locked ? 'disabled' : ''}>${esc(st.name)}${locked ? L(' (araştırma)', ' (research)') : ''}</option>`;
       }).join('')}</select>`;
       const store = cur ? STORES[cur.store] : undefined;
       const cap = capOf(h, this.has);
@@ -565,21 +580,21 @@ export class Planner {
         ? `<div class="stepper mini"><button data-act="${k}hpn" data-spec="${spec.id}" data-hp="${h.id}" data-v="-1">−</button><b>${cur!.n}</b><button data-act="${k}hpn" data-spec="${spec.id}" data-hp="${h.id}" data-v="1" ${cur!.n >= maxN ? 'disabled' : ''}>+</button></div>` : '';
       const total = store && cur ? `= ${cur.n * h.pylons} × ${esc(store.short)} · ${nf.format(cur.n * h.pylons * store.mass)} kg` : '';
       return `<div class="hprow">
-        <div class="hp-h"><b>${esc(h.name)}${h.pylons > 1 ? ` ×${h.pylons}` : ''}</b><small>askı başına ≤ ${nf.format(cap)} kg${h.heavyCap && cap < h.heavyCap ? ` (ağır askıyla ${nf.format(h.heavyCap)})` : ''}${h.maxN > 1 ? ` · en çok ${h.maxN} adet` : ''}${h.kind === 'bay' ? ' · iç bölme' : ''}</small></div>
+        <div class="hp-h"><b>${esc(h.name)}${h.pylons > 1 ? ` ×${h.pylons}` : ''}</b><small>${L('askı başına', 'per pylon')} ≤ ${nf.format(cap)} kg${h.heavyCap && cap < h.heavyCap ? L(` (ağır askıyla ${nf.format(h.heavyCap)})`, ` (${nf.format(h.heavyCap)} with heavy racks)`) : ''}${h.maxN > 1 ? L(` · en çok ${h.maxN} adet`, ` · up to ${h.maxN}`) : ''}${h.kind === 'bay' ? L(' · iç bölme', ' · internal bay') : ''}</small></div>
         <div class="hp-c">${sel}${step}</div>
         ${total ? `<small class="hp-t">${total}</small>` : ''}
       </div>`;
     }).join('');
     const kits = spec.loadouts.filter((l) => l.replaceGuns);
-    const kitRow = kits.length ? `<div class="form-row"><span>Silah kiti</span><select data-act="${k}kit" data-spec="${spec.id}">
-      <option value="">Standart silahlar</option>${kits.map((l) => `<option value="${l.id}" ${pk.kit === l.id ? 'selected' : ''} ${loadoutAllowed(l, this.has) ? '' : 'disabled'}>${esc(l.name)}</option>`).join('')}</select></div>` : '';
+    const kitRow = kits.length ? `<div class="form-row"><span>${L('Silah kiti', 'Gun kit')}</span><select data-act="${k}kit" data-spec="${spec.id}">
+      <option value="">${L('Standart silahlar', 'Standard guns')}</option>${kits.map((l) => `<option value="${l.id}" ${pk.kit === l.id ? 'selected' : ''} ${loadoutAllowed(l, this.has) ? '' : 'disabled'}>${esc(l.name)}</option>`).join('')}</select></div>` : '';
     const pct = Math.min(100, (chk.kg / Math.max(spec.maxLoad, 1)) * 100);
     const lo = this.pickLoadout(pk);
-    return `<div class="hpedit">${rows || '<p class="muted small">Bu uçakta dış yük askısı yok.</p>'}${kitRow}
-      <div class="loadbar"><span>Toplam yük</span><div class="fuelbar"><i style="width:${pct.toFixed(0)}%" class="${chk.kg > spec.maxLoad ? 'over' : pct > 85 ? 'tight' : ''}"></i></div><b>${nf.format(chk.kg)} / ${nf.format(spec.maxLoad)} kg</b></div>
+    return `<div class="hpedit">${rows || `<p class="muted small">${L('Bu uçakta dış yük askısı yok.', 'This aircraft has no hardpoints.')}</p>`}${kitRow}
+      <div class="loadbar"><span>${L('Toplam yük', 'Total load')}</span><div class="fuelbar"><i style="width:${pct.toFixed(0)}%" class="${chk.kg > spec.maxLoad ? 'over' : pct > 85 ? 'tight' : ''}"></i></div><b>${nf.format(chk.kg)} / ${nf.format(spec.maxLoad)} kg</b></div>
       <p class="muted small">${esc(this.loadoutEffect(spec, lo))}</p>
       ${chk.errors.map((e) => `<p class="warnbox bad">${esc(e)}</p>`).join('')}
-      ${chk.missing.length ? `<p class="warnbox">Araştırma gerekli: ${esc(chk.missing.map((r) => TECH_BY_ID[r]?.name ?? r).join(', '))}</p>` : ''}
+      ${chk.missing.length ? `<p class="warnbox">${L('Araştırma gerekli', 'Research required')}: ${esc(chk.missing.map((r) => TECH_BY_ID[r]?.name ?? r).join(', '))}</p>` : ''}
     </div>`;
   }
 
@@ -592,16 +607,16 @@ export class Planner {
     const lt = this.loadoutText(spec, lo);
     const k = escort ? 'e' : 'f';
     const maxN = this.maxCount(pk, ready);
-    const crewTxt = Number.isFinite(this.crewLeft(pk)) ? ` · ${spec.crew} kişilik` : '';
+    const crewTxt = Number.isFinite(this.crewLeft(pk)) ? ` · ${L(`${spec.crew} kişilik`, `crew ${spec.crew}`)}` : '';
     const head = `
       <div class="frc-head">
         <img src="${aircraftThumb(spec.id, 0x6f86b8)}" alt="">
-        <div class="frc-name"><b>${esc(spec.abbr)}</b><small>${ROLE_NAMES[spec.role]} · ${ready} hazır${crewTxt}${maxN < ready ? ` · <span class="bad">personelle ${maxN}</span>` : ''}</small></div>
+        <div class="frc-name"><b>${esc(spec.abbr)}</b><small>${ROLE_NAMES[spec.role]} · ${ready} ${L('hazır', 'ready')}${crewTxt}${maxN < ready ? ` · <span class="bad">${L(`personelle ${maxN}`, `${maxN} with crews`)}</span>` : ''}</small></div>
         <div class="stepper"><button data-act="${k}cnt" data-spec="${spec.id}" data-v="-1">−</button><b>${pk.count}</b><button data-act="${k}cnt" data-spec="${spec.id}" data-v="1" ${pk.count >= maxN ? 'disabled' : ''}>+</button></div>
       </div>`;
     if (pk.count === 0) return `<div class="frc off">${head}</div>`;
-    const loName = pk.custom ? `Serbest: ${lt.text || 'boş'}` : lo.name;
-    const summaryLine = `<button class="frc-load" data-act="${k}open" data-spec="${spec.id}"><span class="licons">${lt.icons}</span><span><span class="ln">${esc(loName)}${!pk.custom && lo.id === suggested ? ' <em>önerilen</em>' : ''}</span><small>${esc(BELTS[pk.belt].name)} · ${esc(FORMATION_NAMES[pk.formation])}</small></span><span class="chev">${open ? '▴' : '▾'}</span></button>`;
+    const loName = pk.custom ? `${L('Serbest', 'Custom')}: ${lt.text || L('boş', 'empty')}` : lo.name;
+    const summaryLine = `<button class="frc-load" data-act="${k}open" data-spec="${spec.id}"><span class="licons">${lt.icons}</span><span><span class="ln">${esc(loName)}${!pk.custom && lo.id === suggested ? ` <em>${L('önerilen', 'suggested')}</em>` : ''}</span><small>${esc(BELTS[pk.belt].name)} · ${esc(FORMATION_NAMES[pk.formation])}</small></span><span class="chev">${open ? '▴' : '▾'}</span></button>`;
     if (!open) return `<div class="frc">${head}${summaryLine}</div>`;
     const ordAllowed = MISSION_FIELDS[escort ? 'escort' : st.type].ordnance;
     const cards = pk.custom ? this.customEditor(pk, k, ordAllowed) : spec.loadouts.map((l) => {
@@ -610,27 +625,27 @@ export class Planner {
       const ordOk = ordAllowed || (!l.bombCount && !l.rocketCount);
       return `<button class="lcard ${l.id === pk.loadoutId ? 'active' : ''}" data-act="${k}load" data-spec="${spec.id}" data-v="${l.id}" ${ok && ordOk ? '' : 'disabled'}>
         <span class="licons">${t.icons}</span>
-        <span class="lbody"><b>${esc(l.name)}${l.id === suggested ? ' <em>önerilen</em>' : ''}</b>
+        <span class="lbody"><b>${esc(l.name)}${l.id === suggested ? ` <em>${L('önerilen', 'suggested')}</em>` : ''}</b>
         <small>${esc(t.text)}</small>
-        <small class="leff">${ok ? (ordOk ? esc(this.loadoutEffect(spec, l)) : 'bu görevde dış yük atılamaz') : `araştırma: ${esc(l.reqs.filter((r) => !this.has(r)).map((r) => TECH_BY_ID[r]?.name ?? r).join(', '))}`}</small></span>
+        <small class="leff">${ok ? (ordOk ? esc(this.loadoutEffect(spec, l)) : L('bu görevde dış yük atılamaz', 'stores cannot be dropped on this mission')) : `${L('araştırma', 'research')}: ${esc(l.reqs.filter((r) => !this.has(r)).map((r) => TECH_BY_ID[r]?.name ?? r).join(', '))}`}</small></span>
       </button>`;
     }).join('');
     const modeTabs = spec.hardpoints.length ? `<div class="seg ltabs">
-      <button class="${pk.custom ? '' : 'active'}" data-act="${k}mode" data-spec="${spec.id}" data-v="preset">Hazır yükler</button>
-      <button class="${pk.custom ? 'active' : ''}" data-act="${k}mode" data-spec="${spec.id}" data-v="custom">Serbest yükleme</button></div>` : '';
+      <button class="${pk.custom ? '' : 'active'}" data-act="${k}mode" data-spec="${spec.id}" data-v="preset">${L('Hazır yükler', 'Presets')}</button>
+      <button class="${pk.custom ? 'active' : ''}" data-act="${k}mode" data-spec="${spec.id}" data-v="custom">${L('Serbest yükleme', 'Custom loading')}</button></div>` : '';
     const belts = spec.guns.length || lo.extraGuns || lo.replaceGuns ? `
-      <div class="sub">Mermi kuşağı</div>
+      <div class="sub">${L('Mermi kuşağı', 'Ammo belt')}</div>
       <div class="belts">${BELT_LIST.map((b) => `<button class="${b.id === pk.belt ? 'active' : ''}" data-act="${k}belt" data-spec="${spec.id}" data-v="${b.id}" title="${esc(b.desc)}">${esc(b.name)}</button>`).join('')}</div>
       <p class="muted small">${esc(BELTS[pk.belt].desc)}</p>` : '';
     const forms = (Object.keys(FORMATION_NAMES) as FormationType[]).map((f) =>
       `<option value="${f}" ${f === pk.formation ? 'selected' : ''}>${FORMATION_NAMES[f]}</option>`).join('');
     return `<div class="frc open">${head}${summaryLine}
       <div class="frc-body">
-        <div class="sub">Yük</div>
+        <div class="sub">${L('Yük', 'Load')}</div>
         ${modeTabs}
         <div class="lcards">${cards}</div>
         ${belts}
-        <div class="form-row"><span>Formasyon</span><select data-act="${k}form" data-spec="${spec.id}">${forms}</select></div>
+        <div class="form-row"><span>${L('Formasyon', 'Formation')}</span><select data-act="${k}form" data-spec="${spec.id}">${forms}</select></div>
       </div></div>`;
   }
 
@@ -655,25 +670,25 @@ export class Planner {
     const forceRows = el.map((e) => {
       const pk = st.force.find((x) => x.specId === e.spec.id) ?? { ...this.newPick(e.spec, 0), count: 0 };
       return this.pickRow(pk, e.ready, false);
-    }).join('') || '<p class="muted">Bu görev için üste hazır uçak yok.</p>';
+    }).join('') || `<p class="muted">${L('Bu görev için üste hazır uçak yok.', 'No aircraft at this base are ready for this mission.')}</p>`;
     const totalAc = st.force.reduce((a, x) => a + x.count, 0);
 
     // Hedef
     let targetCtl = '';
     if (kind === 'flight') {
       const opts = w.flights.filter((x) => x.team === g.playerTeam && x.phase !== 'done' && x.phase !== 'landing' && x.plan.type !== 'escort');
-      targetCtl = `<select data-act="tflight" class="wide"><option value="">— korunacak kol —</option>${opts.map((x) =>
+      targetCtl = `<select data-act="tflight" class="wide"><option value="">— ${L('korunacak kol', 'flight to escort')} —</option>${opts.map((x) =>
         `<option value="${x.id}" ${x.id === p.targetFlightId ? 'selected' : ''}>${x.name} · ${x.alive.length || x.expected} × ${x.members[0]?.spec.abbr ?? ''} · ${MISSION_NAMES[x.plan.type]}</option>`).join('')}</select>`;
     } else if (kind === 'base') {
       const opts = w.airbasesOf(g.playerTeam).filter((b) => b !== st.base && b.s.active);
-      targetCtl = `<select data-act="tbase" class="wide"><option value="">— hedef üs —</option>${opts.map((b) =>
-        `<option value="${b.s.id}" ${b.s.id === p.targetBaseId ? 'selected' : ''}>${esc(b.s.name)} (${b.freeSlots} boş yer)</option>`).join('')}</select>`;
+      targetCtl = `<select data-act="tbase" class="wide"><option value="">— ${L('hedef üs', 'destination base')} —</option>${opts.map((b) =>
+        `<option value="${b.s.id}" ${b.s.id === p.targetBaseId ? 'selected' : ''}>${esc(b.s.name)} (${L(`${b.freeSlots} boş yer`, `${b.freeSlots} free`)})</option>`).join('')}</select>`;
     } else {
       const list = kind === 'aircraft' ? this.interceptOptions() : kind === 'structure' ? this.structureOptions() : [];
       const cur = kind === 'aircraft' ? p.targetAircraftId : p.targetStructureId;
-      const sel = list.length ? `<select data-act="${kind === 'aircraft' ? 'tair' : 'tstruct'}" class="wide"><option value="">— listeden seç —</option>${list.map((o) =>
+      const sel = list.length ? `<select data-act="${kind === 'aircraft' ? 'tair' : 'tstruct'}" class="wide"><option value="">— ${L('listeden seç', 'pick from the list')} —</option>${list.map((o) =>
         `<option value="${o.id}" ${o.id === cur ? 'selected' : ''}>${esc(o.text)}</option>`).join('')}</select>` : '';
-      targetCtl = `<button class="${picking === 'pickTarget' ? 'active' : ''}" data-act="pick">${picking === 'pickTarget' ? 'Haritada tıkla…' : 'Haritadan seç'}</button>${sel}`;
+      targetCtl = `<button class="${picking === 'pickTarget' ? 'active' : ''}" data-act="pick">${picking === 'pickTarget' ? L('Haritada tıkla…', 'Click on the map…') : L('Haritadan seç', 'Pick on map')}</button>${sel}`;
     }
     const tlabel = this.targetLabel();
 
@@ -681,38 +696,38 @@ export class Planner {
     const flightCtl: string[] = [];
     if (f.route) {
       flightCtl.push(`<div class="form-row">
-        <button class="${picking === 'pickWaypoint' ? 'active' : ''}" data-act="wp">${picking === 'pickWaypoint' ? 'Ekleniyor…<span class="kbd"> (Esc bitir)</span>' : 'Ara nokta ekle'}</button>
-        <span class="muted small">${p.waypoints.length ? `${p.waypoints.length} nokta` : 'doğrudan hedefe'}</span>
-        ${p.waypoints.length ? '<button data-act="wpclear">Temizle</button>' : ''}</div>`);
+        <button class="${picking === 'pickWaypoint' ? 'active' : ''}" data-act="wp">${picking === 'pickWaypoint' ? L('Ekleniyor…<span class="kbd"> (Esc bitir)</span>', 'Adding…<span class="kbd"> (Esc to finish)</span>') : L('Ara nokta ekle', 'Add waypoint')}</button>
+        <span class="muted small">${p.waypoints.length ? L(`${p.waypoints.length} nokta`, count(p.waypoints.length, 'waypoint')) : L('doğrudan hedefe', 'straight to target')}</span>
+        ${p.waypoints.length ? `<button data-act="wpclear">${L('Temizle', 'Clear')}</button>` : ''}</div>`);
     }
-    if (f.lowLevel) flightCtl.push(`<label class="check"><input type="checkbox" data-act="low" ${p.lowLevel ? 'checked' : ''}> Alçak uçuş: arazi takibi (radar altı)</label>`);
+    if (f.lowLevel) flightCtl.push(`<label class="check"><input type="checkbox" data-act="low" ${p.lowLevel ? 'checked' : ''}> ${L('Alçak uçuş: arazi takibi (radar altı)', 'Low level: terrain following (under the radar)')}</label>`);
     const maxCeil = Math.min(...st.force.map((x) => SPECS[x.specId].ceiling), 13000);
     if (f.lowLevel && p.lowLevel) {
-      flightCtl.push(`<div class="form-row"><span>Yerden</span><input type="range" min="60" max="400" step="10" value="${p.agl}" data-act="agl"><b>${p.agl} m</b></div>`);
+      flightCtl.push(`<div class="form-row"><span>${L('Yerden', 'Above ground')}</span><input type="range" min="60" max="400" step="10" value="${p.agl}" data-act="agl"><b>${p.agl} m</b></div>`);
     } else if (f.altitude) {
-      flightCtl.push(`<div class="form-row"><span>İrtifa</span><input type="range" min="500" max="${Math.max(3000, Math.round((Number.isFinite(maxCeil) ? maxCeil : 9000) - 300))}" step="100" value="${p.altitude}" data-act="alt"><b>${nf.format(p.altitude)} m</b></div>`);
+      flightCtl.push(`<div class="form-row"><span>${L('İrtifa', 'Altitude')}</span><input type="range" min="500" max="${Math.max(3000, Math.round((Number.isFinite(maxCeil) ? maxCeil : 9000) - 300))}" step="100" value="${p.altitude}" data-act="alt"><b>${nf.format(p.altitude)} m</b></div>`);
     }
     if (f.speed) {
-      flightCtl.push(`<div class="form-row"><span>Hız</span><div class="seg">${(['eco', 'cruise', 'max'] as const).map((s) =>
-        `<button class="${p.speed === s ? 'active' : ''}" data-act="speed" data-v="${s}">${s === 'eco' ? 'Ekonomik' : s === 'cruise' ? 'Seyir' : 'Azami'}</button>`).join('')}</div></div>`);
+      flightCtl.push(`<div class="form-row"><span>${L('Hız', 'Speed')}</span><div class="seg">${(['eco', 'cruise', 'max'] as const).map((s) =>
+        `<button class="${p.speed === s ? 'active' : ''}" data-act="speed" data-v="${s}">${s === 'eco' ? L('Ekonomik', 'Economy') : s === 'cruise' ? L('Seyir', 'Cruise') : L('Azami', 'Max')}</button>`).join('')}</div></div>`);
     }
     const autoNote = st.type === 'intercept'
-      ? 'İrtifa, hız ve rota otomatik: kol tam güçle hedefin irtifasına tırmanarak kesişme noktasına gider.'
-      : st.type === 'escort' ? 'İrtifa, hız ve rota korunan koldan alınır; eskort onun üstünde ve yanında uçar.' : '';
+      ? L('İrtifa, hız ve rota otomatik: kol tam güçle hedefin irtifasına tırmanarak kesişme noktasına gider.', 'Altitude, speed and route are automatic: the flight climbs at full power to the target\'s altitude and heads for the intercept point.')
+      : st.type === 'escort' ? L('İrtifa, hız ve rota korunan koldan alınır; eskort onun üstünde ve yanında uçar.', 'Altitude, speed and route follow the escorted flight; the escort flies above and beside it.') : '';
 
     // Kurallar
     const anyFighter = st.force.some((x) => x.count > 0 && SPECS[x.specId].role === 'fighter');
     const rules: string[] = [];
     if (f.roe) {
-      rules.push(`<div class="form-row"><span>Angajman</span><select data-act="roe">
-        <option value="free" ${p.roe === 'free' ? 'selected' : ''}>Serbest: görev bölgesinde saldır</option>
-        <option value="defensive" ${p.roe === 'defensive' ? 'selected' : ''}>Yalnız savunma</option>
-        <option value="avoid" ${p.roe === 'avoid' ? 'selected' : ''}>Çatışmadan kaçın</option></select></div>`);
+      rules.push(`<div class="form-row"><span>${L('Angajman', 'Engagement')}</span><select data-act="roe">
+        <option value="free" ${p.roe === 'free' ? 'selected' : ''}>${L('Serbest: görev bölgesinde saldır', 'Free: attack in the mission area')}</option>
+        <option value="defensive" ${p.roe === 'defensive' ? 'selected' : ''}>${L('Yalnız savunma', 'Defensive only')}</option>
+        <option value="avoid" ${p.roe === 'avoid' ? 'selected' : ''}>${L('Çatışmadan kaçın', 'Avoid combat')}</option></select></div>`);
     }
     if (anyFighter && st.type !== 'ferry') {
-      rules.push(`<div class="form-row"><span>Kanat adamı</span><select data-act="doc">
-        <option value="cover" ${p.doctrine === 'cover' ? 'selected' : ''}>Lideri korur</option>
-        <option value="free" ${p.doctrine === 'free' ? 'selected' : ''}>Serbest avlanır</option></select></div>`);
+      rules.push(`<div class="form-row"><span>${L('Kanat adamı', 'Wingman')}</span><select data-act="doc">
+        <option value="cover" ${p.doctrine === 'cover' ? 'selected' : ''}>${L('Lideri korur', 'Covers the leader')}</option>
+        <option value="free" ${p.doctrine === 'free' ? 'selected' : ''}>${L('Serbest avlanır', 'Hunts freely')}</option></select></div>`);
     }
 
     // Görev dağılımı: aynı tipin uçakları iki işe ayrı kollar olarak bölünür
@@ -724,7 +739,7 @@ export class Planner {
     }
     const escSplit = f.escort ? st.escort.filter((x) => this.splittable(x, 'escort')) : [];
     if (escSplit.length) {
-      if (mainSplit.length) split.push('<div class="sub">Eskort</div>');
+      if (mainSplit.length) split.push(`<div class="sub">${L('Eskort', 'Escort')}</div>`);
       split.push(...escSplit.map((x) => this.splitRow(x, 'escort', 'esplit')));
       split.push(`<p class="muted small">${esc(TASK_SPLIT.escort!.help)}</p>`);
     }
@@ -732,10 +747,10 @@ export class Planner {
     // Görev ayrıntısı
     const detail: string[] = [];
     if (f.patrol) {
-      detail.push(`<div class="form-row"><span>Yarıçap</span><input type="range" min="1000" max="8000" step="500" value="${p.patrolRadius}" data-act="rad"><b>${(p.patrolRadius / 1000).toFixed(1)} km</b></div>
-        <div class="form-row"><span>Süre</span><input type="range" min="120" max="1500" step="60" value="${p.stationTime}" data-act="time"><b>${fmtDur(p.stationTime)}</b></div>`);
+      detail.push(`<div class="form-row"><span>${L('Yarıçap', 'Radius')}</span><input type="range" min="1000" max="8000" step="500" value="${p.patrolRadius}" data-act="rad"><b>${(p.patrolRadius / 1000).toFixed(1)} km</b></div>
+        <div class="form-row"><span>${L('Süre', 'Duration')}</span><input type="range" min="120" max="1500" step="60" value="${p.stationTime}" data-act="time"><b>${fmtDur(p.stationTime)}</b></div>`);
     }
-    if (f.passes) detail.push(`<div class="form-row"><span>Geçiş</span><input type="range" min="1" max="4" step="1" value="${p.passes}" data-act="passes"><b>${p.passes}</b></div>`);
+    if (f.passes) detail.push(`<div class="form-row"><span>${L('Geçiş', 'Passes')}</span><input type="range" min="1" max="4" step="1" value="${p.passes}" data-act="passes"><b>${p.passes}</b></div>`);
 
     // Eskort
     let escortHtml = '';
@@ -744,30 +759,30 @@ export class Planner {
       escortHtml = fighters.length ? fighters.map((e) => {
         const pk = st.escort.find((x) => x.specId === e.spec.id) ?? { ...this.newPick(e.spec, 0, 'escort'), count: 0 };
         return this.pickRow(pk, this.escortAvail(e.spec.id), true);
-      }).join('') : '<p class="muted small">Üste hazır avcı yok.</p>';
+      }).join('') : `<p class="muted small">${L('Üste hazır avcı yok.', 'No fighters ready at this base.')}</p>`;
     }
 
     let n = 0;
     const sec = (title: string, body: string, extra = '') => body ? `<section class="psec"><h3><i>${++n}</i>${title}${extra}</h3>${body}</section>` : '';
     this.el.innerHTML = `
       <div class="panel-head">
-        <button class="icon" data-act="close" title="Kapat (Esc)">✕</button>
-        <div><div class="info-title">Görev planı</div><div class="muted small">${esc(st.base.s.name)} · ${st.base.inventory.filter((a) => a.status === 'ready').length} hazır uçak${Number.isFinite(this.game.world.crewFree(st.base.s.team)) ? ` · personel ${this.game.world.crewFree(st.base.s.team)} kişi boşta` : ''}</div></div>
+        <button class="icon" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button>
+        <div><div class="info-title">${L('Görev planı', 'Mission plan')}</div><div class="muted small">${esc(st.base.s.name)} · ${L(`${st.base.inventory.filter((a) => a.status === 'ready').length} hazır uçak`, `${st.base.inventory.filter((a) => a.status === 'ready').length} aircraft ready`)}${Number.isFinite(this.game.world.crewFree(st.base.s.team)) ? L(` · personel ${this.game.world.crewFree(st.base.s.team)} kişi boşta`, ` · ${this.game.world.crewFree(st.base.s.team)} personnel free`) : ''}</div></div>
       </div>
-      ${sec('Görev', `<div class="mgrid4">${typeBtns}</div><p class="muted small mdesc2">${esc(MISSION_DESCS[st.type])}</p>`)}
-      ${sec('Kuvvet', `<div class="force">${forceRows}</div>`, totalAc ? `<span class="hcount">${totalAc} uçak</span>` : '')}
-      ${sec('Hedef', `<div class="tbox ${tlabel ? '' : 'empty'}">${tlabel ? esc(tlabel) : 'seçilmedi'}</div>
+      ${sec(L('Görev', 'Mission'), `<div class="mgrid4">${typeBtns}</div><p class="muted small mdesc2">${esc(MISSION_DESCS[st.type])}</p>`)}
+      ${sec(L('Kuvvet', 'Force'), `<div class="force">${forceRows}</div>`, totalAc ? `<span class="hcount">${totalAc} ${L('uçak', 'aircraft')}</span>` : '')}
+      ${sec(L('Hedef', 'Target'), `<div class="tbox ${tlabel ? '' : 'empty'}">${tlabel ? esc(tlabel) : L('seçilmedi', 'not chosen')}</div>
         ${st.type === 'intercept' && tlabel ? `<p class="muted small">${this.trackInfo()}</p>` : ''}
         <div class="form-row tctl">${targetCtl}</div>`)}
-      ${sec('Uçuş', flightCtl.join('') + (autoNote ? `<p class="muted small">${esc(autoNote)}</p>` : ''))}
-      ${sec('Kurallar', rules.join(''))}
-      ${sec(f.patrol ? 'Devriye' : 'Taarruz', detail.join(''))}
-      ${f.escort ? sec('Eskort', `<div class="force">${escortHtml}</div>`) : ''}
-      ${sec('Görev dağılımı', split.join(''))}
-      ${sec('Yakıt', `<div class="form-row"><span>İç depo</span><input type="range" min="40" max="100" step="5" value="${Math.round(p.fuelFrac * 100)}" data-act="fuel"><b>%${Math.round(p.fuelFrac * 100)}</b></div>`)}
-      <section class="psec"><h3>Özet</h3><div id="plan-summary"></div></section>
+      ${sec(L('Uçuş', 'Flight'), flightCtl.join('') + (autoNote ? `<p class="muted small">${esc(autoNote)}</p>` : ''))}
+      ${sec(L('Kurallar', 'Rules'), rules.join(''))}
+      ${sec(f.patrol ? L('Devriye', 'Patrol') : L('Taarruz', 'Attack'), detail.join(''))}
+      ${f.escort ? sec(L('Eskort', 'Escort'), `<div class="force">${escortHtml}</div>`) : ''}
+      ${sec(L('Görev dağılımı', 'Task split'), split.join(''))}
+      ${sec(L('Yakıt', 'Fuel'), `<div class="form-row"><span>${L('İç depo', 'Internal tank')}</span><input type="range" min="40" max="100" step="5" value="${Math.round(p.fuelFrac * 100)}" data-act="fuel"><b>${P(Math.round(p.fuelFrac * 100))}</b></div>`)}
+      <section class="psec"><h3>${L('Özet', 'Summary')}</h3><div id="plan-summary"></div></section>
       <div class="btn-row sticky">
-        <button class="primary wide" data-act="launch">Kalkış${totalAc + st.escort.reduce((a, x) => a + x.count, 0) ? ` · ${totalAc + st.escort.reduce((a, x) => a + x.count, 0)} uçak` : ''}</button>
+        <button class="primary wide" data-act="launch">${L('Kalkış', 'Take off')}${totalAc + st.escort.reduce((a, x) => a + x.count, 0) ? ` · ${totalAc + st.escort.reduce((a, x) => a + x.count, 0)} ${L('uçak', 'aircraft')}` : ''}</button>
       </div>`;
     this.summaryEl = this.el.querySelector('#plan-summary');
     this.nextSummary = 0;
@@ -959,7 +974,7 @@ export class Planner {
       if (out) {
         const a = el.dataset.act;
         out.textContent =
-          a === 'alt' ? `${nf.format(p.altitude)} m` : a === 'agl' ? `${p.agl} m` : a === 'fuel' ? `%${Math.round(p.fuelFrac * 100)}`
+          a === 'alt' ? `${nf.format(p.altitude)} m` : a === 'agl' ? `${p.agl} m` : a === 'fuel' ? P(Math.round(p.fuelFrac * 100))
           : a === 'rad' ? `${(p.patrolRadius / 1000).toFixed(1)} km` : a === 'time' ? fmtDur(p.stationTime) : `${p.passes}`;
       }
       this.nextSummary = 0;

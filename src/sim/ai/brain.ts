@@ -21,6 +21,7 @@ import { avoidAA, flakWeave } from './aaEvade';
 import { speedFor } from './missions';
 import type { FlightContact, FlightGroup } from './flightGroup';
 import { clamp } from '../../core/math';
+import { L } from '../../i18n';
 
 export type AttackPhase =
   | 'wait' | 'ingress' | 'dive' | 'pullout' | 'reposition' | 'approach' | 'popup' | 'extend' | 'turn' | 'rally';
@@ -70,7 +71,7 @@ const _p = new Vector3();
 
 export class Brain {
   /** Arayüzde gösterilen anlık davranış. */
-  status = 'Hazır';
+  status = L('Hazır', 'Ready');
   target: Aircraft | null = null;
   threat: Aircraft | null = null;
   fireGuns = false;
@@ -121,7 +122,7 @@ export class Brain {
     if (this.detached) return;
     this.detached = true;
     this.detachReason = reason;
-    world.log(`${ac.callsign}: ${reason}, koldan ayrılıp üsse dönüyor`, ac.team, 'combat');
+    world.log(L(`${ac.callsign}: ${reason}, koldan ayrılıp üsse dönüyor`, `${ac.callsign}: ${reason}, leaving the flight for base`), ac.team, 'combat');
   }
 
   groundUpdate(ac: Aircraft, world: World, dt: number): void {
@@ -172,7 +173,7 @@ export class Brain {
 
     if (ac.hasTank && (this.threat || (fl?.engaged && isFighter))) {
       ac.jettisonTanks();
-      world.log(`${ac.callsign} dış yakıt tanklarını attı`, ac.team, 'combat');
+      world.log(L(`${ac.callsign} dış yakıt tanklarını attı`, `${ac.callsign} dropped its external tanks`), ac.team, 'combat');
     }
 
     if (this.ops.mode === 'climbout') {
@@ -217,10 +218,10 @@ export class Brain {
       if (agl < 120 && ac.speed < stallSpeed(ac) * 1.35 && ac.fwd.y < 0.03) world.abandon(ac, 'forced');
     }
     if (ac.status !== 'flying' || this.detached || this.ops.mode === 'landing') return;
-    if (enginesDead(ac.damage)) this.detach(ac, world, 'motor durdu');
-    else if (ac.totalFuel <= 0) this.detach(ac, world, 'yakıt bitti');
-    else if (isCrippled(ac)) this.detach(ac, world, 'ağır hasarlı');
-    else if (!ac.flight && world.isBingo(ac)) this.detach(ac, world, 'yakıt azaldı');
+    if (enginesDead(ac.damage)) this.detach(ac, world, L('motor durdu', 'engine out'));
+    else if (ac.totalFuel <= 0) this.detach(ac, world, L('yakıt bitti', 'out of fuel'));
+    else if (isCrippled(ac)) this.detach(ac, world, L('ağır hasarlı', 'badly damaged'));
+    else if (!ac.flight && world.isBingo(ac)) this.detach(ac, world, L('yakıt azaldı', 'low on fuel'));
   }
 
   /**
@@ -245,7 +246,7 @@ export class Brain {
     const base = home && home.usable ? home : world.nearestAirbase(ac.team, ac.pos, (b) => b.usable);
     if (!base) {
       orbitDir(cmd.dir, ac, ac.pos, 2000, ac.pos.y);
-      this.status = 'İnecek üs yok!';
+      this.status = L('İnecek üs yok!', 'No base to land at!');
       return;
     }
     const dx = base.s.pos.x - ac.pos.x;
@@ -260,7 +261,7 @@ export class Brain {
       const l = d || 1;
       cmd.dir.set(dx / l, -0.09, dz / l);
       cmd.maxG = 2;
-      this.status = `Motor durdu: üsse süzülüyor (${(d / 1000).toFixed(1)} km)`;
+      this.status = `${L('Motor durdu: üsse süzülüyor', 'Engine out: gliding to base')} (${(d / 1000).toFixed(1)} km)`;
       return;
     }
     // Önce düşman bombardıman kutusunun nişancı menzilinden yana ve aşağı çık: üs çoğu zaman bombardıman rotasının
@@ -284,7 +285,7 @@ export class Brain {
       pz = (pz / pl) * side;
       cmd.dir.set(px, ac.pos.y - groundLevel(ac.pos.x, ac.pos.z) > 600 ? -0.35 : 0, pz);
       cmd.maxG = 3;
-      this.status = `${this.detachReason ? this.detachReason[0].toUpperCase() + this.detachReason.slice(1) : 'Dönüş'}: nişancı menzilinden çıkıyor`;
+      this.status = `${this.detachReason ? this.detachReason[0].toUpperCase() + this.detachReason.slice(1) : L('Dönüş', 'Returning')}: ${L('nişancı menzilinden çıkıyor', 'leaving gunner range')}`;
       return;
     }
     headingWithAlt(cmd.dir, ac, dx, dz, Math.max(base.s.pos.y + 900, Math.min(ac.pos.y, 2500)));
@@ -292,7 +293,7 @@ export class Brain {
     flakWeave(ac, world, cmd.dir);
     cmd.speed = ac.spec.cruiseSpeed;
     cmd.maxG = 2.5;
-    this.status = `${this.detachReason ? this.detachReason[0].toUpperCase() + this.detachReason.slice(1) : 'Dönüş'}: ${base.s.name} (${(d / 1000).toFixed(1)} km)`;
+    this.status = `${this.detachReason ? this.detachReason[0].toUpperCase() + this.detachReason.slice(1) : L('Dönüş', 'Returning')}: ${base.s.name} (${(d / 1000).toFixed(1)} km)`;
   }
 
   private follow(ac: Aircraft, fl: FlightGroup, leader: Aircraft | null, cmd: FlyCommand): boolean {
@@ -300,7 +301,7 @@ export class Brain {
     const idx = Math.max(fl.formationIndex(ac), 1);
     holdFormation(ac, leader, slotOffset(fl.plan.formation, idx, fl.spacing(ac)), cmd);
     if (fl.plan.lowLevel && (fl.phase === 'enroute' || fl.phase === 'action')) cmd.minAlt = fl.plan.agl * 0.6;
-    this.status = `Formasyonda: ${FORMATION_NAMES[fl.plan.formation]} (${leader.callsign})`;
+    this.status = `${L('Formasyonda', 'In formation')}: ${FORMATION_NAMES[fl.plan.formation]} (${leader.callsign})`;
     return true;
   }
 
@@ -315,10 +316,10 @@ export class Brain {
           orbitDir(cmd.dir, ac, fl.rendezvous, 1800, fl.rendezvousAlt);
           cmd.speed = s.cruiseSpeed * 0.85;
           cmd.maxG = 2.2;
-          this.status = 'Toplanma noktasında kolu bekliyor';
+          this.status = L('Toplanma noktasında kolu bekliyor', 'Waiting for the flight at the rally point');
         } else {
           this.follow(ac, fl, leader, cmd);
-          this.status = `Kola katılıyor (${leader.callsign})`;
+          this.status = `${L('Kola katılıyor', 'Joining up')} (${leader.callsign})`;
         }
         break;
       case 'enroute':
@@ -353,7 +354,7 @@ export class Brain {
       const row = Math.ceil(k / 2);
       const side = k % 2 === 1 ? 1 : -1;
       holdFormation(ac, ll, { right: side * 700 * row, back: 650 * row, up: p.lowLevel ? 0 : 60 * row }, cmd, p.lowLevel ? p.agl * 0.6 : undefined);
-      this.status = `Paket: ${lead!.name} kolunu izliyor`;
+      this.status = L(`Paket: ${lead!.name} kolunu izliyor`, `Package: following ${lead!.name} flight`);
       return;
     }
     const wp = fl.route[fl.routeIndex];
@@ -369,7 +370,7 @@ export class Brain {
     cmd.speed = this.flightSpeed(ac, fl, world);
     cmd.maxG = 2.5;
     const km = (Math.hypot(dx, dz) / 1000).toFixed(1);
-    this.status = `İntikal: nokta ${fl.routeIndex + 1}/${fl.route.length} — ${km} km${p.lowLevel ? ' (alçak uçuş)' : ''}`;
+    this.status = `${L('İntikal: nokta', 'En route: waypoint')} ${fl.routeIndex + 1}/${fl.route.length} — ${km} km${p.lowLevel ? L(' (alçak uçuş)', ' (low level)') : ''}`;
   }
 
   /** Kol hızı: en yavaş üyenin (pakette en yavaş tipin) yetişebileceği hız. */
@@ -397,7 +398,7 @@ export class Brain {
     cmd.speed = this.flightSpeed(ac, fl);
     cmd.maxG = 2.5;
     const reason = fl.rtbReason ? ` (${fl.rtbReason})` : '';
-    this.status = `${fl.phase === 'egress' ? 'Hedeften çıkış' : 'Üsse dönüş'}${reason}: ${(Math.hypot(dx, dz) / 1000).toFixed(1)} km`;
+    this.status = `${fl.phase === 'egress' ? L('Hedeften çıkış', 'Egress') : L('Üsse dönüş', 'Returning to base')}${reason}: ${(Math.hypot(dx, dz) / 1000).toFixed(1)} km`;
   }
 
   private missionAction(
@@ -417,12 +418,12 @@ export class Brain {
         if (gci) {
           headingWithAlt(cmd.dir, ac, gci.x - ac.pos.x, gci.z - ac.pos.z, Math.max(gci.y + 300, ac.pos.y - 300));
           cmd.speed = s.vMax * 0.9;
-          this.status = 'Yer kontrolü radar temasına yönlendiriyor';
+          this.status = L('Yer kontrolü radar temasına yönlendiriyor', 'Ground control vectoring to a radar contact');
         } else {
           orbitDir(cmd.dir, ac, center, p.patrolRadius, p.altitude);
           cmd.speed = speedFor(s, 'eco');
           const left = Math.max(0, p.stationTime - (world.time - fl.stationStart));
-          this.status = `${p.type === 'cap' ? 'Devriye' : 'Tarama'}: ${Math.ceil(left / 60)} dk kaldı`;
+          this.status = `${p.type === 'cap' ? L('Devriye', 'Patrol') : L('Tarama', 'Sweep')}: ${Math.ceil(left / 60)} ${L('dk kaldı', 'min left')}`;
         }
         break;
       }
@@ -442,7 +443,7 @@ export class Brain {
           orbitDir(cmd.dir, ac, _p, 4500, clamp(Math.max(_p.y, ac.pos.y - 300), groundLevel(ac.pos.x, ac.pos.z) + 600, 9000));
           cmd.speed = speedFor(s, 'cruise');
           cmd.maxG = 2.5;
-          this.status = `Arama: ${name} ${Math.round(age)} sn'dir görülmedi`;
+          this.status = L(`Arama: ${name} ${Math.round(age)} sn'dir görülmedi`, `Searching: ${name} not seen for ${Math.round(age)} s`);
           break;
         }
         // Kesişme: hedefin ileride olacağı yere (iz tazeyse)
@@ -452,8 +453,8 @@ export class Brain {
         cmd.throttle = 1;
         cmd.speed = null;
         cmd.maxG = 3;
-        const src = age < 3 ? '' : age < 20 ? ' · radar/gözcü izi' : ` · son iz ${Math.round(age)} sn önce`;
-        this.status = `Önleme: ${name} (${(R / 1000).toFixed(1)} km)${src}`;
+        const src = age < 3 ? '' : age < 20 ? L(' · radar/gözcü izi', ' · radar/observer track') : L(` · son iz ${Math.round(age)} sn önce`, ` · last track ${Math.round(age)} s ago`);
+        this.status = `${L('Önleme', 'Intercept')}: ${name} (${(R / 1000).toFixed(1)} km)${src}`;
         break;
       }
       case 'escort': {
@@ -468,7 +469,7 @@ export class Brain {
         const idx = fl.formationIndex(ac);
         const so = idx > 0 ? slotOffset(fl.plan.formation, idx, fl.spacing(ac)) : { right: 0, back: 0, up: 0 };
         escortWeave(ac, el, { right: 650 + so.right, back: 250 + so.back, up: 450 + so.up }, fl.weave, isLeader, cmd);
-        this.status = `Eskort: ${esc!.name} kolu`;
+        this.status = L(`Eskort: ${esc!.name} kolu`, `Escort: ${esc!.name} flight`);
         break;
       }
       case 'levelBomb':

@@ -10,18 +10,19 @@ import type { Airbase } from '../structures/airbase';
 import { MISSION_NAMES, type FlightTask, type MissionPlan } from './missions';
 import { formationSpacing, slotOffset, slotWorld } from './formation';
 import { isCrippled } from '../aircraft/damage';
+import { L, lower } from '../../i18n';
 
 export type FlightPhase = 'ground' | 'formup' | 'enroute' | 'action' | 'egress' | 'rtb' | 'landing' | 'done';
 
 export const PHASE_NAMES: Record<FlightPhase, string> = {
-  ground: 'Kalkış sırasında',
-  formup: 'Toplanıyor',
-  enroute: 'İntikal',
-  action: 'Görevde',
-  egress: 'Hedeften çıkış',
-  rtb: 'Üsse dönüş',
-  landing: 'İniş',
-  done: 'Tamamlandı',
+  ground: L('Kalkış sırasında', 'Taking off'),
+  formup: L('Toplanıyor', 'Forming up'),
+  enroute: L('İntikal', 'En route'),
+  action: L('Görevde', 'On task'),
+  egress: L('Hedeften çıkış', 'Egress'),
+  rtb: L('Üsse dönüş', 'Returning'),
+  landing: L('İniş', 'Landing'),
+  done: L('Tamamlandı', 'Done'),
 };
 
 export interface FlightContact {
@@ -242,10 +243,10 @@ export class FlightGroup {
       this.stats.reachedAction = true;
     }
     const msg: Partial<Record<FlightPhase, string>> = {
-      enroute: `${this.name} kolu toplandı, ${MISSION_NAMES[this.plan.type].toLowerCase()} görevine intikal ediyor`,
-      action: `${this.name} kolu görev bölgesinde`,
-      egress: `${this.name} kolu hedeften ayrılıyor${note ? ` (${note})` : ''}`,
-      landing: `${this.name} kolu iniş için üs üzerinde`,
+      enroute: L(`${this.name} kolu toplandı, ${lower(MISSION_NAMES[this.plan.type])} görevine intikal ediyor`, `${this.name} flight formed up, heading out on ${lower(MISSION_NAMES[this.plan.type])}`),
+      action: L(`${this.name} kolu görev bölgesinde`, `${this.name} flight is on station`),
+      egress: L(`${this.name} kolu hedeften ayrılıyor`, `${this.name} flight is leaving the target`) + (note ? ` (${note})` : ''),
+      landing: L(`${this.name} kolu iniş için üs üzerinde`, `${this.name} flight is over base to land`),
     };
     if (msg[p]) world.log(msg[p]!, this.team, 'ops');
   }
@@ -269,13 +270,13 @@ export class FlightGroup {
 
     if (this.phase === 'enroute' || this.phase === 'action') {
       if (alive.some((m) => !m.brain.detached && world.isBingo(m))) {
-        this.rtbReason = 'yakıt azaldı';
+        this.rtbReason = L('yakıt azaldı', 'low on fuel');
         this.setPhase('egress', world, this.rtbReason);
       } else if (this.isFighterFlight() && p.type !== 'ferry') {
         const inFormation = alive.filter((m) => !m.brain.detached);
         const armed = inFormation.filter((m) => m.ammoFrac > 0.15);
         if (armed.length === 0 && inFormation.length > 0) {
-          this.rtbReason = 'mühimmat bitti';
+          this.rtbReason = L('mühimmat bitti', 'out of ammo');
           this.setPhase('egress', world, this.rtbReason);
         }
       }
@@ -294,7 +295,7 @@ export class FlightGroup {
           // Alarm kalkışı: toplanma beklenmez, kanat adamları yolda yetişir
           if (leader && ((allUp && waited > 4) || waited > 30)) {
             this.setPhase('action', world);
-            world.log(`${this.name} kolu havada, hedefe yöneliyor`, this.team, 'ops');
+            world.log(L(`${this.name} kolu havada, hedefe yöneliyor`, `${this.name} flight is airborne, heading for the target`), this.team, 'ops');
           }
           break;
         }
@@ -304,7 +305,7 @@ export class FlightGroup {
         if (this.formedUp && (pkgReady || waited > 150)) {
           this.setPhase(p.type === 'escort' ? 'action' : 'enroute', world);
           if (p.type === 'escort') {
-            world.log(`${this.name} kolu toplandı, ${MISSION_NAMES[p.type].toLowerCase()} görevine başlıyor`, this.team, 'ops');
+            world.log(L(`${this.name} kolu toplandı, ${lower(MISSION_NAMES[p.type])} görevine başlıyor`, `${this.name} flight formed up, starting ${lower(MISSION_NAMES[p.type])}`), this.team, 'ops');
           }
         }
         break;
@@ -343,7 +344,7 @@ export class FlightGroup {
         if (!base || !base.usable) {
           const alt = leader ? world.nearestAirbase(this.team, leader.pos, (b) => b.usable) : null;
           if (alt && alt !== base) {
-            world.log(`${this.name}: ${base?.s.name ?? 'üs'} kullanılamıyor, ${alt.s.name} üssüne yöneliyor`, this.team, 'ops');
+            world.log(L(`${this.name}: ${base?.s.name ?? 'üs'} kullanılamıyor, ${alt.s.name} üssüne yöneliyor`, `${this.name}: ${base?.s.name ?? 'base'} unusable, diverting to ${alt.s.name}`), this.team, 'ops');
             this.returnBaseId = alt.s.id;
             base = alt;
           }
@@ -389,16 +390,16 @@ export class FlightGroup {
       case 'cap':
       case 'sweep':
         if (this.stationStart < 0) this.stationStart = t;
-        if (t - this.stationStart > p.stationTime && !this.engaged) this.setPhase('egress', world, 'devriye süresi doldu');
+        if (t - this.stationStart > p.stationTime && !this.engaged) this.setPhase('egress', world, L('devriye süresi doldu', 'patrol time is up'));
         break;
       case 'intercept': {
         const id = p.targetAircraftId;
         const tgt = id !== null ? world.aircraftById(id) : undefined;
         if (!tgt || !tgt.airborne) {
-          const prev = tgt ? `${tgt.callsign} ${tgt.status === 'flying' ? 'indi' : 'düştü'}` : 'hedef kayboldu';
+          const prev = tgt ? `${tgt.callsign} ${tgt.status === 'flying' ? L('indi', 'landed') : L('düştü', 'went down')}` : L('hedef kayboldu', 'target lost');
           const next = this.retarget(world);
-          if (next) world.log(`${this.name}: ${prev}, ${next.callsign} (${next.spec.abbr}) uçağına yöneliyor`, this.team, 'ops');
-          else this.setPhase('egress', world, `${prev}, bölgede başka düşman yok`);
+          if (next) world.log(L(`${this.name}: ${prev}, ${next.callsign} (${next.spec.abbr}) uçağına yöneliyor`, `${this.name}: ${prev}, turning onto ${next.callsign} (${next.spec.abbr})`), this.team, 'ops');
+          else this.setPhase('egress', world, L(`${prev}, bölgede başka düşman yok`, `${prev}, no other enemies in the area`));
           break;
         }
         this.updateTrack(world);
@@ -410,7 +411,7 @@ export class FlightGroup {
           const est = this.trackEstimate(t, _est);
           const d = Math.min(world.distToTeam(this.team, est), world.distToTeam(this.team, leader.pos));
           if (d > this.leash + (this.engaged ? 20000 : 0)) {
-            this.setPhase('egress', world, 'hedef savunma bölgesinden çıktı');
+            this.setPhase('egress', world, L('hedef savunma bölgesinden çıktı', 'target left the defended zone'));
             break;
           }
         }
@@ -420,7 +421,7 @@ export class FlightGroup {
           if (this.searchStart < 0 && Math.hypot(est.x - leader.pos.x, est.z - leader.pos.z) < 3500) this.searchStart = t;
         } else this.searchStart = -1;
         if (!this.engaged && ((this.searchStart >= 0 && t - this.searchStart > 180) || age > 900)) {
-          this.setPhase('egress', world, 'hedef bulunamadı');
+          this.setPhase('egress', world, L('hedef bulunamadı', 'target not found'));
         }
         break;
       }
@@ -434,26 +435,26 @@ export class FlightGroup {
           if (next) {
             p.targetFlightId = next.id;
             this.escortOf = next;
-            world.log(`${this.name}: korunan kol kayıp, ${next.name} kolunu korumaya geçiyor`, this.team, 'ops');
+            world.log(L(`${this.name}: korunan kol kayıp, ${next.name} kolunu korumaya geçiyor`, `${this.name}: escorted flight lost, now covering ${next.name} flight`), this.team, 'ops');
             break;
           }
         }
         if (gone(esc)) {
           this.setPhase('rtb', world);
-          world.log(`${this.name}: eskort görevi bitti, üsse dönüyor`, this.team, 'ops');
+          world.log(L(`${this.name}: eskort görevi bitti, üsse dönüyor`, `${this.name}: escort complete, returning to base`), this.team, 'ops');
         }
         break;
       }
       case 'levelBomb': {
         const loaded = alive.some((m) => m.bombCount > 0);
-        if (this.bomb.released && (!loaded || t - this.bomb.releaseTime > 14)) this.setPhase('egress', world, 'bombalar atıldı');
-        if (t - this.actionStart > 360) this.setPhase('egress', world, 'süre aşıldı');
+        if (this.bomb.released && (!loaded || t - this.bomb.releaseTime > 14)) this.setPhase('egress', world, L('bombalar atıldı', 'bombs away'));
+        if (t - this.actionStart > 360) this.setPhase('egress', world, L('süre aşıldı', 'time limit reached'));
         break;
       }
       case 'diveBomb':
       case 'attack': {
         const busy = alive.some((m) => !m.brain.detached && !m.brain.attack.done);
-        if (!busy || t - this.actionStart > 320) this.setPhase('egress', world, 'saldırı tamamlandı');
+        if (!busy || t - this.actionStart > 320) this.setPhase('egress', world, L('saldırı tamamlandı', 'attack complete'));
         break;
       }
       case 'ferry':

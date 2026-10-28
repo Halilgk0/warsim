@@ -16,10 +16,12 @@ import ffmpegPath from 'ffmpeg-static';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
-const OUT = join(HERE, 'out');
 const PORT = 5293;
 
 const args = process.argv.slice(2);
+// --dir=once: çıktı out/once/ altına (aynı çekimin önce/sonra kayıtları birbirini ezmesin)
+const dirArg = args.find((a) => a.startsWith('--dir='));
+const OUT = dirArg ? join(HERE, 'out', dirArg.slice(6)) : join(HERE, 'out');
 const preview = args.includes('--preview');
 const list = args.includes('--list');
 const scaleArg = args.find((a) => a.startsWith('--scale='));

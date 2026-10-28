@@ -7,6 +7,58 @@
 // Bu modül specs.ts'ten yalnız tür alır (döngüsel bağımlılık olmasın); specs.ts türetmede buradaki tabloları kullanır.
 
 import type { AircraftSpec, BombDef, GunSpec, Loadout, Placement, RocketDef } from './specs';
+import { L, terms } from '../../i18n';
+
+/** Askı, mühimmat ve hazır yük adları İngilizcede (uzun ifadeler önce). */
+export const storeName = terms([
+  ['Gövde altı (dalış çatalı)', 'Centreline (bomb crutch)'],
+  ['Kanat altı (dış, 6 askı)', 'Outer wing (6 pylons)'],
+  ['Kanat altı top gondolları', 'Underwing gun pods'],
+  ['Kanat altı (iç)', 'Inner wing'],
+  ['Kanat altı (dış)', 'Outer wing'],
+  ['Kanat altı tanklar', 'Underwing tanks'],
+  ['Gövde altı tank', 'Belly tank'],
+  ['Gövde altı ETC', 'Centreline ETC'],
+  ['Burun altı ETC', 'Under-nose ETC'],
+  ['Gövde altı', 'Centreline'],
+  ['Kanat altı', 'Underwing'],
+  ['Roket rayları', 'Rocket rails'],
+  ['Motor naseli bölmeleri', 'Nacelle bays'],
+  ['Kanat bomba bölmeleri', 'Wing bomb cells'],
+  ['Ön bomba bölmesi', 'Forward bomb bay'],
+  ['Arka bomba bölmesi', 'Aft bomb bay'],
+  ['Bomba bölmesi', 'Bomb bay'],
+  ['Kanat ucu tankları', 'Wingtip tanks'],
+  ['Kanat ucu tankı', 'Wingtip tank'],
+  ['Kanat ucu', 'Wingtip'],
+  ['Karın tankı', 'Belly tank'],
+  ['İki dış tank', 'Two drop tanks'],
+  ['Büyük dış tanklar', 'Large drop tanks'],
+  ['İki büyük tank', 'Two large tanks'],
+  ['Küçük tank', 'Small tank'],
+  ['Orta tank', 'Medium tank'],
+  ['Büyük tank', 'Large tank'],
+  ['Jet tankı', 'Jet tank'],
+  ['gövde tankı', 'belly tank'],
+  ['uç tankları', 'tip tanks'],
+  ['Avcı-bombardıman', 'Fighter-bomber'],
+  ['top gondolu', 'gun pod'],
+  ['burun topu', 'hub cannon'],
+  [' bombası', ' bomb'],
+  [' roketi', ' rocket'],
+  [' roket', ' rockets'],
+  ['(gondol)', '(pod)'],
+  [' gondol', ' pod'],
+  ['(ön)', '(front)'],
+  ['(arka)', '(rear)'],
+  ['(sol)', '(left)'],
+  ['(sağ)', '(right)'],
+  ['(kanat)', '(wing)'],
+  ['(alan)', '(area)'],
+  ['(dış)', '(external)'],
+  ['5 inç', '5 in'],
+  ['Standart', 'Standard'],
+]);
 
 export type StoreKind = 'bomb' | 'rocket' | 'tank' | 'gunpod';
 export type Family = 'de' | 'uk' | 'us' | 'su' | 'fr';
@@ -75,7 +127,7 @@ export const BOMBS: Record<string, BombDef> = {
 export const ROCKETS: Record<string, RocketDef> = {
   r82: { name: 'RS-82', damage: 60, blastRadius: 16, speed: 360, mass: 7 },
   rp3: { name: 'RP-3 (60 lb)', damage: 110, blastRadius: 22, speed: 430, mass: 36 },
-  hvar: { name: 'HVAR (5 inç)', damage: 95, blastRadius: 20, speed: 420, mass: 64 },
+  hvar: { name: L('HVAR (5 inç)', 'HVAR (5 in)'), damage: 95, blastRadius: 20, speed: 420, mass: 64 },
 };
 
 const bombDrag = (kg: number) => 0.006 + 0.05 * Math.pow(kg / 1000, 0.75);
@@ -124,9 +176,14 @@ export const STORES: Record<string, StoreDef> = Object.fromEntries([
       rate: 700 / 60, damage: 6, muzzleVel: 790, dispersion: 0.017, range: 700, ammo: 135,
     },
   },
-].map((s) => [s.id, s as StoreDef]));
+].map((s) => {
+  const d = s as StoreDef;
+  return [d.id, { ...d, name: storeName(d.name), short: storeName(d.short), gun: d.gun && { ...d.gun, name: storeName(d.gun.name) } }];
+}));
 
-export const STORE_KIND_NAMES: Record<StoreKind, string> = { bomb: 'Bomba', rocket: 'Roket', tank: 'Yakıt tankı', gunpod: 'Top gondolu' };
+export const STORE_KIND_NAMES: Record<StoreKind, string> = {
+  bomb: L('Bomba', 'Bomb'), rocket: L('Roket', 'Rocket'), tank: L('Yakıt tankı', 'Fuel tank'), gunpod: L('Top gondolu', 'Gun pod'),
+};
 
 export function familyOf(origin: string): Family {
   if (origin === 'Almanya') return 'de';
@@ -139,7 +196,7 @@ export function familyOf(origin: string): Family {
 // ---------------------------------------------------------------- askı noktaları
 
 const hp = (id: string, name: string, kind: HardpointKind, pylons: number, maxN: number, cap: number, accepts: StoreKind[], o: Partial<Hardpoint> = {}): Hardpoint => ({
-  id, name, kind, pylons, maxN, cap, accepts, ...o,
+  id, kind, pylons, maxN, cap, accepts, ...o, name: storeName(o.name ?? name),
 });
 const C = (cap: number, accepts: StoreKind[], maxN = 1, o: Partial<Hardpoint> = {}) => hp('c', 'Gövde altı', 'center', 1, maxN, cap, accepts, o);
 const W = (cap: number, accepts: StoreKind[], maxN = 1, o: Partial<Hardpoint> = {}) => hp('w', 'Kanat altı', 'wing', 2, maxN, cap, accepts, { at: 0.36, ...o });
@@ -572,21 +629,21 @@ export function checkPlacement(spec: AircraftSpec, place: Placement[], has: (id?
     const h = spec.hardpoints.find((x) => x.id === p.hp);
     const s = STORES[p.store];
     if (!h || !s) {
-      errors.push('Bilinmeyen askı ya da mühimmat');
+      errors.push(L('Bilinmeyen askı ya da mühimmat', 'Unknown hardpoint or store'));
       continue;
     }
-    if (seen.has(h.id)) errors.push(`${h.name}: iki ayrı yük`);
+    if (seen.has(h.id)) errors.push(`${h.name}: ${L('iki ayrı yük', 'two different stores')}`);
     seen.add(h.id);
-    if (!fits(spec, h, s)) errors.push(`${h.name}: ${s.short} takılamaz`);
-    if (p.n > h.maxN) errors.push(`${h.name}: askı başına en fazla ${h.maxN}`);
+    if (!fits(spec, h, s)) errors.push(`${h.name}: ${L(`${s.short} takılamaz`, `${s.short} cannot be fitted`)}`);
+    if (p.n > h.maxN) errors.push(`${h.name}: ${L('askı başına en fazla', 'at most per pylon:')} ${h.maxN}`);
     if (s.mass * p.n > capOf(h, has)) {
       if (h.heavyCap && s.mass * p.n <= h.heavyCap) missing.add('w_heavybomb');
-      else errors.push(`${h.name}: askı başına en fazla ${capOf(h, has)} kg`);
+      else errors.push(`${h.name}: ${L('askı başına en fazla', 'at most per pylon:')} ${capOf(h, has)} kg`);
     }
     for (const r of s.requires ?? []) if (!has(r)) missing.add(r);
     kg += s.mass * p.n * h.pylons;
   }
-  if (kg > spec.maxLoad) errors.push(`Azami yük aşıldı (${Math.round(kg)} / ${spec.maxLoad} kg)`);
+  if (kg > spec.maxLoad) errors.push(`${L('Azami yük aşıldı', 'Maximum load exceeded')} (${Math.round(kg)} / ${spec.maxLoad} kg)`);
   return { ok: errors.length === 0 && missing.size === 0, kg, missing: [...missing], errors };
 }
 
@@ -625,7 +682,7 @@ export function makeLoadout(spec: AircraftSpec, id: string, name: string, place:
     }
   }
   return {
-    id, name, place: clean, replaceGuns, reqs: [...reqs], bombCount, bombKg, maxBombKg, rocketCount, tankFuel,
+    id, name: storeName(name), place: clean, replaceGuns, reqs: [...reqs], bombCount, bombKg, maxBombKg, rocketCount, tankFuel,
     extraGuns: extraGuns.length ? extraGuns : undefined, mass, drag,
   };
 }

@@ -1,12 +1,23 @@
 # WarSimBox — Claude için çalışma notları
 
 Yukarıdan bakılan, pastel, low-poly bir hava savaşı strateji oyunu. Canlı sürüm: https://warsimbox.vercel.app.
-Oyuncuların çoğu **yatay telefonda** oynuyor. Arayüz ve metinler **Türkçe**. En öncelikli konu uçakların ve hava
+Oyuncuların çoğu **yatay telefonda** oynuyor. Arayüz **Türkçe ve İngilizce**. En öncelikli konu uçakların ve hava
 savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Şehir ve ekonomi katmanı ikinci planda.
 
 ## Kurallar
 
-- Kullanıcıya Türkçe yaz. Oyun içi metinler Türkçe kalsın.
+- Kullanıcıya Türkçe yaz.
+- **Oyun iki dilli** (`src/i18n.ts`; ana menüdeki EN/TR düğmesi, `warsim.lang`):
+  - Türkçe asıl. Her yeni metin İngilizcesiyle birlikte `L('Türkçe', 'English')` olarak yazılır.
+  - `L()` iki dilin metnini de hesaplar. İçine yan etkili çağrı koyma (ör. `finishJob()` iki kez çalışıp oyunu
+    düşürmüştü): önce değişkene al.
+  - Büyük kataloglarda İngilizce, kimliğe göre yan dosyadadır: `specsEn.ts`, `techEn.ts`, `newsEn.ts`. Yeni uçak,
+    araştırma ya da haber eklenince oraya da yazılır.
+  - Sim mantığında anahtar olan Türkçe metinler değişmez, yalnız ekranda çevrilir: ülke adı (`originName`), düşürme
+    nedeni (`world.ts` `CAUSE_EN`).
+  - `index.html`'deki sabit metinler `data-en` / `data-en-title` taşır. İlk yükleme ekranını paket inmeden satır içi
+    betik çevirir; kuralı `i18n.ts` `initial()` ile aynıdır.
+  - Başsız simülasyon (Node) ve video kayıt kipi hep Türkçedir.
 - **Commit ve push yalnız kullanıcı söyleyince.** `main`'e push, Vercel'de doğrudan canlıya çıkar. Push'tan önce
   `npm run build` (tsc dahil) ve kısa bir oyun denemesi yap.
 - Kayıt anahtarları (`warsim.*`) ve IndexedDB adı (`warsim`) değişmez. Değişirse oyuncuların kayıtları silinir.
@@ -46,8 +57,16 @@ npm run sim:hits     # isabet/düşürme istatistikleri
   - `aircraft/`: gerçek uçak katalogu (`specs.ts`), uçuş modeli, hasar.
   - `ai/`: kol, dalaş, pike, taarruz, bombardıman, taret, pist operasyonları.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
-  - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita, 300 × 300 km: Anakara,
-    Takımadalar), `scenarios.ts`, `campaign.ts`, `commander.ts` (rakip yapay zekâ).
+  - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
+    `scenarios.ts`, `campaign.ts`, `commander.ts` (rakip yapay zekâ).
+  - **Harita büyüklüğü:**
+    - Seçenekler: Küçük 150, Orta 200 (varsayılan), Büyük 300 km.
+    - Haritalar 300 km için çizildi (`MAP_BASE`). Küçükte büyük şekiller ve yerler ölçeklenir; yerel ayrıntı, pist ve
+      şehir gerçek boyda kalır. 300 km arazisi birebir korunur (eski kayıtlar).
+    - `MAP_SIZE`, `MAP_HALF`, `TERRAIN_CELL` canlı bağlardır: modül düzeyinde sabite kopyalama, kullanırken oku.
+    - Izgara her büyüklükte 2048 hücre. Ayrıntı düzeyi mesafeleri ve parça boyu ölçeğe göre ayarlanır; çizim yükü
+      büyüklükten bağımsız kalsın.
+    - Senaryolar ve video kayıt kipi 300 km'dir.
   - **Olaylar:** `w.events` her kare önce ses (`audio/battle.ts`), sonra render tarafından tüketilir; render listeyi
     siler.
   - **Kimlikler:** Kimlik sayaçları modül düzeyinde. Kayıt kipi için sıfırlama işlevleri var.
@@ -55,6 +74,8 @@ npm run sim:hits     # isabet/düşürme istatistikleri
   - `gameRenderer.ts`: sahne ve senkron.
   - `camera.ts`: strateji kamerası; `director` kancası sinematik kayıt içindir.
   - `effects.ts`: iki ponpon katmanı var: ışıkla gölgelenen duman/ateş ve ışıktan etkilenmeyen parlama.
+  - `atmosphere.ts`: gök kubbesi, güneş, yükseklik sisi (three.js sis parçalarının yerine). Kendi `onBeforeCompile`'ı
+    olan malzeme `linkAtmosphere` çağırmalı, yoksa sisi bozulur.
   - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `models.ts` (kodla üretilen parametrik uçaklar),
     `structures.ts`, `palette.ts`.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
@@ -65,8 +86,13 @@ npm run sim:hits     # isabet/düşürme istatistikleri
   - Ses dosyaları `public/sounds`; künye `credits.ts`.
 - **`src/ui/`:** DOM arayüzü: HUD, paneller, planlayıcı, araştırma, pazar, inşa, ana menü, haberler, geri bildirim
   (Google Form).
+  - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
+    Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
+    güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.
 - **`src/persist.ts`:** Hesaplar localStorage'da, kayıtlar IndexedDB'de; şifre yok.
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
+- **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
+  kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron
   ses. Yayın derlemesine girmez.
 

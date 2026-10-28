@@ -2,6 +2,7 @@
 
 import { type Account, NAME_MAX, cleanName, currentAccount, login, nameError } from '../persist';
 import { $, esc } from './dom';
+import { L } from '../i18n';
 
 export class LoginBox {
   isOpen = false;
@@ -64,11 +65,14 @@ export class LoginBox {
     const cur = currentAccount();
     this.el.innerHTML = `
       <div class="login-card">
-        <div class="login-head"><b>Giriş yap</b><button class="icon" data-lg="close" title="Kapat (Esc)">✕</button></div>
-        <p class="muted small">Bir ad yaz; şifre yok. Daha sonra aynı adla girip kayıtlarına ulaşırsın. Yeni bir adla girersen hesap oluşturulur.</p>
-        <input name="acc" maxlength="${NAME_MAX}" autocomplete="off" spellcheck="false" placeholder="Kullanıcı adı" value="${esc(value || cur?.name || '')}">
+        <div class="login-head"><b>${L('Giriş yap', 'Log in')}</b><button class="icon" data-lg="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
+        <p class="muted small">${L(
+          'Bir ad yaz; şifre yok. Daha sonra aynı adla girip kayıtlarına ulaşırsın. Yeni bir adla girersen hesap oluşturulur.',
+          'Type a name; there is no password. Log in with the same name later to reach your saves. A new name creates a new account.',
+        )}</p>
+        <input name="acc" maxlength="${NAME_MAX}" autocomplete="off" spellcheck="false" placeholder="${L('Kullanıcı adı', 'User name')}" value="${esc(value || cur?.name || '')}">
         ${this.error ? `<div class="login-err">${esc(this.error)}</div>` : ''}
-        <button class="primary wide" data-lg="submit">Giriş</button>
+        <button class="primary wide" data-lg="submit">${L('Giriş', 'Log in')}</button>
       </div>`;
   }
 }

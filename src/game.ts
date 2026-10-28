@@ -14,9 +14,9 @@ import { Modals } from './ui/modals';
 import { Hangar } from './ui/hangar';
 import { BuildBar } from './ui/build';
 import { Layout } from './ui/layout';
-import { onSettingsChange } from './ui/settings';
+import { onSettingsChange, settings } from './ui/settings';
 import { aircraftNode } from './sim/tech';
-import { groundLevel, loadMap, terrainMap } from './sim/terrain';
+import { groundLevel, loadMap, mapKey, terrainMap } from './sim/terrain';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
@@ -33,6 +33,10 @@ import { sound } from './audio/sound';
 import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
+import { L } from './i18n';
+import { Tutorial } from './ui/tutorial';
+import { MAP_BASE, MAP_SCALE } from './sim/mapData';
+import { AutoFast } from './autoFast';
 
 const STEP = 1 / 60;
 /** Otomatik kayıt aralığı (gerçek zaman, oyun akarken). */
@@ -63,6 +67,12 @@ export class Game {
   readonly pause: PauseMenu;
   /** Harekât sonu (zafer / yenilgi) ve son üs geri sayımı. */
   readonly end: EndScreen;
+  /** Öğretici ("Oyuna başla"da sorulur; duraklatma menüsünden de açılır). */
+  readonly tutorial: Tutorial;
+  /** Boş yolda otomatik 2× (HUD'daki 1× düğmesi gösterir). */
+  readonly autoFast = new AutoFast();
+  /** Otomatik 2× ilk kez devreye girince bir kez açıklanır. */
+  private autoFastTold = false;
   /** Savaş sesleri (yakınlaştıkça) ve oyuncuya uyarılar. */
   private readonly battle = new BattleSound();
   private readonly alerts = new AlertSound();
@@ -99,6 +109,7 @@ export class Game {
     this.menu = new MainMenu(this);
     this.pause = new PauseMenu(this);
     this.end = new EndScreen(this);
+    this.tutorial = new Tutorial(this);
     onSettingsChange(() => this.renderer.invalidateCoverage());
     onFullscreenChange(() => {
       document.querySelector('.fs-btn')?.classList.toggle('active', isFullscreen());
@@ -108,6 +119,8 @@ export class Game {
     this.bindPageLifecycle();
     sound.install();
     this.showMainMenu();
+    // Dil değişince sayfa yeniden açıldı: ana menüdeki öğretici kaldığı yerden sürer
+    this.tutorial.resume();
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');
   }
@@ -115,18 +128,19 @@ export class Game {
   /**
    * Harita gerekiyorsa önce onu yükle (arazi üretimi birkaç saniye sürer: yükleme ekranı gösterilir), sonra devam et.
    */
-  private withMap(mapId: string, then: () => void): void {
-    if (terrainMap.id === mapById(mapId).id) {
+  private withMap(mapId: string, size: number, then: () => void): void {
+    if (terrainMap.key === mapKey(mapById(mapId).id, size)) {
       then();
       return;
     }
     const el = $('loading');
-    el.querySelector('span')!.textContent = `${mapById(mapId).name} hazırlanıyor…`;
+    const name = `${mapById(mapId).name} · ${size / 1000} km`;
+    el.querySelector('span')!.textContent = L(`${name} hazırlanıyor…`, `Preparing ${name}…`);
     el.classList.remove('hidden');
     // Yükleme ekranı çizilsin diye iki kare bekle
     requestAnimationFrame(() => requestAnimationFrame(() => {
       try {
-        loadMap(mapId);
+        loadMap(mapId, size);
         this.renderer.prepareMap();
         then();
       } finally {
@@ -154,20 +168,21 @@ export class Game {
     this.attachWorld(w, 'menu');
     this.setTimeScale(2);
     const rig = this.renderer.rig;
-    rig.target.set(0, 0, 6000);
-    rig.distance = 215000;
+    // Haritanın tamamı görünsün (küçük haritada kamera da yakın)
+    rig.target.set(0, 0, 6000 * MAP_SCALE);
+    rig.distance = 215000 * MAP_SCALE;
     rig.pitch = 0.98;
   }
 
-  /** Ana menüde seçilen harita arka plana gelir. */
-  previewMap(mapId: string): void {
+  /** Ana menüde seçilen harita (ve büyüklüğü) arka plana gelir. */
+  previewMap(mapId: string, size: number): void {
     if (this.mode !== 'menu') return;
-    this.withMap(mapId, () => this.buildBackdrop());
+    this.withMap(mapId, size, () => this.buildBackdrop());
   }
 
   /** Yeni harekât: oyuncu + düşmanlar, herkes aynı varlıklarla başlar. */
-  newCampaign(playerName: string, enemies: number, mapId = terrainMap.id): void {
-    this.withMap(mapId, () => {
+  newCampaign(playerName: string, enemies: number, mapId = terrainMap.id, size = terrainMap.size): void {
+    this.withMap(mapId, size, () => {
       const w = new World();
       setupCampaign(w, { enemies, playerName });
       this.enterPlay(w, 'kampanya');
@@ -180,8 +195,9 @@ export class Game {
   async loadSave(id: string): Promise<void> {
     try {
       const d = await readSave(id);
-      if (d.v !== 2 || !d.mapId) throw new Error('bu kayıt eski harita sürümüne ait (150 km); yeni haritalarda açılamaz');
-      await new Promise<void>((resolve, reject) => this.withMap(d.mapId, () => {
+      if (d.v !== 2 || !d.mapId) throw new Error(L('bu kayıt eski bir harita sürümüne ait; yeni haritalarda açılamaz', 'this save belongs to an old map version and cannot be opened on the new maps'));
+      // Büyüklüğü olmayan (önceki) kayıtlar 300 km
+      await new Promise<void>((resolve, reject) => this.withMap(d.mapId, d.mapSize ?? MAP_BASE, () => {
         try {
           this.applySave(d);
           resolve();
@@ -190,7 +206,7 @@ export class Game {
         }
       }));
     } catch (e) {
-      this.toast(`Kayıt yüklenemedi: ${(e as Error).message}`, true);
+      this.toast(`${L('Kayıt yüklenemedi', 'Could not load the save')}: ${(e as Error).message}`, true);
     }
   }
 
@@ -206,7 +222,7 @@ export class Game {
       rig.yaw = cam.yaw;
       rig.pitch = cam.pitch;
     } else this.focusHome();
-    this.toast(`Kayıt yüklendi · ${mapById(d.mapId).name} · oyun ${fmtTime(w.time)}`);
+    this.toast(`${L('Kayıt yüklendi', 'Save loaded')} · ${mapById(d.mapId).name} · ${L('oyun', 'game')} ${fmtTime(w.time)}`);
   }
 
   exitToMenu(): void {
@@ -248,7 +264,7 @@ export class Game {
     this.hud.onScenarioChanged();
     this.left.render(true);
     const sub = document.querySelector('.brand span');
-    if (sub) sub.textContent = w.playerName ? `Komutan ${w.playerName}` : '';
+    if (sub) sub.textContent = w.playerName ? `${L('Komutan', 'Commander')} ${w.playerName}` : '';
   }
 
   /** Kamera oyuncunun ana üssüne. */
@@ -269,7 +285,7 @@ export class Game {
   // ------------------------------------------------------------------ kayıt
 
   defaultSaveTitle(): string {
-    const who = this.world.playerName || 'Senaryo';
+    const who = this.world.playerName || L('Senaryo', 'Scenario');
     return `${who} · ${fmtTime(this.world.time)}`;
   }
 
@@ -285,9 +301,9 @@ export class Game {
 
   ago(real: number): string {
     const s = Math.max(0, (performance.now() - real) / 1000);
-    if (s < 60) return 'az önce';
+    if (s < 60) return L('az önce', 'just now');
     const m = Math.round(s / 60);
-    return m < 60 ? `${m} dk önce` : `${Math.floor(m / 60)} sa ${m % 60} dk önce`;
+    return m < 60 ? L(`${m} dk önce`, `${m} min ago`) : L(`${Math.floor(m / 60)} sa ${m % 60} dk önce`, `${Math.floor(m / 60)} h ${m % 60} min ago`);
   }
 
   /** Hesaba kaydet (giriş yoksa false). */
@@ -302,10 +318,10 @@ export class Game {
       if (kind === 'auto') await pruneAutosaves(acc.key, 3);
       this.lastSave = { real: performance.now(), gameTime: this.world.time, kind };
       this.autosaveClock = 0;
-      this.toast(kind === 'auto' ? 'Otomatik kayıt alındı' : 'Oyun kaydedildi');
+      this.toast(kind === 'auto' ? L('Otomatik kayıt alındı', 'Autosaved') : L('Oyun kaydedildi', 'Game saved'));
       return true;
     } catch (e) {
-      this.toast(`Kayıt başarısız: ${(e as Error).message}`, true);
+      this.toast(`${L('Kayıt başarısız', 'Save failed')}: ${(e as Error).message}`, true);
       return false;
     }
   }
@@ -336,7 +352,7 @@ export class Game {
     const sc = SCENARIOS.find((s) => s.id === id);
     if (!sc) return;
     // Hazır senaryolar Anakara'da kurulu
-    this.withMap('anakara', () => {
+    this.withMap('anakara', MAP_BASE, () => {
       const w = new World();
       sc.build(w);
       this.enterPlay(w, id);
@@ -420,9 +436,9 @@ export class Game {
 
   /** Kolu üsse geri çağır. */
   recallFlight(fl: FlightGroup): void {
-    fl.rtbReason = 'komuta emri';
+    fl.rtbReason = L('komuta emri', 'ordered back');
     fl.stats.recalled = true;
-    if (fl.phase === 'enroute' || fl.phase === 'action' || fl.phase === 'formup') fl.setPhase('egress', this.world, 'komuta emri');
+    if (fl.phase === 'enroute' || fl.phase === 'action' || fl.phase === 'formup') fl.setPhase('egress', this.world, L('komuta emri', 'ordered back'));
     else if (fl.phase === 'egress') fl.setPhase('rtb', this.world);
   }
 
@@ -540,6 +556,8 @@ export class Game {
       const tgt = e.target as HTMLElement;
       if (tgt instanceof HTMLInputElement || tgt instanceof HTMLSelectElement || tgt instanceof HTMLTextAreaElement) return;
       if (this.mode === 'menu') return;
+      // Öğretici açıkken kısayollar kapalı (yalnız gösterilen yere tıklanır)
+      if (this.tutorial.capturesKeys) return;
       if (this.login.isOpen) {
         if (e.code === 'Escape') this.login.close();
         return;
@@ -611,7 +629,7 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'hidden' || this.mode !== 'play' || !currentAccount()) return;
       if (this.lastSave && this.world.time - this.lastSave.gameTime < HIDE_SAVE_MIN) return;
-      void this.saveNow('auto', `Otomatik · ${this.defaultSaveTitle()}`);
+      void this.saveNow('auto', `${L('Otomatik', 'Auto')} · ${this.defaultSaveTitle()}`);
     });
     window.addEventListener('beforeunload', (e) => {
       if (this.mode !== 'play' || !this.unsavedProgress()) return;
@@ -639,14 +657,22 @@ export class Game {
     }
     if (!this.errorShown) {
       this.errorShown = true;
-      this.toast('Beklenmeyen bir hata oldu; oyun sürüyor. Sorun devam ederse kaydedip sayfayı yenile.', true);
+      this.toast(L('Beklenmeyen bir hata oldu; oyun sürüyor. Sorun devam ederse kaydedip sayfayı yenile.', 'Something unexpected went wrong; the game goes on. If it keeps happening, save and reload the page.'), true);
     }
   }
 
   private tick(now: number): void {
     const real = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
-    this.acc += real * this.timeScale;
+    // Oyunun bu karedeki hızı: seçilen hız, 1× seçiliyken boş yolda 2×
+    const scale = this.mode === 'play'
+      ? this.autoFast.update(this.world, this.playerTeam, this.timeScale, real, settings.game.autoFast)
+      : this.timeScale;
+    if (this.autoFast.active && !this.autoFastTold && this.mode === 'play') {
+      this.autoFastTold = true;
+      this.toast(L('Boş yol: kolların yoldayken oyun 2× akar; çatışma ve görevde 1×\'e döner.', 'Open road: while your flights travel the game runs at 2×; it drops to 1× for combat and missions.'));
+    }
+    this.acc += real * scale;
     let steps = 0;
     const maxSteps = 80;
     while (this.acc >= STEP && steps < maxSteps) {
@@ -660,7 +686,7 @@ export class Game {
     try {
       const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
       const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
-      this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, this.timeScale, listener, (ac) => this.renderer.isVisible(ac));
+      this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, scale, listener, (ac) => this.renderer.isVisible(ac));
       if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
     } catch (e) {
       this.reportError(e);
@@ -669,6 +695,7 @@ export class Game {
       // Arka plan: harita yavaşça döner; oyun arayüzü gizli
       rig.yaw += real * 0.025;
       this.renderer.frame(real, Math.min(this.acc / STEP, 1));
+      this.tutorial.update();
       return;
     }
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
@@ -676,7 +703,7 @@ export class Game {
       this.autosaveClock += real;
       if (this.autosaveClock >= AUTOSAVE_SEC) {
         this.autosaveClock = 0;
-        if (currentAccount()) void this.saveNow('auto', `Otomatik · ${this.defaultSaveTitle()}`);
+        if (currentAccount()) void this.saveNow('auto', `${L('Otomatik', 'Auto')} · ${this.defaultSaveTitle()}`);
       }
     }
     // Seçili uçak indi/düştüyse seçim kalksın
@@ -689,5 +716,6 @@ export class Game {
     this.planner.update();
     this.build.update();
     this.modals.update();
+    this.tutorial.update();
   }
 }

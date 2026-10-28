@@ -22,9 +22,24 @@ import {
   oreRichness, researchCost, type LedgerEntry, type MarketOffer,
 } from './economy';
 import { flattenFootprint, footprintStats, groundLevel, lineOfSight, resetTerrainEdits, terrainHeight } from './terrain';
-import { MAP_ID } from './mapData';
+import { MAP_ID, MAP_SIZE } from './mapData';
 import { evaluateMission, type MissionReport } from './missionResult';
 import { G, clamp, gauss, rand } from '../core/math';
+import { EN, L, lower } from '../i18n';
+
+/** Düşürme nedenleri: Türkçe metin düşüş biçimini seçen anahtardır (kill), günlükte İngilizcesi yazılır. */
+const CAUSE_EN: Record<string, string> = {
+  'havada infilak etti': 'exploded in mid-air',
+  'pilot öldü': 'pilot killed',
+  'kumanda kaybı': 'controls shot away',
+  'kanat koptu': 'wing torn off',
+  'havada parçalandı': 'broke up in mid-air',
+  'parçalandı': 'shot to pieces',
+  'motoru durdu, pilot uçağı terk etti': 'engine dead, pilot bailed out',
+  'yangın': 'fire',
+  'yangın depoya ulaştı, infilak etti': 'fire reached the fuel tank, it exploded',
+};
+const causeText = (c: string): string => (EN ? CAUSE_EN[c] ?? c : c);
 
 /** Kendi yapılarından en fazla bu uzaklıkta inşa edilebilir (m). */
 export const TERRITORY = 30000;
@@ -252,6 +267,8 @@ export class World {
   playerName = '';
   /** Dünyanın kurulduğu harita (kurulmadan önce terrain.loadMap ile yüklenmiş olmalı). */
   mapId = MAP_ID;
+  /** Haritanın büyüklüğü (kenar, m). */
+  mapSize = MAP_SIZE;
   setup: { enemies: number } | null = null;
   /** Harekâtın kazananı (haritada son kalan taraf); sürüyorsa null. */
   winner: number | null = null;
@@ -280,9 +297,9 @@ export class World {
       const price = node.specId && SPECS[node.specId] ? aircraftPrice(SPECS[node.specId]) : undefined;
       const cost = researchCost(node, price);
       if (this.economyEnabled && cost > 0 && t.money - cost < t.reserve) return null;
-      return this.pay(t.id, cost, `Araştırma: ${node.specId ? SPECS[node.specId]?.abbr ?? node.name : node.name}`) ? (this.economyEnabled ? cost : 0) : null;
+      return this.pay(t.id, cost, `${L('Araştırma', 'Research')}: ${node.specId ? SPECS[node.specId]?.abbr ?? node.name : node.name}`) ? (this.economyEnabled ? cost : 0) : null;
     };
-    t.research.refunder = (amount) => this.earn(t.id, amount, 'Araştırma iptali (iade)');
+    t.research.refunder = (amount) => this.earn(t.id, amount, L('Araştırma iptali (iade)', 'Research cancelled (refund)'));
     return t;
   }
 
@@ -331,11 +348,11 @@ export class World {
       if (t.incomeHist.length > 60) t.incomeHist.shift();
       t.incomeAcc = 0;
       if (t.mineAcc >= 1 && Math.floor(this.time) % 30 === 0) {
-        this.record(t, t.mineAcc, 'Maden geliri');
+        this.record(t, t.mineAcc, L('Maden geliri', 'Mine income'));
         t.mineAcc = 0;
       }
       if (t.repairAcc >= 1 && Math.floor(this.time) % 30 === 0) {
-        this.record(t, -Math.round(t.repairAcc), 'Onarım');
+        this.record(t, -Math.round(t.repairAcc), L('Onarım', 'Repairs'));
         t.repairAcc = 0;
       }
     }
@@ -362,7 +379,7 @@ export class World {
       if (base) {
         if (t.lastStand !== null) {
           t.lastStand = null;
-          this.log(`${t.name}: yeni hava üssü kuruluyor, harekâtta kalıyor`, null, 'info');
+          this.log(L(`${t.name}: yeni hava üssü kuruluyor, harekâtta kalıyor`, `${t.name}: a new airbase is being built, still in the campaign`), null, 'info');
         }
         continue;
       }
@@ -372,7 +389,7 @@ export class World {
       }
       if (t.lastStand === null) {
         t.lastStand = LAST_STAND;
-        this.log(`${t.name}: son hava üssü yıkıldı! ${LAST_STAND / 60} dk içinde yeni üs kurulmazsa elenecek`, null, 'defense');
+        this.log(L(`${t.name}: son hava üssü yıkıldı! ${LAST_STAND / 60} dk içinde yeni üs kurulmazsa elenecek`, `${t.name}: last airbase destroyed! Out of the campaign unless a new base is built within ${LAST_STAND / 60} min`), null, 'defense');
       }
       t.lastStand -= 1;
       if (t.lastStand <= 0) this.eliminate(t);
@@ -380,7 +397,7 @@ export class World {
     const left = this.teams.filter((t) => !t.eliminated);
     if (left.length === 1 && this.teams.length > 1) {
       this.winner = left[0].id;
-      this.log(`Harekât bitti: haritada son kalan ${left[0].name} kazandı!`, null, 'info');
+      this.log(L(`Harekât bitti: haritada son kalan ${left[0].name} kazandı!`, `Campaign over: ${left[0].name}, the last side standing, wins!`), null, 'info');
     }
   }
 
@@ -400,7 +417,7 @@ export class World {
       this.destroyQuietly(ac);
       interned++;
     }
-    this.log(`${t.name} harekâttan elendi${interned ? ` (havadaki ${interned} uçağı tarafsız ülkelere indi)` : ''}`, null, 'info');
+    this.log(L(`${t.name} harekâttan elendi`, `${t.name} is out of the campaign`) + (interned ? L(` (havadaki ${interned} uçağı tarafsız ülkelere indi)`, ` (its ${interned} airborne aircraft landed in neutral countries)`) : ''), null, 'info');
   }
 
   /** Son bir dakikadaki toplam gelir (kr/dk). */
@@ -438,7 +455,7 @@ export class World {
     const spec = SPECS[specId];
     if (!f || !spec || f.queue.length >= 8) return false;
     const price = aircraftPrice(spec);
-    if (!this.pay(s.team, price, `Üretim: ${spec.abbr}`)) return false;
+    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${spec.abbr}`)) return false;
     f.enqueue(specId, this.economyEnabled ? price : 0);
     return true;
   }
@@ -449,13 +466,13 @@ export class World {
     const item = f?.queue[index];
     if (!f || !item) return;
     f.queue.splice(index, 1);
-    if (item.paid > 0) this.earn(s.team, Math.round(item.paid * (1 - item.progress)), `Sipariş iptali: ${SPECS[item.specId]?.abbr ?? ''}`);
+    if (item.paid > 0) this.earn(s.team, Math.round(item.paid * (1 - item.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${SPECS[item.specId]?.abbr ?? ''}`);
   }
 
   /** Üs tesisi inşaatı (ücretli). */
   startBaseUpgrade(base: Airbase, key: BaseUpgrade): boolean {
     if (base.job || base.upgrades.has(key) || !base.s.active) return false;
-    if (!this.pay(base.s.team, BASE_UPGRADE_COST[key], `Üs tesisi: ${BASE_UPGRADES[key].name}`)) return false;
+    if (!this.pay(base.s.team, BASE_UPGRADE_COST[key], `${L('Üs tesisi', 'Base facility')}: ${BASE_UPGRADES[key].name}`)) return false;
     return base.startUpgrade(key);
   }
 
@@ -505,14 +522,14 @@ export class World {
   /** Pazardan satın al: uçak seçilen üssün hangarına teslim edilir. */
   buyOffer(team: number, offerId: number, base: Airbase, n = 1): string | null {
     const o = this.market.offers.find((x) => x.id === offerId);
-    if (!o || o.count <= 0) return 'Teklif kalmadı';
+    if (!o || o.count <= 0) return L('Teklif kalmadı', 'Offer no longer available');
     n = Math.min(n, o.count, base.freeSlots);
-    if (n <= 0) return 'Üssün hangarında yer yok';
+    if (n <= 0) return L('Üssün hangarında yer yok', 'No room in the base hangar');
     const spec = SPECS[o.specId];
-    if (!this.pay(team, o.unitPrice * n, `Pazardan alım: ${n} × ${spec.abbr} (${o.seller})`)) return 'Para yetmiyor';
+    if (!this.pay(team, o.unitPrice * n, `${L('Pazardan alım', 'Market purchase')}: ${n} × ${spec.abbr} (${o.seller})`)) return L('Para yetmiyor', 'Not enough money');
     o.count -= n;
     for (let i = 0; i < n; i++) base.addAirframe(newAirframe(o.specId, team));
-    this.log(`${o.seller}: ${n} × ${spec.name} satın alındı, ${base.s.name} hangarına teslim edildi`, team, 'build');
+    this.log(L(`${o.seller}: ${n} × ${spec.name} satın alındı, ${base.s.name} hangarına teslim edildi`, `${o.seller}: ${n} × ${spec.name} bought, delivered to the ${base.s.name} hangar`), team, 'build');
     return null;
   }
 
@@ -521,8 +538,8 @@ export class World {
     if (af.status !== 'ready' || !base.inventory.includes(af)) return false;
     const spec = SPECS[af.specId];
     base.removeAirframe(af);
-    this.earn(base.s.team, Math.round(aircraftPrice(spec) * SELL_RATE * (1 - af.wear * 0.3)), `Satış: ${spec.abbr}`);
-    this.log(`${base.s.name}: ${spec.name} pazarda satıldı`, base.s.team, 'build');
+    this.earn(base.s.team, Math.round(aircraftPrice(spec) * SELL_RATE * (1 - af.wear * 0.3)), `${L('Satış', 'Sale')}: ${spec.abbr}`);
+    this.log(L(`${base.s.name}: ${spec.name} pazarda satıldı`, `${base.s.name}: ${spec.name} sold on the market`), base.s.team, 'build');
     return true;
   }
 
@@ -591,9 +608,9 @@ export class World {
     const tally = this.missionTally.get(key) ?? { success: 0, fail: 0, none: 0 };
     tally[r.outcome]++;
     this.missionTally.set(key, tally);
-    if (r.outcome === 'success' && r.reward > 0) this.earn(fl.team, r.reward, `Görev başarılı: ${MISSION_NAMES[fl.plan.type]} (${fl.name})`);
+    if (r.outcome === 'success' && r.reward > 0) this.earn(fl.team, r.reward, `${L('Görev başarılı', 'Mission success')}: ${MISSION_NAMES[fl.plan.type]} (${fl.name})`);
     const icon = r.outcome === 'success' ? '✓' : r.outcome === 'fail' ? '✗' : '–';
-    const word = r.outcome === 'success' ? 'başarılı' : r.outcome === 'fail' ? 'başarısız' : 'sonuçsuz';
+    const word = r.outcome === 'success' ? L('başarılı', 'succeeded') : r.outcome === 'fail' ? L('başarısız', 'failed') : L('sonuçsuz', 'inconclusive');
     const money = r.outcome === 'success' && r.reward > 0 && this.economyEnabled ? ` (+${fmtMoney(r.reward)})` : '';
     this.log(`${icon} ${fl.name} · ${MISSION_NAMES[fl.plan.type]} ${word}: ${r.reason}${money}`, fl.team, 'ops');
     const types = [...new Set(fl.members.map((m) => m.spec.abbr))].join(', ');
@@ -703,9 +720,9 @@ export class World {
     const last = this.engageLogTimes.get(key);
     if (last !== undefined && this.time - last < 30) return;
     this.engageLogTimes.set(key, this.time);
-    const who = attacker.flight ? `${attacker.flight.name} kolu` : attacker.callsign;
+    const who = attacker.flight ? L(`${attacker.flight.name} kolu`, `${attacker.flight.name} flight`) : attacker.callsign;
     const whom = target.flight ? `${target.flight.name} (${target.spec.abbr})` : target.callsign;
-    this.log(`${who}, ${whom} ile çatışmaya giriyor`, attacker.team, 'combat');
+    this.log(L(`${who}, ${whom} ile çatışmaya giriyor`, `${who} engages ${whom}`), attacker.team, 'combat');
   }
 
   // ------------------------------------------------------------------ yapılar
@@ -733,7 +750,7 @@ export class World {
     const key = `${team}:${kind}`;
     const n = (this.nameCounters.get(key) ?? 0) + 1;
     this.nameCounters.set(key, n);
-    return `${this.teams[team].name} ${STRUCTURE_DEFS[kind].name.toLowerCase()} ${n}`;
+    return `${this.teams[team].name} ${lower(STRUCTURE_DEFS[kind].name)} ${n}`;
   }
 
   checkPlacement(team: number, kind: StructureKind, x: number, z: number, headingRad: number, attachTo: number | null = null): PlacementCheck {
@@ -742,12 +759,12 @@ export class World {
     const stats = footprintStats(x, z, def.halfW, def.halfL, headingRad);
     const elevation = Math.max(stats.mean, 6);
     const fail = (reason: string) => ({ ok: false, reason, elevation });
-    if (def.requires && !research.has(def.requires)) return fail(`Araştırma gerekli: ${TECH_BY_ID[def.requires].name}`);
-    if (stats.outside) return fail('Harita dışında');
-    if (stats.water > 0.02) return fail('Su üzerine inşa edilemez');
-    if (stats.max - stats.min > def.maxRelief) return fail(`Arazi çok engebeli (${Math.round(stats.max - stats.min)} m fark)`);
+    if (def.requires && !research.has(def.requires)) return fail(`${L('Araştırma gerekli', 'Research required')}: ${TECH_BY_ID[def.requires].name}`);
+    if (stats.outside) return fail(L('Harita dışında', 'Outside the map'));
+    if (stats.water > 0.02) return fail(L('Su üzerine inşa edilemez', 'Cannot build on water'));
+    if (stats.max - stats.min > def.maxRelief) return fail(L(`Arazi çok engebeli (${Math.round(stats.max - stats.min)} m fark)`, `Ground too uneven (${Math.round(stats.max - stats.min)} m difference)`));
     if (kind === 'airbase' && runwayScore(x, z, elevation, headingRad) < -40) {
-      return fail('Bu pist yönünde iniş/kalkış koridoru dağlarla kapalı (R ile döndür)');
+      return fail(L('Bu pist yönünde iniş/kalkış koridoru dağlarla kapalı (R ile döndür)', 'Mountains block the approach corridor for this runway heading (rotate with R)'));
     }
     const city = def.category === 'city';
     const myR = kind === 'airbase' ? 1400 : def.radius * 1.6 + 60;
@@ -761,32 +778,32 @@ export class World {
       }
       if (city && s.def.category === 'city') {
         // Şehir yapıları yan yana dizilebilir: yalnız tabanlar çakışmasın
-        if (d < (Math.max(def.halfW, def.halfL) + Math.max(s.def.halfW, s.def.halfL)) * 0.92) return fail('Başka bir binaya çok yakın');
+        if (d < (Math.max(def.halfW, def.halfL) + Math.max(s.def.halfW, s.def.halfL)) * 0.92) return fail(L('Başka bir binaya çok yakın', 'Too close to another building'));
       } else if (kind === 'aa' && s.airbase) {
         // Uçaksavar tel örgünün hemen dışına kurulabilir: üssün 1,4 km'lik dairesi pistin yanını da kapatıyordu, 2 km
         // menzilli 20 mm pisti koruyamıyordu. Tel örgü pistin 120 m bir yanından 560 m öbür yanına; pist uzantısındaki
         // yaklaşma koridoru boş kalır
         const { u, v } = s.airbase.toRunway(x, z);
         if ((Math.abs(u) < 1430 && v > -270 && v < 710) || (Math.abs(u) < 3800 && Math.abs(v) < 300)) {
-          return fail('Hava üssüne ya da yaklaşma koridoruna çok yakın');
+          return fail(L('Hava üssüne ya da yaklaşma koridoruna çok yakın', 'Too close to an airbase or its approach corridor'));
         }
       } else {
         const otherR = s.kind === 'airbase' ? 1400 : s.def.radius * 1.6 + 60;
-        if (d < myR + otherR - 200) return fail('Başka bir yapıya çok yakın');
+        if (d < myR + otherR - 200) return fail(L('Başka bir yapıya çok yakın', 'Too close to another structure'));
       }
-      if (s.team !== team && d < 12000) return fail('Düşman yapısına çok yakın');
+      if (s.team !== team && d < 12000) return fail(L('Düşman yapısına çok yakın', 'Too close to an enemy structure'));
       if (s.team === team) nearOwn = Math.min(nearOwn, d);
     }
-    if (nearOwn > TERRITORY) return fail(`Kendi bölgenizden çok uzak (en fazla ${TERRITORY / 1000} km)`);
+    if (nearOwn > TERRITORY) return fail(L(`Kendi bölgenizden çok uzak (en fazla ${TERRITORY / 1000} km)`, `Too far from your territory (at most ${TERRITORY / 1000} km)`));
     if (kind === 'mine' && this.structures.some((s) => s.kind === 'mine' && !s.destroyed && Math.hypot(s.pos.x - x, s.pos.z - z) < 2500)) {
-      return fail('Başka bir madene çok yakın (en az 2,5 km)');
+      return fail(L('Başka bir madene çok yakın (en az 2,5 km)', 'Too close to another mine (at least 2.5 km)'));
     }
     const cost = this.structureCost(team, kind);
-    if (!this.canAfford(team, cost)) return fail(`Para yetmiyor (${fmtMoney(cost)})`);
+    if (!this.canAfford(team, cost)) return fail(`${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(cost)})`);
     // Askerî: aynı anda 3 inşaat. Şehir: 12'ye kadar sıraya alınır, 4'ü aynı anda ilerler
     const limit = city ? 12 : def.category === 'economy' ? 2 : 3;
     const building = this.structures.filter((s) => s.team === team && s.build < 1 && !s.destroyed && s.def.category === def.category).length;
-    if (building >= limit) return fail(city ? 'Şehir inşaat sırası dolu (12)' : `Aynı anda en fazla ${limit} inşaat (bu tür)`);
+    if (building >= limit) return fail(city ? L('Şehir inşaat sırası dolu (12)', 'City build queue is full (12)') : L(`Aynı anda en fazla ${limit} inşaat (bu tür)`, `At most ${limit} at a time (this type)`));
     return { ok: true, elevation };
   }
 
@@ -796,14 +813,14 @@ export class World {
     if (!chk.ok) return null;
     const p = base.factoryPad();
     const s = this.placeStructure(base.s.team, 'factory', p.x, p.z, base.s.heading, base.s.id);
-    if (s) s.name = `${base.s.name} fabrikası`;
+    if (s) s.name = L(`${base.s.name} fabrikası`, `${base.s.name} factory`);
     return s;
   }
 
   checkBaseFactory(base: Airbase): PlacementCheck {
     const p = base.factoryPad();
-    if (this.structures.some((s) => s.attachedTo === base.s.id && !s.destroyed)) return { ok: false, reason: 'Bu üssün fabrikası zaten var', elevation: 0 };
-    if (!base.s.active) return { ok: false, reason: 'Üs inşaatı bitmeli', elevation: 0 };
+    if (this.structures.some((s) => s.attachedTo === base.s.id && !s.destroyed)) return { ok: false, reason: L('Bu üssün fabrikası zaten var', 'This base already has a factory'), elevation: 0 };
+    if (!base.s.active) return { ok: false, reason: L('Üs inşaatı bitmeli', 'The base must be finished first'), elevation: 0 };
     return this.checkPlacement(base.s.team, 'factory', p.x, p.z, base.s.heading, base.s.id);
   }
 
@@ -811,14 +828,14 @@ export class World {
     const chk = this.checkPlacement(team, kind, x, z, headingRad, attachTo);
     if (!chk.ok) return null;
     const def = STRUCTURE_DEFS[kind];
-    if (!this.pay(team, this.structureCost(team, kind), `İnşaat: ${def.name}`)) return null;
+    if (!this.pay(team, this.structureCost(team, kind), `${L('İnşaat', 'Construction')}: ${def.name}`)) return null;
     const rich = kind === 'mine' ? oreRichness(x, z) : 0;
     flattenFootprint(x, z, def.halfW + 20, def.halfL + 40, headingRad, chk.elevation, kind === 'airbase' ? 260 : def.category === 'city' ? 50 : 90);
     const s = new Structure(team, kind, this.structureName(team, kind), new Vector3(x, chk.elevation, z), headingRad, false);
     s.richness = rich;
     s.attachedTo = attachTo;
     this.structures.push(s);
-    this.log(`${s.name}: inşaat başladı (${def.buildTime} sn)`, team, 'build');
+    this.log(L(`${s.name}: inşaat başladı (${def.buildTime} sn)`, `${s.name}: construction started (${def.buildTime} s)`), team, 'build');
     return s;
   }
 
@@ -961,7 +978,7 @@ export class World {
     const parts: string[] = [];
     const logShortage = () => {
       if (shortages.length) {
-        this.log(`${base.s.name}: mürettebat yok — ${shortages.join(', ')} hangarda kaldı (personel için ev kur)`, base.s.team, 'ops');
+        this.log(L(`${base.s.name}: mürettebat yok — ${shortages.join(', ')} hangarda kaldı (personel için ev kur)`, `${base.s.name}: no crews — ${shortages.join(', ')} stayed in the hangar (build houses for personnel)`), base.s.team, 'ops');
         shortages.length = 0;
       }
     };
@@ -988,7 +1005,7 @@ export class World {
       ep.loadoutId = '';
       ep.belt = escortPlan?.belt ?? 'std';
       const f = make(g, ep, task);
-      if (f.length) parts.push(`eskort ${f.reduce((a, x) => a + x.expected, 0)} × ${SPECS[g.specId].abbr}${taskNote(task)}`);
+      if (f.length) parts.push(`${L('eskort', 'escort')} ${f.reduce((a, x) => a + x.expected, 0)} × ${SPECS[g.specId].abbr}${taskNote(task)}`);
       escortFlights.push(...f);
     }
     // Eskortlar saldırı kollarına sırayla
@@ -1002,7 +1019,8 @@ export class World {
     logShortage();
     const all = [...flights, ...escortFlights];
     this.log(
-      `${base.s.name}: ${parts.join(', ')} — ${MISSION_NAMES[plan.type].toLowerCase()} görevine kalkıyor (${all.map((f) => f.name).join(', ')})`,
+      L(`${base.s.name}: ${parts.join(', ')} — ${lower(MISSION_NAMES[plan.type])} görevine kalkıyor`, `${base.s.name}: ${parts.join(', ')} — taking off for ${lower(MISSION_NAMES[plan.type])}`)
+        + ` (${all.map((f) => f.name).join(', ')})`,
       base.s.team, 'ops',
     );
     return all;
@@ -1215,7 +1233,7 @@ export class World {
         });
       }
       if (ac.flight) ac.flight.stats.struck = true;
-      if (b.releaseAll) this.log(`${ac.callsign} bombasını bıraktı (${Math.round(ac.pos.y - groundLevel(ac.pos.x, ac.pos.z))} m)`, ac.team, 'strike');
+      if (b.releaseAll) this.log(`${ac.callsign} ${L('bombasını bıraktı', 'released its bombs')} (${Math.round(ac.pos.y - groundLevel(ac.pos.x, ac.pos.z))} m)`, ac.team, 'strike');
     }
     if (b.fireRocket && ac.rocketCount > 0) {
       for (const side of [-1, 1]) {
@@ -1261,7 +1279,7 @@ export class World {
     this.creditKill(target, attacker, sourceTeam);
     this.loseAirframe(target);
     for (const s of this.structures) s.airbase?.cancelLanding(target.id);
-    this.log(`${sourceName}, ${target.callsign} (${target.spec.abbr}) uçağını düşürdü — ${cause}`, sourceTeam, 'kill');
+    this.log(L(`${sourceName}, ${target.callsign} (${target.spec.abbr}) uçağını düşürdü — ${cause}`, `${sourceName} shot down ${target.callsign} (${target.spec.abbr}) — ${causeText(cause)}`), sourceTeam, 'kill');
     if (explode) {
       this.disintegrate(target);
       return;
@@ -1324,7 +1342,7 @@ export class World {
       if (af.plan.type === 'intercept' && (target.id === af.plan.targetAircraftId || tfid === af.stats.targetFlightId || tfid === af.interceptFlightId)) af.stats.targetKills++;
     }
     this.teams[team]?.research.award(50 + target.hpMax * 0.3);
-    if (team !== target.team) this.earn(team, Math.round(aircraftPrice(target.spec) * KILL_REWARD), `Düşürülen ${target.spec.abbr}`);
+    if (team !== target.team) this.earn(team, Math.round(aircraftPrice(target.spec) * KILL_REWARD), `${L('Düşürülen', 'Kill')}: ${target.spec.abbr}`);
   }
 
   /**
@@ -1349,7 +1367,7 @@ export class World {
         ac.status = 'falling';
         ac.fallMode = 'glide';
         ac.spin = rand(-0.2, 0.2);
-        this.log(`${ac.callsign}: üsse ulaşamıyor, pilot uçağı terk etti`, ac.team, 'combat');
+        this.log(L(`${ac.callsign}: üsse ulaşamıyor, pilot uçağı terk etti`, `${ac.callsign}: cannot reach base, pilot bailed out`), ac.team, 'combat');
       }
       ac.brain.bailAt = this.time + rand(0.5, 2);
       ac.bailed = false;
@@ -1363,19 +1381,19 @@ export class World {
     const water = terrainHeight(ac.pos.x, ac.pos.z) < 0;
     if (!water && ac.crewLost > 0) {
       const home = this.crewSurvives(ac.team, ac.pos.x, ac.pos.z, ac.crewLost);
-      this.log(`${ac.callsign} mürettebatı ${home ? 'kurtuldu' : 'esir düştü'}`, ac.team, 'combat');
+      this.log(L(`${ac.callsign} mürettebatı ${home ? 'kurtuldu' : 'esir düştü'}`, `${ac.callsign} crew ${home ? 'rescued' : 'taken prisoner'}`), ac.team, 'combat');
     }
-    const what = water ? 'denize zorunlu iniş yaptı' : 'araziye zorunlu iniş yaptı';
+    const what = water ? L('denize zorunlu iniş yaptı', 'ditched in the sea') : L('araziye zorunlu iniş yaptı', 'force-landed in the field');
     if (att) {
       this.creditKill(ac, att, att.team);
-      this.log(`${src}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — ${what}`, att.team, 'kill');
+      this.log(L(`${src}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — ${what}`, `${src} shot down ${ac.callsign} (${ac.spec.abbr}) — ${what}`), att.team, 'kill');
     } else this.log(`${ac.callsign} ${what}`, ac.team, 'combat');
   }
 
   /** Motorsuz uçak üssün yanına zorunlu iniş yapar: gövde kurtulur ama uzun onarım gerekir. */
   deadStickLanding(ac: Aircraft, base: Airbase): void {
     if (ac.status !== 'flying') return;
-    this.log(`${ac.callsign}: ${base.s.name} üssüne motorsuz zorunlu iniş yaptı`, ac.team, 'ops');
+    this.log(L(`${ac.callsign}: ${base.s.name} üssüne motorsuz zorunlu iniş yaptı`, `${ac.callsign}: dead-stick landing at ${base.s.name}`), ac.team, 'ops');
     ac.hp = Math.min(ac.hp, ac.hpMax * 0.3);
     this.recover(ac, base);
   }
@@ -1405,7 +1423,7 @@ export class World {
         name: ac.callsign, t: -i * 0.8, people,
       });
     }
-    this.log(`${ac.callsign}: ${n > 1 ? 'mürettebat' : 'pilot'} paraşütle atladı`, ac.team, 'combat');
+    this.log(L(`${ac.callsign}: ${n > 1 ? 'mürettebat' : 'pilot'} paraşütle atladı`, `${ac.callsign}: ${n > 1 ? 'crew' : 'pilot'} bailed out`), ac.team, 'combat');
   }
 
   private updateParachutes(dt: number): void {
@@ -1431,8 +1449,9 @@ export class World {
       if (p.pos.y <= g + 1) {
         const water = terrainHeight(p.pos.x, p.pos.z) < 0;
         const home = !water && this.crewSurvives(p.team, p.pos.x, p.pos.z, p.people);
-        const where = water ? 'denize indi' : home ? 'kendi bölgesine indi, kurtarıldı' : 'düşman bölgesine indi, esir düştü';
-        this.log(`${p.name} mürettebatı ${where}`, p.team, 'combat');
+        const where = water ? L('denize indi', 'came down in the sea')
+          : home ? L('kendi bölgesine indi, kurtarıldı', 'landed in friendly territory, rescued') : L('düşman bölgesine indi, esir düştü', 'landed behind enemy lines, taken prisoner');
+        this.log(L(`${p.name} mürettebatı ${where}`, `${p.name} crew ${where}`), p.team, 'combat');
         continue;
       }
       this.parachutes[w++] = p;
@@ -1465,7 +1484,7 @@ export class World {
       for (const id of t.research.update(dt)) {
         const node = TECH_BY_ID[id];
         const name = node.specId ? SPECS[node.specId]?.name ?? node.name : node.name;
-        this.log(`Araştırma tamamlandı: ${name}${node.kind === 'aircraft' ? ' (üretime hazır)' : ''}`, t.id, 'research');
+        this.log(`${L('Araştırma tamamlandı', 'Research complete')}: ${name}${node.kind === 'aircraft' ? L(' (üretime hazır)', ' (ready for production)') : ''}`, t.id, 'research');
       }
     }
     for (const s of this.structures) this.updateStructure(s, dt);
@@ -1495,7 +1514,7 @@ export class World {
       const fl = this.flights[i];
       if (fl.phase === 'done') {
         if (fl.landed > 0 || fl.members.length > 0) {
-          this.log(`${fl.name} kolu görevi bitirdi: ${fl.landed}/${fl.expected} uçak döndü`, fl.team, 'ops');
+          this.log(L(`${fl.name} kolu görevi bitirdi: ${fl.landed}/${fl.expected} uçak döndü`, `${fl.name} flight finished its mission: ${fl.landed}/${fl.expected} aircraft returned`), fl.team, 'ops');
         }
         this.finishMission(fl);
         this.flights.splice(i, 1);
@@ -1569,7 +1588,7 @@ export class World {
     if (!ac.bailed && this.time >= ac.brain.bailAt) this.bailOut(ac);
     // Kontrolsüz dalış yapısal sınırı aşınca uçak havada dağılır
     if (iasOf(ac) > ac.spec.vne * 1.3 && Math.random() < dt * 2) {
-      this.log(`${ac.callsign} dalışta parçalandı`, ac.team, 'combat');
+      this.log(L(`${ac.callsign} dalışta parçalandı`, `${ac.callsign} broke up in a dive`), ac.team, 'combat');
       this.disintegrate(ac);
       return;
     }
@@ -1581,7 +1600,7 @@ export class World {
       const busy = this.structures.filter((o) => o.team === s.team && o.build < 1 && !o.destroyed && o.def.category === s.def.category);
       if (busy.indexOf(s) < (s.def.category === 'city' ? 4 : s.def.category === 'economy' ? 2 : 3)) {
         s.build = Math.min(1, s.build + dt / s.def.buildTime);
-        if (s.build >= 1) this.log(`${s.name} tamamlandı`, s.team, 'build');
+        if (s.build >= 1) this.log(L(`${s.name} tamamlandı`, `${s.name} completed`), s.team, 'build');
       }
       return;
     }
@@ -1604,7 +1623,7 @@ export class World {
     if (on && (!s.active || s.hp >= s.maxHp || s.repairing)) return false;
     s.repairing = on;
     // Botların onarımları günlüğü doldurmasın
-    if (on && !this.teams[s.team]?.ai) this.log(`${s.name}: onarım başladı`, s.team, 'build');
+    if (on && !this.teams[s.team]?.ai) this.log(L(`${s.name}: onarım başladı`, `${s.name}: repairs started`), s.team, 'build');
     return true;
   }
 
@@ -1635,7 +1654,7 @@ export class World {
     if (s.hp >= s.maxHp - 1e-6) {
       s.hp = s.maxHp;
       s.repairing = false;
-      if (!this.teams[s.team]?.ai) this.log(`${s.name} onarıldı`, s.team, 'build');
+      if (!this.teams[s.team]?.ai) this.log(L(`${s.name} onarıldı`, `${s.name} repaired`), s.team, 'build');
     }
   }
 
@@ -1666,11 +1685,11 @@ export class World {
     if (Math.random() < (diving ? 0.16 : 0.02) * dt) {
       d.fire = 0;
       d.fireSource = null;
-      this.log(`${ac.callsign}: yangın söndü`, ac.team, 'combat');
+      this.log(L(`${ac.callsign}: yangın söndü`, `${ac.callsign}: fire is out`), ac.team, 'combat');
       return;
     }
     const attacker = ac.lastHitFrom !== null ? this.aircraftById(ac.lastHitFrom) ?? null : null;
-    const src = attacker?.callsign ?? 'Yangın';
+    const src = attacker?.callsign ?? L('Yangın', 'Fire');
     const team = attacker?.team ?? (ac.lastHitTeam >= 0 ? ac.lastHitTeam : ac.team);
     // Yangın depoya ulaşırsa infilak
     const reach = (d.fireSource === 'fuel' ? 0.16 : 0.08) * (hasSealedTanks(ac) ? 0.5 : 1);
@@ -1692,7 +1711,7 @@ export class World {
     for (let i = 0; i < d.engines.length; i++) if (d.engines[i] < 1 && (worst < 0 || d.engines[i] > d.engines[worst])) worst = i;
     if (worst < 0) return;
     d.engines[worst] = 1;
-    this.log(`${ac.callsign}: motor hararet yaptı ve kilitlendi`, ac.team, 'combat');
+    this.log(L(`${ac.callsign}: motor hararet yaptı ve kilitlendi`, `${ac.callsign}: engine overheated and seized`), ac.team, 'combat');
     if (d.engines.some((e) => e < 1)) {
       d.heat = 0.4;
       d.coolant *= 0.5;
@@ -1714,7 +1733,7 @@ export class World {
     ac.departure = rand(2.5, 5);
     ac.lastDepart = this.time;
     ac.departSpin = (Math.random() < 0.5 ? -1 : 1) * rand(2, 3.5);
-    this.log(`${ac.callsign}: tutunma kaybı, vrilleye girdi`, ac.team, 'combat');
+    this.log(L(`${ac.callsign}: tutunma kaybı, vrilleye girdi`, `${ac.callsign}: stalled and entered a spin`), ac.team, 'combat');
   }
 
   private checkGround(ac: Aircraft): void {
@@ -1730,7 +1749,7 @@ export class World {
       const chaser = ac.brain.threat ?? ac.brain.target ?? this.lastAttacker(ac);
       if (chaser && chaser.team !== ac.team) {
         this.creditKill(ac, chaser, chaser.team);
-        this.log(`${chaser.callsign}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — vrilleden çıkamadı (manevra düşürmesi)`, chaser.team, 'kill');
+        this.log(L(`${chaser.callsign}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — vrilleden çıkamadı (manevra düşürmesi)`, `${chaser.callsign} shot down ${ac.callsign} (${ac.spec.abbr}) — could not recover from a spin (manoeuvre kill)`), chaser.team, 'kill');
         this.crash(ac, null);
         return;
       }
@@ -1744,7 +1763,7 @@ export class World {
       const team = att?.team ?? ac.lastHitTeam;
       this.creditKill(ac, att, team);
       const water = terrainHeight(ac.pos.x, ac.pos.z) < 0;
-      this.log(`${att?.callsign ?? 'Uçaksavar'}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — hasarlı uçak ${water ? 'denize' : 'yere'} düştü`, team, 'kill');
+      this.log(L(`${att?.callsign ?? 'Uçaksavar'}, ${ac.callsign} (${ac.spec.abbr}) uçağını düşürdü — hasarlı uçak ${water ? 'denize' : 'yere'} düştü`, `${att?.callsign ?? 'Flak'} shot down ${ac.callsign} (${ac.spec.abbr}) — the damaged aircraft fell ${water ? 'into the sea' : 'to the ground'}`), team, 'kill');
       this.crash(ac, null);
       return;
     }
@@ -1753,9 +1772,10 @@ export class World {
     // acemide daha olası; günlükte ayrı yazılır
     const fighting = !!(ac.brain.target || ac.brain.threat);
     const spun = ac.departure > 0 || this.time - ac.lastDepart < 10;
-    const reason = ac.brain.ops.mode === 'landing' ? 'iniş kazası yaptı'
-      : spun ? `alçakta vrilleden çıkamayıp ${water ? 'denize' : 'yere'} çakıldı (pilot hatası)`
-      : fighting ? `dalaşta ${water ? 'denize' : 'yere'} çakıldı (pilot hatası)` : water ? 'denize düştü' : 'yere çakıldı';
+    const reason = ac.brain.ops.mode === 'landing' ? L('iniş kazası yaptı', 'crashed on landing')
+      : spun ? L(`alçakta vrilleden çıkamayıp ${water ? 'denize' : 'yere'} çakıldı (pilot hatası)`, `spun in low ${water ? 'into the sea' : 'into the ground'} (pilot error)`)
+      : fighting ? L(`dalaşta ${water ? 'denize' : 'yere'} çakıldı (pilot hatası)`, `flew ${water ? 'into the sea' : 'into the ground'} in a dogfight (pilot error)`)
+      : water ? L('denize düştü', 'went down in the sea') : L('yere çakıldı', 'crashed into the ground');
     this.crash(ac, reason);
   }
 
@@ -1897,7 +1917,7 @@ export class World {
           const af = idle[Math.floor(Math.random() * idle.length)];
           s.airbase.removeAirframe(af);
           s.airbase.lostCount++;
-          this.log(`${s.name}: hangarda bir ${SPECS[af.specId].abbr} yok edildi`, team, 'strike');
+          this.log(L(`${s.name}: hangarda bir ${SPECS[af.specId].abbr} yok edildi`, `${s.name}: a ${SPECS[af.specId].abbr} destroyed in the hangar`), team, 'strike');
         }
       }
       this.damageStructure(s, dmg, source, team, flightId);
@@ -1925,17 +1945,17 @@ export class World {
     this.teams[team]?.research.award((before - s.hp) * 0.5);
     if (s.hp <= 0) {
       this.teams[team]?.research.award(250);
-      this.earn(team, Math.round(STRUCTURE_COST[s.kind] * STRUCTURE_REWARD), `Yıkılan düşman yapısı: ${s.def.name}`);
+      this.earn(team, Math.round(STRUCTURE_COST[s.kind] * STRUCTURE_REWARD), `${L('Yıkılan düşman yapısı', 'Enemy structure destroyed')}: ${s.def.name}`);
       this.events.push({ kind: 'structureDestroyed', id: s.id });
       s.repairing = false;
-      this.log(`${source}: ${s.name} imha edildi!`, team, 'strike');
+      this.log(L(`${source}: ${s.name} imha edildi!`, `${source}: ${s.name} destroyed!`), team, 'strike');
       if (s.factory) s.factory.queue.length = 0;
       return;
     }
     const last = this.hitLogTimes.get(s.id) ?? -1e9;
     if (this.time - last > 6) {
       this.hitLogTimes.set(s.id, this.time);
-      this.log(`${s.name} vuruldu (%${Math.round((s.hp / s.maxHp) * 100)} sağlam)`, team, 'strike');
+      this.log(L(`${s.name} vuruldu (%${Math.round((s.hp / s.maxHp) * 100)} sağlam)`, `${s.name} hit (${Math.round((s.hp / s.maxHp) * 100)}% intact)`), team, 'strike');
     }
   }
 

@@ -3,6 +3,7 @@
 // Misafir oyun kaydedilmez; sekme kapanınca ilerleme kaybolur.
 
 import type { SaveData } from './sim/save';
+import { L } from './i18n';
 
 const ACC_KEY = 'warsim.accounts.v1';
 const SESSION_KEY = 'warsim.session.v1';
@@ -16,6 +17,8 @@ export interface Account {
   key: string;
   created: number;
   lastLogin: number;
+  /** Öğretici "Oyuna başla"da sorulmasın ("Bir daha sorma"). */
+  noTutorial?: boolean;
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -33,6 +36,8 @@ export interface SaveMeta {
   structures: number;
   /** Harita (eski kayıtlarda yok). */
   mapId?: string;
+  /** Harita büyüklüğü (m; önceki kayıtlarda yok: 300 km). */
+  mapSize?: number;
   /** Kayıt biçimi sürümü. */
   v?: number;
 }
@@ -51,8 +56,8 @@ export function nameKey(n: string): string {
 /** Ad geçerli mi: 2–20 karakter, harf/rakam/boşluk/-/_ . */
 export function nameError(n: string): string | null {
   const c = cleanName(n);
-  if (c.length < NAME_MIN) return `En az ${NAME_MIN} karakter`;
-  if (!/^[\p{L}\p{N} _.-]+$/u.test(c)) return 'Yalnız harf, rakam, boşluk, - _ .';
+  if (c.length < NAME_MIN) return L(`En az ${NAME_MIN} karakter`, `At least ${NAME_MIN} characters`);
+  if (!/^[\p{L}\p{N} _.-]+$/u.test(c)) return L('Yalnız harf, rakam, boşluk, - _ .', 'Only letters, digits, spaces, - _ .');
   return null;
 }
 
@@ -86,6 +91,42 @@ export function currentAccount(): Account | null {
     session = null;
   }
   return session;
+}
+
+/** Misafirin "Bir daha sorma" tercihi (bu tarayıcıda). */
+const TUTORIAL_OFF_KEY = 'warsim.tutorial.off';
+
+/** Öğretici sorulmayacak mı: hesap açıksa hesabın tercihi, değilse bu tarayıcınınki. */
+export function tutorialPromptOff(): boolean {
+  const acc = currentAccount();
+  if (acc) return !!acc.noTutorial;
+  try {
+    return localStorage.getItem(TUTORIAL_OFF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setTutorialPromptOff(off: boolean): void {
+  const acc = currentAccount();
+  if (acc) {
+    const list = readAccounts();
+    const a = list.find((x) => x.key === acc.key);
+    if (a) {
+      if (off) a.noTutorial = true;
+      else delete a.noTutorial;
+      writeAccounts(list);
+    }
+    if (off) acc.noTutorial = true;
+    else delete acc.noTutorial;
+    return;
+  }
+  try {
+    if (off) localStorage.setItem(TUTORIAL_OFF_KEY, '1');
+    else localStorage.removeItem(TUTORIAL_OFF_KEY);
+  } catch {
+    /* depolama kapalı: yalnız bu oturum */
+  }
 }
 
 /** Aynı adla giriş; yoksa hesap oluşturulur. */
@@ -133,7 +174,7 @@ function db(): Promise<IDBDatabase> {
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => {
         dbp = null;
-        reject(req.error ?? new Error('Kayıt deposu açılamadı'));
+        reject(req.error ?? new Error(L('Kayıt deposu açılamadı', 'Could not open save storage')));
       };
     });
   }
@@ -143,15 +184,15 @@ function db(): Promise<IDBDatabase> {
 function done(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('Kayıt işlemi başarısız'));
-    tx.onabort = () => reject(tx.error ?? new Error('Kayıt işlemi iptal edildi'));
+    tx.onerror = () => reject(tx.error ?? new Error(L('Kayıt işlemi başarısız', 'Save operation failed')));
+    tx.onabort = () => reject(tx.error ?? new Error(L('Kayıt işlemi iptal edildi', 'Save operation was aborted')));
   });
 }
 
 function request<T>(r: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error ?? new Error('Kayıt okunamadı'));
+    r.onerror = () => reject(r.error ?? new Error(L('Kayıt okunamadı', 'Could not read the save')));
   });
 }
 
@@ -171,7 +212,7 @@ export async function writeSave(account: string, title: string, kind: SaveKind, 
     account, title, kind, created: Date.now(), gameTime: data.time, playerName: data.playerName,
     enemies: data.setup?.enemies ?? Math.max(0, data.teams.length - 1), money: Math.round(me?.money ?? 0),
     structures: data.structures.filter((s) => s.team === data.playerTeam && s.hp > 0).length,
-    mapId: data.mapId, v: data.v,
+    mapId: data.mapId, mapSize: data.mapSize, v: data.v,
   };
   const tx = d.transaction(['saves', 'blobs'], 'readwrite');
   tx.objectStore('saves').put(meta);
@@ -184,7 +225,7 @@ export async function readSave(id: string): Promise<SaveData> {
   const d = await db();
   const tx = d.transaction('blobs', 'readonly');
   const raw = await request(tx.objectStore('blobs').get(id) as IDBRequest<string | undefined>);
-  if (!raw) throw new Error('Kayıt bulunamadı');
+  if (!raw) throw new Error(L('Kayıt bulunamadı', 'Save not found'));
   return JSON.parse(raw) as SaveData;
 }
 

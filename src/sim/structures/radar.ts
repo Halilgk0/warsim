@@ -12,10 +12,11 @@ import type { World } from '../world';
 import type { Aircraft } from '../aircraft/aircraft';
 import { groundLevel, lineOfSight } from '../terrain';
 import { smoothstep } from '../../core/math';
+import { L } from '../../i18n';
 
 export const RADAR_LEVELS = {
-  1: { range: 80000, minAgl: 350, name: 'Erken ihbar radarı I' },
-  2: { range: 120000, minAgl: 120, name: 'Erken ihbar radarı II' },
+  1: { range: 80000, minAgl: 350, name: L('Erken ihbar radarı I', 'Early-warning radar I') },
+  2: { range: 120000, minAgl: 120, name: L('Erken ihbar radarı II', 'Early-warning radar II') },
 } as const;
 
 export class RadarSite {
@@ -40,7 +41,7 @@ export class RadarSite {
     if (!s.active) return;
     if (this.level === 1 && world.teams[s.team].research.has('radar_ew2')) {
       this.level = 2;
-      world.log(`${s.name}: radar II seviyesine yükseltildi`, s.team, 'defense');
+      world.log(L(`${s.name}: radar II seviyesine yükseltildi`, `${s.name}: upgraded to radar II`), s.team, 'defense');
     }
     this.angle += (dt * Math.PI * 2) / this.scanPeriod;
     this.scanTimer -= dt;

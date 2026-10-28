@@ -16,6 +16,7 @@ import type { Caliber } from './specs';
 import type { BeltDef } from './ammo';
 import type { HitZone } from './hitbox';
 import { clamp } from '../../core/math';
+import { L } from '../../i18n';
 
 export type DamagePart = 'structure' | 'engine' | 'controls' | 'wings' | 'fuel' | 'pilot';
 
@@ -207,15 +208,15 @@ export function applyHit(
       const before = dmg.engines[i];
       dmg.engines[i] = clamp(before + a * K.engine, 0, 1);
       ac.hp -= a * 0.45 * K.structure;
-      if (before < 1 && dmg.engines[i] >= 1) event = s.engines > 1 ? `${i + 1}. motor durdu` : 'motor durdu';
+      if (before < 1 && dmg.engines[i] >= 1) event = s.engines > 1 ? L(`${i + 1}. motor durdu`, `engine ${i + 1} out`) : L('motor durdu', 'engine out');
       // Çok motorlu uçağın motor yangın söndürücüsü vardır
       if (dmg.fire <= 0 && Math.random() < chance(a * K.engineFire * fireMul) * (s.engines > 1 ? 0.6 : 1)) {
         dmg.fire = 0.01;
         dmg.fireSource = 'engine';
-        event = 'motor yanıyor!';
+        event = L('motor yanıyor!', 'engine on fire!');
       } else if (s.engine.kind !== 'jet' && Math.random() < (s.engine.kind === 'inline' ? 0.45 : 0.15)) {
         // Sıvı soğutmalı motorun radyatörü tek mermiyle delinebilir; radyal motorda yağ hattı daha korunaklı
-        if (dmg.coolant <= 0) event = s.engine.kind === 'inline' ? 'radyatör delindi, soğutma sıvısı kaçırıyor' : 'yağ kaçırıyor';
+        if (dmg.coolant <= 0) event = s.engine.kind === 'inline' ? L('radyatör delindi, soğutma sıvısı kaçırıyor', 'radiator holed, losing coolant') : L('yağ kaçırıyor', 'losing oil');
         dmg.coolant += a * K.coolant;
       }
       break;
@@ -238,9 +239,9 @@ export function applyHit(
       else if (dmg.fire <= 0 && Math.random() < chance(a * K.fuelFire * seal * fireMul)) {
         dmg.fire = 0.01;
         dmg.fireSource = 'fuel';
-        event = 'yakıt deposu yanıyor!';
+        event = L('yakıt deposu yanıyor!', 'fuel tank on fire!');
       } else if (dmg.fuelLeak > 1.5 && dmg.fuelLeak - a * 0.15 * seal <= 1.5) {
-        event = 'yakıt sızdırıyor';
+        event = L('yakıt sızdırıyor', 'leaking fuel');
       }
       break;
     }
@@ -253,7 +254,7 @@ export function applyHit(
         const lethal = (caliber === 'cannon' ? 0.5 : 0.3) * crewed;
         if (dmg.pilot === 0 && Math.random() >= lethal) {
           dmg.pilot = 1;
-          event = s.crew >= 3 ? 'mürettebat yaralandı' : 'pilot yaralandı';
+          event = s.crew >= 3 ? L('mürettebat yaralandı', 'crew wounded') : L('pilot yaralandı', 'pilot wounded');
         } else if (dmg.pilot === 0 || Math.random() < 0.6 * crewed) {
           dmg.pilot = 2;
         }

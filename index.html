@@ -31,48 +31,49 @@
       <header id="topbar">
         <div class="brand">WarSimBox<span></span></div>
         <div class="timebar" id="timebar">
-          <button data-speed="0" title="Duraklat (Boşluk)">❚❚</button>
+          <button data-speed="0" title="Duraklat (Boşluk)" data-en-title="Pause (Space)">❚❚</button>
           <button data-speed="1" title="1">1×</button>
           <button data-speed="2" title="2">2×</button>
           <button data-speed="4" title="3">4×</button>
           <button data-speed="8" title="4">8×</button>
           <button data-speed="16" title="5">16×</button>
           <button data-speed="32" title="6">32×</button>
-          <span class="clock" id="clock">00:00</span>
+          <span class="clock" id="clock" title="Oyun süresi" data-en-title="Game time">00:00</span>
+          <span class="dayclock" id="dayclock" title="Günün saati (oyunda 48 dakikada bir gün)" data-en-title="Time of day (one day every 48 minutes in game)"></span>
         </div>
-        <div class="money-chip hidden" id="money-chip" title="Hazine ve pazar (M)"></div>
+        <div class="money-chip hidden" id="money-chip" title="Hazine ve pazar (M)" data-en-title="Treasury and market (M)"></div>
         <div class="research-chip" id="research-chip"></div>
         <div class="top-actions">
-          <button data-open="pause" title="Menü (Esc)">☰ Menü</button>
-          <button data-open="fullscreen" class="fs-btn" title="Tam ekran">⛶</button>
-          <button data-open="sound" class="snd-btn" title="Sesi kapat / aç (N)"></button>
-          <button data-open="scenarios">Senaryo</button>
-          <button data-open="market" title="M">Pazar</button>
-          <button data-open="build" title="B">İnşa</button>
-          <button data-open="research" title="T">Araştırma</button>
+          <button data-open="pause" title="Menü (Esc)" data-en-title="Menu (Esc)" data-en="☰ Menu">☰ Menü</button>
+          <button data-open="fullscreen" class="fs-btn" title="Tam ekran" data-en-title="Fullscreen">⛶</button>
+          <button data-open="sound" class="snd-btn" title="Sesi kapat / aç (N)" data-en-title="Mute / unmute (N)"></button>
+          <button data-open="scenarios" data-en="Scenarios">Senaryo</button>
+          <button data-open="market" title="M" data-en="Market">Pazar</button>
+          <button data-open="build" title="B" data-en="Build">İnşa</button>
+          <button data-open="research" title="T" data-en="Research">Araştırma</button>
           <button data-open="hangar" title="H">Hangar</button>
-          <button data-open="settings" title="Ses ve görünüm (V)">Ayarlar</button>
+          <button data-open="settings" title="Ses ve görünüm (V)" data-en-title="Sound and display (V)" data-en="Settings">Ayarlar</button>
         </div>
       </header>
 
       <aside id="left" class="panel"></aside>
-      <button id="left-toggle" class="side-toggle left" title="Sol paneli kapat">‹</button>
+      <button id="left-toggle" class="side-toggle left" title="Sol paneli kapat" data-en-title="Close left panel">‹</button>
       <aside id="planner" class="panel drawer hidden"></aside>
       <aside id="right" class="panel">
         <section class="rsec" data-sec="info">
-          <h3 class="rsec-h" data-toggle="info"><span>Seçim</span><i class="chev"></i></h3>
+          <h3 class="rsec-h" data-toggle="info"><span data-en="Selection">Seçim</span><i class="chev"></i></h3>
           <div id="info" class="rsec-b"></div>
         </section>
         <section class="rsec" data-sec="missions">
-          <h3 class="rsec-h" data-toggle="missions"><span>Aktif görevler</span><span id="mission-count" class="cnt"></span><i class="chev"></i></h3>
+          <h3 class="rsec-h" data-toggle="missions"><span data-en="Active missions">Aktif görevler</span><span id="mission-count" class="cnt"></span><i class="chev"></i></h3>
           <div id="missions" class="rsec-b"></div>
         </section>
         <section class="rsec" data-sec="log">
-          <h3 class="rsec-h" data-toggle="log"><span>Olaylar</span><i class="chev"></i></h3>
+          <h3 class="rsec-h" data-toggle="log"><span data-en="Events">Olaylar</span><i class="chev"></i></h3>
           <div id="log" class="rsec-b"></div>
         </section>
       </aside>
-      <button id="right-toggle" class="side-toggle right" title="Sağ paneli kapat">›</button>
+      <button id="right-toggle" class="side-toggle right" title="Sağ paneli kapat" data-en-title="Close right panel">›</button>
 
       <div id="buildbar" class="hidden"></div>
       <footer id="hint"></footer>
@@ -86,9 +87,30 @@
       <div id="news" class="news hidden"></div>
       <div id="feedback" class="fb hidden"></div>
       <div id="toast" class="toast hidden"></div>
-      <div id="rotate" class="rotate"><div><b>Telefonu yan çevir</b><span>WarSimBox yatay ekranda oynanır.</span></div></div>
-      <div id="loading" class="loading"><div><b>WarSimBox</b><span>Harita hazırlanıyor…</span></div></div>
+      <div id="rotate" class="rotate"><div><b data-en="Turn your phone sideways">Telefonu yan çevir</b><span data-en="WarSimBox is played in landscape.">WarSimBox yatay ekranda oynanır.</span></div></div>
+      <div id="loading" class="loading"><div><b>WarSimBox</b><span data-en="Preparing the map…">Harita hazırlanıyor…</span></div></div>
     </div>
+    <script>
+      // Oyun paketi inerken görünen yükleme ekranı ve yan çevir uyarısı da seçili dilde olsun (kural i18n.ts
+      // initial() ile aynı: ?lang, ?rec, warsim.lang, tarayıcının dili)
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var l = q.get('lang');
+        if (l !== 'tr' && l !== 'en') {
+          if (q.has('rec')) return;
+          try {
+            l = localStorage.getItem('warsim.lang');
+          } catch (e) {
+            l = null;
+          }
+          if (l !== 'tr' && l !== 'en') l = (navigator.language || 'tr').toLowerCase().indexOf('tr') === 0 ? 'tr' : 'en';
+        }
+        if (l !== 'en') return;
+        document.documentElement.lang = 'en';
+        document.querySelectorAll('[data-en]').forEach(function (e) { e.textContent = e.dataset.en; });
+        document.querySelectorAll('[data-en-title]').forEach(function (e) { e.title = e.dataset.enTitle; });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

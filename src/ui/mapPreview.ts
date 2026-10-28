@@ -1,6 +1,6 @@
 // Harita önizlemesi: haritanın doğal yükseklik fonksiyonundan küçük bir resim (arazi üretmeden, birkaç ms).
 
-import { MAP_SIZE } from '../sim/mapData';
+import { MAP_BASE } from '../sim/mapData';
 import type { MapDef } from '../sim/maps';
 
 const cache = new Map<string, string>();
@@ -31,11 +31,12 @@ export function mapPreview(def: MapDef, px = 120): string {
   c.height = px;
   const ctx = c.getContext('2d')!;
   const img = ctx.createImageData(px, px);
-  const half = MAP_SIZE / 2;
+  // Biçim her büyüklükte aynı: taban ölçekte çizilir
+  const half = MAP_BASE / 2;
   for (let j = 0; j < px; j++) {
     for (let i = 0; i < px; i++) {
-      const x = -half + ((i + 0.5) / px) * MAP_SIZE;
-      const z = -half + ((j + 0.5) / px) * MAP_SIZE;
+      const x = -half + ((i + 0.5) / px) * MAP_BASE;
+      const z = -half + ((j + 0.5) / px) * MAP_BASE;
       const [r, g, b] = color(def.natural(x, z));
       const o = (j * px + i) * 4;
       img.data[o] = r;

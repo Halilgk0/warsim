@@ -7,6 +7,8 @@ import { RHO0, sigma, soundSpeed } from '../atmosphere';
 import { dragAt, fuelFlowAt, inducedK, liftLimitG, stallSpeedAt, sustainableLoad, thrustAt, waveCd, type ThrustState } from './aero';
 import { G, clamp } from '../../core/math';
 import { BOMBS, ROCKETS, STORE_TABLE, buildLoadouts, familyOf, type Family, type Hardpoint } from './stores';
+import { EN, L, terms } from '../../i18n';
+import { DESC_EN, NAME_EN, ORIGIN_EN } from './specsEn';
 
 export type GenerationId = 'P1' | 'P2' | 'J1' | 'J2' | 'J3' | 'J4' | 'J45' | 'J5';
 export type Role = 'fighter' | 'diveBomber' | 'bomber' | 'attacker';
@@ -28,44 +30,52 @@ export interface GenerationInfo {
 
 export const GENERATIONS: GenerationInfo[] = [
   {
-    id: 'P1', label: 'P1', name: 'Erken pervaneli', era: '1936–1941', playable: true,
-    summary: 'Makineli tüfekler, ilk toplar ve gözle tespit. Dönüş savaşı, pike ve yatay bombardıman dönemi.',
-    tech: ['Sıra motor (V12)', 'Makineli bataryası', 'Pike freni', 'Savunma taretleri'],
+    id: 'P1', label: 'P1', name: L('Erken pervaneli', 'Early piston'), era: '1936–1941', playable: true,
+    summary: L('Makineli tüfekler, ilk toplar ve gözle tespit. Dönüş savaşı, pike ve yatay bombardıman dönemi.',
+      'Machine guns, the first cannon and visual spotting. The era of turn fights, dive bombing and level bombing.'),
+    tech: EN ? ['Inline engine (V12)', 'Machine-gun battery', 'Dive brakes', 'Defensive turrets'] : ['Sıra motor (V12)', 'Makineli bataryası', 'Pike freni', 'Savunma taretleri'],
   },
   {
-    id: 'P2', label: 'P2', name: 'Gelişmiş pervaneli', era: '1941–1945', playable: true,
-    summary: '2000 bg motorlar, iki kademeli süperşarj, acil güç, zırhlı taarruz uçakları ve roketler. Enerji taktiği öne çıkar.',
-    tech: ['İki kademeli süperşarj', 'Su-metanol enjeksiyonu', 'Zırh', 'Roket', 'Jiroskoplu nişangâh'],
+    id: 'P2', label: 'P2', name: L('Gelişmiş pervaneli', 'Late piston'), era: '1941–1945', playable: true,
+    summary: L('2000 bg motorlar, iki kademeli süperşarj, acil güç, zırhlı taarruz uçakları ve roketler. Enerji taktiği öne çıkar.',
+      '2000 hp engines, two-stage superchargers, emergency power, armoured attack aircraft and rockets. Energy tactics come to the fore.'),
+    tech: EN ? ['Two-stage supercharger', 'Water-methanol injection', 'Armour', 'Rockets', 'Gyro gunsight'] : ['İki kademeli süperşarj', 'Su-metanol enjeksiyonu', 'Zırh', 'Roket', 'Jiroskoplu nişangâh'],
   },
   {
-    id: 'J1', label: 'J1', name: '1. nesil jet', era: '1944–1955', playable: true,
-    summary: 'Turbojet ve ok kanat. Silah hâlâ yalnızca top; hız her şeydir. Erken jetlerde gaz tepkisi yavaştır.',
-    tech: ['Turbojet', 'Ok kanat', 'Radar telemetreli nişangâh', 'Fırlatma koltuğu'],
+    id: 'J1', label: 'J1', name: L('1. nesil jet', '1st-gen jet'), era: '1944–1955', playable: true,
+    summary: L('Turbojet ve ok kanat. Silah hâlâ yalnızca top; hız her şeydir. Erken jetlerde gaz tepkisi yavaştır.',
+      'Turbojets and swept wings. Guns are still the only weapon; speed is everything. Early jets respond slowly to the throttle.'),
+    tech: EN ? ['Turbojet', 'Swept wing', 'Radar-ranging gunsight', 'Ejection seat'] : ['Turbojet', 'Ok kanat', 'Radar telemetreli nişangâh', 'Fırlatma koltuğu'],
   },
   {
-    id: 'J2', label: 'J2', name: '2. nesil jet', era: '1955–1965', playable: false,
-    summary: 'Süpersonik hız, ilk ısı güdümlü füzeler (yalnız arka sektör), basit menzil radarı.',
-    tech: ['Art yakıcı', 'IR füze (arka sektör)', 'Menzil radarı'],
+    id: 'J2', label: 'J2', name: L('2. nesil jet', '2nd-gen jet'), era: '1955–1965', playable: false,
+    summary: L('Süpersonik hız, ilk ısı güdümlü füzeler (yalnız arka sektör), basit menzil radarı.',
+      'Supersonic speed, the first heat-seeking missiles (rear aspect only), a simple ranging radar.'),
+    tech: EN ? ['Afterburner', 'IR missile (rear aspect)', 'Ranging radar'] : ['Art yakıcı', 'IR füze (arka sektör)', 'Menzil radarı'],
   },
   {
-    id: 'J3', label: 'J3', name: '3. nesil jet', era: '1965–1975', playable: false,
-    summary: 'Yarı aktif radar güdümlü füzelerle görüş ötesi çatışma. Füze vurana kadar radar kilidi korunmalı.',
-    tech: ['SARH füze', 'Darbeli radar', 'Radar ikaz alıcısı'],
+    id: 'J3', label: 'J3', name: L('3. nesil jet', '3rd-gen jet'), era: '1965–1975', playable: false,
+    summary: L('Yarı aktif radar güdümlü füzelerle görüş ötesi çatışma. Füze vurana kadar radar kilidi korunmalı.',
+      'Beyond-visual-range combat with semi-active radar missiles. The radar lock must be held until the missile hits.'),
+    tech: EN ? ['SARH missile', 'Pulse radar', 'Radar warning receiver'] : ['SARH füze', 'Darbeli radar', 'Radar ikaz alıcısı'],
   },
   {
-    id: 'J4', label: 'J4', name: '4. nesil jet', era: '1975–1990', playable: false,
-    summary: 'Yüksek manevra, aşağı bakabilen darbeli-doppler radar, her açıdan IR füze, chaff ve flare.',
-    tech: ['Darbeli-doppler radar', 'Her açıdan IR', 'Fly-by-wire', 'Chaff / flare'],
+    id: 'J4', label: 'J4', name: L('4. nesil jet', '4th-gen jet'), era: '1975–1990', playable: false,
+    summary: L('Yüksek manevra, aşağı bakabilen darbeli-doppler radar, her açıdan IR füze, chaff ve flare.',
+      'High agility, look-down pulse-Doppler radar, all-aspect IR missiles, chaff and flares.'),
+    tech: EN ? ['Pulse-Doppler radar', 'All-aspect IR', 'Fly-by-wire', 'Chaff / flare'] : ['Darbeli-doppler radar', 'Her açıdan IR', 'Fly-by-wire', 'Chaff / flare'],
   },
   {
-    id: 'J45', label: 'J4.5', name: '4.5 nesil jet', era: '1990–2005', playable: false,
-    summary: 'Aktif radar güdümlü ateşle-unut füzeler, AESA radar, veri bağı, kanard tasarımlar.',
-    tech: ['ARH füze', 'AESA', 'Veri bağı'],
+    id: 'J45', label: 'J4.5', name: L('4.5 nesil jet', '4.5-gen jet'), era: '1990–2005', playable: false,
+    summary: L('Aktif radar güdümlü ateşle-unut füzeler, AESA radar, veri bağı, kanard tasarımlar.',
+      'Fire-and-forget active radar missiles, AESA radar, data links, canard designs.'),
+    tech: EN ? ['ARH missile', 'AESA', 'Data link'] : ['ARH füze', 'AESA', 'Veri bağı'],
   },
   {
-    id: 'J5', label: 'J5', name: '5. nesil jet', era: '2005+', playable: false,
-    summary: 'Düşük radar izi, süper seyir ve sensör füzyonu. Önce gören, önce vurur.',
-    tech: ['Düşük radar izi', 'Süper seyir', 'Sensör füzyonu'],
+    id: 'J5', label: 'J5', name: L('5. nesil jet', '5th-gen jet'), era: '2005+', playable: false,
+    summary: L('Düşük radar izi, süper seyir ve sensör füzyonu. Önce gören, önce vurur.',
+      'Low observability, supercruise and sensor fusion. Whoever sees first, shoots first.'),
+    tech: EN ? ['Low observability', 'Supercruise', 'Sensor fusion'] : ['Düşük radar izi', 'Süper seyir', 'Sensör füzyonu'],
   },
 ];
 
@@ -77,8 +87,8 @@ export const GENERATIONS: GenerationInfo[] = [
 export type GunMount = 'wing' | 'root' | 'cowl' | 'nose' | 'hub' | 'pod';
 
 export const MOUNT_NAMES: Record<GunMount, string> = {
-  wing: 'kanat', root: 'kanat kökü, senkronize', cowl: 'motor kaputu, senkronize', nose: 'burun', hub: 'pervane göbeği',
-  pod: 'gondol',
+  wing: L('kanat', 'wing'), root: L('kanat kökü, senkronize', 'wing root, synchronised'), cowl: L('motor kaputu, senkronize', 'cowling, synchronised'),
+  nose: L('burun', 'nose'), hub: L('pervane göbeği', 'propeller hub'), pod: L('gondol', 'pod'),
 };
 
 /** Senkronize silahın atış hızı çarpanı. */
@@ -375,7 +385,8 @@ function gun(type: keyof typeof GT, count: number, rpg: number, mount: GunMount 
   const rps = (count * t.rpm * (sync ? SYNC_RATE : 1)) / 60;
   const k = Math.max(1, Math.ceil(rps / (t.caliber === 'cannon' ? 12 : 16)));
   return {
-    name: `${count > 1 ? `${count} × ` : ''}${t.name} (${MOUNT_NAMES[mount]})`,
+    // İngilizcede ondalık nokta: "7,7 mm" → "7.7 mm" (baştaki "N × " sesler için okunuyor, değişmez)
+    name: `${count > 1 ? `${count} × ` : ''}${EN ? t.name.replace(/(\d),(\d)/g, '$1.$2') : t.name} (${MOUNT_NAMES[mount]})`,
     caliber: t.caliber,
     mount,
     x,
@@ -390,8 +401,41 @@ function gun(type: keyof typeof GT, count: number, rpg: number, mount: GunMount 
 }
 
 function turret(name: string, offset: [number, number, number], yaw: number, yawHalf: number, pitch: [number, number], g: GunSpec, power = false): TurretSpec {
-  return { name, offset, yaw, yawHalf, pitchMin: pitch[0], pitchMax: pitch[1], gun: g, power };
+  return { name: turretName(name), offset, yaw, yawHalf, pitchMin: pitch[0], pitchMax: pitch[1], gun: g, power };
 }
+
+/** Taret adları İngilizcede (uzun ifadeler önce). */
+const turretName = terms([
+  ['Burun altı', 'Under-nose'],
+  ['Arka karın', 'Rear ventral'],
+  ['Arka nişancı', 'Rear gunner'],
+  ['Arka sırt', 'Rear dorsal'],
+  ['Karın gondolu', 'Ventral gondola'],
+  ['Kokpit arkası', 'Behind cockpit'],
+  ['Küre taret', 'Ball turret'],
+  ['Sırt taret', 'Top turret'],
+  ['Ön karın', 'Front ventral'],
+  ['Ön sırt', 'Front dorsal'],
+  ['Sağ yanak', 'Right cheek'],
+  ['Sol yanak', 'Left cheek'],
+  ['Sağ bel', 'Right waist'],
+  ['Sol bel', 'Left waist'],
+  ['Sağ yan', 'Right side'],
+  ['Sol yan', 'Left side'],
+  ['Telsizci', 'Radio operator'],
+  ['Burun', 'Nose'],
+  ['Karın', 'Ventral'],
+  ['Kuyruk', 'Tail'],
+  ['Sırt', 'Dorsal'],
+  ['Çene', 'Chin'],
+  ['geriye', 'rearward'],
+  ['uzaktan', 'remote'],
+  ['dörtlü', 'quad'],
+  ['çift', 'twin'],
+]);
+
+/** Ülke adı (ekranda). Veride Türkçe ad anahtar olarak kalır (mühimmat ailesi, işaretler). */
+export const originName = (o: string): string => (EN ? ORIGIN_EN[o] ?? o : o);
 
 const STD: LegacyLoadout = { id: 'std', name: 'Standart', drag: 0 };
 const tank = (kg: number, req = 'drop_tanks', name = 'Atılabilir yakıt tankı', id = 'tank'): LegacyLoadout => ({
@@ -1281,8 +1325,8 @@ const LENGTHS: Record<string, number> = {
 function derive(dd: AircraftDef): AircraftSpec {
   const ab = !!dd.engine.abKn;
   const s: AircraftSpec = {
-    id: dd.id, name: dd.name, abbr: dd.abbr, origin: dd.origin, year: dd.year, generation: dd.generation, role: dd.role,
-    model: dd.model, description: dd.description, hp: dd.hp, size: Math.max(4.5, dd.span * 0.48), length: LENGTHS[dd.id] ?? dd.span * 0.85, armor: dd.armor,
+    id: dd.id, name: EN ? NAME_EN[dd.id] ?? dd.name : dd.name, abbr: dd.abbr, origin: dd.origin, year: dd.year, generation: dd.generation, role: dd.role,
+    model: dd.model, description: EN ? DESC_EN[dd.id] ?? dd.description : dd.description, hp: dd.hp, size: Math.max(4.5, dd.span * 0.48), length: LENGTHS[dd.id] ?? dd.span * 0.85, armor: dd.armor,
     crew: dd.crew, engines: dd.engine.count, engine: dd.engine, massEmpty: dd.massEmpty, fuelKg: dd.fuelKg,
     wingArea: dd.wingArea, span: dd.span, clMax: dd.clMax, oswald: dd.oswald ?? 0.8, cd0: 0.02,
     cdWave: dd.cdWave ?? 0.12, mcrit: dd.mcrit, machTuck: dd.machTuck ?? 0.6, vne: kmh(dd.vneKmh), nMax: dd.nMax,
@@ -1382,16 +1426,16 @@ export const SPEC_LIST: readonly AircraftSpec[] = LIST;
 export const SPECS: Record<string, AircraftSpec> = Object.fromEntries(LIST.map((s) => [s.id, s]));
 
 export const ROLE_NAMES: Record<Role, string> = {
-  fighter: 'Avcı',
-  diveBomber: 'Pike bombardıman',
-  bomber: 'Bombardıman',
-  attacker: 'Taarruz',
+  fighter: L('Avcı', 'Fighter'),
+  diveBomber: L('Pike bombardıman', 'Dive bomber'),
+  bomber: L('Bombardıman', 'Bomber'),
+  attacker: L('Taarruz', 'Attacker'),
 };
 
 export const ENGINE_NAMES: Record<EngineKind, string> = {
-  inline: 'Sıra motor (sıvı soğutmalı)',
-  radial: 'Radyal motor (hava soğutmalı)',
-  jet: 'Turbojet',
+  inline: L('Sıra motor (sıvı soğutmalı)', 'Inline engine (liquid-cooled)'),
+  radial: L('Radyal motor (hava soğutmalı)', 'Radial engine (air-cooled)'),
+  jet: L('Turbojet', 'Turbojet'),
 };
 
 export function generationInfo(id: GenerationId): GenerationInfo {

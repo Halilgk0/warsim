@@ -3,8 +3,11 @@
 
 import { $, esc } from './dom';
 import { SOUND_CREDITS } from '../audio/credits';
+import { EN, L } from '../i18n';
+import { NEWS_EN } from './newsEn';
+import { socialLinks } from './social';
 
-interface NewsSection {
+export interface NewsSection {
   heading?: string;
   text?: string[];
   bullets?: string[];
@@ -26,7 +29,43 @@ export interface NewsItem {
 const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 
 /** En yeni en üstte. */
-export const NEWS: NewsItem[] = [
+const NEWS_TR: NewsItem[] = [
+  {
+    id: 'ingilizce',
+    date: '2026-10-28',
+    title: 'Artık İngilizce de var',
+    summary: 'Ana menüdeki EN | TR düğmesiyle oyunu tek dokunuşla İngilizceye ya da Türkçeye çevir.',
+    cover: img('dil.jpg'),
+    images: [{ src: img('dil-menu.jpg'), caption: 'Ana menünün sağ üstündeki EN | TR düğmesi: koyu taraf seçili dili gösterir.' }],
+    sections: [
+      {
+        text: [
+          'WarSimBox artık İngilizce de oynanabiliyor. Ana menünün sağ üstündeki EN | TR düğmesine bir kez dokun: koyu taraf öbür dile kayar, pankart çeken küçük bir uçak ekrandan geçer ve oyun yeni dille açılır.',
+        ],
+      },
+      {
+        heading: 'Neler çevrildi',
+        bullets: [
+          'Menüler, paneller, görev planlayıcı, araştırma ağacı, pazar, inşa ve ayarlar.',
+          'Uçakların açıklamaları, hangardaki veriler, senaryolar, haritalar ve haberler.',
+          'Olay günlüğü ve uçakların o anda ne yaptığını anlatan yazılar (“Defensive: break turn” gibi).',
+          'Sayılar ve birimler dile göre yazılır: İngilizcede 40%, 7.7 mm, 25,000 kr.',
+        ],
+      },
+      {
+        heading: 'Bilmekte fayda var',
+        bullets: [
+          'Oyun ilk açılışta tarayıcının diline göre başlar; seçtiğin dil bu cihazda hatırlanır.',
+          'Dil yalnız ana menüden değişir. Oyun sürerken değiştirmek istersen önce kaydet, sonra ana menüye dön.',
+          'Eski kayıtlarda yapı adları ve geçmiş olaylar kaydedildikleri dilde kalır; yeni harekât seçtiğin dille başlar.',
+        ],
+      },
+      {
+        heading: 'Ayrıca',
+        bullets: ['Dizüstü ekranlarda (1280–1600 px) üst çubuk artık taşmıyor, düğme yazıları iki satıra kırılmıyor.'],
+      },
+    ],
+  },
   {
     id: 'sesler',
     date: '2026-10-22',
@@ -338,7 +377,18 @@ export const NEWS: NewsItem[] = [
   },
 ];
 
-const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+/** Geçerli dildeki haberler (İngilizcesi newsEn.ts'te; görsel ve tarih ortak). */
+export const NEWS: NewsItem[] = EN
+  ? NEWS_TR.map((n) => {
+    const t = NEWS_EN[n.id];
+    if (!t) return n;
+    return { ...n, title: t.title, summary: t.summary, sections: t.sections, images: n.images.map((g, i) => ({ ...g, caption: t.captions?.[i] ?? g.caption })) };
+  })
+  : NEWS_TR;
+
+const MONTHS = EN
+  ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  : ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 function fmtDate(d: string): string {
   const [y, m, day] = d.split('-').map(Number);
@@ -403,7 +453,7 @@ export class NewsView {
   }
 
   private list(): string {
-    return `<div class="news-head"><h2>Haberler</h2><button class="icon" data-nw="close" title="Kapat (Esc)">✕</button></div>
+    return `<div class="news-head"><h2>${L('Haberler', 'News')}</h2>${socialLinks(true)}<button class="icon" data-nw="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
       <div class="news-list">${NEWS.map((n) => newsCard(n, `data-nw="open" data-id="${n.id}"`)).join('')}</div>`;
   }
 
@@ -414,7 +464,7 @@ export class NewsView {
       ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
       ${s.links ? `<ul class="news-links">${s.links.map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}`).join('');
     const gallery = n.images.map((g) => `<figure><img src="${g.src}" alt="" loading="lazy"><figcaption>${esc(g.caption)}</figcaption></figure>`).join('');
-    return `<div class="news-head"><button class="news-back" data-nw="back">‹ Haberler</button><button class="icon" data-nw="close" title="Kapat (Esc)">✕</button></div>
+    return `<div class="news-head"><button class="news-back" data-nw="back">‹ ${L('Haberler', 'News')}</button><button class="icon" data-nw="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
       <article class="news-article">
         <img class="news-hero" src="${n.cover}" alt="">
         <div class="news-date">${fmtDate(n.date)}</div>

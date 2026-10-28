@@ -3,6 +3,7 @@ import type { AircraftSpec, Loadout } from '../aircraft/specs';
 import { loadoutAllowed } from '../aircraft/stores';
 import type { BeltId } from '../aircraft/ammo';
 import type { FormationType } from './formation';
+import { L } from '../../i18n';
 
 export type MissionType = 'cap' | 'sweep' | 'intercept' | 'escort' | 'levelBomb' | 'diveBomb' | 'attack' | 'ferry';
 export type Roe = 'free' | 'defensive' | 'avoid';
@@ -20,8 +21,8 @@ export type SpeedSetting = 'eco' | 'cruise' | 'max';
 export type FlightTask = 'auto' | 'fighters' | 'bombers' | 'flak' | 'close' | 'free';
 
 export const TASK_NAMES: Record<FlightTask, string> = {
-  auto: 'otomatik', fighters: 'eskort avcılarına', bombers: 'bombardıman uçaklarına', flak: 'uçaksavar bastırma',
-  close: 'yakın eskort', free: 'serbest avcı',
+  auto: L('otomatik', 'automatic'), fighters: L('eskort avcılarına', 'vs escort fighters'), bombers: L('bombardıman uçaklarına', 'vs bombers'),
+  flak: L('uçaksavar bastırma', 'flak suppression'), close: L('yakın eskort', 'close escort'), free: L('serbest avcı', 'free hunt'),
 };
 
 /** Görev türüne göre dağılım: "side" sayıdaki uçak ikincil işe, kalanı birincil işe. */
@@ -33,35 +34,59 @@ export interface TaskSplit {
   help: string;
 }
 
+const TO_BOMBERS: TaskSplit = {
+  main: 'fighters', side: 'bombers', label: L('Bombardımana', 'Vs bombers'),
+  help: L(
+    'Seçilen sayıda uçak bombardıman ve taarruz uçaklarına gider (yalnız kendine saldıranla çatışır); kalanı eskort avcılarını bağlar ve onları korur.',
+    'The chosen number of aircraft go for bombers and attackers (fighting only those that attack them); the rest tie up the escort fighters and cover them.',
+  ),
+};
+
 export const TASK_SPLIT: Partial<Record<MissionType, TaskSplit>> = {
-  cap: { main: 'fighters', side: 'bombers', label: 'Bombardımana', help: 'Seçilen sayıda uçak bombardıman ve taarruz uçaklarına gider (yalnız kendine saldıranla çatışır); kalanı eskort avcılarını bağlar ve onları korur.' },
-  sweep: { main: 'fighters', side: 'bombers', label: 'Bombardımana', help: 'Seçilen sayıda uçak bombardıman ve taarruz uçaklarına gider (yalnız kendine saldıranla çatışır); kalanı eskort avcılarını bağlar ve onları korur.' },
-  intercept: { main: 'fighters', side: 'bombers', label: 'Bombardımana', help: 'Seçilen sayıda uçak bombardıman ve taarruz uçaklarına gider (yalnız kendine saldıranla çatışır); kalanı eskort avcılarını bağlar ve onları korur.' },
-  escort: { main: 'free', side: 'close', label: 'Yakın eskort', help: 'Yakın eskort korunan kolun yanından ayrılmaz, yalnız ona saldıranla çatışır; kalanı serbest avcı olarak kola yaklaşan her düşman avcıya saldırır.' },
-  attack: { main: 'auto', side: 'flak', label: 'Uçaksavar bastırma', help: 'Seçilen sayıda uçak önce hedefin çevresindeki (3,5 km) uçaksavar bataryalarına saldırır; kalanı asıl hedefe.' },
-  diveBomb: { main: 'auto', side: 'flak', label: 'Uçaksavar bastırma', help: 'Seçilen sayıda uçak önce hedefin çevresindeki (3,5 km) uçaksavar bataryalarına dalar; kalanı asıl hedefe.' },
+  cap: TO_BOMBERS,
+  sweep: TO_BOMBERS,
+  intercept: TO_BOMBERS,
+  escort: { main: 'free', side: 'close', label: L('Yakın eskort', 'Close escort'), help: L(
+    'Yakın eskort korunan kolun yanından ayrılmaz, yalnız ona saldıranla çatışır; kalanı serbest avcı olarak kola yaklaşan her düşman avcıya saldırır.',
+    'Close escorts never leave the escorted flight and fight only what attacks it; the rest hunt freely, attacking every enemy fighter that approaches.',
+  ) },
+  attack: { main: 'auto', side: 'flak', label: L('Uçaksavar bastırma', 'Flak suppression'), help: L(
+    'Seçilen sayıda uçak önce hedefin çevresindeki (3,5 km) uçaksavar bataryalarına saldırır; kalanı asıl hedefe.',
+    'The chosen number of aircraft first attack the flak batteries around the target (3.5 km); the rest go for the main target.',
+  ) },
+  diveBomb: { main: 'auto', side: 'flak', label: L('Uçaksavar bastırma', 'Flak suppression'), help: L(
+    'Seçilen sayıda uçak önce hedefin çevresindeki (3,5 km) uçaksavar bataryalarına dalar; kalanı asıl hedefe.',
+    'The chosen number of aircraft first dive on the flak batteries around the target (3.5 km); the rest go for the main target.',
+  ) },
 };
 
 export const MISSION_NAMES: Record<MissionType, string> = {
-  cap: 'Hava devriyesi',
-  sweep: 'Avcı taraması',
-  intercept: 'Önleme',
-  escort: 'Eskort',
-  levelBomb: 'Yatay bombardıman',
-  diveBomb: 'Pike bombardımanı',
-  attack: 'Taarruz (alçak irtifa)',
-  ferry: 'Üs transferi',
+  cap: L('Hava devriyesi', 'Combat air patrol'),
+  sweep: L('Avcı taraması', 'Fighter sweep'),
+  intercept: L('Önleme', 'Intercept'),
+  escort: L('Eskort', 'Escort'),
+  levelBomb: L('Yatay bombardıman', 'Level bombing'),
+  diveBomb: L('Pike bombardımanı', 'Dive bombing'),
+  attack: L('Taarruz (alçak irtifa)', 'Ground attack (low level)'),
+  ferry: L('Üs transferi', 'Ferry'),
 };
 
 export const MISSION_DESCS: Record<MissionType, string> = {
-  cap: 'Bir bölgenin üzerinde daire çizer, bölgeye giren düşmanla çatışır, süre dolunca döner.',
-  sweep: 'Hedef bölgeye gidip gördüğü her düşmanı avlar. Eskortsuz bombardıman uçaklarını avlamak için.',
-  intercept: 'Seçilen düşman uçağına ve koluna en kısa yoldan, tam güçle yönelir. Radar ya da gözcüler izledikçe rota güncellenir; iz kaybolursa son görülen yerde arar.',
-  escort: 'Dost bir kolu korur: ona yaklaşan avcılara saldırır ama uzağa kovalamaz. İrtifa ve rota korunan koldan alınır.',
-  levelBomb: 'Başlangıç noktasından (IP) düz ve sabit bombardıman koşusu. Kol liderin bıraktığı anda bırakır.',
-  diveBomb: 'Sırayla dik dalış: tek hedefe yüksek isabet. Uçaksavara karşı açıktır.',
-  attack: 'Alçaktan sızma, yükselip sığ dalışla roket, top ve bombalarla birden çok geçiş.',
-  ferry: 'Uçakları başka bir dost hava üssüne taşır.',
+  cap: L('Bir bölgenin üzerinde daire çizer, bölgeye giren düşmanla çatışır, süre dolunca döner.',
+    'Circles over an area, engages any enemy that enters it and returns when time is up.'),
+  sweep: L('Hedef bölgeye gidip gördüğü her düşmanı avlar. Eskortsuz bombardıman uçaklarını avlamak için.',
+    'Flies to the target area and hunts every enemy it sees. Good for catching unescorted bombers.'),
+  intercept: L('Seçilen düşman uçağına ve koluna en kısa yoldan, tam güçle yönelir. Radar ya da gözcüler izledikçe rota güncellenir; iz kaybolursa son görülen yerde arar.',
+    'Heads for the chosen enemy aircraft and its flight by the shortest route at full power. The course updates while radar or observers track it; if the track is lost, it searches where the enemy was last seen.'),
+  escort: L('Dost bir kolu korur: ona yaklaşan avcılara saldırır ama uzağa kovalamaz. İrtifa ve rota korunan koldan alınır.',
+    'Protects a friendly flight: attacks fighters that approach it but does not chase far. Altitude and route follow the escorted flight.'),
+  levelBomb: L('Başlangıç noktasından (IP) düz ve sabit bombardıman koşusu. Kol liderin bıraktığı anda bırakır.',
+    'A straight, steady bomb run from the initial point (IP). The flight releases when the leader does.'),
+  diveBomb: L('Sırayla dik dalış: tek hedefe yüksek isabet. Uçaksavara karşı açıktır.',
+    'Steep dives one after another: high accuracy on a single target. Exposed to flak.'),
+  attack: L('Alçaktan sızma, yükselip sığ dalışla roket, top ve bombalarla birden çok geçiş.',
+    'Low-level ingress, then pop-up and shallow dives for several passes with rockets, cannon and bombs.'),
+  ferry: L('Uçakları başka bir dost hava üssüne taşır.', 'Moves aircraft to another friendly airbase.'),
 };
 
 /** Görev simgeleri (arayüz). */

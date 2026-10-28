@@ -13,6 +13,7 @@ import { clamp, gauss } from '../../core/math';
 import { headingWithAlt } from './nav';
 import { predictImpact } from './strike';
 import { flakWeave } from './aaEvade';
+import { L } from '../../i18n';
 
 const _i = new Vector3();
 const _aim = new Vector3();
@@ -31,7 +32,7 @@ export function bombRunLeader(ac: Aircraft, brain: Brain, world: World, cmd: Fly
     const agl = Math.max(ac.pos.y - gt.pos.y, 800);
     const sigma = 75 * (agl / 4000) * ac.mods.bombsightMul * ac.mods.strikeAimMul;
     fl.bomb.aimOffset.set(gauss() * sigma, 0, gauss() * sigma);
-    world.log(`${fl.name} bombardıman koşusuna başladı: ${gt.name}`, ac.team, 'strike');
+    world.log(L(`${fl.name} bombardıman koşusuna başladı: ${gt.name}`, `${fl.name} began its bomb run: ${gt.name}`), ac.team, 'strike');
   }
   const fhx = ac.fwd.x;
   const fhz = ac.fwd.z;
@@ -48,7 +49,7 @@ export function bombRunLeader(ac: Aircraft, brain: Brain, world: World, cmd: Fly
       flakWeave(ac, world, cmd.dir);
     }
     cmd.maxG = 1.8;
-    brain.status = 'Bombalar atıldı: hedeften çıkış';
+    brain.status = L('Bombalar atıldı: hedeften çıkış', 'Bombs away: egressing');
     return;
   }
   _aim.copy(gt.pos).add(fl.bomb.aimOffset);
@@ -75,11 +76,11 @@ export function bombRunLeader(ac: Aircraft, brain: Brain, world: World, cmd: Fly
   cmd.turnGain = 1;
   const bombs = ac.bombCount;
   const stickHalf = (bombs * STICK_INTERVAL * ac.speed) / 2;
-  brain.status = `Bombardıman koşusu: ${Math.round(Math.max(along, 0))} m · yanal ${Math.round(cross)} m`;
+  brain.status = `${L('Bombardıman koşusu', 'Bomb run')}: ${Math.round(Math.max(along, 0))} m · ${L('yanal', 'cross')} ${Math.round(cross)} m`;
   if (along <= stickHalf && distAim < reach) {
     fl.bomb.released = true;
     fl.bomb.releaseTime = t;
-    world.log(`${fl.name}: "Bombalar bırakılıyor!"`, ac.team, 'strike');
+    world.log(L(`${fl.name}: "Bombalar bırakılıyor!"`, `${fl.name}: "Bombs away!"`), ac.team, 'strike');
   }
 }
 

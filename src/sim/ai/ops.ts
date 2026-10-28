@@ -12,6 +12,7 @@ import { RUNWAY_HALF } from '../structures/airbase';
 import { groundLevel } from '../terrain';
 import { DEG, clamp } from '../../core/math';
 import { orbitDir } from './nav';
+import { L } from '../../i18n';
 
 export type OpsMode = 'none' | 'takeoff' | 'climbout' | 'landing';
 export type LandingStage = 'hold' | 'toIaf' | 'final' | 'flare' | 'rollout';
@@ -44,14 +45,14 @@ export function groundUpdate(ac: Aircraft, brain: Brain, world: World, dt: numbe
     c.brake = false;
     const vr = rotateSpeed(ac);
     stepGround(ac, dt, ac.speed > vr * 0.92);
-    brain.status = `Kalkış koşusu: ${Math.round(ac.speed * 3.6)} km/sa`;
+    brain.status = `${L('Kalkış koşusu', 'Takeoff roll')}: ${Math.round(ac.speed * 3.6)} km/${L('sa', 'h')}`;
     if (ac.speed >= vr) {
       ac.onGround = false;
       ac.pos.y += 0.6;
       ac.setAttitude(ac.groundHeading / DEG, 7);
       ac.n = 1;
       ops.mode = 'climbout';
-      brain.status = 'Kalkış: ilk tırmanış';
+      brain.status = L('Kalkış: ilk tırmanış', 'Takeoff: initial climb');
     }
     return;
   }
@@ -59,7 +60,7 @@ export function groundUpdate(ac: Aircraft, brain: Brain, world: World, dt: numbe
   c.throttle = 0;
   c.brake = ac.speed < 45;
   stepGround(ac, dt, false);
-  brain.status = `İniş koşusu: ${Math.round(ac.speed * 3.6)} km/sa`;
+  brain.status = `${L('İniş koşusu', 'Landing roll')}: ${Math.round(ac.speed * 3.6)} km/${L('sa', 'h')}`;
   if (ac.speed < 2.5) {
     const base = world.airbaseById(ops.baseId);
     if (base) world.recover(ac, base);
@@ -74,7 +75,7 @@ export function climbout(ac: Aircraft, brain: Brain, cmd: FlyCommand): void {
   cmd.speed = null;
   cmd.maxG = 2;
   cmd.minAlt = 40;
-  brain.status = 'Kalkış: ilk tırmanış';
+  brain.status = L('Kalkış: ilk tırmanış', 'Takeoff: initial climb');
   const agl = ac.pos.y - groundLevel(ac.pos.x, ac.pos.z);
   if (agl > 220) brain.ops.mode = 'none';
 }
@@ -88,7 +89,7 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
     if (alt && alt !== base) {
       base?.cancelLanding(ac.id);
       brain.beginLanding(alt);
-      world.log(`${ac.callsign}: üs kullanılamıyor, ${alt.s.name} üssüne yöneliyor`, ac.team, 'ops');
+      world.log(L(`${ac.callsign}: üs kullanılamıyor, ${alt.s.name} üssüne yöneliyor`, `${ac.callsign}: base unusable, diverting to ${alt.s.name}`), ac.team, 'ops');
       return;
     }
     if (!base) {
@@ -127,7 +128,7 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       orbitDir(cmd.dir, ac, _hold, 1800, base.holdAltitude(ops.queue - 1));
       cmd.speed = s.cruiseSpeed * 0.8;
       cmd.maxG = 2.2;
-      brain.status = `Bekleme paterni: iniş sırası ${ops.queue}`;
+      brain.status = `${L('Bekleme paterni: iniş sırası', 'Holding pattern: landing order')} ${ops.queue}`;
       break;
     }
     case 'toIaf': {
@@ -146,7 +147,7 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       }
       const aligned = ac.fwd.x * dx + ac.fwd.z * dz > 0.92;
       const dIaf = Math.hypot(_iaf.x - ac.pos.x, _iaf.z - ac.pos.z);
-      brain.status = `Yaklaşma: ilk yaklaşma noktasına ${(dIaf / 1000).toFixed(1)} km`;
+      brain.status = L(`Yaklaşma: ilk yaklaşma noktasına ${(dIaf / 1000).toFixed(1)} km`, `Approach: ${(dIaf / 1000).toFixed(1)} km to the initial approach fix`);
       const onLine = aligned && along < -1800 && along > -plan.finalDist - 2500 && Math.abs(cross) < 300;
       const altOk = Math.abs(ac.pos.y - iafAlt) < 300;
       if ((dIaf < 1000 || onLine) && altOk) ops.stage = 'final';
@@ -154,7 +155,7 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
         // Çok yüksek ya da alçak: ilk yaklaşma noktasının gerisinde helezonla irtifa ayarla
         _hold.set(_iaf.x - dx * 2500, iafAlt, _iaf.z - dz * 2500);
         orbitDir(cmd.dir, ac, _hold, 1500, iafAlt);
-        brain.status = `Yaklaşma: irtifa ayarlıyor (${Math.round(ac.pos.y - rwyY)} m)`;
+        brain.status = `${L('Yaklaşma: irtifa ayarlıyor', 'Approach: adjusting altitude')} (${Math.round(ac.pos.y - rwyY)} m)`;
       }
       break;
     }
@@ -175,13 +176,13 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       const gpErr = hgt - Math.max(0, -along) * glide;
       // Süzülüş yolunun çok üstündeyse yavaşla (hız tutma gazı keser)
       if (gpErr > 40) cmd.speed = Math.min(cmd.speed, vApp * 0.95);
-      brain.status = `Son yaklaşma: ${Math.round(-along)} m, ${Math.round(hgt)} m`;
+      brain.status = `${L('Son yaklaşma', 'Final approach')}: ${Math.round(-along)} m, ${Math.round(hgt)} m`;
       const offCourse = along > -1200 && Math.abs(cross) > 110;
       const tooHigh = (along > -700 && gpErr > 60) || gpErr > 260;
       const tooFast = along > -1300 && ac.speed > vApp * 1.55;
       if (ac.speed > vApp * 1.25) cmd.diveBrake = true;
       if (offCourse || tooHigh || tooFast || along > RUNWAY_HALF) {
-        goAround(ac, brain, world, offCourse ? 'eksenden saptı' : tooFast ? 'çok hızlı' : 'yüksek kaldı');
+        goAround(ac, brain, world, offCourse ? L('eksenden saptı', 'off the centreline') : tooFast ? L('çok hızlı', 'too fast') : L('yüksek kaldı', 'too high'));
         break;
       }
       if (hgt < 16 && along > -450) ops.stage = 'flare';
@@ -194,8 +195,8 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       cmd.maxG = 1.6;
       cmd.terrainAvoid = false;
       cmd.pushTheta = 1.2;
-      brain.status = 'Düzleştirme';
-      if (along > RUNWAY_HALF * 1.3 || ac.pos.y - rwyY > 40) goAround(ac, brain, world, 'uzun indi');
+      brain.status = L('Düzleştirme', 'Flare');
+      if (along > RUNWAY_HALF * 1.3 || ac.pos.y - rwyY > 40) goAround(ac, brain, world, L('uzun indi', 'landed long'));
       break;
     }
     case 'rollout':
@@ -206,7 +207,7 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
 function goAround(ac: Aircraft, brain: Brain, world: World, why: string): void {
   brain.ops.stage = 'toIaf';
   brain.ops.goArounds++;
-  if (brain.ops.goArounds <= 3) world.log(`${ac.callsign} pas geçti (${why}), yeniden yaklaşıyor`, ac.team, 'ops');
+  if (brain.ops.goArounds <= 3) world.log(L(`${ac.callsign} pas geçti (${why}), yeniden yaklaşıyor`, `${ac.callsign} went around (${why}), approaching again`), ac.team, 'ops');
 }
 
 /** Teker koyma uygun mu (world, zemin temasında çağırır). */

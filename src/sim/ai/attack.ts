@@ -12,6 +12,7 @@ import { DEG, angleBetween, clamp } from '../../core/math';
 import { headingWithAlt, orbitDir, terrainFollow } from './nav';
 import { flakTarget, holdPoint, mayStartAttack, predictImpact, rally } from './strike';
 import { aaJink, avoidAA } from './aaEvade';
+import { L } from '../../i18n';
 
 const _to = new Vector3();
 const _err = new Vector3();
@@ -88,7 +89,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
         else orbitDir(cmd.dir, ac, _p, 1300, ac.pos.y);
       } else orbitDir(cmd.dir, ac, _p, 1300, p?.altitude ?? 1200);
       cmd.speed = ac.spec.cruiseSpeed;
-      brain.status = 'Taarruz sırasını bekliyor';
+      brain.status = L('Taarruz sırasını bekliyor', 'Waiting for attack turn');
       return;
     }
   }
@@ -107,7 +108,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       avoidAA(ac, world, cmd.dir, tp);
       cmd.speed = ac.spec.vMax * 0.92;
       cmd.minAlt = Math.min(agl * 0.7, 120);
-      brain.status = `Alçaktan sızma: ${(dh / 1000).toFixed(1)} km`;
+      brain.status = `${L('Alçaktan sızma', 'Low-level ingress')}: ${(dh / 1000).toFixed(1)} km`;
       if (dh < POPUP_DIST) st.phase = 'popup';
       break;
     }
@@ -116,11 +117,11 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       cmd.throttle = 1;
       cmd.speed = null;
       cmd.maxG = 3.5;
-      brain.status = 'Pop-up: hedef için tırmanış';
+      brain.status = L('Pop-up: hedef için tırmanış', 'Pop-up: climbing for the target');
       const depression = Math.atan2(h, dh);
       if (depression > 20 * DEG || dh < 1800) {
         st.phase = 'dive';
-        world.log(`${ac.callsign} ${gt.name} hedefine dalışa geçti`, ac.team, 'strike');
+        world.log(L(`${ac.callsign} ${gt.name} hedefine dalışa geçti`, `${ac.callsign} dives on ${gt.name}`), ac.team, 'strike');
       }
       break;
     }
@@ -142,7 +143,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       _to.subVectors(tp, ac.pos);
       const slant = _to.length();
       const err = angleBetween(ac.fwd, _to.normalize());
-      brain.status = `Taarruz dalışı: ${Math.round(slant)} m`;
+      brain.status = `${L('Taarruz dalışı', 'Attack dive')}: ${Math.round(slant)} m`;
       if (st.rocketsPass > 0 && slant < 1500 && slant > 550 && err < 3 * DEG && t - st.lastShot > 0.3) {
         brain.fireRocket = true;
         st.rocketsPass -= 2;
@@ -173,7 +174,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       cmd.throttle = 1;
       cmd.speed = null;
       cmd.minAlt = 50;
-      brain.status = 'Toparlanma ve alçaktan kaçış';
+      brain.status = L('Toparlanma ve alçaktan kaçış', 'Pulling out, escaping low');
       if (ac.fwd.y > 0.03) {
         st.phase = 'extend';
         st.phaseTime = t;
@@ -186,7 +187,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       const jink = aaJink(ac, world, cmd.dir);
       cmd.speed = ac.spec.vMax;
       cmd.minAlt = Math.min(agl * 0.7, 120);
-      brain.status = jink ? 'Hedeften açılıyor: uçaksavara karşı kaçamak' : 'Hedeften açılıyor';
+      brain.status = jink ? L('Hedeften açılıyor: uçaksavara karşı kaçamak', 'Breaking off: jinking against flak') : L('Hedeften açılıyor', 'Breaking off the target');
       if (dh > 3600 || t - st.phaseTime > 40) {
         st.passes--;
         if (st.passes <= 0 || (!ac.hasOrdnance && !gunsLeft)) st.phase = 'rally';
@@ -204,7 +205,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       cmd.maxG = 3.5;
       cmd.turnGain = 2;
       cmd.minAlt = Math.min(agl * 0.7, 120);
-      brain.status = 'Yeni geçiş için dönüyor';
+      brain.status = L('Yeni geçiş için dönüyor', 'Turning for another pass');
       const fh = Math.hypot(ac.fwd.x, ac.fwd.z) || 1;
       const cos = (ac.fwd.x * dx + ac.fwd.z * dz) / (fh * Math.max(dh, 1));
       if (cos > 0.85) st.phase = dh < POPUP_DIST ? 'popup' : 'approach';

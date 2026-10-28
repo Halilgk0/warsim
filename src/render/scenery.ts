@@ -3,22 +3,36 @@
 // Ağaç ve kayalar arazi parçası başına, kameraya yakınken üretilir; yollar ve yerleşimler açılışta bir kez.
 
 import * as THREE from 'three';
-import { CITIES, MAP_SIZE, TEAM_SITES } from '../sim/mapData';
+import { CITIES, MAP_HALF as HALF, MAP_SIZE, TEAM_SITES } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, groundLevel, terrainHeight, terrainMap } from '../sim/terrain';
+import { chunkCells } from './terrain';
 import { clamp, mulberry32, smoothstep } from '../core/math';
 import { cleared, clearingsVersion, fieldGrid, forestGrid, sampleGrid, sampleSmooth, slopeGrid } from './landcover';
-import { BOX, CYL, GABLE, broadleafGeo, coniferGeo, rockGeo } from './props';
+import { BOX, CYL, GABLE, broadleafFarGeo, broadleafGeo, coniferFarGeo, coniferGeo, freeze, rockGeo } from './props';
+import { linkAtmosphere } from './atmosphere';
+import { linkCloudShadow } from './clouds';
 
-const HALF = MAP_SIZE / 2;
-/** Parça kenarı (m) — arazi parçalarıyla aynı. */
-const CHUNK = 64 * TERRAIN_CELL;
-const NC = TERRAIN_N / 64;
+/** Bulut gölgesi alan düz Lambert malzemesi (ağaç, kaya, köy evleri). */
+function shadedLambert(o: THREE.MeshLambertMaterialParameters, key: string): THREE.MeshLambertMaterial {
+  const m = new THREE.MeshLambertMaterial(o);
+  m.onBeforeCompile = (shader) => {
+    linkAtmosphere(shader);
+    linkCloudShadow(shader);
+  };
+  m.customProgramCacheKey = () => key;
+  return m;
+}
 
-const WALLS = [0xf3e9d9, 0xebdcc7, 0xe8d5cb, 0xdfe3d1, 0xf1e0cf, 0xe4dde8, 0xf0e4c6];
-const ROOFS = [0xd39a85, 0xc98f7d, 0xb9a3a0, 0xd8b48f, 0xa9aeb9, 0xcf8f7f];
-const TREES_B = [0x93c07f, 0x86b67b, 0x9ec88a, 0x7fae77, 0xa3c584];
-const TREES_C = [0x79a983, 0x6f9e7c, 0x84b08a];
-const ROCKS = [0xc9c3c8, 0xbcb6b9, 0xd3cdc4, 0xb3afb6];
+/** Parça kenarı (m) — arazi parçalarıyla aynı; harita büyüklüğüyle değişir (rebuild günceller; dizi en çok parçaya göre). */
+let CHUNK = 64 * TERRAIN_CELL;
+let NC = TERRAIN_N / 64;
+
+// Gerçekçi tonlar: sıva (beyaz, krem, aşı boyası), kiremit ve arduvaz çatı, koyu yaz yeşili ağaçlar, gri kaya
+const WALLS = [0xe8e2d4, 0xdccfb2, 0xc9a77e, 0xcfcbc2, 0xe1d3a6, 0xd6c3b0, 0xece6da];
+const ROOFS = [0xa45838, 0x8e4a32, 0xb06844, 0x5a5e66, 0x6a5a50, 0x9a5a3e];
+const TREES_B = [0x5e8c44, 0x54803e, 0x69964c, 0x4c7a3a, 0x709c50];
+const TREES_C = [0x3f6a46, 0x38623f, 0x4a7650];
+const ROCKS = [0x8f8a84, 0x847f7a, 0x9a948c, 0x7a7672];
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -54,42 +68,254 @@ class InstList {
   }
 }
 
+// Ağaç ayrıntı düzeyleri: kameraya yakın halkadaki ağaçlar tam modelle (gövde + taç), ötesi basit taçla çizilir.
+// Basit taçlar sık taç yarıçapı ötesinde dörtte bire seyrelir ve sönme aralığında küçülerek söner (uzakta piksel altı ağaçlar
+// ormanı siyah noktalı gösteriyordu). Eskiden kameraya yakın parçaların (9 km) bütün ağaçları tam modeldi: yakın
+// görünümde 2,5–3,7 milyon üçgen.
+// Uzaklıklar grafik kalitesinden gelir (ui/settings QUALITY); aşağıdakiler Yüksek basamağın değerleri.
+/** Kamera bu kadar kayınca yakın ağaçlar yeniden toplanır. */
+const NEAR_MOVE = 120;
+/** Yakın ağaç katmanının kapasitesi (tür başına). */
+const NEAR_CAP = 16384;
+/** Sık taç blokları (parça kenarı başına) ve seyrek taç blokları: yalnız kameraya yeterince yakın bloklar çizilir. */
+const DENSE_BLOCKS = 4;
+const SPARSE_BLOCKS = 2;
+
+/** Bir blok basit taç: tür, kare alan, sık mı seyrek mi. */
+interface TreeBlock {
+  mesh: THREE.InstancedMesh;
+  species: number;
+  dense: boolean;
+  x0: number;
+  z0: number;
+  size: number;
+}
+
+/** Yerleşim blokları (m): yalnız kameranın yakınındaki bloklar çizilir (Yüksek kalitede 10 km) (eskiden bütün haritanın köy ve
+ * şehirleri birlikte çiziliyordu: kamera 20 km'den yakınken 1,4–1,7 milyon üçgen). */
+let SETTLE_BLOCK = CHUNK;
+/** Blok sayısı (kenar): parça sayısıyla aynı. */
+let SETTLE_NB = NC;
+
+/** Konuma göre bloklara dağıtan örnek listesi (InstList ile aynı ekleme). */
+class BlockedList {
+  readonly blocks = new Map<number, InstList>();
+  push(x: number, y: number, z: number, sx: number, sy: number, sz: number, yaw: number, color: number): void {
+    const bx = clamp(Math.floor((x + HALF) / SETTLE_BLOCK), 0, SETTLE_NB - 1);
+    const bz = clamp(Math.floor((z + HALF) / SETTLE_BLOCK), 0, SETTLE_NB - 1);
+    const k = bz * SETTLE_NB + bx;
+    let l = this.blocks.get(k);
+    if (!l) this.blocks.set(k, (l = new InstList()));
+    l.push(x, y, z, sx, sy, sz, yaw, color);
+  }
+}
+
+interface SettleBlock {
+  group: THREE.Group;
+  x0: number;
+  z0: number;
+}
+
 interface Chunk {
   group: THREE.Group | null;
   version: number;
-  /** Ağaç ağları ve uzak görünümde gösterilecek (ilk geçiş) örnek sayıları. */
-  trees: { mesh: THREE.InstancedMesh; far: number; all: number }[];
+  trees: TreeBlock[];
+}
+
+/** Noktanın kare alana (x0, z0 köşesi, kenarı s) yatay uzaklığı. */
+function rectDist(x: number, z: number, x0: number, z0: number, s: number): number {
+  const dx = Math.max(x0 - x, 0, x - (x0 + s));
+  const dz = Math.max(z0 - z, 0, z - (z0 + s));
+  return Math.hypot(dx, dz);
+}
+
+/**
+ * Örnek aralığını [a, b) kare bloklara böl, her dolu blok için basit taç ağı. Yaklaşık sıralama korunur.
+ */
+function farBlocks(
+  geo: THREE.BufferGeometry, mat: THREE.Material, species: number, dense: boolean, list: { mats: number[]; cols: number[] },
+  a: number, b: number, x0: number, z0: number, nb: number,
+): TreeBlock[] {
+  const size = CHUNK / nb;
+  const buckets: number[][] = Array.from({ length: nb * nb }, () => []);
+  for (let i = a; i < b; i++) {
+    const bx = clamp(Math.floor((list.mats[i * 16 + 12] - x0) / size), 0, nb - 1);
+    const bz = clamp(Math.floor((list.mats[i * 16 + 14] - z0) / size), 0, nb - 1);
+    buckets[bz * nb + bx].push(i);
+  }
+  const out: TreeBlock[] = [];
+  buckets.forEach((idx, k) => {
+    if (!idx.length) return;
+    const m = new THREE.InstancedMesh(geo, mat, idx.length);
+    const ma = m.instanceMatrix.array as Float32Array;
+    const ca = new Float32Array(idx.length * 3);
+    idx.forEach((i, o) => {
+      for (let e = 0; e < 16; e++) ma[o * 16 + e] = list.mats[i * 16 + e];
+      ca[o * 3] = list.cols[i * 3];
+      ca[o * 3 + 1] = list.cols[i * 3 + 1];
+      ca[o * 3 + 2] = list.cols[i * 3 + 2];
+    });
+    m.instanceColor = new THREE.InstancedBufferAttribute(ca, 3);
+    m.computeBoundingSphere();
+    out.push({ mesh: m, species, dense, x0: x0 + (k % nb) * size, z0: z0 + Math.floor(k / nb) * size, size });
+  });
+  return out;
 }
 
 export class Scenery {
   readonly group = new THREE.Group();
-  private readonly vegMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  private readonly bldMat = new THREE.MeshLambertMaterial({ flatShading: true });
+  private readonly vegMat = shadedLambert({ vertexColors: true, flatShading: true }, 'vegCloud');
+  private readonly bldMat = shadedLambert({ flatShading: true }, 'bldCloud');
   private readonly treeB = broadleafGeo(0xffffff);
   private readonly treeC = coniferGeo(0xffffff);
+  private readonly treeFar = [broadleafFarGeo(0xffffff), coniferFarGeo(0xffffff)];
   private readonly rock = rockGeo(0xffffff);
+  /** Basit taç malzemeleri: seyrek ve sık (sık olan sık taç yarıçapı ötesinde atılır). Paylaşılan değerler. */
+  private readonly treeU = {
+    treeNear: { value: new THREE.Vector3(0, -1e9, 0) },
+    treeParams: { value: new THREE.Vector2(1300, 2500) },
+    treeFade: { value: new THREE.Vector2(5500, 8500) },
+  };
+  private readonly farMat = this.treeMaterial(false);
+  private readonly denseMat = this.treeMaterial(true);
+  /** Kameranın yakınındaki ağaçlar (tam model), tür başına. */
+  private readonly near: THREE.InstancedMesh[];
+  private readonly nearCenter = new THREE.Vector3(0, -1e9, 0);
+  private nearDirty = true;
+  /** Kalite basamağının uzaklıkları (m). */
+  private q = { near: 1300, thin: 2500, fade: [5500, 8500] as [number, number], settle: 10000 };
   private readonly chunks: Chunk[] = [];
   private readonly chunkGroup = new THREE.Group();
   private roadNear: THREE.Mesh | null = null;
   private roadFar: THREE.LineSegments | null = null;
   private settle: THREE.Group = new THREE.Group();
+  private settleBlocks: SettleBlock[] = [];
   private roads: THREE.Vector3[][] = [];
   private settleVersion = 0;
   private settleDirtyAt = -1;
   /** Hangi harita için kuruldu. */
   private mapVersion = -1;
+  /** Gök ışığı (0..1): ışıksız harita çizgisinin rengi buna göre (gece karanlıkta parlamasın). */
+  private light = 1;
 
   constructor(scene: THREE.Scene) {
     for (let i = 0; i < NC * NC; i++) this.chunks.push({ group: null, version: -1, trees: [] });
     this.group.add(this.chunkGroup, this.settle);
+    this.near = [this.treeB, this.treeC].map((geo) => {
+      const m = new THREE.InstancedMesh(geo, this.vegMat, NEAR_CAP);
+      m.count = 0;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NEAR_CAP * 3), 3).setUsage(THREE.DynamicDrawUsage);
+      m.frustumCulled = false;
+      this.group.add(m);
+      freeze(m);
+      return m;
+    });
     scene.add(this.group);
     this.rebuild();
+  }
+
+  /** Gün döngüsü: gök ışığına göre ışıksız yol çizgisinin rengi. */
+  setLight(k: number): void {
+    this.light = k;
+    if (this.roadFar) (this.roadFar.material as THREE.LineBasicMaterial).color.setHex(ROAD_LINE).multiplyScalar(k);
+  }
+
+  /**
+   * Basit taç malzemesi. Gölgelendiricide: yakın ağaç halkasındakiler (tam modelle çizilenler) atılır; sık katman
+   * sık taç yarıçapı ötesinde atılır; hepsi sönme aralığında küçülerek söner. Atılan örnek sıfır boyuta iner (üçgeni çizilmez).
+   */
+  private treeMaterial(dense: boolean): THREE.MeshLambertMaterial {
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    m.onBeforeCompile = (shader) => {
+      linkAtmosphere(shader);
+      linkCloudShadow(shader);
+      Object.assign(shader.uniforms, this.treeU);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 treeNear;\nuniform vec2 treeParams;\nuniform vec2 treeFade;')
+        .replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
+          vec3 iPos = instanceMatrix[3].xyz;
+          float tDist = distance( iPos, cameraPosition );
+          float keep = step( treeParams.x, distance( iPos, treeNear ) );
+          ${dense ? 'keep *= step( tDist, treeParams.y );' : ''}
+          keep *= 1.0 - smoothstep( treeFade.x, treeFade.y, tDist );
+          transformed *= keep;`);
+    };
+    m.customProgramCacheKey = () => (dense ? 'treeDense' : 'treeFar');
+    return m;
+  }
+
+  /**
+   * Yakın ağaç halkası: kameranın yakın halkasındaki ağaçlar tam model katmanına kopyalanır (kamera NEAR_MOVE
+   * kayınca ya da parçalar değişince). Basit taç gölgelendiricisi aynı merkez ve yarıçapla bunları atar: her ağaç
+   * bir kez çizilir.
+   */
+  private gatherNear(cam: THREE.Vector3, show: boolean): void {
+    if (!show) {
+      for (const m of this.near) m.count = 0;
+      this.nearCenter.set(0, -1e9, 0);
+      this.treeU.treeNear.value.copy(this.nearCenter);
+      this.nearDirty = true;
+      return;
+    }
+    if (!this.nearDirty && this.nearCenter.distanceToSquared(cam) < NEAR_MOVE * NEAR_MOVE) return;
+    this.nearDirty = false;
+    this.nearCenter.copy(cam);
+    this.treeU.treeNear.value.copy(cam);
+    const R2 = this.q.near * this.q.near;
+    const counts = [0, 0];
+    for (let cj = 0; cj < NC; cj++) {
+      for (let ci = 0; ci < NC; ci++) {
+        const ch = this.chunks[cj * NC + ci];
+        if (!ch.group || !ch.group.visible) continue;
+        const x0 = -HALF + ci * CHUNK;
+        const z0 = -HALF + cj * CHUNK;
+        if (rectDist(cam.x, cam.z, x0, z0, CHUNK) > this.q.near) continue;
+        for (const t of ch.trees) {
+          if (rectDist(cam.x, cam.z, t.x0, t.z0, t.size) > this.q.near) continue;
+          const s = t.species;
+          const dst = this.near[s];
+          const md = dst.instanceMatrix.array as Float32Array;
+          const cd = dst.instanceColor!.array as Float32Array;
+          const m = t.mesh.instanceMatrix.array;
+          const c = t.mesh.instanceColor!.array;
+          for (let k = 0; k < t.mesh.count; k++) {
+            const dx = m[k * 16 + 12] - cam.x;
+            const dy = m[k * 16 + 13] - cam.y;
+            const dz = m[k * 16 + 14] - cam.z;
+            if (dx * dx + dy * dy + dz * dz >= R2 || counts[s] >= NEAR_CAP) continue;
+            const o = counts[s]++;
+            for (let e = 0; e < 16; e++) md[o * 16 + e] = m[k * 16 + e];
+            cd[o * 3] = c[k * 3];
+            cd[o * 3 + 1] = c[k * 3 + 1];
+            cd[o * 3 + 2] = c[k * 3 + 2];
+          }
+        }
+      }
+    }
+    this.near.forEach((m, s) => {
+      m.count = counts[s];
+      m.instanceMatrix.needsUpdate = true;
+      m.instanceColor!.needsUpdate = true;
+    });
+  }
+
+  /** Grafik kalitesi: ağaç ve yerleşim uzaklıkları (yakın ağaç halkası yeniden toplanır). */
+  setQuality(near: number, thin: number, fade: [number, number], settle: number): void {
+    this.q = { near, thin, fade, settle };
+    this.treeU.treeParams.value.set(near, thin);
+    this.treeU.treeFade.value.set(fade[0], fade[1]);
+    this.nearDirty = true;
   }
 
   /** Yollar, yerleşimler ve ağaç parçaları yüklü haritaya göre (harita değişince) yeniden kurulur. */
   rebuild(): void {
     if (this.mapVersion === terrainMap.version) return;
     this.mapVersion = terrainMap.version;
+    // Harita büyüklüğü değişmiş olabilir: parça boyu ve sayısı yeniden (arazi parçalarıyla aynı)
+    const cells = chunkCells();
+    CHUNK = SETTLE_BLOCK = cells * TERRAIN_CELL;
+    NC = SETTLE_NB = TERRAIN_N / cells;
     for (const ch of this.chunks) {
       if (ch.group) {
         this.chunkGroup.remove(ch.group);
@@ -110,6 +336,9 @@ export class Scenery {
     this.roadNear = roadRibbon(roads);
     this.roadFar = roadLines(roads);
     this.group.add(this.roadNear, this.roadFar);
+    freeze(this.roadNear);
+    freeze(this.roadFar);
+    this.setLight(this.light);
     this.buildSettlements(roads);
     this.settleVersion = clearingsVersion();
   }
@@ -117,9 +346,12 @@ export class Scenery {
   private clearSettlements(): void {
     for (const c of [...this.settle.children]) {
       this.settle.remove(c);
-      if (c instanceof THREE.InstancedMesh) c.dispose();
-      else if (c instanceof THREE.Mesh) c.geometry.dispose();
+      c.traverse((o) => {
+        if (o instanceof THREE.InstancedMesh) o.dispose();
+        else if (o instanceof THREE.Mesh) o.geometry.dispose();
+      });
     }
+    this.settleBlocks = [];
   }
 
   /** Yeni yapı tabanları: üstünde kalan dekor evleri ve ağaçları kaldırmak için yerleşimleri yeniden kur. */
@@ -135,24 +367,24 @@ export class Scenery {
     this.buildSettlements(this.roads);
   }
 
-  /** Kameraya göre ağaç/kaya parçalarını üret, göster, gizle. */
-  update(target: THREE.Vector3, camDist: number, enabled: boolean): void {
+  /** Kameraya göre ağaç/kaya parçalarını üret, göster, gizle; yakın ağaç halkasını kameranın konumuna göre topla. */
+  update(camDist: number, enabled: boolean, cam: THREE.Vector3): void {
     this.group.visible = enabled;
     if (!enabled) return;
     this.refreshSettlements();
     // Uzakta ağaçlar piksel altına düşer ve kaydırırken kıvılcım gibi titrer: yalnız yakın/orta görünümde
     const show = camDist < 9000;
-    const radius = Math.max(4500, camDist * 1.35);
-    const nearR = Math.max(2200, camDist * 0.6);
+    // Basit taçlar kameradan sönme uzaklığında söner: yalnız o kadar yakındaki parçalar ve bloklar çizilir. Uzaklık
+    // kameranın yerden yüksekliğini de sayar (7 km'deki uçağın altındaki ağaçlar zaten sönmüş olur)
+    const agl = Math.max(0, cam.y - groundLevel(cam.x, cam.z));
+    const far3 = (x0: number, z0: number, size: number) => Math.hypot(rectDist(cam.x, cam.z, x0, z0, size), agl);
     let budget = 1;
     const ver = clearingsVersion();
     for (let cj = 0; cj < NC; cj++) {
       for (let ci = 0; ci < NC; ci++) {
         const ch = this.chunks[cj * NC + ci];
-        const cx = -HALF + (ci + 0.5) * CHUNK;
-        const cz = -HALF + (cj + 0.5) * CHUNK;
-        const d = Math.max(0, Math.hypot(cx - target.x, cz - target.z) - CHUNK * 0.71);
-        const want = show && d < radius;
+        const d = far3(-HALF + ci * CHUNK, -HALF + cj * CHUNK, CHUNK);
+        const want = show && d < this.q.fade[1];
         if (want && (!ch.group || ch.version !== ver) && budget > 0) {
           budget--;
           if (ch.group) {
@@ -162,14 +394,16 @@ export class Scenery {
           ch.group = this.buildChunk(ci, cj, ch);
           ch.version = ver;
           this.chunkGroup.add(ch.group);
+          freeze(ch.group);
+          this.nearDirty = true;
         }
         if (ch.group) {
+          if (ch.group.visible !== want) this.nearDirty = true;
           ch.group.visible = want;
-          // Yakın parçada bütün ağaçlar, uzakta yalnız seyrek ilk geçiş
-          const full = d < nearR;
-          for (const t of ch.trees) t.mesh.count = full ? t.all : t.far;
+          // Bloklar: sık taç sık taç yarıçapı, seyrek taç sönme uzaklığı içindeyse (ötesinde gölgelendirici zaten atar)
+          for (const t of ch.trees) t.mesh.visible = far3(t.x0, t.z0, t.size) < (t.dense ? this.q.thin : this.q.fade[1]);
           // Çok uzaktaki parçaları bellekten at
-          if (!want && d > radius + CHUNK * 3) {
+          if (!want && d > this.q.fade[1] + CHUNK * 3) {
             this.chunkGroup.remove(ch.group);
             disposeGroup(ch.group);
             ch.group = null;
@@ -178,13 +412,19 @@ export class Scenery {
         }
       }
     }
+    this.gatherNear(cam, show);
     // Yol şeridi yalnız arazinin tam çözünürlükte olduğu yakın görünümde (uzakta kaba arazinin altında kalıp yanıp sönüyordu)
     if (this.roadNear) this.roadNear.visible = camDist < 11000;
     if (this.roadFar) this.roadFar.visible = camDist >= 9000;
     // Yerleşimler: uzakta piksel altı (şehirler arazide renk olarak görünür); ayrıntılar yalnız yakında
     this.settle.visible = camDist < 20000;
+    const detail = camDist < 9000;
+    for (const b of this.settleBlocks) {
+      b.group.visible = far3(b.x0, b.z0, SETTLE_BLOCK) < this.q.settle;
+      for (const c of b.group.children) if (c.userData.near) c.visible = detail;
+    }
     this.settle.children.forEach((c) => {
-      if (c.userData.near) c.visible = camDist < 9000;
+      if (c.userData.near) c.visible = detail;
     });
   }
 
@@ -246,24 +486,32 @@ export class Scenery {
         }
       }
     }
+    // Tür başına: ilk geçiş seyrek bloklar, kalan geçişler sık bloklar (basit taç)
     ch.trees = [];
-    const mb = tb.mesh(this.treeB, this.vegMat);
-    const mc = tc.mesh(this.treeC, this.vegMat);
-    if (mb) ch.trees.push({ mesh: mb, far: far.b, all: tb.count });
-    if (mc) ch.trees.push({ mesh: mc, far: far.c, all: tc.count });
-    for (const m of [mb, mc, rk.mesh(this.rock, this.vegMat)]) if (m) g.add(m);
+    [tb, tc].forEach((list, s) => {
+      const n0 = s === 0 ? far.b : far.c;
+      for (const t of [
+        ...farBlocks(this.treeFar[s], this.farMat, s, false, list, 0, n0, x0, z0, SPARSE_BLOCKS),
+        ...farBlocks(this.treeFar[s], this.denseMat, s, true, list, n0, list.count, x0, z0, DENSE_BLOCKS),
+      ]) {
+        ch.trees.push(t);
+        g.add(t.mesh);
+      }
+    });
+    const rocks = rk.mesh(this.rock, this.vegMat);
+    if (rocks) g.add(rocks);
     return g;
   }
 
   // ------------------------------------------------------------------ yerleşimler
 
   private buildSettlements(roads: THREE.Vector3[][]): void {
-    const walls = new InstList();
-    const roofs = new InstList();
-    const caps = new InstList();
-    const bands = new InstList();
-    const silos = new InstList();
-    const trees = new InstList();
+    const walls = new BlockedList();
+    const roofs = new BlockedList();
+    const caps = new BlockedList();
+    const bands = new BlockedList();
+    const silos = new BlockedList();
+    const trees = new BlockedList();
     const streets: THREE.Vector3[][] = [];
     const rng = mulberry32(4242);
     const house = (x: number, z: number, yaw: number, s = 1) => {
@@ -279,8 +527,8 @@ export class Scenery {
       const y = groundLevel(x, z) - 0.6;
       const wall = WALLS[Math.floor(rng() * WALLS.length)];
       walls.push(x, y, z, w, H + 0.6, d, yaw, wall);
-      caps.push(x, y + H + 0.6, z, w + 0.6, 0.7, d + 0.6, yaw, 0xb3b0b9);
-      for (let f = 0; f < floors; f++) bands.push(x, y + 0.6 + f * 3.2 + 1.0, z, w + 0.3, 1.3, d - 2, yaw, 0x93abc2);
+      caps.push(x, y + H + 0.6, z, w + 0.6, 0.7, d + 0.6, yaw, 0x8a8884);
+      for (let f = 0; f < floors; f++) bands.push(x, y + 0.6 + f * 3.2 + 1.0, z, w + 0.3, 1.3, d - 2, yaw, 0x5d6b78);
     };
     const tree = (x: number, z: number, s = 1) => {
       const size = (9 + rng() * 6) * s;
@@ -379,8 +627,8 @@ export class Scenery {
         }
         // Köy camisi / kilisesi yerine nötr bir kule: yüksek tek yapı
         const y = groundLevel(cx, cz) - 0.5;
-        walls.push(cx, y, cz, 7, 18, 7, yaw, 0xf2ece2);
-        roofs.push(cx, y + 18, cz, 7.6, 6, 7.6, yaw, 0xb9a3a0);
+        walls.push(cx, y, cz, 7, 18, 7, yaw, 0xe8e2d4);
+        roofs.push(cx, y + 18, cz, 7.6, 6, 7.6, yaw, 0x5a5e66);
       }
     }
 
@@ -394,10 +642,10 @@ export class Scenery {
       if (CITIES.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.3) || cleared(x, z, 300)) continue;
       const yaw = rng() * Math.PI;
       const y = groundLevel(x, z) - 0.5;
-      walls.push(x, y, z, 14, 7.5, 26, yaw, 0xe6c9b5);
-      roofs.push(x, y + 7.5, z, 15, 5, 27, yaw, 0xc98f7d);
+      walls.push(x, y, z, 14, 7.5, 26, yaw, 0x8e3e2e);
+      roofs.push(x, y + 7.5, z, 15, 5, 27, yaw, 0x5a5e66);
       house(x + 28 * Math.cos(yaw), z - 28 * Math.sin(yaw), yaw);
-      silos.push(x - 14 * Math.cos(yaw) + 10 * Math.sin(yaw), y, z + 14 * Math.sin(yaw) + 10 * Math.cos(yaw), 3.4, 15, 3.4, 0, 0xd8d4dc);
+      silos.push(x - 14 * Math.cos(yaw) + 10 * Math.sin(yaw), y, z + 14 * Math.sin(yaw) + 10 * Math.cos(yaw), 3.4, 15, 3.4, 0, 0xaaa69d);
       for (let k = 0; k < 4; k++) tree(x + (rng() - 0.5) * 70, z + (rng() - 0.5) * 70);
     }
 
@@ -405,14 +653,24 @@ export class Scenery {
       if (m) m.userData.near = true;
       return m;
     };
-    for (const m of [
-      walls.mesh(BOX, this.bldMat), roofs.mesh(GABLE, this.bldMat), caps.mesh(BOX, this.bldMat),
-      near(bands.mesh(BOX, this.bldMat)), near(silos.mesh(CYL, this.bldMat)), trees.mesh(this.treeB, this.vegMat),
-    ]) if (m) this.settle.add(m);
+    const keys = new Set<number>();
+    for (const l of [walls, roofs, caps, bands, silos, trees]) for (const k of l.blocks.keys()) keys.add(k);
+    for (const k of keys) {
+      const g = new THREE.Group();
+      const mk = (l: BlockedList, geo: THREE.BufferGeometry, mat: THREE.Material) => l.blocks.get(k)?.mesh(geo, mat) ?? null;
+      for (const m of [
+        mk(walls, BOX, this.bldMat), mk(roofs, GABLE, this.bldMat), mk(caps, BOX, this.bldMat),
+        near(mk(bands, BOX, this.bldMat)), near(mk(silos, CYL, this.bldMat)), mk(trees, this.treeB, this.vegMat),
+      ]) if (m) g.add(m);
+      this.settle.add(g);
+      freeze(g);
+      this.settleBlocks.push({ group: g, x0: -HALF + (k % SETTLE_NB) * SETTLE_BLOCK, z0: -HALF + Math.floor(k / SETTLE_NB) * SETTLE_BLOCK });
+    }
     // Şehir sokakları (yakın görünümde şerit)
-    const st = roadRibbon(streets, 9, 0xe3dccf);
+    const st = roadRibbon(streets, 9, 0x8a857c);
     st.userData.near = true;
     this.settle.add(st);
+    freeze(st);
   }
 }
 
@@ -588,7 +846,7 @@ function resample(pts: THREE.Vector3[], step: number): THREE.Vector3[] {
 }
 
 /** Araziye oturan yol şeridi (köprüler deniz/nehir üstünde düz geçer). */
-function roadRibbon(roads: THREE.Vector3[][], width = 11, color = 0xe9e0cd): THREE.Mesh {
+function roadRibbon(roads: THREE.Vector3[][], width = 11, color = 0x9a9284): THREE.Mesh {
   const pos: number[] = [];
   const idx: number[] = [];
   for (const r of roads) {
@@ -624,6 +882,8 @@ function roadRibbon(roads: THREE.Vector3[][], width = 11, color = 0xe9e0cd): THR
   return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
 }
 
+const ROAD_LINE = 0xcdbfa6;
+
 /** Uzak görünümde ince çizgi yollar (harita görünümü). */
 function roadLines(roads: THREE.Vector3[][]): THREE.LineSegments {
   const pos: number[] = [];
@@ -637,7 +897,7 @@ function roadLines(roads: THREE.Vector3[][]): THREE.LineSegments {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   // Harita çizgisi: derinlik sınaması yok (kaba arazi düzeyinin altında kalıp kesik kesik görünmesin)
-  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xcdbfa6, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }));
+  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: ROAD_LINE, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }));
   l.renderOrder = 1;
   return l;
 }

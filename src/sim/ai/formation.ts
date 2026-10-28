@@ -5,17 +5,18 @@ import type { Aircraft } from '../aircraft/aircraft';
 import type { FlyCommand } from '../aircraft/pilot';
 import { stallSpeed } from '../aircraft/flightModel';
 import { clamp } from '../../core/math';
+import { L } from '../../i18n';
 
 export type FormationType = 'vic' | 'echelonR' | 'echelonL' | 'finger4' | 'lineAbreast' | 'trail' | 'box';
 
 export const FORMATION_NAMES: Record<FormationType, string> = {
-  vic: 'Kama (V)',
-  echelonR: 'Sağ kademe',
-  echelonL: 'Sol kademe',
-  finger4: 'Dörtlü parmak',
-  lineAbreast: 'Yan yana',
-  trail: 'Kol (arka arkaya)',
-  box: 'Savaş kutusu',
+  vic: L('Kama (V)', 'Vic (V)'),
+  echelonR: L('Sağ kademe', 'Echelon right'),
+  echelonL: L('Sol kademe', 'Echelon left'),
+  finger4: L('Dörtlü parmak', 'Finger-four'),
+  lineAbreast: L('Yan yana', 'Line abreast'),
+  trail: L('Kol (arka arkaya)', 'Trail'),
+  box: L('Savaş kutusu', 'Combat box'),
 };
 
 export interface SlotOffset {

@@ -11,6 +11,10 @@ import type { Research } from '../tech';
 import { lineOfSight } from '../terrain';
 import { visibility } from '../ai/perception';
 import { DEG, G, gauss, rand } from '../../core/math';
+import { L, lower } from '../../i18n';
+
+const NEED_RESEARCH = L('Araştırma gerekli', 'Research required');
+const BUSY = L('Başka iş sürüyor', 'Another job is in progress');
 
 export type AAWeaponId = 'mg' | 'aa20' | 'aa20q' | 'aa37' | 'aa40' | 'aa88' | 'aa128';
 
@@ -44,37 +48,37 @@ export interface AAWeaponDef {
 
 export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
   mg: {
-    id: 'mg', name: '12,7 mm uçaksavar makineli', short: '12,7 mm', requires: null, range: 1300, ceiling: 1200,
+    id: 'mg', name: L('12,7 mm uçaksavar makineli', '12.7 mm AA machine gun'), short: L('12,7 mm', '12.7 mm'), requires: null, range: 1300, ceiling: 1200,
     rate: 9, muzzleVel: 860, damage: 1.4, dispersion: 0.012, kind: 'tracer', burstRadius: 0, caliber: 'heavy',
     installTime: 20, rank: 1, medium: false, cost: 300, slew: 60,
   },
   aa20: {
-    id: 'aa20', name: '20 mm hafif uçaksavar topu', short: '20 mm', requires: 'hd_20', range: 2000, ceiling: 2000,
+    id: 'aa20', name: L('20 mm hafif uçaksavar topu', '20 mm light flak gun'), short: '20 mm', requires: 'hd_20', range: 2000, ceiling: 2000,
     rate: 5, muzzleVel: 900, damage: 6, dispersion: 0.01, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
     installTime: 30, rank: 2, medium: false, cost: 850, slew: 45,
   },
   aa20q: {
-    id: 'aa20q', name: 'Dörtlü 20 mm uçaksavar (Flakvierling)', short: '4×20 mm', requires: 'hd_20q', range: 2000, ceiling: 2000,
+    id: 'aa20q', name: L('Dörtlü 20 mm uçaksavar (Flakvierling)', 'Quad 20 mm flak (Flakvierling)'), short: '4×20 mm', requires: 'hd_20q', range: 2000, ceiling: 2000,
     rate: 15, muzzleVel: 900, damage: 6, dispersion: 0.012, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
     installTime: 40, rank: 3, medium: false, cost: 1600, slew: 40,
   },
   aa37: {
-    id: 'aa37', name: '37 mm orta uçaksavar topu', short: '37 mm', requires: 'hd_37', range: 3500, ceiling: 3500,
+    id: 'aa37', name: L('37 mm orta uçaksavar topu', '37 mm medium flak gun'), short: '37 mm', requires: 'hd_37', range: 3500, ceiling: 3500,
     rate: 2, muzzleVel: 880, damage: 24, dispersion: 0.008, kind: 'tracer', burstRadius: 9, caliber: 'cannon',
     installTime: 45, rank: 4, medium: true, cost: 1600, slew: 30,
   },
   aa40: {
-    id: 'aa40', name: '40 mm Bofors uçaksavar topu', short: '40 mm', requires: 'hd_40', range: 4000, ceiling: 4200,
+    id: 'aa40', name: L('40 mm Bofors uçaksavar topu', '40 mm Bofors gun'), short: '40 mm', requires: 'hd_40', range: 4000, ceiling: 4200,
     rate: 2.2, muzzleVel: 880, damage: 30, dispersion: 0.007, kind: 'tracer', burstRadius: 11, caliber: 'cannon',
     installTime: 50, rank: 5, medium: true, cost: 2500, slew: 30,
   },
   aa88: {
-    id: 'aa88', name: '88 mm ağır uçaksavar topu', short: '88 mm', requires: 'hd_88', range: 9000, ceiling: 9000,
+    id: 'aa88', name: L('88 mm ağır uçaksavar topu', '88 mm heavy flak gun'), short: '88 mm', requires: 'hd_88', range: 9000, ceiling: 9000,
     rate: 0.35, muzzleVel: 820, damage: 55, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
     installTime: 60, rank: 6, medium: true, cost: 3350, slew: 12,
   },
   aa128: {
-    id: 'aa128', name: '128 mm çok ağır flak', short: '128 mm', requires: 'hd_128', range: 13000, ceiling: 13000,
+    id: 'aa128', name: L('128 mm çok ağır flak', '128 mm very heavy flak'), short: '128 mm', requires: 'hd_128', range: 13000, ceiling: 13000,
     rate: 0.2, muzzleVel: 880, damage: 95, dispersion: 0, kind: 'flak', burstRadius: 32, caliber: 'cannon',
     installTime: 90, rank: 7, medium: true, cost: 6300, slew: 8,
   },
@@ -102,20 +106,20 @@ export interface AASensorDef {
 
 export const AA_SENSORS: Record<AASensorId, AASensorDef> = {
   rangefinder: {
-    id: 'rangefinder', name: 'Optik telemetre', requires: 'hd_rangefinder', installTime: 30, cost: 950,
-    desc: 'Nişan hatası %15–25 azalır, hedef 1 sn daha çabuk alınır.',
+    id: 'rangefinder', name: L('Optik telemetre', 'Optical rangefinder'), requires: 'hd_rangefinder', installTime: 30, cost: 950,
+    desc: L('Nişan hatası %15–25 azalır, hedef 1 sn daha çabuk alınır.', 'Aiming error drops by 15–25%, targets are acquired 1 s sooner.'),
   },
   predictor: {
-    id: 'predictor', name: 'Mekanik atış hesaplayıcı', requires: 'hd_predictor', installTime: 40, cost: 1900,
-    desc: 'Orta ve ağır toplarda ön nişan otomatik: hata %30–40 azalır.',
+    id: 'predictor', name: L('Mekanik atış hesaplayıcı', 'Mechanical predictor'), requires: 'hd_predictor', installTime: 40, cost: 1900,
+    desc: L('Orta ve ağır toplarda ön nişan otomatik: hata %30–40 azalır.', 'Automatic lead for medium and heavy guns: error drops by 30–40%.'),
   },
   gunRadar: {
-    id: 'gunRadar', name: 'Atış kontrol radarı', requires: 'hd_gunradar', installTime: 60, cost: 3700,
-    desc: 'Hedefi gözle görmeden tam menzilde izler; ağır topların hatası yarıya iner.',
+    id: 'gunRadar', name: L('Atış kontrol radarı', 'Gun-laying radar'), requires: 'hd_gunradar', installTime: 60, cost: 3700,
+    desc: L('Hedefi gözle görmeden tam menzilde izler; ağır topların hatası yarıya iner.', 'Tracks targets at full range without seeing them; heavy gun error is halved.'),
   },
   proximity: {
-    id: 'proximity', name: 'Yakınlık tapası', requires: 'hd_vt', installTime: 30, cost: 2650,
-    desc: 'Orta ve ağır mermiler hedefin yanında patlar: öldürücü yarıçap %50 büyür.',
+    id: 'proximity', name: L('Yakınlık tapası', 'Proximity fuze'), requires: 'hd_vt', installTime: 30, cost: 2650,
+    desc: L('Orta ve ağır mermiler hedefin yanında patlar: öldürücü yarıçap %50 büyür.', 'Medium and heavy shells burst next to the target: lethal radius grows by 50%.'),
   },
 };
 
@@ -211,9 +215,9 @@ export class AASite {
       const w = AA_WEAPONS[id];
       const unlocked = research.has(w.requires ?? undefined);
       out.push({
-        key: `add:${id}`, label: `${w.short} ekle`, detail: w.name, time: w.installTime, cost: w.cost,
+        key: `add:${id}`, label: L(`${w.short} ekle`, `Add ${w.short}`), detail: w.name, time: w.installTime, cost: w.cost,
         enabled: !busy && free && unlocked,
-        reason: !unlocked ? 'Araştırma gerekli' : !free ? 'Boş yuva yok' : busy ? 'Başka iş sürüyor' : undefined,
+        reason: !unlocked ? NEED_RESEARCH : !free ? L('Boş yuva yok', 'No free slot') : busy ? BUSY : undefined,
       });
     }
     // En zayıf yuvayı yükselt
@@ -227,8 +231,8 @@ export class AASite {
         const w = AA_WEAPONS[id];
         if (w.rank <= cur.rank || !research.has(w.requires ?? undefined)) continue;
         out.push({
-          key: `rep:${weakest}:${id}`, label: `${cur.short} → ${w.short}`, detail: `${weakest + 1}. yuvayı yenile`,
-          time: Math.round(w.installTime * 0.8), cost: Math.round((w.cost * 0.85) / 50) * 50, enabled: !busy, reason: busy ? 'Başka iş sürüyor' : undefined,
+          key: `rep:${weakest}:${id}`, label: `${cur.short} → ${w.short}`, detail: L(`${weakest + 1}. yuvayı yenile`, `Replace slot ${weakest + 1}`),
+          time: Math.round(w.installTime * 0.8), cost: Math.round((w.cost * 0.85) / 50) * 50, enabled: !busy, reason: busy ? BUSY : undefined,
         });
       }
     }
@@ -237,17 +241,18 @@ export class AASite {
       if (this.sensors.has(sid)) continue;
       const unlocked = research.has(sd.requires);
       out.push({
-        key: `sen:${sid}`, label: `${sd.name} kur`, detail: sd.desc, time: sd.installTime, cost: sd.cost,
-        enabled: !busy && unlocked, reason: !unlocked ? 'Araştırma gerekli' : busy ? 'Başka iş sürüyor' : undefined,
+        key: `sen:${sid}`, label: L(`${sd.name} kur`, `Install ${lower(sd.name)}`), detail: sd.desc, time: sd.installTime, cost: sd.cost,
+        enabled: !busy && unlocked, reason: !unlocked ? NEED_RESEARCH : busy ? BUSY : undefined,
       });
     }
     if (this.level < 4) {
       const lv = LEVELS[this.level - 1];
       const unlocked = research.has(lv.req);
       out.push({
-        key: 'lvl', label: `Seviye ${this.level + 1}: +2 yuva`, detail: this.level === 3 ? 'Dış halkaya iki ağır top yuvası, beton sığınaklar' : 'Mevziyi genişlet ve tahkim et',
+        key: 'lvl', label: L(`Seviye ${this.level + 1}: +2 yuva`, `Level ${this.level + 1}: +2 slots`),
+        detail: this.level === 3 ? L('Dış halkaya iki ağır top yuvası, beton sığınaklar', 'Two heavy gun pits on the outer ring, concrete shelters') : L('Mevziyi genişlet ve tahkim et', 'Expand and fortify the position'),
         time: lv.time, cost: lv.cost, enabled: !busy && unlocked,
-        reason: !unlocked ? 'Araştırma gerekli' : busy ? 'Başka iş sürüyor' : undefined,
+        reason: !unlocked ? NEED_RESEARCH : busy ? BUSY : undefined,
       });
     }
     return out;
@@ -281,7 +286,11 @@ export class AASite {
   update(world: World, s: Structure, dt: number): void {
     if (this.job && s.active) {
       this.job.left -= dt;
-      if (this.job.left <= 0) world.log(`${s.name}: ${this.finishJob()} tamamlandı`, s.team, 'defense');
+      if (this.job.left <= 0) {
+        // İş bir kez bitirilir (L iki dilin metnini de kurar)
+        const done = this.finishJob();
+        world.log(L(`${s.name}: ${done} tamamlandı`, `${s.name}: ${done} complete`), s.team, 'defense');
+      }
     }
     if (!s.active) return;
     const research = world.teams[s.team].research;

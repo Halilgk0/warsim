@@ -13,6 +13,7 @@ import { resetAirframeIds } from '../sim/structures/airbase';
 import { resetStructureIds } from '../sim/structures/structure';
 import { loadMap, terrainMap } from '../sim/terrain';
 import { GameRenderer } from '../render/gameRenderer';
+import { dayHour } from '../render/atmosphere';
 import { settings, type MapLayer } from '../ui/settings';
 import { sound } from '../audio/sound';
 import { BattleSound } from '../audio/battle';
@@ -98,6 +99,9 @@ function scan(take: Take): { t: number; subject: Subject } {
 function applyLayers(take: Take): void {
   Object.assign(settings.map, CINEMA, take.layers ?? {});
   renderer.rings = !!take.rings;
+  renderer.cinemaClearClouds = !!take.clearClouds;
+  renderer.clouds.setDensity(take.clouds ?? 1);
+  renderer.cinemaSmoke = take.smoke ?? 1;
 }
 
 /** Yakındaki patlamalar kamerayı sarsar. */
@@ -186,7 +190,7 @@ async function record(id: string, opts: RecordOpts = {}): Promise<{ t0: number; 
   const take = TAKES.find((t) => t.id === id);
   if (!take) throw new Error(`çekim yok: ${id}`);
   const send = opts.send !== false;
-  const warm = opts.warm ?? 1;
+  const warm = take.warm ?? opts.warm ?? 1;
   const found = scan(take);
   const start = Math.max(0, found.t + take.offset);
   const w = build(take);
@@ -196,6 +200,9 @@ async function record(id: string, opts: RecordOpts = {}): Promise<{ t0: number; 
   }
   renderer.setWorld(w);
   applyLayers(take);
+  // Çekimin saati: kayıt başında take.clock (yoksa dünya zamanından)
+  const shift0 = take.clock !== undefined ? take.clock - dayHour(start) : 0;
+  renderer.clockShift = shift0;
 
   const total = warm + take.duration;
   const N = Math.round(total * FPS);
@@ -211,6 +218,7 @@ async function record(id: string, opts: RecordOpts = {}): Promise<{ t0: number; 
   const frame = async (k: number): Promise<void> => {
     simStep(w);
     c.t = (k - warmN) / FPS;
+    if (take.clockSpeed) renderer.clockShift = shift0 + take.clockSpeed * Math.max(0, c.t);
     d.apply(take.shot(c), STEP);
     shakeFromEvents(w, d, take.shake ?? 1);
     rig.target.copy(d.look);
@@ -248,6 +256,9 @@ export function startRecorder(): void {
   const labels = document.createElement('div');
   labels.style.display = 'none';
   document.body.append(vp, labels);
+  // Tanıtım kayıtları hep en yüksek kalitede (oyunun varsayılanı düşük)
+  settings.graphics.quality = 'high';
+  settings.graphics.clouds = true;
   renderer = new GameRenderer(vp, labels, { preserveBuffer: true });
   renderer.rig.director = () => {};
   Math.random = fxRand;

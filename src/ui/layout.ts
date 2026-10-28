@@ -1,6 +1,8 @@
 // Arayüz yerleşimi: yan panelleri gizle/göster, sağ paneldeki bölümleri (seçim, aktif görevler, olaylar) daralt.
 // Tercihler tarayıcıda saklanır. Dar ekranda (yatay telefon) paneller kapalı başlar ve aynı anda biri açık kalır.
 
+import { L } from '../i18n';
+
 /** Dar ekran (yatay telefon ya da küçük pencere): style.css'teki sıkışık düzenle aynı eşik. */
 const COMPACT = window.matchMedia('(max-height: 520px), (max-width: 900px)');
 
@@ -85,6 +87,14 @@ export class Layout {
     this.apply();
   }
 
+  /** Sağ paneldeki bölümü aç (daraltılmışsa). */
+  unfold(sec: string): void {
+    const i = this.st.collapsed.indexOf(sec);
+    if (i < 0) return;
+    this.st.collapsed.splice(i, 1);
+    this.apply();
+  }
+
   /** Sol panel planlayıcı açıkken zaten gizli; düğme de gizlenir. */
   update(plannerOpen: boolean): void {
     this.leftBtn.classList.toggle('hidden', plannerOpen);
@@ -98,10 +108,10 @@ export class Layout {
     this.left.classList.toggle('collapsed', this.st.hideLeft);
     this.right.classList.toggle('collapsed', this.st.hideRight);
     this.leftBtn.textContent = this.st.hideLeft ? '›' : '‹';
-    this.leftBtn.title = this.st.hideLeft ? 'Sol paneli aç' : 'Sol paneli kapat';
+    this.leftBtn.title = this.st.hideLeft ? L('Sol paneli aç', 'Open left panel') : L('Sol paneli kapat', 'Close left panel');
     this.leftBtn.classList.toggle('closed', this.st.hideLeft);
     this.rightBtn.textContent = this.st.hideRight ? '‹' : '›';
-    this.rightBtn.title = this.st.hideRight ? 'Sağ paneli aç' : 'Sağ paneli kapat';
+    this.rightBtn.title = this.st.hideRight ? L('Sağ paneli aç', 'Open right panel') : L('Sağ paneli kapat', 'Close right panel');
     this.rightBtn.classList.toggle('closed', this.st.hideRight);
     for (const sec of this.right.querySelectorAll<HTMLElement>('.rsec')) {
       sec.classList.toggle('folded', this.st.collapsed.includes(sec.dataset.sec!));

@@ -15,6 +15,7 @@ import { DEG, G, angleBetween, gauss } from '../../core/math';
 import { headingWithAlt, orbitDir } from './nav';
 import { aaJink, avoidAA } from './aaEvade';
 import { groundLevel } from '../terrain';
+import { L } from '../../i18n';
 
 const _err = new Vector3();
 const _to = new Vector3();
@@ -111,7 +112,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       holdPoint(ac, gt.pos, 6000, _p);
       orbitDir(cmd.dir, ac, _p, 1600, cruiseAlt);
       cmd.speed = ac.spec.cruiseSpeed * 0.9;
-      brain.status = 'Dalış sırasını bekliyor';
+      brain.status = L('Dalış sırasını bekliyor', 'Waiting for dive turn');
       return;
     }
   }
@@ -128,7 +129,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       cmd.speed = ac.spec.cruiseSpeed;
       cmd.maxG = 2.5;
       cmd.turnGain = 1.2;
-      brain.status = `Hedefe intikal: ${gt!.name} (${(dh / 1000).toFixed(1)} km)`;
+      brain.status = `${L('Hedefe intikal', 'Heading to target')}: ${gt!.name} (${(dh / 1000).toFixed(1)} km)`;
       const depression = Math.atan2(h, dh);
       // Burnu basmak birkaç saniye sürer: dalışa hedef dalış açısının biraz önünde başlanır
       if (depression > (dive.diveAngle - 8) * DEG) {
@@ -136,7 +137,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
         if (ahead && h > dive.releaseAlt + 600) {
           st.phase = 'dive';
           st.aimOffset.set(0, 0, 0);
-          world.log(`${ac.callsign} pike dalışına geçti`, ac.team, 'strike');
+          world.log(L(`${ac.callsign} pike dalışına geçti`, `${ac.callsign} rolled into its dive`), ac.team, 'strike');
         } else st.phase = 'reposition';
       }
       break;
@@ -178,11 +179,11 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       // Dalış bilerek yapılır: ağır uçak (Ju 88) da burnu sokabilir
       cmd.maxBank = Math.PI;
       cmd.pushTheta = 1.0;
-      brain.status = `Pike dalışı: ${Math.round(h)} m · sapma ${Math.round(miss)} m`;
+      brain.status = `${L('Pike dalışı', 'Dive')}: ${Math.round(h)} m · ${L('sapma', 'miss')} ${Math.round(miss)} m`;
       _to.set(dx, -h, dz).normalize();
       if (angleBetween(ac.fwd, _to) > 75 * DEG && h < dive.releaseAlt * 2) {
         st.phase = 'pullout';
-        world.log(`${ac.callsign} dalışı iptal etti, yeniden deneyecek`, ac.team, 'strike');
+        world.log(L(`${ac.callsign} dalışı iptal etti, yeniden deneyecek`, `${ac.callsign} aborted the dive, will try again`), ac.team, 'strike');
         break;
       }
       const steep = ac.fwd.y < -0.6 || dive.diveAngle < 60;
@@ -209,7 +210,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       cmd.throttle = 1;
       cmd.speed = null;
       cmd.minAlt = 60;
-      brain.status = 'Toparlanma: yüksek G çekiş';
+      brain.status = L('Toparlanma: yüksek G çekiş', 'Pull-out: high-G recovery');
       if (ac.fwd.y > 0.12) st.phase = ac.bombCount > 0 ? 'reposition' : 'rally';
       break;
     }
@@ -218,7 +219,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       const jink = aaJink(ac, world, cmd.dir);
       cmd.speed = ac.spec.cruiseSpeed;
       cmd.maxG = 2.5;
-      brain.status = jink ? 'Yeniden dalış için açılıyor: uçaksavara karşı kaçamak' : 'Yeniden dalış için açılıyor';
+      brain.status = jink ? L('Yeniden dalış için açılıyor: uçaksavara karşı kaçamak', 'Opening out for another dive: jinking against flak') : L('Yeniden dalış için açılıyor', 'Opening out for another dive');
       if (dh > 4500 && h > cruiseAlt * 0.6 - tp.y) st.phase = 'ingress';
       break;
     }
@@ -235,5 +236,5 @@ export function rally(ac: Aircraft, brain: Brain, target: Vector3, cmd: FlyComma
   orbitDir(cmd.dir, ac, _p, 1500, groundLevel(_p.x, _p.z) + 1200);
   cmd.speed = ac.spec.cruiseSpeed;
   cmd.maxG = 2.5;
-  brain.status = 'Toplanma noktasında, kolu bekliyor';
+  brain.status = L('Toplanma noktasında, kolu bekliyor', 'At the rally point, waiting for the flight');
 }

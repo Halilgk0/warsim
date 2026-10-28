@@ -2,11 +2,11 @@
 // yerleşimi aynı ızgaradan okunur; böylece uzaktan görülen orman lekesi yakından ağaç olur.
 // Yapı tabanları (üsler, fabrikalar, şehir binaları) ormandan ve tarladan temizlenir.
 
-import { CITIES, MAP_SIZE, TEAM_SITES } from '../sim/mapData';
+import { CITIES, MAP_BASE, MAP_HALF as HALF, TEAM_SITES } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, TERRAIN_W, heights, makeFbm, terrainMap } from '../sim/terrain';
 import { clamp, smoothstep } from '../core/math';
 
-const HALF = MAP_SIZE / 2;
+
 
 // 300 km haritada 4,2 milyon köşe: 0..1 değerli ızgaralar 8 bit (0..255) tutulur, okurken /255.
 /** Köşe başına orman yoğunluğu (0..255). */
@@ -24,8 +24,9 @@ type Grid = Float32Array | Uint8Array;
 const unit = (g: Grid) => (g instanceof Uint8Array ? 1 / 255 : 1);
 
 /** Parsel renkleri (sRGB 0-255): buğday, taze ekin, sürülmüş, çayır, kolza. */
+/** Parsel renkleri: olgun buğday, yeşil ekin, sürülmüş toprak, çayır, kolza. */
 export const FIELD_COLORS: [number, number, number][] = [
-  [236, 225, 172], [205, 228, 166], [222, 205, 178], [194, 221, 158], [238, 231, 150],
+  [212, 186, 104], [140, 172, 80], [150, 122, 88], [166, 190, 108], [216, 200, 86],
 ];
 
 interface Circle { x: number; z: number; r: number }
@@ -82,6 +83,8 @@ export function computeLandcover(): void {
   if (computedFor === terrainMap.version) return;
   computedFor = terrainMap.version;
   STATIC_CLEAR = TEAM_SITES.map((t) => ({ x: t.site.x, z: t.site.z, r: 2600 }));
+  /** 300 km hücresinin bu haritanın hücresine oranı (300 km'de 1, 150 km'de 2). */
+  const cellK = MAP_BASE / TERRAIN_N / TERRAIN_CELL;
   forestGrid.fill(0);
   fieldGrid.fill(0);
   fieldKind.fill(0);
@@ -127,10 +130,11 @@ export function computeLandcover(): void {
         const region = smoothstep(-0.12, 0.22, fbmField(x / 15000, z / 15000));
         const fl = clamp(region * 0.85 + cityNear * 0.6, 0, 1) * (1 - smoothstep(0.1, 0.35, f)) * (1 - smoothstep(0.08, 0.14, slope)) * site * (1 - urban);
         let fv = fl * smoothstep(18, 40, h) * (1 - smoothstep(420, 560, h));
-        // Parseller: köşe ızgarasına hizalı dikdörtgenler (bölgeye göre 3-5 × 2-4 köşe), hücre başına renk
+        // Parseller: köşe ızgarasına hizalı dikdörtgenler (bölgeye göre 3-5 × 2-4 köşe, 300 km hücresinde), hücre başına
+        // renk. Küçük haritada hücre küçük: köşe sayısı artar, parsel gerçek boyunda kalır
         const region2 = Math.floor((fbmAngle(x / 30000, z / 30000) + 1) * 3);
-        const pw = 3 + (region2 % 3);
-        const ph = 2 + ((region2 + 1) % 3);
+        const pw = Math.round((3 + (region2 % 3)) * cellK);
+        const ph = Math.round((2 + ((region2 + 1) % 3)) * cellK);
         const cu = Math.floor((i + region2 * 7) / pw);
         const cv = Math.floor((j + region2 * 3 + (cu % 2)) / ph);
         fieldKind[k] = Math.floor(hash(cu, cv) * FIELD_COLORS.length);

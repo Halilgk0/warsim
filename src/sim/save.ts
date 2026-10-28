@@ -15,6 +15,8 @@ import type { LedgerEntry, MarketOffer } from './economy';
 import type { MissionReport } from './missionResult';
 import type { Slot } from './tech';
 import { flattenFootprint, loadMap } from './terrain';
+import { MAP_BASE } from './mapData';
+import { L } from '../i18n';
 
 /** 2: 300 km haritalar (eski 150 km kayıtları yüklenemez). */
 export const SAVE_VERSION = 2;
@@ -85,6 +87,8 @@ export interface SaveData {
   v: number;
   scenarioId: string;
   mapId: string;
+  /** Harita büyüklüğü (m); önceki kayıtlarda yok (300 km). */
+  mapSize?: number;
   time: number;
   playerTeam: number;
   playerName: string;
@@ -161,6 +165,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     v: SAVE_VERSION,
     scenarioId,
     mapId: w.mapId,
+    mapSize: w.mapSize,
     time: w.time,
     playerTeam: w.playerTeam,
     playerName: w.playerName,
@@ -181,11 +186,12 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
 
 /** Kayıttan dünyayı kur (arazi temiz başlar, yapıların düzleştirmeleri yeniden uygulanır). */
 export function deserializeWorld(d: SaveData): World {
-  if (!d || d.v !== SAVE_VERSION) throw new Error('bu kayıt eski harita sürümüne ait (150 km); yeni haritalarda açılamaz');
-  // Önce kaydın haritası (arazi üretimi), sonra dünya
-  loadMap(d.mapId);
+  if (!d || d.v !== SAVE_VERSION) throw new Error(L('bu kayıt eski bir harita sürümüne ait; yeni haritalarda açılamaz', 'this save belongs to an old map version and cannot be opened on the new maps'));
+  // Önce kaydın haritası (arazi üretimi; büyüklüğü olmayan önceki kayıtlar 300 km), sonra dünya
+  loadMap(d.mapId, d.mapSize ?? MAP_BASE);
   const w = new World();
   w.mapId = d.mapId;
+  w.mapSize = d.mapSize ?? MAP_BASE;
   w.time = d.time;
   w.playerTeam = d.playerTeam;
   w.playerName = d.playerName;

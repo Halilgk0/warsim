@@ -21,6 +21,7 @@ içerir. Simülasyon tohumludur: aynı çekim her seferinde aynı oynar.
 node record.mjs --list                      çekimleri listele
 node record.mjs --preview stuka_dive        hızlı deneme (540×960); out/stuka_dive.sheet.jpg kare tablosu
 node record.mjs stuka_dive dogfight         tam kalite: out/<çekim>.mp4 ve .wav
+node record.mjs --dir=once gfx_rise         çıktı out/once/ altına (önce/sonra kayıtları ayrı)
 node probe.mjs betik.js                     kayıt kipindeki dünyada betik çalıştır (tetik anı aramak için)
 ```
 
@@ -32,9 +33,25 @@ Kareler bilgisayarın hızından bağımsız çizilir; ses aynı zamana kilitli 
 node ui.mjs                 telefon yatay ekranında planlayıcı, araştırma, inşa ekranları → out/ui/
 node edit.mjs               yazı kartları, arayüz bölümü, kurgu → release/sosyal/01-tanitim/tanitim.mp4
 node edit.mjs assemble      yalnız kurgu (grafikler hazırsa)
+node kapanis.mjs            kapanış kartı: geri bildirim düğmesi ve sosyal hesaplar → release/sosyal/06-…/yeni/
 ```
 
 Kurgu listesi (`CUTS`) ve yazı kartları (`CAPTIONS`) `edit.mjs` başında. Ses −14 LUFS'e getirilir.
+
+## Önce/sonra geçiş klipleri (geliştirici günlüğü)
+
+Grafik değişikliğinden önce ve sonra aynı çekim kaydedilir; tohumlu simülasyon sayesinde iki kayıt kare kare örtüşür.
+
+```
+node record.mjs --dir=once gfx_valley gfx_rise     değişiklikten önce (eski kodla)
+node record.mjs --dir=sonra gfx_valley gfx_rise    değişiklikten sonra
+node gecis.mjs gfx_valley gfx_rise                 süpürme geçişi (parlak çizgi + "Eski/Yeni görünüm" etiketi)
+node gecis.mjs title_b17 --tur=daire               daire açılımı
+node gecis.mjs gfx_valley --once=sonra --sonra=gunbatimi --ad=gun --eski=Öğle --yeni=Akşam   başka iki durum
+```
+
+Çıktı `release/sosyal/02-devblog/klipler/`: etiketli, etiketsiz (`_temiz`) ve kare tablosu. Geliştirici günlüğü
+için çekimler `gfx_*` adıyla `src/rec/takes.ts` sonunda.
 
 ## Görsel denetim ve performans (önce/sonra)
 

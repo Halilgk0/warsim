@@ -6,7 +6,7 @@
 // İki hat (teknoloji + araç) aynı anda ilerler; savaş puanı araştırmayı en fazla iki kat hızlandırır.
 // Para kuralları açıkken araştırma başlarken ödenir; para yetmezse iş sırada bekler.
 
-import { SPECS, ROLE_NAMES, type AircraftSpec } from '../sim/aircraft/specs';
+import { SPECS, ROLE_NAMES, originName, type AircraftSpec } from '../sim/aircraft/specs';
 import {
   AA_GROUP_NAMES, CAT_ICONS, CAT_NAMES, ERA_NAMES, LINE_NAMES, LINE_ORDER, TECH, TECH_BY_ID,
   type AAGroup, type Era, type ModCategory, type Research, type Slot, type TechNode,
@@ -15,15 +15,16 @@ import { modAppliesTo } from '../sim/mods';
 import type { World } from '../sim/world';
 import { aircraftPlan, aircraftThumb } from '../render/thumbs';
 import { aircraftPrice, fmtMoney, researchCost } from '../sim/economy';
-import { bar, esc, fmtDur, nf } from './dom';
+import { bar, esc, fmtDur, nf, pct } from './dom';
+import { L, count } from '../i18n';
 
 export type ResearchTab = 'arac' | 'mod' | 'hd' | 'radar';
 /** Araştırma aşaması: 1 pervaneliler, 2 ilk nesil jetler (sonraki nesiller eklenecek). */
 export type ResearchStage = 1 | 2;
 
 export const STAGES: { id: ResearchStage; name: string; years: string }[] = [
-  { id: 1, name: 'Pervaneliler', years: '1936–1945' },
-  { id: 2, name: 'İlk nesil jetler', years: '1944–1955' },
+  { id: 1, name: L('Pervaneliler', 'Piston aircraft'), years: '1936–1945' },
+  { id: 2, name: L('İlk nesil jetler', 'First-generation jets'), years: '1944–1955' },
 ];
 
 /** Düğümün aşaması. */
@@ -34,10 +35,10 @@ export function stageOf(t: TechNode): ResearchStage {
 }
 
 export const RESEARCH_TABS: { id: ResearchTab; name: string; sub: string }[] = [
-  { id: 'arac', name: 'Uçak programları', sub: 'tasarım panosu' },
-  { id: 'mod', name: 'Mühendislik', sub: 'motor, gövde, silah' },
-  { id: 'hd', name: 'Hava savunma', sub: 'silah ve nişan' },
-  { id: 'radar', name: 'İhbar ve komuta', sub: 'gözcü, radar' },
+  { id: 'arac', name: L('Uçak programları', 'Aircraft programmes'), sub: L('tasarım panosu', 'design board') },
+  { id: 'mod', name: L('Mühendislik', 'Engineering'), sub: L('motor, gövde, silah', 'engine, airframe, guns') },
+  { id: 'hd', name: L('Hava savunma', 'Air defence'), sub: L('silah ve nişan', 'guns and sights') },
+  { id: 'radar', name: L('İhbar ve komuta', 'Warning and control'), sub: L('gözcü, radar', 'observers, radar') },
 ];
 
 /** Düğümün görünen adı (uçaklarda gerçek ad). */
@@ -68,12 +69,12 @@ function progressOf(r: Research, t: TechNode): number {
 function stamp(r: Research, t: TechNode, st: NodeState): string {
   const aircraft = t.kind === 'aircraft';
   switch (st) {
-    case 'done': return t.starting ? (aircraft ? 'Hizmette' : 'Mevcut') : aircraft ? 'Hizmette' : 'Tamam';
-    case 'active': return `${aircraft ? 'Prototip' : 'Geliştiriliyor'} %${Math.round(progressOf(r, t) * 100)}`;
-    case 'queued': return 'Sırada';
-    case 'avail': return aircraft ? 'Proje hazır' : 'Başlatılabilir';
-    case 'future': return 'Sonraki aşama';
-    default: return 'Taslak';
+    case 'done': return t.starting ? (aircraft ? L('Hizmette', 'In service') : L('Mevcut', 'Available')) : aircraft ? L('Hizmette', 'In service') : L('Tamam', 'Done');
+    case 'active': return `${aircraft ? L('Prototip', 'Prototype') : L('Geliştiriliyor', 'In development')} ${pct(progressOf(r, t))}`;
+    case 'queued': return L('Sırada', 'Queued');
+    case 'avail': return aircraft ? L('Proje hazır', 'Ready to start') : L('Başlatılabilir', 'Can start');
+    case 'future': return L('Sonraki aşama', 'Later stage');
+    default: return L('Taslak', 'Draft');
   }
 }
 
@@ -99,22 +100,24 @@ export function researchHeader(r: Research, w?: World, team = 0): string {
       const t = TECH_BY_ID[wt];
       const cost = costOf(t);
       const have = w!.teams[team].money;
-      return `<div class="pboard idle wait" data-act="rsel" data-id="${t.id}"><span class="pb-ic">${icon}</span><div><b>${label} · para bekleniyor</b><span>${esc(techName(t))}</span>
-        ${bar((have / cost) * 100, 'var(--warn)', true)}<span class="muted small">${fmtMoney(have)} / ${fmtMoney(cost)} — para birikince kendiliğinden başlar</span></div></div>`;
+      return `<div class="pboard idle wait" data-act="rsel" data-id="${t.id}"><span class="pb-ic">${icon}</span><div><b>${label} · ${L('para bekleniyor', 'awaiting funds')}</b><span>${esc(techName(t))}</span>
+        ${bar((have / cost) * 100, 'var(--warn)', true)}<span class="muted small">${fmtMoney(have)} / ${fmtMoney(cost)} — ${L('para birikince kendiliğinden başlar', 'starts by itself once the money is there')}</span></div></div>`;
     }
     if (!c) {
-      return `<div class="pboard idle"><span class="pb-ic">${icon}</span><div><b>${label}</b><span class="muted small">Boş — panodan bir program seç</span></div></div>`;
+      return `<div class="pboard idle"><span class="pb-ic">${icon}</span><div><b>${label}</b><span class="muted small">${L('Boş — panodan bir program seç', 'Idle — pick a programme from the board')}</span></div></div>`;
     }
     const t = TECH_BY_ID[c.id];
     const img = t.specId ? `<img class="pb-plan" src="${aircraftPlan(t.specId)}" alt="">` : `<span class="pb-ic">${icon}</span>`;
     return `<div class="pboard" data-act="rsel" data-id="${t.id}">${img}<div><b>${label}</b><span>${esc(techName(t))}</span>
-      ${bar(c.progress * 100, 'var(--warn)', true)}<span class="muted small">${fmtDur(r.remaining(t.id))} kaldı${q.length ? ` · sırada ${q.length}` : ''}</span></div></div>`;
+      ${bar(c.progress * 100, 'var(--warn)', true)}<span class="muted small">${L(`${fmtDur(r.remaining(t.id))} kaldı`, `${fmtDur(r.remaining(t.id))} left`)}${q.length ? ` · ${L('sırada', 'queued')} ${q.length}` : ''}</span></div></div>`;
   };
   return `<div class="rhead2">
-    ${slot('vehicle', 'Uçak programı', '✈')}
-    ${slot('tech', 'Mühendislik hattı', '⚙')}
-    <div class="pboard rp ${r.boosting ? 'boost' : ''}"><span class="pb-ic">★</span><div><b>Savaş puanı · ${nf.format(r.points)}</b>
-      <span class="muted small">${r.boosting ? 'Cepheden gelen raporlar araştırmayı ×2 hızlandırıyor' : 'Düşürme, isabet ve görevlerden birikir; araştırmayı 2 kata kadar hızlandırır'}</span></div></div>
+    ${slot('vehicle', L('Uçak programı', 'Aircraft programme'), '✈')}
+    ${slot('tech', L('Mühendislik hattı', 'Engineering line'), '⚙')}
+    <div class="pboard rp ${r.boosting ? 'boost' : ''}"><span class="pb-ic">★</span><div><b>${L('Savaş puanı', 'War points')} · ${nf.format(r.points)}</b>
+      <span class="muted small">${r.boosting
+        ? L('Cepheden gelen raporlar araştırmayı ×2 hızlandırıyor', 'Reports from the front are speeding research up ×2')
+        : L('Düşürme, isabet ve görevlerden birikir; araştırmayı 2 kata kadar hızlandırır', 'Earned from kills, hits and missions; speeds research up to 2×')}</span></div></div>
   </div>`;
 }
 
@@ -130,7 +133,8 @@ const LANE_HEAD = 132;
 interface Placed { t: TechNode; sp: AircraftSpec; x: number; y: number }
 
 const ORIGIN_SHORT: Record<string, string> = {
-  'Birleşik Krallık': 'İngiltere', Almanya: 'Alm.', ABD: 'ABD', 'Sovyetler Birliği': 'SSCB', Fransa: 'Fransa',
+  'Birleşik Krallık': L('İngiltere', 'UK'), Almanya: L('Alm.', 'Ger.'), ABD: L('ABD', 'USA'), 'Sovyetler Birliği': L('SSCB', 'USSR'),
+  Fransa: L('Fransa', 'France'), Japonya: L('Japonya', 'Japan'),
 };
 
 function layoutTimeline(stage: ResearchStage): { placed: Placed[]; lanes: { line: string; y: number; h: number }[]; width: number; height: number } {
@@ -174,8 +178,8 @@ function timeline(r: Research, sel: string | null, stage: ResearchStage): string
   const yx = (yr: number) => LANE_HEAD + (yr - Y0) * PX;
   // Dönem şeritleri ve yıl ekseni
   const eras: [number, number, string][] = stage === 1
-    ? [[Y0, 1941.5, 'Erken pervaneli'], [1941.5, Y1 + 1, 'Gelişmiş pervaneli']]
-    : [[Y0, 1944, 'Önceki aşamadan'], [1944, Y1 + 1, 'İlk jetler']];
+    ? [[Y0, 1941.5, L('Erken pervaneli', 'Early piston')], [1941.5, Y1 + 1, L('Gelişmiş pervaneli', 'Late piston')]]
+    : [[Y0, 1944, L('Önceki aşamadan', 'From the previous stage')], [1944, Y1 + 1, L('İlk jetler', 'First jets')]];
   const bands = eras.map(([a, b, n], i) =>
     `<rect x="${yx(a)}" y="0" width="${yx(b) - yx(a)}" height="${height}" class="era e${i}"/><text x="${yx(a) + 8}" y="14" class="era-t">${n}</text>`).join('');
   let ticks = '';
@@ -227,7 +231,7 @@ function timeline(r: Research, sel: string | null, stage: ResearchStage): string
       <svg width="${width}" height="${height}">${laneSvg}${bands}${ticks}${links}</svg>
       ${laneLabels}${chips}
     </div></div>
-    ${stage === 2 ? `<div class="fut-row"><span class="muted small">Sonraki nesiller — radar ve füzeler:</span>${future}</div>` : ''}`;
+    ${stage === 2 ? `<div class="fut-row"><span class="muted small">${L('Sonraki nesiller — radar ve füzeler:', 'Later generations — radar and missiles:')}</span>${future}</div>` : ''}`;
 }
 
 function statLine(label: string, v: string, delta: number | null, unit: string, better: 'up' | 'down' = 'up'): string {
@@ -251,19 +255,19 @@ function aircraftDossier(r: Research, t: TechNode, w: World): string {
   const guns = sp.guns.map((g) => g.name).join(', ') || '—';
   return `
     <div class="ds-head"><img src="${aircraftThumb(sp.id)}" alt=""><div><h3>${esc(sp.name)}</h3>
-      <div class="muted small">${esc(sp.origin)} · ${sp.year} · ${ROLE_NAMES[sp.role]} · ${esc(LINE_NAMES[t.line!])}</div></div></div>
+      <div class="muted small">${esc(originName(sp.origin))} · ${sp.year} · ${ROLE_NAMES[sp.role]} · ${esc(LINE_NAMES[t.line!])}</div></div></div>
     <div class="ds-stamp ${st}">${esc(stamp(r, t, st))}</div>
     ${st === 'active' ? bar(progressOf(r, t) * 100, 'var(--warn)') : ''}
     <p class="ds-desc">${esc(sp.description)}</p>
     <div class="kv ds-kv">
-      ${statLine('Azami hız', `${nf.format(sp.vMax * 3.6)} km/sa`, dv, '', 'up')}
-      ${statLine('Tırmanış', `${sp.climbRate.toFixed(1)} m/sn`, dc, '', 'up')}
-      ${statLine('Sürekli dönüş', `${sp.turnTime.toFixed(1)} sn`, dt, ' sn', 'down')}
-      <span>Tavan</span><span>${nf.format(sp.ceiling)} m</span>
-      <span>Silahlar</span><span class="wrap">${esc(guns)}</span>
-      ${w.economyEnabled ? `<span>Birim fiyat</span><span>${fmtMoney(aircraftPrice(sp))}</span>` : ''}
+      ${statLine(L('Azami hız', 'Top speed'), `${nf.format(sp.vMax * 3.6)} km/${L('sa', 'h')}`, dv, '', 'up')}
+      ${statLine(L('Tırmanış', 'Climb'), `${sp.climbRate.toFixed(1)} m/${L('sn', 's')}`, dc, '', 'up')}
+      ${statLine(L('Sürekli dönüş', 'Sustained turn'), `${sp.turnTime.toFixed(1)} ${L('sn', 's')}`, dt, L(' sn', ' s'), 'down')}
+      <span>${L('Tavan', 'Ceiling')}</span><span>${nf.format(sp.ceiling)} m</span>
+      <span>${L('Silahlar', 'Guns')}</span><span class="wrap">${esc(guns)}</span>
+      ${w.economyEnabled ? `<span>${L('Birim fiyat', 'Unit price')}</span><span>${fmtMoney(aircraftPrice(sp))}</span>` : ''}
     </div>
-    ${prev ? `<p class="muted small">Farklar ${esc(prev.abbr)} ile karşılaştırılıyor.</p>` : ''}
+    ${prev ? `<p class="muted small">${L(`Farklar ${esc(prev.abbr)} ile karşılaştırılıyor.`, `Differences compared with the ${esc(prev.abbr)}.`)}</p>` : ''}
     ${reqBlock(r, t)}
     ${upgradeBlock(r, sp)}
     ${actionRow(r, t, st, w, sp.id)}`;
@@ -273,25 +277,25 @@ function aircraftDossier(r: Research, t: TechNode, w: World): string {
 function upgradeBlock(r: Research, sp: AircraftSpec): string {
   const list = TECH.filter((q) => q.kind === 'mod' && !q.future && modAppliesTo(q.id, sp));
   if (!list.length) return '';
-  return `<div class="sub">Geliştirmeler · açmak için gerekmez, araştırdıkça eklenir</div><div class="ds-reqs">${list.map((q) => {
+  return `<div class="sub">${L('Geliştirmeler · açmak için gerekmez, araştırdıkça eklenir', 'Upgrades · not needed to unlock, added once researched')}</div><div class="ds-reqs">${list.map((q) => {
     const ok = r.done.has(q.id);
     const busy = r.isActive(q.id) || r.isQueued(q.id);
     return `<button class="ds-req ${ok ? 'ok' : busy ? 'busy' : ''}" data-act="rsel" data-id="${q.id}" title="${esc(q.effect ?? '')}">
       <span class="ri">${q.cat ? CAT_ICONS[q.cat] : '•'}</span>
-      <span>${esc(techName(q))}</span><small>${ok ? '✓' : busy ? 'sırada' : '○'}</small></button>`;
+      <span>${esc(techName(q))}</span><small>${ok ? '✓' : busy ? L('sırada', 'queued') : '○'}</small></button>`;
   }).join('')}</div>`;
 }
 
 function reqBlock(r: Research, t: TechNode): string {
   if (!t.requires.length || t.future) return '';
-  return `<div class="sub">Önkoşullar</div><div class="ds-reqs">${t.requires.map((id) => {
+  return `<div class="sub">${L('Önkoşullar', 'Prerequisites')}</div><div class="ds-reqs">${t.requires.map((id) => {
     const q = TECH_BY_ID[id];
     if (!q) return '';
     const ok = r.done.has(id);
     const busy = r.isActive(id) || r.isQueued(id);
     return `<button class="ds-req ${ok ? 'ok' : busy ? 'busy' : ''}" data-act="rsel" data-id="${id}">
       ${q.specId ? `<img src="${aircraftPlan(q.specId)}" alt="">` : `<span class="ri">${q.cat ? CAT_ICONS[q.cat] : '•'}</span>`}
-      <span>${esc(techName(q))}</span><small>${ok ? '✓' : busy ? 'sırada' : '✗'}</small></button>`;
+      <span>${esc(techName(q))}</span><small>${ok ? '✓' : busy ? L('sırada', 'queued') : '✗'}</small></button>`;
   }).join('')}</div>`;
 }
 
@@ -303,14 +307,16 @@ function actionRow(r: Research, t: TechNode, st: NodeState, w: World, specId?: s
   let note = '';
   if (st === 'avail' || st === 'locked') {
     const missing = t.requires.filter((id) => !r.done.has(id)).length;
-    main = `<button class="primary" data-act="tech" data-id="${t.id}">${st === 'avail' ? `Araştır · ${fmtDur(t.time)}${price}` : `Önkoşullarla sıraya al (${missing + 1} iş)`}</button>`;
-    if (econ && cost > 0) note = `<p class="muted small">Maliyet başlarken ödenir${st === 'locked' ? ' (önkoşullar da ayrıca ödenir)' : ''}; durdurursan kalan kısmın %80'i geri döner.</p>`;
+    main = `<button class="primary" data-act="tech" data-id="${t.id}">${st === 'avail' ? `${L('Araştır', 'Research')} · ${fmtDur(t.time)}${price}` : L(`Önkoşullarla sıraya al (${missing + 1} iş)`, `Queue with prerequisites (${count(missing + 1, 'job')})`)}</button>`;
+    if (econ && cost > 0) {
+      note = `<p class="muted small">${L('Maliyet başlarken ödenir', 'The cost is paid at the start')}${st === 'locked' ? L(' (önkoşullar da ayrıca ödenir)', ' (prerequisites are paid separately)') : ''}${L("; durdurursan kalan kısmın %80'i geri döner.", '; if you stop, 80% of the remaining part is refunded.')}</p>`;
+    }
   } else if (st === 'active' || st === 'queued') {
-    main = `<button data-act="tech" data-id="${t.id}">${st === 'active' ? `Durdur · ${fmtDur(r.remaining(t.id))} kaldı` : 'Sıradan çıkar'}</button>`;
+    main = `<button data-act="tech" data-id="${t.id}">${st === 'active' ? L(`Durdur · ${fmtDur(r.remaining(t.id))} kaldı`, `Stop · ${fmtDur(r.remaining(t.id))} left`) : L('Sıradan çıkar', 'Remove from queue')}</button>`;
     const waiting = r.waiting[r.slotOf(t)] === t.id;
-    if (econ && waiting) note = `<p class="note warn">Para bekleniyor: ${fmtMoney(cost)} gerekli. Para birikince kendiliğinden başlar.</p>`;
+    if (econ && waiting) note = `<p class="note warn">${L(`Para bekleniyor: ${fmtMoney(cost)} gerekli. Para birikince kendiliğinden başlar.`, `Awaiting funds: ${fmtMoney(cost)} needed. It starts by itself once the money is there.`)}</p>`;
   }
-  const info = specId ? `<button data-act="spec-info" data-spec="${specId}">Hangarda incele</button>` : '';
+  const info = specId ? `<button data-act="spec-info" data-spec="${specId}">${L('Hangarda incele', 'View in hangar')}</button>` : '';
   return main || info ? `<div class="btn-row">${main}${info}</div>${note}` : '';
 }
 
@@ -335,7 +341,7 @@ function stageNav(r: Research, stage: ResearchStage, kind: 'aircraft' | 'mod'): 
     const nodes = TECH.filter((t) => t.kind === kind && !t.future && stageOf(t) === s.id);
     const done = nodes.filter((t) => r.done.has(t.id)).length;
     return `<button class="${s.id === stage ? 'active' : ''}" data-act="rstage" data-v="${s.id}">
-      <span class="sn">${s.id}</span><span><b>${s.name}</b><small>${s.years} · ${done}/${nodes.length} tamam</small></span></button>`;
+      <span class="sn">${s.id}</span><span><b>${s.name}</b><small>${s.years} · ${done}/${nodes.length} ${L('tamam', 'done')}</small></span></button>`;
   }).join('<span class="stage-arrow">›</span>')}</div>`;
 }
 
@@ -351,15 +357,15 @@ function techDossier(r: Research, t: TechNode, w: World, team: number): string {
   const st = stateOf(r, t);
   const un = unlocks(t.id);
   const sites = t.kind === 'aa' ? w.structures.filter((s) => s.team === team && s.aa && !s.destroyed).length : 0;
-  const where = t.kind === 'mod' ? `${esc(CAT_NAMES[t.cat!])} · ${esc(ERA_NAMES[t.era])}` : t.kind === 'aa' ? esc(AA_GROUP_NAMES[t.group!]) : 'İhbar ve komuta';
+  const where = t.kind === 'mod' ? `${esc(CAT_NAMES[t.cat!])} · ${esc(ERA_NAMES[t.era])}` : t.kind === 'aa' ? esc(AA_GROUP_NAMES[t.group!]) : L('İhbar ve komuta', 'Warning and control');
   return `
     <div class="ds-head"><span class="ds-ic">${t.cat ? CAT_ICONS[t.cat] : t.kind === 'aa' ? '◎' : '◉'}</span><div><h3>${esc(t.name)}</h3><div class="muted small">${where}</div></div></div>
     <div class="ds-stamp ${st}">${esc(stamp(r, t, st))}</div>
     ${st === 'active' ? bar(progressOf(r, t) * 100, 'var(--warn)') : ''}
     ${t.effect ? `<div class="ds-eff">${esc(t.effect)}</div>` : ''}
     <p class="ds-desc">${esc(t.desc)}</p>
-    ${t.kind === 'aa' && st === 'done' ? `<p class="note">Araştırma yalnız kullanılabilir yapar: haritada bir bataryaya tıkla ve panelinden kur (${sites} batarya).</p>` : ''}
-    ${un.length ? `<div class="sub">Açtığı uçaklar</div><div class="ds-reqs">${un.map((u) =>
+    ${t.kind === 'aa' && st === 'done' ? `<p class="note">${L(`Araştırma yalnız kullanılabilir yapar: haritada bir bataryaya tıkla ve panelinden kur (${sites} batarya).`, `Research only makes it available: click a battery on the map and install it from its panel (${count(sites, 'battery', 'batteries')}).`)}</p>` : ''}
+    ${un.length ? `<div class="sub">${L('Açtığı uçaklar', 'Unlocks aircraft')}</div><div class="ds-reqs">${un.map((u) =>
       `<button class="ds-req ${r.done.has(u.id) ? 'ok' : ''}" data-act="rsel" data-id="${u.id}"><img src="${aircraftPlan(u.specId!)}" alt=""><span>${esc(shortName(u))}</span><small>${SPECS[u.specId!]?.year ?? ''}</small></button>`).join('')}</div>` : ''}
     ${reqBlock(r, t)}
     ${actionRow(r, t, st, w)}`;
@@ -367,18 +373,21 @@ function techDossier(r: Research, t: TechNode, w: World, team: number): string {
 
 function aaList(r: Research, sel: string | null): string {
   const groups: AAGroup[] = ['silah', 'nisan', 'tahkimat'];
-  return `<p class="muted">Araştırma yalnız yeni silahı ya da aleti <b>kullanılabilir</b> yapar; hangi bataryaya kurulacağını batarya panelinden seçersin.</p>
+  return `<p class="muted">${L(
+    'Araştırma yalnız yeni silahı ya da aleti <b>kullanılabilir</b> yapar; hangi bataryaya kurulacağını batarya panelinden seçersin.',
+    'Research only makes a new gun or device <b>available</b>; you choose which battery gets it from the battery panel.',
+  )}</p>
     <div class="cols3">${groups.map((g) => {
       const nodes = TECH.filter((t) => t.kind === 'aa' && t.group === g).sort((a, b) => a.tier - b.tier);
-      const base = g === 'silah' ? '<div class="it done static"><i class="dot-st"></i><span class="it-n">12,7 mm uçaksavar makineli</span><small>başlangıçta</small></div>' : '';
+      const base = g === 'silah' ? `<div class="it done static"><i class="dot-st"></i><span class="it-n">${L('12,7 mm uçaksavar makineli', '12.7 mm AA machine gun')}</span><small>${L('başlangıçta', 'from the start')}</small></div>` : '';
       return `<div><div class="mt-h">${esc(AA_GROUP_NAMES[g])}</div>${base}${nodes.map((t) => itemRow(r, t, sel)).join('')}</div>`;
     }).join('')}</div>`;
 }
 
 function radarList(r: Research, sel: string | null): string {
   const nodes = TECH.filter((t) => t.kind === 'radar').sort((a, b) => a.tier - b.tier);
-  const names = ['Gözetleme', 'Erken ihbar', 'Yer kontrollü önleme'];
-  return `<p class="muted">Düşmanı görmeden önce bilmek: gözcüler, telsiz, erken ihbar radarı ve yer kontrolü.</p>
+  const names = [L('Gözetleme', 'Observation'), L('Erken ihbar', 'Early warning'), L('Yer kontrollü önleme', 'Ground-controlled interception')];
+  return `<p class="muted">${L('Düşmanı görmeden önce bilmek: gözcüler, telsiz, erken ihbar radarı ve yer kontrolü.', 'Knowing about the enemy before you see it: observers, radio, early-warning radar and ground control.')}</p>
     <div class="cols3">${[1, 2, 3].map((tier, i) => `<div><div class="mt-h">${names[i]}</div>${nodes.filter((n) => n.tier === tier).map((t) => itemRow(r, t, sel)).join('')}</div>`).join('')}</div>`;
 }
 
@@ -401,6 +410,6 @@ export function researchBody(r: Research, tab: ResearchTab, w: World, team: numb
   else if (tab === 'hd') main = aaList(r, sel);
   else main = radarList(r, sel);
   const t = sel ? TECH_BY_ID[sel] : undefined;
-  const dossier = !t ? '<p class="muted">Bir program seç.</p>' : t.kind === 'aircraft' ? aircraftDossier(r, t, w) : techDossier(r, t, w, team);
+  const dossier = !t ? `<p class="muted">${L('Bir program seç.', 'Pick a programme.')}</p>` : t.kind === 'aircraft' ? aircraftDossier(r, t, w) : techDossier(r, t, w, team);
   return `${researchHeader(r, w, team)}${tabs}<div class="rb"><div class="rb-main">${main}</div><aside class="rb-dos">${dossier}</aside></div>`;
 }

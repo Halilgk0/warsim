@@ -15,6 +15,7 @@ import { defaultLoadout } from './ai/missions';
 import type { Structure } from './structures/structure';
 import { STRUCTURE_COST, aircraftPrice, fmtMoney } from './economy';
 import { TECH_BY_ID } from './tech';
+import { L, count } from '../i18n';
 
 export type MissionOutcome = 'success' | 'fail' | 'none';
 
@@ -103,14 +104,14 @@ export function evaluateMission(world: World, fl: FlightGroup): { outcome: Missi
   const p = fl.plan;
   const wiped = fl.expected > 0 && st.losses >= fl.expected;
   const res = (outcome: MissionOutcome, reason: string, reward = 0) => ({ outcome, reason, reward: outcome === 'success' ? reward : 0 });
-  if (st.recalled && !st.struck && st.kills === 0) return res('none', 'komuta emriyle geri çağrıldı');
+  if (st.recalled && !st.struck && st.kills === 0) return res('none', L('komuta emriyle geri çağrıldı', 'recalled by command'));
   switch (p.type) {
     case 'levelBomb':
     case 'diveBomb':
     case 'attack': {
       const s = p.targetStructureId !== null ? world.structureById(p.targetStructureId) : undefined;
       if (!s) {
-        return st.anyDamage >= 200 ? res('success', 'bölgedeki hedeflere hasar verildi', missionReward(world, p, st)) : res('fail', 'bölgede hedef vurulamadı');
+        return st.anyDamage >= 200 ? res('success', L('bölgedeki hedeflere hasar verildi', 'targets in the area were damaged'), missionReward(world, p, st)) : res('fail', L('bölgede hedef vurulamadı', 'no targets hit in the area'));
       }
       const need = STRIKE_NEED[p.type] ?? 0.12;
       const frac = st.targetDamage / s.maxHp;
@@ -118,42 +119,42 @@ export function evaluateMission(world: World, fl: FlightGroup): { outcome: Missi
       if (destroyed || frac >= need) {
         return res('success', destroyed ? `${s.name} imha edildi` : `${s.name}: %${Math.round(frac * 100)} hasar verildi`, missionReward(world, p, st, 0, destroyed));
       }
-      if (!st.reachedAction) return res('fail', wiped ? 'kol hedefe varmadan imha edildi' : 'hedefe ulaşılamadı');
+      if (!st.reachedAction) return res('fail', wiped ? L('kol hedefe varmadan imha edildi', 'the flight was wiped out before reaching the target') : L('hedefe ulaşılamadı', 'could not reach the target'));
       return res('fail', `hedefe yeterli hasar verilemedi (%${Math.round(frac * 100)}, gereken %${Math.round(need * 100)})`);
     }
     case 'intercept': {
       const tf = st.targetFlightId !== null ? world.flightById(st.targetFlightId) : undefined;
-      if (st.targetKills > 0) return res('success', `hedef koldan ${st.targetKills} uçak düşürüldü`, missionReward(world, p, st));
+      if (st.targetKills > 0) return res('success', L(`hedef koldan ${st.targetKills} uçak düşürüldü`, `${st.targetKills} aircraft shot down from the target flight`), missionReward(world, p, st));
       // Hedef kol saldırısını yapamadan döndüyse de önleme amacına ulaşmıştır
-      if (st.kills > 0 && tf && !tf.stats.struck && tf.phase !== 'action') return res('success', 'hedef kol saldırısını yapamadan döndü', missionReward(world, p, st));
-      if (st.kills === 0 && st.losses === 0) return res('fail', 'hedef önlenemedi (temas kurulamadı)');
+      if (st.kills > 0 && tf && !tf.stats.struck && tf.phase !== 'action') return res('success', L('hedef kol saldırısını yapamadan döndü', 'the target flight turned back before attacking'), missionReward(world, p, st));
+      if (st.kills === 0 && st.losses === 0) return res('fail', L('hedef önlenemedi (temas kurulamadı)', 'target not intercepted (no contact)'));
       return res('fail', 'hedef kola zarar verilemedi');
     }
     case 'escort': {
       const ef = fl.escortOf;
-      if (!ef) return res('none', 'eşlik edilecek kol yok');
+      if (!ef) return res('none', L('eşlik edilecek kol yok', 'no flight to escort'));
       const es = ef.stats;
-      if (es.recalled && !es.struck) return res('none', 'eşlik edilen kol geri çağrıldı');
+      if (es.recalled && !es.struck) return res('none', L('eşlik edilen kol geri çağrıldı', 'the escorted flight was recalled'));
       const maxLoss = Math.floor(ef.expected / 2);
       if ((es.struck || es.reachedAction) && es.losses <= maxLoss) {
-        return res('success', `${ef.name} kolu hedefe ulaştı, kaybı ${es.losses}/${ef.expected}`, missionReward(world, p, st, flightValue(ef)));
+        return res('success', L(`${ef.name} kolu hedefe ulaştı, kaybı ${es.losses}/${ef.expected}`, `${ef.name} flight reached the target, losses ${es.losses}/${ef.expected}`), missionReward(world, p, st, flightValue(ef)));
       }
-      if (es.losses > maxLoss) return res('fail', `${ef.name} kolu ağır kayıp verdi (${es.losses}/${ef.expected})`);
-      return res('fail', `${ef.name} kolu hedefe ulaşamadı`);
+      if (es.losses > maxLoss) return res('fail', L(`${ef.name} kolu ağır kayıp verdi (${es.losses}/${ef.expected})`, `${ef.name} flight took heavy losses (${es.losses}/${ef.expected})`));
+      return res('fail', L(`${ef.name} kolu hedefe ulaşamadı`, `${ef.name} flight did not reach the target`));
     }
     case 'cap': {
-      if (st.areaDamage > 0 && st.kills === 0) return res('fail', 'devriye bölgesi vuruldu, düşman düşürülemedi');
-      if (st.kills > 0 && st.kills >= st.losses) return res('success', `bölge korundu, ${st.kills} düşman düşürüldü`, missionReward(world, p, st));
-      if (st.kills === 0 && st.losses === 0) return res('none', 'devriyede temas olmadı');
-      return res('fail', `kayıp (${st.losses}) düşürülenden (${st.kills}) fazla`);
+      if (st.areaDamage > 0 && st.kills === 0) return res('fail', L('devriye bölgesi vuruldu, düşman düşürülemedi', 'the patrol area was hit and no enemy was shot down'));
+      if (st.kills > 0 && st.kills >= st.losses) return res('success', L(`bölge korundu, ${st.kills} düşman düşürüldü`, `area defended, ${count(st.kills, 'enemy', 'enemies')} shot down`), missionReward(world, p, st));
+      if (st.kills === 0 && st.losses === 0) return res('none', L('devriyede temas olmadı', 'no contact on patrol'));
+      return res('fail', L(`kayıp (${st.losses}) düşürülenden (${st.kills}) fazla`, `losses (${st.losses}) exceeded kills (${st.kills})`));
     }
     case 'sweep': {
-      if (st.kills === 0 && st.losses === 0) return res('none', 'taramada temas olmadı');
-      if (st.kills > st.losses) return res('success', `${st.kills} düşman düşürüldü, kayıp ${st.losses}`, missionReward(world, p, st));
-      return res('fail', `kayıp (${st.losses}) düşürülenden (${st.kills}) fazla ya da eşit`);
+      if (st.kills === 0 && st.losses === 0) return res('none', L('taramada temas olmadı', 'no contact on the sweep'));
+      if (st.kills > st.losses) return res('success', L(`${st.kills} düşman düşürüldü, kayıp ${st.losses}`, `${count(st.kills, 'enemy', 'enemies')} shot down, ${st.losses} lost`), missionReward(world, p, st));
+      return res('fail', L(`kayıp (${st.losses}) düşürülenden (${st.kills}) fazla ya da eşit`, `losses (${st.losses}) equal to or above kills (${st.kills})`));
     }
     case 'ferry':
-      return fl.landed > 0 ? res('success', `${fl.landed} uçak teslim edildi`) : res('fail', 'uçaklar teslim edilemedi');
+      return fl.landed > 0 ? res('success', L(`${fl.landed} uçak teslim edildi`, `${fl.landed} aircraft delivered`)) : res('fail', L('uçaklar teslim edilemedi', 'aircraft could not be delivered'));
   }
 }
 
@@ -277,12 +278,12 @@ export function missionOdds(
     const fit = main.every((g) => IDEAL[plan.type].includes(SPECS[g.specId].role));
     if (!fit) {
       pct -= 10;
-      factors.push({ label: 'Uçak türü bu göreve uygun değil', delta: -10 });
+      factors.push({ label: L('Uçak türü bu göreve uygun değil', 'Aircraft type not suited to this mission'), delta: -10 });
     }
     const n = Math.min(12, Math.round(5 * Math.log2(Math.max(total, 1))));
     if (n > 0) {
       pct += n;
-      factors.push({ label: `${total} uçak`, delta: n });
+      factors.push({ label: L(`${total} uçak`, `${total} aircraft`), delta: n });
     }
   }
   const strike = plan.type === 'levelBomb' || plan.type === 'diveBomb' || plan.type === 'attack';
@@ -295,15 +296,17 @@ export function missionOdds(
     const ratio = dmg >= tgtS.hp ? 3 : dmg / Math.max(need, 1);
     const d = ratio < 0.5 ? -30 : ratio < 0.85 ? -18 : ratio < 1.15 ? -6 : ratio < 2 ? 0 : 6;
     const label = dmg >= tgtS.hp
-      ? 'Yük hedefi yıkmaya yeter'
-      : `Beklenen hasar ≈%${Math.round((100 * dmg) / tgtS.maxHp)} (gereken %${Math.round((100 * need) / tgtS.maxHp)})${ratio < 0.85 ? ': yük hedefe yetmeyebilir' : ''}`;
+      ? L('Yük hedefi yıkmaya yeter', 'The load is enough to destroy the target')
+      : L(`Beklenen hasar ≈%${Math.round((100 * dmg) / tgtS.maxHp)} (gereken %${Math.round((100 * need) / tgtS.maxHp)})`,
+        `Expected damage ≈${Math.round((100 * dmg) / tgtS.maxHp)}% (needed ${Math.round((100 * need) / tgtS.maxHp)}%)`)
+        + (ratio < 0.85 ? L(': yük hedefe yetmeyebilir', ': the load may not be enough') : '');
     pct += d;
     factors.push({ label, delta: d });
   }
   const esc = escorts.reduce((a, g) => a + g.count, 0);
   if (strike && esc >= 2) {
     pct += 10;
-    factors.push({ label: `${esc} eskort avcısı`, delta: 10 });
+    factors.push({ label: L(`${esc} eskort avcısı`, count(esc, 'escort fighter')), delta: 10 });
   }
   const tp = world.planTargetPos(plan);
   if (tp) {
@@ -324,16 +327,16 @@ export function missionOdds(
     if (aa && strike) {
       const d = -Math.min(18, aa * 5 + (heavy ? 4 : 0));
       pct += d;
-      factors.push({ label: `Hedefte ${aa} uçaksavar bataryası${heavy ? ' (ağır top)' : ''}`, delta: d });
+      factors.push({ label: L(`Hedefte ${aa} uçaksavar bataryası`, `${count(aa, 'flak battery', 'flak batteries')} at the target`) + (heavy ? L(' (ağır top)', ' (heavy guns)') : ''), delta: d });
     }
     if (bases && (strike || plan.type === 'escort' || plan.type === 'sweep')) {
       const d = -Math.min(12, bases * 6);
       pct += d;
-      factors.push({ label: `Yakında ${bases} düşman hava üssü`, delta: d });
+      factors.push({ label: L(`Yakında ${bases} düşman hava üssü`, `${count(bases, 'enemy airbase')} nearby`), delta: d });
     }
     if (radar && strike) {
       pct -= 4;
-      factors.push({ label: 'Düşman radarı bölgeyi görüyor', delta: -4 });
+      factors.push({ label: L('Düşman radarı bölgeyi görüyor', 'Enemy radar covers the area'), delta: -4 });
     }
     if (from) {
       const km = Math.hypot(tp.x - from.x, tp.z - from.z) / 1000;
@@ -349,17 +352,17 @@ export function missionOdds(
   pct = Math.max(5, Math.min(92, Math.round(pct)));
   const need = STRIKE_NEED[plan.type];
   const criterion = strike
-    ? `Hedefe en az %${Math.round((need ?? 0.12) * 100)} hasar ver ya da hedefi yık`
-    : plan.type === 'intercept' ? 'Hedef koldan en az bir uçak düşür ya da saldırısını engelle'
-      : plan.type === 'escort' ? 'Eşlik edilen kol hedefe ulaşsın ve yarısından fazlasını kaybetmesin'
-        : plan.type === 'cap' ? 'Bölgeyi koru ve en az bir düşman düşür (kayıp, düşürülenden az)'
-          : plan.type === 'sweep' ? 'Düşürülen düşman kayıptan fazla olsun' : 'Uçakları teslim et (ödül yok)';
+    ? L(`Hedefe en az %${Math.round((need ?? 0.12) * 100)} hasar ver ya da hedefi yık`, `Deal at least ${Math.round((need ?? 0.12) * 100)}% damage to the target or destroy it`)
+    : plan.type === 'intercept' ? L('Hedef koldan en az bir uçak düşür ya da saldırısını engelle', 'Shoot down at least one aircraft of the target flight or stop its attack')
+      : plan.type === 'escort' ? L('Eşlik edilen kol hedefe ulaşsın ve yarısından fazlasını kaybetmesin', 'The escorted flight must reach the target without losing more than half')
+        : plan.type === 'cap' ? L('Bölgeyi koru ve en az bir düşman düşür (kayıp, düşürülenden az)', 'Defend the area and shoot down at least one enemy (fewer losses than kills)')
+          : plan.type === 'sweep' ? L('Düşürülen düşman kayıptan fazla olsun', 'Shoot down more enemies than you lose') : L('Uçakları teslim et (ödül yok)', 'Deliver the aircraft (no reward)');
   // Ödül: hedef biliniyorsa ona göre
   let rewardText = '';
   if (strike) {
     const s = plan.targetStructureId !== null ? world.structureById(plan.targetStructureId) : undefined;
     const r0 = missionReward(world, plan, { killValue: 0, targetFlightValue: 0 });
-    rewardText = `${fmtMoney(r0)}${s ? `, yıkılırsa ${fmtMoney(missionReward(world, plan, { killValue: 0, targetFlightValue: 0 }, 0, true))}` : ''}`;
+    rewardText = `${fmtMoney(r0)}${s ? `${L(', yıkılırsa', ', if destroyed')} ${fmtMoney(missionReward(world, plan, { killValue: 0, targetFlightValue: 0 }, 0, true))}` : ''}`;
   } else if (plan.type === 'intercept') {
     const t = plan.targetAircraftId !== null ? world.aircraftById(plan.targetAircraftId) : undefined;
     const v = t?.flight ? flightValue(t.flight) : t ? aircraftPrice(t.spec) : 0;
@@ -367,8 +370,8 @@ export function missionOdds(
   } else if (plan.type === 'escort') {
     const f = plan.targetFlightId !== null ? world.flightById(plan.targetFlightId) : undefined;
     rewardText = fmtMoney(missionReward(world, plan, { killValue: 0, targetFlightValue: 0 }, f ? flightValue(f) : 0));
-  } else if (plan.type === 'cap') rewardText = `${fmtMoney(400)} + düşürülenlerin değerinin %8'i`;
-  else if (plan.type === 'sweep') rewardText = `${fmtMoney(300)} + düşürülenlerin değerinin %10'u`;
+  } else if (plan.type === 'cap') rewardText = L(`${fmtMoney(400)} + düşürülenlerin değerinin %8'i`, `${fmtMoney(400)} + 8% of the value of kills`);
+  else if (plan.type === 'sweep') rewardText = L(`${fmtMoney(300)} + düşürülenlerin değerinin %10'u`, `${fmtMoney(300)} + 10% of the value of kills`);
   else rewardText = 'yok (intikal)';
   return { pct, factors, missing: missing.sort((a, b) => b.delta - a.delta), criterion, rewardText };
 }

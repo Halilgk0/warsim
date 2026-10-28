@@ -2,6 +2,7 @@ import type { Structure } from './structure';
 import type { World } from '../world';
 import { SPECS } from '../aircraft/specs';
 import { newAirframe } from './airbase';
+import { L } from '../../i18n';
 
 export interface ProductionItem {
   specId: string;
@@ -38,11 +39,11 @@ export class Factory {
     this.queue.shift();
     const af = newAirframe(item.specId, s.team);
     base.addAirframe(af);
-    world.log(`${s.name}: ${spec.name} üretildi, ${base.s.name} hangarına teslim edildi`, s.team, 'build');
+    world.log(L(`${s.name}: ${spec.name} üretildi, ${base.s.name} hangarına teslim edildi`, `${s.name}: ${spec.name} built, delivered to the ${base.s.name} hangar`), s.team, 'build');
     // Tekrar: yeni sipariş yeniden ödenir; para yetmezse tekrar durur
     if (this.repeat && !world.orderAircraft(s, item.specId)) {
       this.repeat = false;
-      world.log(`${s.name}: para yetmediği için tekrarlı üretim durdu`, s.team, 'build');
+      world.log(L(`${s.name}: para yetmediği için tekrarlı üretim durdu`, `${s.name}: repeat production stopped, not enough money`), s.team, 'build');
     }
   }
 }

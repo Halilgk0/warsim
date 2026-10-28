@@ -4,6 +4,7 @@
 
 import { NAME_MAX } from '../persist';
 import { $, esc } from './dom';
+import { L } from '../i18n';
 
 /** Google Formu: yanıt adresi ve soruların alan kimlikleri (formun sayfasından). */
 const FORM = {
@@ -136,9 +137,9 @@ export class FeedbackBox {
     const message = this.message.trim();
     const p = this.price.trim().replace(',', '.');
     const price = p === '' ? null : Number(p);
-    if (!name) this.error = 'Göndermeden önce gönderen adını yaz.';
-    else if (price !== null && (!Number.isFinite(price) || price < 0 || price > 1e6)) this.error = 'Fiyat 0 ile 1.000.000 arasında bir sayı olmalı.';
-    else if (!message && price === null) this.error = 'Bir görüş yaz ya da oyuna vereceğin fiyatı gir.';
+    if (!name) this.error = L('Göndermeden önce gönderen adını yaz.', 'Enter your name before sending.');
+    else if (price !== null && (!Number.isFinite(price) || price < 0 || price > 1e6)) this.error = L('Fiyat 0 ile 1.000.000 arasında bir sayı olmalı.', 'The price must be a number between 0 and 1,000,000.');
+    else if (!message && price === null) this.error = L('Bir görüş yaz ya da oyuna vereceğin fiyatı gir.', 'Write some feedback or enter the price you would pay.');
     if (this.error) {
       this.render();
       this.el.querySelector<HTMLInputElement>(name ? 'textarea' : 'input[name="fbname"]')?.focus();
@@ -149,11 +150,11 @@ export class FeedbackBox {
     this.render();
     try {
       await post(entry);
-      this.done = 'Teşekkürler! Geri bildirimin bize ulaştı.';
+      this.done = L('Teşekkürler! Geri bildirimin bize ulaştı.', 'Thank you! Your feedback has reached us.');
       void flushOutbox();
     } catch {
       keepLocally(entry);
-      this.error = 'Şu an gönderilemedi; bu cihazda saklandı. Biraz sonra yeniden dene.';
+      this.error = L('Şu an gönderilemedi; bu cihazda saklandı. Biraz sonra yeniden dene.', 'Could not send right now; it is kept on this device. Try again a little later.');
     }
     this.sending = false;
     this.render();
@@ -163,19 +164,19 @@ export class FeedbackBox {
     if (!this.isOpen) return;
     const body = this.done
       ? `<div class="fb-done">${esc(this.done)}</div>
-         <div class="fb-actions"><button data-fb="again">Yeni geri bildirim</button><button class="primary" data-fb="close">Kapat</button></div>`
-      : `<label class="mm-label" for="fb-msg">Görüşün ve önerin</label>
-         <textarea id="fb-msg" name="fbmsg" maxlength="${MESSAGE_MAX}" rows="5" placeholder="Neyi beğendin, neyi değiştirelim, nerede hata gördün?">${esc(this.message)}</textarea>
-         <label class="fb-price" for="fb-price">Ben bu oyuna Steam’de
+         <div class="fb-actions"><button data-fb="again">${L('Yeni geri bildirim', 'New feedback')}</button><button class="primary" data-fb="close">${L('Kapat', 'Close')}</button></div>`
+      : `<label class="mm-label" for="fb-msg">${L('Görüşün ve önerin', 'Your thoughts and suggestions')}</label>
+         <textarea id="fb-msg" name="fbmsg" maxlength="${MESSAGE_MAX}" rows="5" placeholder="${L('Neyi beğendin, neyi değiştirelim, nerede hata gördün?', 'What did you like, what should we change, where did you spot a bug?')}">${esc(this.message)}</textarea>
+         <label class="fb-price" for="fb-price">${L('Ben bu oyuna Steam’de', 'I would pay')}
            <input id="fb-price" name="fbprice" type="number" inputmode="decimal" min="0" step="1" placeholder="…" value="${esc(this.price)}">
-           $ veririm</label>
-         <label class="mm-label" for="fb-name">Gönderen adı <span class="fb-req">zorunlu</span></label>
-         <input id="fb-name" name="fbname" maxlength="${NAME_MAX * 2}" autocomplete="nickname" placeholder="Adın ya da takma adın" value="${esc(this.name)}">
+           ${L('$ veririm', '$ for this game on Steam')}</label>
+         <label class="mm-label" for="fb-name">${L('Gönderen adı', 'Your name')} <span class="fb-req">${L('zorunlu', 'required')}</span></label>
+         <input id="fb-name" name="fbname" maxlength="${NAME_MAX * 2}" autocomplete="nickname" placeholder="${L('Adın ya da takma adın', 'Your name or nickname')}" value="${esc(this.name)}">
          ${this.error ? `<div class="fb-err">${esc(this.error)}</div>` : ''}
-         <div class="fb-actions"><button data-fb="close">Vazgeç</button><button class="primary" data-fb="send" ${this.sending ? 'disabled' : ''}>${this.sending ? 'Gönderiliyor…' : 'Gönder'}</button></div>`;
+         <div class="fb-actions"><button data-fb="close">${L('Vazgeç', 'Cancel')}</button><button class="primary" data-fb="send" ${this.sending ? 'disabled' : ''}>${this.sending ? L('Gönderiliyor…', 'Sending…') : L('Gönder', 'Send')}</button></div>`;
     this.el.innerHTML = `<div class="fb-card">
-      <div class="news-head"><h2>Geri bildirim</h2><button class="icon" data-fb="close" title="Kapat (Esc)">✕</button></div>
-      <p class="muted small">Hesap açman gerekmez; yalnız gönderen adını yazman yeter.</p>
+      <div class="news-head"><h2>${L('Geri bildirim', 'Feedback')}</h2><button class="icon" data-fb="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
+      <p class="muted small">${L('Hesap açman gerekmez; yalnız gönderen adını yazman yeter.', 'No account needed; just enter your name.')}</p>
       ${body}
     </div>`;
   }

@@ -10,6 +10,8 @@ vp.id = 'viewport';
 const labels = document.createElement('div');
 labels.id = 'labels';
 document.body.append(vp, labels);
+// Denetim kareleri en yüksek kalitede (oyunun varsayılanı düşük)
+S.settings.graphics.quality = 'high';
 const r = new R.GameRenderer(vp, labels, { preserveBuffer: true });
 r.rig.director = () => {};
 const DEG = Math.PI / 180;
@@ -133,5 +135,9 @@ window.__st = {
     return out;
   },
   settings: S.settings,
+  /** Dünya zamanı (s). */
+  time: () => w?.time ?? 0,
+  /** Tanı için: oyunun çizicisi (sahne, katmanlar). */
+  r,
 };
 return 'hazır';
