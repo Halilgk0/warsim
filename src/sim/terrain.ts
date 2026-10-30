@@ -1,19 +1,19 @@
 // Paylaşılan yükseklik haritası. Simülasyon (çarpışma, arazi takibi, radar görüş hattı) ve
 // render (3B arazi ağı) aynı ızgarayı ve aynı üçgenlemeyi kullanır; uçağın "gördüğü" zemin ekrandakiyle aynıdır.
 
-import { clamp, smoothstep } from '../core/math';
-import { LAND_POINTS, MAP_BASE, MAP_HALF as HALF, MAP_SCALE, MAP_SIZE, setMapPlaces } from './mapData';
+import { smoothstep } from '../core/math';
+import { MAP_BASE, MAP_HALF as HALF } from './mapData';
 import { MAPS, mapById, type MapDef } from './maps';
+import { TERRAIN_N, TERRAIN_W, fillRows, prepareMap } from './terrainGen';
 
 export { makeFbm } from '../core/noise';
+export { TERRAIN_N, TERRAIN_W };
 
 /**
- * Izgara: her büyüklükte 2048 hücre. Hücre haritayla ölçeklenir (300 km'de ≈146 m, 150 km'de ≈73 m): çizim ve bellek
- * aynı kalır, küçük haritada arazi daha ayrıntılı. Canlı bağ (harita yüklenince değişir).
+ * Izgara: her büyüklükte 2048 hücre (TERRAIN_N). Hücre haritayla ölçeklenir (300 km'de ≈146 m, 150 km'de ≈73 m):
+ * çizim ve bellek aynı kalır, küçük haritada arazi daha ayrıntılı. Canlı bağ (harita yüklenince değişir).
  */
-export const TERRAIN_N = 2048;
 export let TERRAIN_CELL = MAP_BASE / TERRAIN_N;
-export const TERRAIN_W = TERRAIN_N + 1;
 /** Etkin dünya yarıçapı (4/3 kuralı) — radar ufku için. */
 const EARTH_R_EFF = 8.5e6;
 
@@ -28,32 +28,15 @@ export const terrainMap = { id: '', size: MAP_BASE, key: '', version: 0 };
 /** Harita + büyüklük anahtarı ("anakara@150000"). */
 export const mapKey = (id: string, size: number): string => `${id}@${size}`;
 
-/** Haritanın arazisini üret: doğal yükseklik + üs/şehir ovalarının düzleştirilmesi. */
+/** Haritanın arazisini üret: doğal yükseklik + üs/şehir ovalarının düzleştirilmesi (terrainGen.ts). */
 function generate(def: MapDef, size: number): void {
-  setMapPlaces(def.id, size, def.sites, def.cities, def.extraLand);
-  TERRAIN_CELL = MAP_SIZE / TERRAIN_N;
-  const k = MAP_SCALE;
-  const pts = LAND_POINTS;
-  const targets = pts.map((p) => clamp(def.natural(p.x, p.z, k), 40, 320));
-  for (let j = 0; j < TERRAIN_W; j++) {
-    const z = -HALF + j * TERRAIN_CELL;
-    for (let i = 0; i < TERRAIN_W; i++) {
-      const x = -HALF + i * TERRAIN_CELL;
-      let m = def.natural(x, z, k);
-      for (let q = 0; q < pts.length; q++) {
-        const p = pts[q];
-        const dx = x - p.x;
-        const dz = z - p.z;
-        const r2 = p.r * p.r;
-        if (Math.abs(dx) > p.r * 3 || Math.abs(dz) > p.r * 3) continue;
-        const dd = (dx * dx + dz * dz) / r2;
-        if (dd > 8) continue;
-        const k = smoothstep(0, 1, Math.exp(-dd) * 1.3);
-        m += (targets[q] - m) * k;
-      }
-      heights[j * TERRAIN_W + i] = m;
-    }
-  }
+  TERRAIN_CELL = prepareMap(def, size);
+  fillRows(def, TERRAIN_CELL, 0, TERRAIN_W, heights);
+  finish(def, size);
+}
+
+/** Üretilen araziyi yüklü harita yap. */
+function finish(def: MapDef, size: number): void {
   pristine.set(heights);
   edited = [];
   terrainEdits.dirty.length = 0;
@@ -71,6 +54,22 @@ export function loadMap(id: string, size: number = MAP_BASE): void {
   generate(def, size);
 }
 
+/**
+ * Dışarıda (işçilerde) üretilecek harita için hazırlık: yerler ve hücre boyu kurulur, heights'ı çağıran doldurur, sonra
+ * endExternalLoad. render/mapLoad.ts açılışta böyle yükler. Yüklü haritaysa false.
+ */
+export function beginExternalLoad(id: string, size: number): boolean {
+  const def = mapById(id);
+  if (terrainMap.key === mapKey(def.id, size)) return false;
+  TERRAIN_CELL = prepareMap(def, size);
+  return true;
+}
+
+/** Dışarıda üretilen heights'ı yüklü harita yap. */
+export function endExternalLoad(id: string, size: number): void {
+  finish(mapById(id), size);
+}
+
 /** Arazi düzenlendiğinde (inşaat) render katmanına haber vermek için. */
 export const terrainEdits = {
   version: 0,
@@ -80,8 +79,9 @@ export const terrainEdits = {
 /** Bu oyunda düzenlenen bölgeler. */
 let edited: { i0: number; j0: number; i1: number; j1: number }[] = [];
 
-// Açılışta ilk harita (taban büyüklükte)
-generate(MAPS[0], MAP_BASE);
+// İlk harita (taban büyüklükte). Tarayıcıda açılışta işçilerde üretilir (render/mapLoad.ts; ana iş parçacığı
+// kilitlenmesin); başsız simülasyonda (Node) modül yüklenirken burada.
+if (typeof document === 'undefined' && !('WorkerGlobalScope' in globalThis)) generate(MAPS[0], MAP_BASE);
 
 /** Tüm inşaat düzleştirmelerini geri al (her yeni dünya temiz araziyle başlar). */
 export function resetTerrainEdits(): void {

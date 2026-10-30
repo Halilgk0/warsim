@@ -15,6 +15,8 @@ import { METRICS, type LeaderRow, type Metric, type StatsReport, cleanName, name
 interface Env {
   DB: D1Database;
   ADMIN_KEY?: string;
+  /** Oyunun dosyaları (dist/): olmayan adreste 404.html buradan. */
+  ASSETS: Fetcher;
 }
 
 interface AccountRow {
@@ -422,9 +424,16 @@ const CORS = {
   vary: 'origin',
 };
 
+/** Olmayan adres: oyunun 404 sayfası (404 durum koduyla; arama motoru sayfa yok saysın). */
+async function notFound(url: URL, env: Env): Promise<Response> {
+  const page = env.ASSETS ? await env.ASSETS.fetch(new URL('/404.html', url)).catch(() => null) : null;
+  if (!page?.ok) return fail(404, 'not_found');
+  return new Response(page.body, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+}
+
 async function route(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
-  if (!url.pathname.startsWith('/api/')) return fail(404, 'not_found');
+  if (!url.pathname.startsWith('/api/')) return notFound(url, env);
   try {
     return await api(req, env, url);
   } catch (e) {

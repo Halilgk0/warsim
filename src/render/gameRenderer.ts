@@ -6,7 +6,8 @@ import { AA_WEAPONS, AASite } from '../sim/structures/airDefense';
 import { detectProbabilityAt } from '../sim/structures/radar';
 import { RUNWAY_HALF, corridorMargin } from '../sim/structures/airbase';
 import { turretWorldPos } from '../sim/ai/gunner';
-import { groundLevel, terrainEdits } from '../sim/terrain';
+import { groundLevel, loadMap, terrainEdits, terrainMap } from '../sim/terrain';
+import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
 import { StructureView } from './structures';
@@ -152,6 +153,8 @@ export class GameRenderer {
 
   /** preserveBuffer: çizilen kare sonradan okunabilsin (video kaydı). */
   constructor(container: HTMLElement, private readonly labelLayer: HTMLElement, opts: { preserveBuffer?: boolean } = {}) {
+    // Oyun haritayı önceden yükler (main.ts); kayıt kipi ve görsel denetim yüklemez: eskisi gibi ilk harita, 300 km
+    if (!terrainMap.key) loadMap(MAPS[0].id);
     // Ölçek 40 m'den 90 km'ye kadar değiştiği için logaritmik derinlik (uzakta z-fighting olmasın)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer });
     this.renderer.setPixelRatio(this.baseRatio);

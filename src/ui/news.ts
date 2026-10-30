@@ -31,6 +31,48 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'ansiklopedi',
+    date: '2026-10-30',
+    title: 'Uçak ansiklopedisi, daha hızlı açılış, gerçek tavanlar',
+    summary: 'Oyundaki 56 uçağın tarihçesi ve verileri artık ansiklopedide. Oyun telefonda çok daha çabuk açılıyor; avcılar gerçek tavanlarına tırmanıyor.',
+    cover: img('ansiklopedi.jpg'),
+    images: [
+      { src: img('ansiklopedi-ucak.jpg'), caption: 'Her uçağın sayfasında tarihçe, künye, oyundaki modelin görselleri ve oyundaki değerleri.' },
+    ],
+    sections: [
+      {
+        text: [
+          'Oyundaki bütün uçakların, 1937’nin Hurricane’inden süpersonik jetlere, artık kendi sayfası var: warsimbox.com/ansiklopedi.',
+        ],
+      },
+      {
+        heading: 'Uçak ansiklopedisi',
+        bullets: [
+          'Uçaklar eskiden yeniye sıralı. Her sayfada uçağın tarihçesi, künyesi (ilk uçuş, hizmete giriş, tasarımcı, motor, silahlar…) ve oyundaki modelinin görselleri var.',
+          'WarSimBox’ta bölümü: uçağın oyundaki azami hızı, tırmanması, dönüşü, tutunma hızı ve araştırmada nasıl açıldığı.',
+          'Ana menüde Ansiklopedi düğmesi; hangarda uçağın açıklamasının altında “Tarihçesini ansiklopedide oku” bağlantısı.',
+          'Türkçe ve İngilizce.',
+        ],
+      },
+      {
+        heading: 'Daha hızlı açılış',
+        bullets: [
+          'Harita artık cihazın birkaç çekirdeğinde aynı anda hazırlanıyor: oyun eskisinden çok daha çabuk açılır, yükleme ekranı donmaz.',
+          'Açılışta Anakara, menüde seçtiğin büyüklükte hazırlanır: orada yeni harekât beklemeden başlar.',
+          'Başka harita ya da büyüklük seçince bekleme de kısaldı.',
+        ],
+      },
+      {
+        heading: 'Uçuş düzeltmeleri',
+        bullets: [
+          'Avcılar gerçek servis tavanlarına kadar tırmanır: motor gücünün irtifayla azalması her avcı için ayrı ayarlandı.',
+          'Her uçağın gerçek azami hızı, en hızlı olduğu irtifadaki hızıdır: hiçbir irtifada bu hızı aşmaz.',
+          'Jetlerde ses hızına yaklaşınca hava direnci gerçekteki gibi dikleşir; F-86 ile MiG-15 en hızlı alçakta uçar.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'yeni-adres',
     date: '2026-10-30',
     title: 'Yeni adres warsimbox.com: şifreli hesap, bulut kayıtları, skorlar',
@@ -573,7 +615,7 @@ function fmtDate(d: string): string {
 /** Görsel ve üstünde tabana ortalanmış başlık (kutu, listede de aynı). */
 export function newsCard(n: NewsItem, attrs: string, small = false): string {
   return `<button class="news-card${small ? ' small' : ''}" ${attrs}>
-    <img src="${n.cover}" alt="" loading="lazy">
+    <img src="${n.cover}" alt="" width="1280" height="720" loading="lazy">
     <span class="news-cap"><b>${esc(n.title)}</b><small>${fmtDate(n.date)}</small></span>
   </button>`;
 }

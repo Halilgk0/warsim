@@ -12,6 +12,45 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  ansiklopedi: {
+    title: 'Aircraft encyclopedia, faster start, real ceilings',
+    summary: 'The history and data of all 56 aircraft in the game are now in the encyclopedia. The game starts much faster on phones, and fighters climb to their real ceilings.',
+    captions: [
+      'Every aircraft page has its history, key facts, pictures of the in-game model and its figures in the game.',
+    ],
+    sections: [
+      {
+        text: [
+          'Every aircraft in the game, from the 1937 Hurricane to supersonic jets, now has its own page: warsimbox.com/en/encyclopedia.',
+        ],
+      },
+      {
+        heading: 'Aircraft encyclopedia',
+        bullets: [
+          'Aircraft are listed from oldest to newest. Each page has the aircraft’s history, key facts (first flight, entry into service, designer, engine, guns…) and pictures of its in-game model.',
+          'The In WarSimBox section: the aircraft’s top speed, climb, turn and stall speed in the game, and how to unlock it in research.',
+          'An Encyclopedia button in the main menu; in the hangar, a “Read its history in the encyclopedia” link under the aircraft’s description.',
+          'In English and Turkish.',
+        ],
+      },
+      {
+        heading: 'Faster start',
+        bullets: [
+          'The map is now prepared on several cores of your device at once: the game starts much faster and the loading screen no longer freezes.',
+          'At start-up the Mainland map is prepared at the size you picked in the menu, so a new campaign there starts without waiting.',
+          'Switching to another map or size takes less time too.',
+        ],
+      },
+      {
+        heading: 'Flight fixes',
+        bullets: [
+          'Fighters climb to their real service ceilings: how engine power falls off with altitude is tuned for each fighter.',
+          'Each aircraft’s real top speed is its speed at the altitude where it is fastest: it does not exceed it at any altitude.',
+          'In jets, drag rises steeply near the speed of sound as it did in reality; the F-86 and MiG-15 are fastest down low.',
+        ],
+      },
+    ],
+  },
   'yeni-adres': {
     title: 'New address warsimbox.com: password accounts, cloud saves, scores',
     summary: 'The game has its own address now. Accounts have passwords, saves live in the cloud, and the Scores tab ranks players weekly and all time.',

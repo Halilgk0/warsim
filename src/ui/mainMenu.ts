@@ -28,7 +28,8 @@ interface Draft { name: string; enemies: number; mapId: string; size?: number }
 /** Seçilen harita büyüklüğü bu tarayıcıda hatırlanır. */
 const SIZE_KEY = 'warsim.mapSize';
 
-function savedSize(): number {
+/** Oyuncunun seçtiği harita büyüklüğü (main.ts açılışta da bu büyüklükte yükler: ilk harekât beklemeden başlar). */
+export function savedSize(): number {
   try {
     const v = Number(localStorage.getItem(SIZE_KEY));
     if ((MAP_SIZES as readonly number[]).includes(v)) return v;
@@ -287,7 +288,7 @@ export class MainMenu {
     const foes = TEAM_SITES.slice(1, this.enemies + 1)
       .map((t) => `<span class="mm-foe"><i style="background:${t.color}"></i>${t.name}</span>`).join('');
     const maps = MAPS.map((m) => `<button class="mm-mapcard ${m.id === this.mapId ? 'active' : ''}" data-mm="map" data-v="${m.id}" title="${esc(m.desc)}">
-        <img src="${mapPreview(m, 96)}" alt=""><span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></span></button>`).join('');
+        <img src="${mapPreview(m, 96)}" alt="" width="96" height="96"><span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></span></button>`).join('');
     const enemyBtns = Array.from({ length: MAX_ENEMIES }, (_, i) => i + 1)
       .map((n) => `<button class="${n === this.enemies ? 'active' : ''}" data-mm="enemies" data-v="${n}">${n}</button>`).join('');
     // Sekmeler: herkese yeni harekât ve skorlar; hesapla kayıtlar
@@ -352,7 +353,7 @@ export class MainMenu {
         </div>`;
     this.el.innerHTML = `
       <div class="mm-veil"></div>
-      <div class="mm-top"><div class="mm-brand">WarSimBox</div>${top}</div>
+      <div class="mm-top"><h1 class="mm-brand">WarSimBox</h1>${top}</div>
       <div class="mm-news">
         <div class="mm-label">${L('Haberler', 'News')}</div>
         ${newsCard(NEWS[0], `data-mm="news" title="${L('Bütün haberler', 'All news')}"`, true)}

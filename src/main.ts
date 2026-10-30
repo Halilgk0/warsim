@@ -1,6 +1,9 @@
 import './style.css';
 import { Game } from './game';
 import { EN, L, LANG } from './i18n';
+import { loadMapParallel } from './render/mapLoad';
+import { MAPS } from './sim/maps';
+import { savedSize } from './ui/mainMenu';
 
 // Sayfanın dili (büyük harfe çevirme: Türkçede i → İ, İngilizcede i → I) ve index.html'deki sabit metinler
 document.documentElement.lang = LANG;
@@ -40,7 +43,26 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('rec')) {
     'This browser does not support 3D graphics (WebGL 2), or hardware acceleration is turned off. Try an up-to-date Chrome, Safari, Edge or Firefox.',
   ));
 } else {
+  void start();
+}
+
+/** İki kare sonra (tarayıcı arada çizsin). */
+const nextPaint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+/**
+ * Açılış: önce yükleme ekranı arka görseliyle çizilir (görsel inene dek en fazla 1,2 sn beklenir), sonra arazi
+ * işçilerde üretilir (ana iş parçacığı kilitlenmez), en son oyun kurulur. Eskiden hepsi tek, uzun bir görevdi:
+ * telefonda yükleme ekranı bile 10+ sn donuk kalıyordu.
+ */
+async function start(): Promise<void> {
   try {
+    const bg = new Image();
+    bg.src = `${import.meta.env.BASE_URL}yukleme.jpg`;
+    await Promise.race([bg.decode().catch(() => {}), new Promise((r) => setTimeout(r, 1200))]);
+    await nextPaint();
+    // Oyuncunun seçtiği büyüklükte (varsayılan 200 km): yeni harekât haritayı yeniden üretmeden başlar
+    await loadMapParallel(MAPS[0].id, savedSize());
+    await nextPaint();
     const game = new Game();
     // Konsoldan inceleme kolaylığı için
     (window as unknown as { game: Game }).game = game;

@@ -113,13 +113,24 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **`src/net/`:** sunucuyla konuşma (`api.ts`), istemci ve sunucu ortak kuralları (`shared.ts`: ad anahtarı, ölçütler),
   skor istatistiği (`stats.ts`).
 - **`worker/` + `migrations/`: sunucu (Cloudflare Worker + D1).** Oyunun dosyalarını Cloudflare sunar, worker yalnız
-  `/api/*`'ye bakar. Yapılandırma `wrangler.jsonc`.
+  `/api/*`'ye ve olmayan adreslere bakar (404 durum koduyla `public/404.html`). Yapılandırma `wrangler.jsonc`.
   - Bedava planda istek başına ~10 ms işlemci süresi var. Bu yüzden şifre tarayıcıda PBKDF2 ile uzatılır, sunucu
     yalnız tuzlu SHA-256 yapar.
   - Ad anahtarında I, İ, ı ve i aynı sayılır (`nameKey`); istemci ve sunucu aynı işlevi kullanır.
   - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.
   - Şifresini ve kurtarma kodunu unutan oyuncu: `tools/admin.mjs` (önce kimlik sorusu sor; bkz. dosyanın başı).
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
+- **Açılış ve harita yükleme:**
+  - `main.ts` önce yükleme ekranını (arka görsel `public/yukleme.jpg`) çizdirir.
+  - Sonra haritayı oyuncunun seçtiği büyüklükte yükler, böylece ilk harekât yeniden üretimsiz başlar. En son oyunu
+    kurar.
+  - Arazi ve arazi örtüsü işçilerde paralel üretilir (`render/mapLoad.ts`, `render/mapWorker.ts`). Saf hesaplar
+    `sim/terrainGen.ts` ve `render/landcoverGen.ts`'tedir; tek seferlik yol da aynı işlevleri kullanır, sonuç bit bit
+    aynıdır (eski kayıtlar).
+  - Oyun içinde harita değişimi (`withMap`) de işçilerle yapılır; bu sırada kare döngüsü bekler.
+  - Başsız simülasyonda (Node) ilk harita `terrain.ts` yüklenirken eski yolla üretilir.
+  - Kayıt kipi ve görsel denetim haritayı önceden yüklemez: `GameRenderer` kurulurken yüklü harita yoksa ilk haritayı
+    300 km'de yükler (eski çekimler aynı kalır).
 - **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron

@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <title>WarSimBox: İkinci Dünya Savaşı hava harbi strateji oyunu</title>
     <!-- Arama ve paylaşım: sayfa tek adres (warsimbox.com); eski adresler buna işaret eder (canonical). -->
-    <meta name="description" content="Spitfire, Bf 109, P-51, Stuka, B-17 ve ilk jetler gerçek verileriyle uçar. Üs kur, uçak üret, araştır, görev planla; it dalaşı ve uçaksavarla rakip ülkeleri yen. Tarayıcıda ücretsiz." />
+    <meta name="description" content="Spitfire, Bf 109, P-51, Stuka ve B-17 gerçek verileriyle uçar. Üs kur, uçak üret, görev planla, rakiplerini yen. Tarayıcıda ücretsiz." />
     <link rel="canonical" href="https://warsimbox.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="WarSimBox" />
@@ -44,15 +44,24 @@
     </script>
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="preload" as="image" href="yukleme.jpg" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Yazı tipi çizimi bekletmez: önce sistem yazısı, Nunito inince yerine geçer -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" /></noscript>
     <style>
-      /* İlk açılış: arazi üretilirken (stil dosyası henüz yüklenmeden) görünen ekran */
-      #loading { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: #e9eee9;
-        font-family: 'Nunito', system-ui, sans-serif; color: #4a4857; }
-      #loading > div { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-      #loading b { font-size: 24px; }
+      /* İlk açılış: arazi üretilirken (stil dosyası henüz yüklenmeden) görünen ekran. Arkada oyundan bir gün batımı:
+         oyun inerken boş ekran yerine oyunun kendisi görünür, sayfanın ilk büyük içeriği de (LCP) hemen çizilir. */
+      #loading { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+        background: #e9eee9; font-family: 'Nunito', system-ui, sans-serif; color: #4a4857; }
+      /* Görsel öğe (CSS arka planı değil): tarayıcı onu sayfanın en büyük içeriği sayar */
+      #loading > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 62%; }
+      #loading > div { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: calc(100% - 32px);
+        padding: 16px 28px; border-radius: 18px; text-align: center; background: rgba(251, 248, 243, 0.88);
+        box-shadow: 0 6px 24px rgba(60, 50, 80, 0.18); }
+      #loading b { font-size: 26px; }
+      #loading p { margin: 0; font-size: 14px; font-weight: 700; }
       #loading span { font-size: 13px; font-weight: 700; color: #9a96a6; }
       #loading.hidden { display: none; }
     </style>
@@ -132,7 +141,7 @@
       <div id="feedback" class="fb hidden"></div>
       <div id="toast" class="toast hidden"></div>
       <div id="rotate" class="rotate"><div><b data-en="Turn your phone sideways">Telefonu yan çevir</b><span data-en="WarSimBox is played in landscape.">WarSimBox yatay ekranda oynanır.</span></div></div>
-      <div id="loading" class="loading"><div><b>WarSimBox</b><span data-en="Preparing the map…">Harita hazırlanıyor…</span></div></div>
+      <div id="loading" class="loading"><img src="yukleme.jpg" alt="" fetchpriority="high"><div><b>WarSimBox</b><p data-en="A Second World War air war strategy game">İkinci Dünya Savaşı hava harbi strateji oyunu</p><span data-en="Preparing the map…">Harita hazırlanıyor…</span></div></div>
     </div>
     <script>
       // Oyun paketi inerken görünen yükleme ekranı ve yan çevir uyarısı da seçili dilde olsun (kural i18n.ts

@@ -16,7 +16,8 @@ import { BuildBar } from './ui/build';
 import { Layout } from './ui/layout';
 import { onSettingsChange, settings } from './ui/settings';
 import { aircraftNode } from './sim/tech';
-import { groundLevel, loadMap, mapKey, terrainMap } from './sim/terrain';
+import { groundLevel, mapKey, terrainMap } from './sim/terrain';
+import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
@@ -105,6 +106,8 @@ export class Game {
   private acc = 0;
   private last = performance.now();
   private lastErrorLog = 0;
+  /** withMap haritayı işçilerde yüklerken (döngü bekler). */
+  private mapLoading = false;
   private errorShown = false;
 
   constructor() {
@@ -144,7 +147,8 @@ export class Game {
   }
 
   /**
-   * Harita gerekiyorsa önce onu yükle (arazi üretimi birkaç saniye sürer: yükleme ekranı gösterilir), sonra devam et.
+   * Harita gerekiyorsa önce onu yükle, sonra devam et. Arazi ve örtüsü işçilerde paralel üretilir (render/mapLoad.ts);
+   * bu sırada yükleme ekranı açık kalır, oyun döngüsü durur (eski dünya yarı yüklenmiş araziyi okumasın).
    */
   private withMap(mapId: string, size: number, then: () => void): void {
     if (terrainMap.key === mapKey(mapById(mapId).id, size)) {
@@ -155,15 +159,19 @@ export class Game {
     const name = `${mapById(mapId).name} · ${size / 1000} km`;
     el.querySelector('span')!.textContent = L(`${name} hazırlanıyor…`, `Preparing ${name}…`);
     el.classList.remove('hidden');
+    this.mapLoading = true;
     // Yükleme ekranı çizilsin diye iki kare bekle
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      try {
-        loadMap(mapId, size);
-        this.renderer.prepareMap();
-        then();
-      } finally {
-        el.classList.add('hidden');
-      }
+      void loadMapParallel(mapId, size)
+        .then(() => {
+          this.renderer.prepareMap();
+          then();
+        })
+        .catch((e) => this.reportError(e))
+        .finally(() => {
+          this.mapLoading = false;
+          el.classList.add('hidden');
+        });
     }));
   }
 
@@ -668,6 +676,11 @@ export class Game {
   /** Kare döngüsü: bir sonraki kare önce istenir, karedeki hata oyunu dondurmaz. */
   private loop = (now: number): void => {
     requestAnimationFrame(this.loop);
+    if (this.mapLoading) {
+      // Harita yükleniyor (withMap): dünya ve çizim bekler; dönüşte uzun bir adım atılmasın
+      this.last = now;
+      return;
+    }
     try {
       this.tick(now);
     } catch (e) {

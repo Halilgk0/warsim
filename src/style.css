@@ -777,7 +777,7 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
   backdrop-filter: blur(1.5px);
 }
 .mm-top { position: absolute; top: calc(18px * var(--ui)); left: calc(24px * var(--ui)); right: calc(24px * var(--ui)); display: flex; align-items: center; justify-content: space-between; }
-.mm-brand { font-size: calc(26px * var(--ui)); font-weight: 800; letter-spacing: 0.4px; color: var(--ink); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
+.mm-brand { margin: 0; line-height: 1.2; font-size: calc(26px * var(--ui)); font-weight: 800; letter-spacing: 0.4px; color: var(--ink); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
 .mm-acc { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
 .mm-login { background: var(--panel); box-shadow: var(--shadow); padding: calc(9px * var(--ui)) calc(16px * var(--ui)); border-radius: calc(12px * var(--ui)); }
 /* Düğme görünümlü bağlantı (button'ın yazı biçimi) */
