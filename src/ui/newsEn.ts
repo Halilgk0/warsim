@@ -12,6 +12,49 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'yeni-adres': {
+    title: 'New address warsimbox.com: password accounts, cloud saves, scores',
+    summary: 'The game has its own address now. Accounts have passwords, saves live in the cloud, and the Scores tab ranks players weekly and all time.',
+    sections: [
+      {
+        text: [
+          'WarSimBox now lives at its own address: warsimbox.com. The old address (warsimbox.vercel.app) stays open for a while, then closes.',
+        ],
+      },
+      {
+        heading: 'If you played at the old address',
+        bullets: [
+          'Your saves are in that browser, and the new address cannot see them on its own. To move them, open the old address and press “Set password” in the main menu.',
+          'Set a password for your account: the saves in that browser upload to the cloud.',
+          'Then press “Log in” at warsimbox.com and use the same name and password. Your saves are in the Saves tab.',
+          'If someone else has taken your name, pick another one; your saves still move over.',
+        ],
+      },
+      {
+        heading: 'Password accounts',
+        bullets: [
+          'Accounts have a name and a password. Someone who sees your name on the leaderboard can no longer get into your account.',
+          'When you create an account you get a recovery code; write it down. If you forget your password, use Log in → Forgot password and this code to set a new one.',
+          'If you lose the code too, write to us through Feedback or social media. Once a few questions confirm the account is yours, we send a new code.',
+        ],
+      },
+      {
+        heading: 'Cloud saves',
+        bullets: [
+          'Your saves are kept on the server: carry on from another phone or computer with the same account.',
+          'Without a connection a save is written to your device first (“on this device” tag) and uploads by itself once you are back online.',
+        ],
+      },
+      {
+        heading: 'Scores and profile',
+        bullets: [
+          'The Scores tab in the main menu: Kills, Wins, Earned, biggest Air force and play Time. All time and this week.',
+          'Only campaigns played with an account count; scenarios and guest games do not. Time is real time: it stops when the game is open but you are away.',
+          'Profile: tap your name at the top right (in a campaign, ☰ Menu → Profile and scores). Your scores, your rank and password change are there.',
+        ],
+      },
+    ],
+  },
   'yeni-gorunum': {
     title: 'A new look: sky, clouds and sunsets',
     summary: 'A day cycle, clouds, a rolling sea and contrails; aircraft in their real paint schemes and rebuilt structures.',

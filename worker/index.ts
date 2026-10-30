@@ -412,15 +412,33 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   return fail(404, 'not_found');
 }
 
+/** Eski adres (Vercel) kayıtlarını buraya taşıyabilsin diye başka kaynaktan yalnız ona izin verilir. */
+const OLD_ORIGIN = 'https://warsimbox.vercel.app';
+const CORS = {
+  'access-control-allow-origin': OLD_ORIGIN,
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE',
+  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-max-age': '86400',
+  vary: 'origin',
+};
+
+async function route(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url);
+  if (!url.pathname.startsWith('/api/')) return fail(404, 'not_found');
+  try {
+    return await api(req, env, url);
+  } catch (e) {
+    console.error(e);
+    return fail(500, 'server');
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const url = new URL(req.url);
-    if (!url.pathname.startsWith('/api/')) return fail(404, 'not_found');
-    try {
-      return await api(req, env, url);
-    } catch (e) {
-      console.error(e);
-      return fail(500, 'server');
-    }
+    if (req.headers.get('origin') !== OLD_ORIGIN) return route(req, env);
+    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    const res = await route(req, env);
+    for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
+    return res;
   },
 } satisfies ExportedHandler<Env>;

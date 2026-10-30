@@ -16,6 +16,7 @@ import { LANG, L, lower, saveLang } from '../i18n';
 import { playLangSwap } from './langSwap';
 import { socialLinks } from './social';
 import { LeaderboardPanel } from './leaderboard';
+import { NEW_SITE, OLD_SITE } from '../net/api';
 
 type Tab = 'new' | 'saves' | 'scores';
 
@@ -239,6 +240,9 @@ export class MainMenu {
         });
         return;
       }
+      case 'newsite':
+        location.href = NEW_SITE;
+        return;
       case 'profile':
         void this.game.profile.open();
         return;
@@ -290,7 +294,20 @@ export class MainMenu {
       ${acc ? tab('saves', `${L('Kayıtlar', 'Saves')}${this.saves.list.length ? ` <span class="cnt">${this.saves.list.length}</span>` : ''}`) : ''}
       ${tab('scores', L('Skorlar', 'Scores'))}</div>`;
     const legacy = legacyAccountName();
-    const claim = legacy
+    const goNew = `<button class="primary mini" data-mm="newsite">${L('warsimbox.com\'a git', 'Go to warsimbox.com')}</button>`;
+    // Eski adreste: önce kayıtlar buluta taşınır (şifre belirleyerek), sonra yeni adreste aynı ad ve şifreyle girilir
+    const claim = OLD_SITE
+      ? legacy
+        ? `<div class="mm-note mm-claim"><span>${L(
+          `WarSimBox artık <b>warsimbox.com</b> adresinde. Kayıtlarını taşımak için önce burada <b>${esc(legacy)}</b> hesabına şifre belirle, sonra yeni adreste aynı ad ve şifreyle gir.`,
+          `WarSimBox has moved to <b>warsimbox.com</b>. To take your saves with you, first set a password for <b>${esc(legacy)}</b> here, then log in at the new address with the same name and password.`,
+        )}</span><button class="primary mini" data-mm="claim">${L('Şifre belirle', 'Set password')}</button></div>`
+        : `<div class="mm-note mm-claim"><span>${acc
+          ? L(`WarSimBox artık <b>warsimbox.com</b> adresinde. Kayıtların bulutta: orada <b>${esc(acc.name)}</b> adı ve şifrenle gir.`,
+            `WarSimBox has moved to <b>warsimbox.com</b>. Your saves are in the cloud: log in there as <b>${esc(acc.name)}</b> with your password.`)
+          : L('WarSimBox artık <b>warsimbox.com</b> adresinde. Bu adres bir süre sonra kapanacak.',
+            'WarSimBox has moved to <b>warsimbox.com</b>. This address will close soon.')}</span>${goNew}</div>`
+      : legacy
       ? `<div class="mm-note mm-claim"><span>${L(
         `Hesaplar artık şifreli. Kayıtlarını korumak için <b>${esc(legacy)}</b> hesabına şifre belirle.`,
         `Accounts now have passwords. Set a password for <b>${esc(legacy)}</b> to keep your saves.`,

@@ -5,7 +5,11 @@
 import { L } from '../i18n';
 import { CLIENT_HASH_ITER, clientSalt, nameKey } from './shared';
 
-const BASE = (import.meta.env.VITE_API as string | undefined) ?? '/api';
+/** Eski adres (Vercel). Orada sunucu yok: hesaplar warsimbox.com'daki sunucuya gider, menü yeni adresi duyurur. */
+export const OLD_SITE = typeof location !== 'undefined' && location.hostname === 'warsimbox.vercel.app';
+export const NEW_SITE = 'https://warsimbox.com/';
+
+const BASE = (import.meta.env.VITE_API as string | undefined) ?? (OLD_SITE ? `${NEW_SITE}api` : '/api');
 const TIMEOUT_MS = 15000;
 
 /** Sunucunun hata kodu ve kullanıcıya gösterilecek ileti. */

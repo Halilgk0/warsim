@@ -31,6 +31,53 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'yeni-adres',
+    date: '2026-10-30',
+    title: 'Yeni adres warsimbox.com: şifreli hesap, bulut kayıtları, skorlar',
+    summary: 'Oyun kendi adresine taşındı. Hesaplar artık şifreli, kayıtlar bulutta; Skorlar sekmesinde haftalık ve tüm zamanlar sıralaması.',
+    cover: img('hesap.jpg'),
+    images: [],
+    sections: [
+      {
+        text: [
+          'WarSimBox artık kendi adresinde: warsimbox.com. Eski adres (warsimbox.vercel.app) bir süre açık kalacak, sonra kapanacak.',
+        ],
+      },
+      {
+        heading: 'Eski adreste oynadıysan',
+        bullets: [
+          'Kayıtların o tarayıcıda duruyor; yeni adres onları kendiliğinden göremez. Taşımak için eski adresi aç ve ana menüdeki “Şifre belirle”ye bas.',
+          'Hesabına bir şifre belirle: o tarayıcıdaki kayıtların buluta yüklenir.',
+          'Sonra warsimbox.com’da “Giriş yap”a bas, aynı ad ve şifreyle gir. Kayıtların Kayıtlar sekmesinde.',
+          'Adın başkasınca alınmışsa başka bir ad seç; kayıtların yine taşınır.',
+        ],
+      },
+      {
+        heading: 'Şifreli hesap',
+        bullets: [
+          'Hesap ad ve şifreyle açılır. Skor tablosunda adını gören biri artık hesabına giremez.',
+          'Hesap açınca bir kurtarma kodu gösterilir; bir yere yaz. Şifreni unutursan Giriş yap → Şifremi unuttum’dan bu kodla yeni şifre belirlersin.',
+          'Kodu da kaybedersen Geri bildirim’den ya da sosyal medyadan bize yaz. Hesabın sana ait olduğunu birkaç soruyla doğrulayınca yeni kod veririz.',
+        ],
+      },
+      {
+        heading: 'Bulut kayıtları',
+        bullets: [
+          'Kayıtların sunucuda saklanır: başka telefondan ya da bilgisayardan aynı hesapla kaldığın yerden devam edersin.',
+          'Bağlantı yoksa kayıt önce cihazına yazılır (“bu cihazda” etiketi), bağlantı gelince kendiliğinden yüklenir.',
+        ],
+      },
+      {
+        heading: 'Skorlar ve profil',
+        bullets: [
+          'Ana menüde Skorlar sekmesi: Düşürme, Zafer, Kazanç, en büyük Hava kuvveti ve oynama Süresi. Tüm zamanlar ve bu hafta.',
+          'Yalnız hesapla oynanan harekâtlar sayılır; senaryolar ve misafir oyun sayılmaz. Süre gerçek zamandır: oyun açık ama başında değilsen işlemez.',
+          'Profil: sağ üstte adına dokun (harekâtta ☰ Menü → Profil ve skorlar). Skorların, sıran ve şifre değiştirme orada.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'yeni-gorunum',
     date: '2026-10-28',
     title: 'Yeni görünüm: gökyüzü, bulutlar ve gün batımı',
