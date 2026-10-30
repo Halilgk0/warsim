@@ -8,8 +8,42 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <title>WarSimBox</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2386b3a2'/%3E%3Cpath d='M6 17l20-6-3 4 3 4z' fill='%23fff'/%3E%3C/svg%3E" />
+    <title>WarSimBox: İkinci Dünya Savaşı hava harbi strateji oyunu</title>
+    <!-- Arama ve paylaşım: sayfa tek adres (warsimbox.com); eski adresler buna işaret eder (canonical). -->
+    <meta name="description" content="Spitfire, Bf 109, P-51, Stuka, B-17 ve ilk jetler gerçek verileriyle uçar. Üs kur, uçak üret, araştır, görev planla; it dalaşı ve uçaksavarla rakip ülkeleri yen. Tarayıcıda ücretsiz." />
+    <link rel="canonical" href="https://warsimbox.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WarSimBox" />
+    <meta property="og:url" content="https://warsimbox.com/" />
+    <meta property="og:title" content="WarSimBox: İkinci Dünya Savaşı hava harbi strateji oyunu" />
+    <meta property="og:description" content="Gerçek uçak verileriyle it dalaşı, bombardıman ve uçaksavar. Üs kur, uçak üret, görev planla. Tarayıcıda ücretsiz; telefon ve bilgisayar." />
+    <meta property="og:image" content="https://warsimbox.com/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Gün batımında bulutların üstünde B-17 kolu ve WarSimBox logosu" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "WarSimBox",
+        "url": "https://warsimbox.com/",
+        "image": "https://warsimbox.com/og.jpg",
+        "description": "İkinci Dünya Savaşı hava harbi strateji oyunu: gerçek uçak verileriyle uçan uçaklar, it dalaşı, uçaksavar, görev planlama ve rakip ülkelerle herkes herkese harekât. A WW2 air war strategy game with real aircraft data.",
+        "genre": ["Strateji", "Strategy", "Simülasyon", "Simulation"],
+        "gamePlatform": ["Web browser", "Android", "iOS", "Windows", "macOS"],
+        "applicationCategory": "Game",
+        "operatingSystem": "Any",
+        "inLanguage": ["tr", "en"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "sameAs": ["https://www.instagram.com/warsimbox/", "https://www.youtube.com/@Warsimbox", "https://www.tiktok.com/@warsimbox0"]
+      }
+    </script>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -24,6 +58,15 @@
     </style>
   </head>
   <body>
+    <noscript>
+      <h1>WarSimBox: İkinci Dünya Savaşı hava harbi strateji oyunu</h1>
+      <p>Üs kur, uçak üret, araştır ve görev planla. Spitfire, Bf 109, P-51, Fw 190, Stuka, B-17 ve ilk jetler gerçek
+        verileriyle uçar; it dalaşı, bombardıman ve uçaksavarla rakip ülkelere karşı savaş. Tarayıcıda ücretsiz,
+        telefonda ve bilgisayarda oynanır. Oynamak için JavaScript'i aç.</p>
+      <p>A WW2 air war strategy game with real aircraft data: build bases, produce aircraft, plan missions and fight
+        rival nations in dogfights, bombing raids and against anti-aircraft fire. Free in the browser. Please enable
+        JavaScript to play.</p>
+    </noscript>
     <div id="app">
       <div id="viewport"></div>
       <div id="labels"></div>

@@ -1,11 +1,16 @@
 {
   "name": "WarSimBox",
   "short_name": "WarSimBox",
+  "description": "İkinci Dünya Savaşı hava harbi strateji oyunu",
   "lang": "tr",
   "start_url": ".",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#dde9ec",
   "theme_color": "#86b3a2",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }
