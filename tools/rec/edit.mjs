@@ -108,7 +108,7 @@ function captionHtml([, , kind, text, sub]) {
   else if (kind === 'end') {
     body = `<div class="scrim"></div><div class="end"><div class="mark">${LOGO}<b>WarSimBox</b></div>
       <div class="line">Ücretsiz · İndirme yok · Telefonda oyna</div>
-      <div class="url">warsimbox.vercel.app</div><small>Bağlantı profilde</small></div>`;
+      <div class="url">warsimbox.com</div><small>Bağlantı profilde</small></div>`;
   }
   return `<!doctype html><html><head><meta charset="utf-8">${FONT}<style>${BASE_CSS}</style></head><body>${body}</body></html>`;
 }

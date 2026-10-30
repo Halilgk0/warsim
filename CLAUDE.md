@@ -1,6 +1,6 @@
 # WarSimBox — Claude için çalışma notları
 
-Yukarıdan bakılan, pastel, low-poly bir hava savaşı strateji oyunu. Canlı sürüm: https://warsimbox.vercel.app.
+Yukarıdan bakılan, pastel, low-poly bir hava savaşı strateji oyunu. Canlı sürüm: https://warsimbox.com (Cloudflare).
 Oyuncuların çoğu **yatay telefonda** oynuyor. Arayüz **Türkçe ve İngilizce**. En öncelikli konu uçakların ve hava
 savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Şehir ve ekonomi katmanı ikinci planda.
 
@@ -18,8 +18,10 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
   - `index.html`'deki sabit metinler `data-en` / `data-en-title` taşır. İlk yükleme ekranını paket inmeden satır içi
     betik çevirir; kuralı `i18n.ts` `initial()` ile aynıdır.
   - Başsız simülasyon (Node) ve video kayıt kipi hep Türkçedir.
-- **Commit ve push yalnız kullanıcı söyleyince.** `main`'e push, Vercel'de doğrudan canlıya çıkar. Push'tan önce
-  `npm run build` (tsc dahil) ve kısa bir oyun denemesi yap.
+- **Commit ve push yalnız kullanıcı söyleyince.** `main`'e push, Cloudflare'de (Workers Builds) doğrudan canlıya çıkar.
+  Push'tan önce `npm run build` (tsc dahil) ve kısa bir oyun denemesi yap.
+  - Eski adres warsimbox.vercel.app: otomatik kurulumu kapalı (`vercel.json` ve proje ayarı). Eski oyuncuların
+    kayıtları taşınana kadar açık kalır, sonra silinir.
 - Kayıt anahtarları (`warsim.*`) ve IndexedDB adı (`warsim`) değişmez. Değişirse oyuncuların kayıtları silinir.
 - **Telefon önce gelir:**
   - Arayüz ölçülerini `calc(Npx * var(--ui))` ile yaz.

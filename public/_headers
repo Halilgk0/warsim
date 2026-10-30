@@ -1,0 +1,9 @@
+# Cloudflare yanıt başlıkları (Workers static assets; derlemede dist/'e kopyalanır, kendisi sunulmaz).
+# Vite'ın adı içeriğe göre değişen dosyaları bir yıl önbellekte kalır; sayfa ve öbür dosyalar her açılışta tazelenir
+# (Cloudflare'in varsayılanı: ETag ile denetim, değişmediyse yeniden inmez).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Cloudflare'in yedek adresi (warsimbox.….workers.dev) aramalarda warsimbox.com'un kopyası olarak çıkmasın
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex
