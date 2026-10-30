@@ -1,0 +1,18 @@
+// Cloudflare yapılandırması: oyunun dosyaları (dist/) varlık olarak sunulur; eşleşmeyen istekler (/api/*) worker'a
+// gelir. Veritabanı D1. Yerel deneme: npm run build, npm run db:local, npm run serve (http://localhost:8787).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "warsimbox",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-10-01",
+  "assets": { "directory": "./dist" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "warsimbox",
+      "database_id": "9a5c64cc-d52a-4e49-a166-f935f0350872",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true }
+}

@@ -1,12 +1,19 @@
-// Hesaplar ve oyun kayıtları (tarayıcıda). Hesap yalnızca bir addır: aynı adla tekrar girilir, şifre yok.
-// Hesaplar localStorage'da, kayıtlar IndexedDB'de (özet ve veri ayrı depolarda: liste hızlı açılsın).
-// Misafir oyun kaydedilmez; sekme kapanınca ilerleme kaybolur.
+// Hesaplar ve oyun kayıtları. Hesap sunucuda: ad + şifre (src/net/api.ts, worker/). Kayıtlar bulutta; her kayıt önce bu
+// tarayıcıya (IndexedDB, önbellek ve yedek) yazılır, sonra buluta yüklenir. Bağlantı yoksa kayıt bu cihazda bekler ve
+// bağlantı gelince yüklenir. Misafir oyun kaydedilmez.
+//
+// Eski sürümde hesap yalnız bir addı (şifresiz, yalnız bu tarayıcıda: warsim.accounts.v1 / warsim.session.v1). O
+// hesabın sahibi şifre belirleyip giriş yapınca bu tarayıcıdaki kayıtları yeni hesaba geçer ve buluta yüklenir.
 
 import type { SaveData } from './sim/save';
 import { L } from './i18n';
+import { ApiError, api, authToken, clientHash, gunzip, gzip, storeAuth, storedAccount } from './net/api';
+import { NAME_MAX, cleanName, nameKey, nameProblem } from './net/shared';
 
-const ACC_KEY = 'warsim.accounts.v1';
-const SESSION_KEY = 'warsim.session.v1';
+export { NAME_MAX, cleanName, nameKey };
+
+const LEGACY_ACC_KEY = 'warsim.accounts.v1';
+const LEGACY_SESSION_KEY = 'warsim.session.v1';
 const DB_NAME = 'warsim';
 const DB_VERSION = 1;
 
@@ -40,57 +47,138 @@ export interface SaveMeta {
   mapSize?: number;
   /** Kayıt biçimi sürümü. */
   v?: number;
-}
-
-export const NAME_MIN = 2;
-export const NAME_MAX = 20;
-
-export function cleanName(n: string): string {
-  return n.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
-}
-
-export function nameKey(n: string): string {
-  return cleanName(n).toLocaleLowerCase('tr-TR');
+  /** Bu tarayıcıdaki kopya buluta yüklendi mi (yalnız yerel önbellekte). */
+  synced?: boolean;
+  /** Listede: yalnız bu cihazda (buluta yüklenmeyi bekliyor). */
+  pending?: boolean;
 }
 
 /** Ad geçerli mi: 2–20 karakter, harf/rakam/boşluk/-/_ . */
 export function nameError(n: string): string | null {
-  const c = cleanName(n);
-  if (c.length < NAME_MIN) return L(`En az ${NAME_MIN} karakter`, `At least ${NAME_MIN} characters`);
-  if (!/^[\p{L}\p{N} _.-]+$/u.test(c)) return L('Yalnız harf, rakam, boşluk, - _ .', 'Only letters, digits, spaces, - _ .');
+  const p = nameProblem(n);
+  if (p === 'short') return L('En az 2 karakter', 'At least 2 characters');
+  if (p === 'chars') return L('Yalnız harf, rakam, boşluk, - _ .', 'Only letters, digits, spaces, - _ .');
   return null;
 }
 
-function readAccounts(): Account[] {
-  try {
-    const raw = localStorage.getItem(ACC_KEY);
-    const list = raw ? (JSON.parse(raw) as Account[]) : [];
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeAccounts(list: Account[]): void {
-  try {
-    localStorage.setItem(ACC_KEY, JSON.stringify(list));
-  } catch {
-    /* depolama kapalı: hesap yalnız bu oturumda geçerli */
-  }
-}
+// ---------------------------------------------------------------- hesap
 
 let session: Account | null = null;
 
-/** Açık hesap (sayfa yenilenince hatırlanır). */
+/** Açık hesap (sayfa yenilenince hatırlanır; sunucuyla refreshSession doğrular). */
 export function currentAccount(): Account | null {
   if (session) return session;
-  try {
-    const key = localStorage.getItem(SESSION_KEY);
-    if (key) session = readAccounts().find((a) => a.key === key) ?? null;
-  } catch {
-    session = null;
-  }
+  if (!authToken()) return null;
+  session = storedAccount<Account>();
   return session;
+}
+
+function setSession(token: string, acc: Account): void {
+  session = acc;
+  storeAuth(token, acc);
+}
+
+/** Sayfa açılınca: oturum hâlâ geçerli mi (kapanmışsa çıkış). Bağlantı yoksa son bilinen hâl kalır. */
+export async function refreshSession(): Promise<void> {
+  if (!authToken()) return;
+  try {
+    const r = await api<{ account: Account }>('GET', '/me');
+    session = r.account;
+    storeAuth(authToken(), r.account);
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'no_session') {
+      session = null;
+      storeAuth(null);
+    }
+  }
+}
+
+interface AuthResult {
+  token: string;
+  account: Account;
+  recoveryCode?: string;
+}
+
+/** Giriş. Başarısızsa ApiError (iletisi oyuncuya gösterilir). */
+export async function login(name: string, password: string): Promise<Account> {
+  const r = await api<AuthResult>('POST', '/login', { name: cleanName(name), pass: await clientHash(name, password) });
+  setSession(r.token, r.account);
+  adoptLegacy(r.account);
+  return r.account;
+}
+
+/** Yeni hesap; kurtarma kodu bir kez döner (oyuncuya gösterilmeli). */
+export async function register(name: string, password: string): Promise<{ account: Account; recoveryCode: string }> {
+  const r = await api<AuthResult>('POST', '/register', { name: cleanName(name), pass: await clientHash(name, password) });
+  setSession(r.token, r.account);
+  adoptLegacy(r.account);
+  return { account: r.account, recoveryCode: r.recoveryCode ?? '' };
+}
+
+/** Şifremi unuttum: kurtarma koduyla yeni şifre; yeni kurtarma kodu döner. */
+export async function recoverAccount(name: string, code: string, password: string): Promise<{ account: Account; recoveryCode: string }> {
+  const r = await api<AuthResult>('POST', '/recover', { name: cleanName(name), code, pass: await clientHash(name, password) });
+  setSession(r.token, r.account);
+  adoptLegacy(r.account);
+  return { account: r.account, recoveryCode: r.recoveryCode ?? '' };
+}
+
+export type StatsRow = Record<'kills' | 'wins' | 'earned' | 'peak' | 'play_sec', number>;
+
+export interface Profile {
+  account: Account;
+  all: StatsRow | null;
+  week: StatsRow | null;
+  /** Tüm zamanlar sırası (ölçüt başına). */
+  ranks: StatsRow | null;
+  saves: number;
+}
+
+export async function fetchProfile(): Promise<Profile> {
+  const p = await api<Profile>('GET', '/profile');
+  session = p.account;
+  storeAuth(authToken(), p.account);
+  return p;
+}
+
+/** Şifre değiştir (mevcut şifreyle); öbür cihazlardaki oturumlar kapanır. */
+export async function changePassword(oldPass: string, newPass: string): Promise<void> {
+  const acc = currentAccount();
+  if (!acc) throw new ApiError('no_session', 401);
+  await api('POST', '/password', { old: await clientHash(acc.name, oldPass), pass: await clientHash(acc.name, newPass) });
+}
+
+export function logout(): void {
+  if (authToken()) void api('POST', '/logout', undefined, { keepalive: true }).catch(() => {});
+  session = null;
+  storeAuth(null);
+}
+
+/** Eski (şifresiz) sürümden kalan, bu tarayıcıdaki hesap adı: sahibi şifre belirlesin diye ana menü sorar. */
+export function legacyAccountName(): string | null {
+  if (currentAccount()) return null;
+  try {
+    const key = localStorage.getItem(LEGACY_SESSION_KEY);
+    if (!key) return null;
+    const list = JSON.parse(localStorage.getItem(LEGACY_ACC_KEY) ?? '[]') as { name: string; key: string }[];
+    return list.find((a) => a.key === key)?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Eski hesabın (bu tarayıcıda açık olanın) kayıtları yeni hesaba geçer (ad değişmiş olabilir); eski oturum kapanır. */
+function adoptLegacy(acc: Account): void {
+  let oldKey: string | null = null;
+  try {
+    oldKey = localStorage.getItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    return;
+  }
+  const keys = new Set([acc.key]);
+  if (oldKey) keys.add(oldKey);
+  void rekeyLocal(keys, acc.key).catch(() => {});
 }
 
 /** Misafirin "Bir daha sorma" tercihi (bu tarayıcıda). */
@@ -110,15 +198,10 @@ export function tutorialPromptOff(): boolean {
 export function setTutorialPromptOff(off: boolean): void {
   const acc = currentAccount();
   if (acc) {
-    const list = readAccounts();
-    const a = list.find((x) => x.key === acc.key);
-    if (a) {
-      if (off) a.noTutorial = true;
-      else delete a.noTutorial;
-      writeAccounts(list);
-    }
     if (off) acc.noTutorial = true;
     else delete acc.noTutorial;
+    storeAuth(authToken(), acc);
+    void api('PATCH', '/me', { noTutorial: off }).catch(() => {});
     return;
   }
   try {
@@ -129,36 +212,7 @@ export function setTutorialPromptOff(off: boolean): void {
   }
 }
 
-/** Aynı adla giriş; yoksa hesap oluşturulur. */
-export function login(name: string): { account: Account; created: boolean } {
-  const key = nameKey(name);
-  const list = readAccounts();
-  let acc = list.find((a) => a.key === key);
-  const created = !acc;
-  if (!acc) {
-    acc = { name: cleanName(name), key, created: Date.now(), lastLogin: Date.now() };
-    list.push(acc);
-  } else acc.lastLogin = Date.now();
-  writeAccounts(list);
-  session = acc;
-  try {
-    localStorage.setItem(SESSION_KEY, key);
-  } catch {
-    /* yok say */
-  }
-  return { account: acc, created };
-}
-
-export function logout(): void {
-  session = null;
-  try {
-    localStorage.removeItem(SESSION_KEY);
-  } catch {
-    /* yok say */
-  }
-}
-
-// ---------------------------------------------------------------- IndexedDB
+// ---------------------------------------------------------------- yerel önbellek (IndexedDB)
 
 let dbp: Promise<IDBDatabase> | null = null;
 
@@ -196,40 +250,27 @@ function request<T>(r: IDBRequest<T>): Promise<T> {
   });
 }
 
-/** Hesabın kayıtları, en yenisi önce. */
-export async function listSaves(account: string): Promise<SaveMeta[]> {
+async function localList(account: string): Promise<SaveMeta[]> {
   const d = await db();
   const tx = d.transaction('saves', 'readonly');
-  const list = await request(tx.objectStore('saves').index('account').getAll(account) as IDBRequest<SaveMeta[]>);
-  return list.sort((a, b) => b.created - a.created);
+  return request(tx.objectStore('saves').index('account').getAll(account) as IDBRequest<SaveMeta[]>);
 }
 
-export async function writeSave(account: string, title: string, kind: SaveKind, data: SaveData): Promise<SaveMeta> {
+async function localPut(meta: SaveMeta, json: string | null): Promise<void> {
   const d = await db();
-  const me = data.teams[data.playerTeam];
-  const meta: SaveMeta = {
-    id: `${account}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-    account, title, kind, created: Date.now(), gameTime: data.time, playerName: data.playerName,
-    enemies: data.setup?.enemies ?? Math.max(0, data.teams.length - 1), money: Math.round(me?.money ?? 0),
-    structures: data.structures.filter((s) => s.team === data.playerTeam && s.hp > 0).length,
-    mapId: data.mapId, mapSize: data.mapSize, v: data.v,
-  };
   const tx = d.transaction(['saves', 'blobs'], 'readwrite');
   tx.objectStore('saves').put(meta);
-  tx.objectStore('blobs').put(JSON.stringify(data), meta.id);
+  if (json !== null) tx.objectStore('blobs').put(json, meta.id);
   await done(tx);
-  return meta;
 }
 
-export async function readSave(id: string): Promise<SaveData> {
+async function localBlob(id: string): Promise<string | undefined> {
   const d = await db();
   const tx = d.transaction('blobs', 'readonly');
-  const raw = await request(tx.objectStore('blobs').get(id) as IDBRequest<string | undefined>);
-  if (!raw) throw new Error(L('Kayıt bulunamadı', 'Save not found'));
-  return JSON.parse(raw) as SaveData;
+  return request(tx.objectStore('blobs').get(id) as IDBRequest<string | undefined>);
 }
 
-export async function deleteSave(id: string): Promise<void> {
+async function localDelete(id: string): Promise<void> {
   const d = await db();
   const tx = d.transaction(['saves', 'blobs'], 'readwrite');
   tx.objectStore('saves').delete(id);
@@ -237,8 +278,113 @@ export async function deleteSave(id: string): Promise<void> {
   await done(tx);
 }
 
-/** Otomatik kayıtlardan en yeni `keep` tanesi kalır. */
-export async function pruneAutosaves(account: string, keep = 3): Promise<void> {
-  const autos = (await listSaves(account)).filter((m) => m.kind === 'auto');
-  for (const m of autos.slice(keep)) await deleteSave(m.id);
+/** Eski hesap anahtarlarının yerel kayıtları yeni hesaba geçer (buluta yüklenmeyi bekler). */
+async function rekeyLocal(keys: Set<string>, to: string): Promise<void> {
+  for (const k of keys) {
+    if (k === to) continue;
+    for (const m of await localList(k)) await localPut({ ...m, account: to, synced: false }, null);
+  }
+}
+
+/** Sunucuya uygun kimlik (eski kayıtların kimliğinde hesap adı vardı: Türkçe harf, boşluk). */
+const newSaveId = (): string => `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+const cloudId = (id: string): boolean => /^[\w:.-]{1,120}$/.test(id);
+
+// ---------------------------------------------------------------- kayıtlar
+
+async function upload(meta: SaveMeta, json: string): Promise<void> {
+  const { synced: _s, pending: _p, ...clean } = meta;
+  await api('PUT', `/saves/${encodeURIComponent(meta.id)}`, { meta: clean, data: await gzip(json) });
+}
+
+/** Bu cihazda bekleyen (buluta yüklenmemiş) kayıtları yükle. Bağlantı yoksa sessizce bekler. */
+export async function syncPending(account: string): Promise<void> {
+  for (const m of await localList(account)) {
+    if (m.synced) continue;
+    const json = await localBlob(m.id);
+    if (!json) continue;
+    let meta = m;
+    if (!cloudId(m.id)) {
+      meta = { ...m, id: newSaveId() };
+      await localPut({ ...meta, synced: false }, json);
+      await localDelete(m.id);
+    }
+    try {
+      await upload(meta, json);
+    } catch (e) {
+      // Sınıra takılan (çok büyük, çok fazla) kayıt bu cihazda kalır; bağlantı yoksa sonra yeniden denenir
+      if (e instanceof ApiError && (e.code === 'offline' || e.code === 'no_session' || e.code === 'server')) return;
+      continue;
+    }
+    await localPut({ ...meta, synced: true }, null);
+  }
+}
+
+/** Hesabın kayıtları, en yenisi önce: bulut + bu cihazda bekleyenler. Bağlantı yoksa yalnız bu cihazdakiler. */
+export async function listSaves(account: string): Promise<SaveMeta[]> {
+  let local = await localList(account).catch(() => [] as SaveMeta[]);
+  let cloud: SaveMeta[] | null = null;
+  try {
+    await syncPending(account);
+    local = await localList(account);
+    cloud = (await api<{ saves: SaveMeta[] }>('GET', '/saves')).saves;
+  } catch {
+    cloud = null;
+  }
+  if (!cloud) return local.map((m) => ({ ...m, pending: !m.synced })).sort((a, b) => b.created - a.created);
+  const ids = new Set(cloud.map((m) => m.id));
+  // Bulutta olmayan ama yüklenmiş görünen yerel kopya başka cihazda silinmiş ya da elenmiş (eski otomatik): önbellekten çıkar
+  for (const m of local) if (m.synced && !ids.has(m.id)) void localDelete(m.id).catch(() => {});
+  const pending = local.filter((m) => !m.synced && !ids.has(m.id)).map((m) => ({ ...m, pending: true }));
+  return [...cloud, ...pending].sort((a, b) => b.created - a.created);
+}
+
+/** Kaydet: önce bu cihaza, sonra buluta. cloud: buluta yüklendi mi (yoksa bağlanınca yüklenir). */
+export async function writeSave(account: string, title: string, kind: SaveKind, data: SaveData): Promise<{ meta: SaveMeta; cloud: boolean }> {
+  const me = data.teams[data.playerTeam];
+  const meta: SaveMeta = {
+    id: newSaveId(),
+    account, title, kind, created: Date.now(), gameTime: data.time, playerName: data.playerName,
+    enemies: data.setup?.enemies ?? Math.max(0, data.teams.length - 1), money: Math.round(me?.money ?? 0),
+    structures: data.structures.filter((s) => s.team === data.playerTeam && s.hp > 0).length,
+    mapId: data.mapId, mapSize: data.mapSize, v: data.v,
+  };
+  const json = JSON.stringify(data);
+  await localPut({ ...meta, synced: false }, json);
+  if (kind === 'auto') await pruneLocalAutos(account, 3);
+  try {
+    await upload(meta, json);
+  } catch (e) {
+    if (e instanceof ApiError && (e.code === 'too_big' || e.code === 'too_many')) throw e;
+    return { meta, cloud: false };
+  }
+  await localPut({ ...meta, synced: true }, null);
+  return { meta, cloud: true };
+}
+
+export async function readSave(id: string): Promise<SaveData> {
+  const cached = await localBlob(id).catch(() => undefined);
+  if (cached) return JSON.parse(cached) as SaveData;
+  const r = await api<{ meta: SaveMeta; data: string }>('GET', `/saves/${encodeURIComponent(id)}`);
+  const json = await gunzip(r.data);
+  await localPut({ ...r.meta, synced: true }, json).catch(() => {});
+  return JSON.parse(json) as SaveData;
+}
+
+export async function deleteSave(id: string): Promise<void> {
+  if (cloudId(id)) {
+    try {
+      await api('DELETE', `/saves/${encodeURIComponent(id)}`);
+    } catch (e) {
+      // Bulutta hiç olmayan (bekleyen) kayıt yalnız bu cihazdan silinir
+      if (!(e instanceof ApiError && e.code === 'no_save')) throw e;
+    }
+  }
+  await localDelete(id);
+}
+
+/** Bu cihazdaki otomatik kayıtlardan en yeni `keep` tanesi kalır (bulutta sunucu eler). */
+async function pruneLocalAutos(account: string, keep: number): Promise<void> {
+  const autos = (await localList(account)).filter((m) => m.kind === 'auto').sort((a, b) => b.created - a.created);
+  for (const m of autos.slice(keep)) await localDelete(m.id);
 }

@@ -253,7 +253,7 @@ export class Tutorial {
       this.stop();
       return;
     }
-    const covered = loading || g.login.isOpen || g.news.isOpen || g.feedback.isOpen || g.pause.isOpen;
+    const covered = loading || g.login.isOpen || g.profile.isOpen || g.news.isOpen || g.feedback.isOpen || g.pause.isOpen;
     this.el.classList.toggle('hidden', covered);
     if (covered) return;
     if (!this.entered) this.enter(st);
@@ -493,12 +493,12 @@ export class Tutorial {
           const acc = currentAccount();
           return acc
             ? L(
-              `<b>${esc(acc.name)}</b> hesabıyla girdin: oyunun 5 dakikada bir kendiliğinden kaydedilir; Menü'den elle de kaydedip kaldığın yerden devam edebilirsin. Kayıtların bu tarayıcıda durur.`,
-              `You are logged in as <b>${esc(acc.name)}</b>: your game autosaves every 5 minutes; you can also save from the Menu and continue where you left off. Your saves are kept in this browser.`,
+              `<b>${esc(acc.name)}</b> hesabıyla girdin: oyunun 5 dakikada bir kendiliğinden buluta kaydedilir, başka cihazdan da devam edersin. Harekâtların Skorlar sekmesindeki tabloya yazılır.`,
+              `You are logged in as <b>${esc(acc.name)}</b>: your game autosaves to the cloud every 5 minutes, so you can continue on another device. Your campaigns count towards the Scores tab.`,
             )
             : L(
-              'Misafir oyun kaydedilmez. Buradan yalnız bir adla hesap aç (şifre yok): oyunun kaydedilir, 5 dakikada bir otomatik kayıt alınır ve kaldığın yerden devam edersin.',
-              'Guest games are not saved. Open an account here with just a name (no password): your game is saved, autosaved every 5 minutes, and you can continue where you left off.',
+              'Misafir oyun kaydedilmez. Buradan ad ve şifreyle hesap aç: oyunun bulutta saklanır, 5 dakikada bir otomatik kaydedilir, başka cihazdan da devam edersin ve Skorlar tablosuna girersin.',
+              'Guest games are not saved. Create an account here with a name and password: your game is kept in the cloud, autosaved every 5 minutes, you can continue on another device and you appear in the Scores table.',
             );
         },
       },

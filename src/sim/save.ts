@@ -42,6 +42,8 @@ interface TeamSave {
   ledger: LedgerEntry[];
   earned: number;
   spent: number;
+  kills?: number;
+  peakFleet?: number;
   eliminated?: boolean;
   lastStand?: number | null;
 }
@@ -95,6 +97,8 @@ export interface SaveData {
   setup: { enemies: number } | null;
   /** Harekâtın kazananı (yoksa sürüyor). */
   winner?: number | null;
+  /** Harekâtın kimliği (skor tablosu; eski kayıtlarda yok). */
+  campaign?: string;
   personnelEnabled: boolean;
   economyEnabled: boolean;
   teams: TeamSave[];
@@ -123,7 +127,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
       points: t.research.points, totalPoints: t.research.totalPoints,
     },
     people: t.personnel.people, capacity: t.personnel.capacity, recruit: t.personnel.recruit,
-    money: t.money, ledger: t.ledger.map((e) => ({ ...e })), earned: t.earned, spent: t.spent,
+    money: t.money, ledger: t.ledger.map((e) => ({ ...e })), earned: t.earned, spent: t.spent, kills: t.kills, peakFleet: t.peakFleet,
     eliminated: t.eliminated, lastStand: t.lastStand,
   }));
   const structures: StructureSave[] = w.structures.map((s) => {
@@ -171,6 +175,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     playerName: w.playerName,
     setup: w.setup ? { ...w.setup } : null,
     winner: w.winner,
+    campaign: w.campaignId || undefined,
     personnelEnabled: w.personnelEnabled,
     economyEnabled: w.economyEnabled,
     teams,
@@ -197,6 +202,7 @@ export function deserializeWorld(d: SaveData): World {
   w.playerName = d.playerName;
   w.setup = d.setup ? { ...d.setup } : null;
   w.winner = d.winner ?? null;
+  w.campaignId = d.campaign ?? '';
   w.personnelEnabled = d.personnelEnabled;
   w.economyEnabled = d.economyEnabled;
   for (const ts of d.teams) {
@@ -222,6 +228,8 @@ export function deserializeWorld(d: SaveData): World {
     t.ledger.push(...ts.ledger);
     t.earned = ts.earned;
     t.spent = ts.spent;
+    t.kills = ts.kills ?? 0;
+    t.peakFleet = ts.peakFleet ?? 0;
     t.eliminated = ts.eliminated ?? false;
     t.lastStand = ts.lastStand ?? null;
   }

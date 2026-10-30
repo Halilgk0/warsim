@@ -49,7 +49,13 @@ npm run build        # tsc --noEmit (sıkı: kullanılmayan değişken de hata) 
 npm run typecheck
 npm run sim:bench    # başsız simülasyon ölçümü (tools/sim)
 npm run sim:hits     # isabet/düşürme istatistikleri
+npm run db:local     # yerel D1 veritabanı (tablolar)
+npm run serve        # yerel Cloudflare sunucusu: dist/ + /api (http://localhost:8787; önce npm run build)
+npm run deploy       # Cloudflare'e elle yayın (normalde GitHub bağlantısıyla kendiliğinden)
 ```
+
+`npm run dev` sırasında `/api` istekleri `npm run serve`'e (8787) gider; hesap denemesi için ikisi birlikte açık olmalı.
+Yerel yönetici anahtarı `.dev.vars` (git dışı).
 
 ## Mimari (kısa)
 
@@ -85,11 +91,23 @@ npm run sim:hits     # isabet/düşürme istatistikleri
   - `alerts.ts`: oyuncuya uyarılar.
   - Ses dosyaları `public/sounds`; künye `credits.ts`.
 - **`src/ui/`:** DOM arayüzü: HUD, paneller, planlayıcı, araştırma, pazar, inşa, ana menü, haberler, geri bildirim
-  (Google Form).
+  (Google Form), hesap penceresi (`loginBox.ts`), skor tablosu (`leaderboard.ts`, ana menüde Skorlar sekmesi), profil
+  (`profile.ts`: ad etiketi ya da Menü → Profil; skorlar, sıra, şifre değiştirme).
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
     Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
     güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.
-- **`src/persist.ts`:** Hesaplar localStorage'da, kayıtlar IndexedDB'de; şifre yok.
+- **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)
+  yazılır, bağlantı yoksa orada bekler ve sonra yüklenir. Eski şifresiz hesabın (`warsim.accounts.v1`) sahibi şifre
+  belirleyince bu tarayıcıdaki kayıtları yeni hesaba geçer.
+- **`src/net/`:** sunucuyla konuşma (`api.ts`), istemci ve sunucu ortak kuralları (`shared.ts`: ad anahtarı, ölçütler),
+  skor istatistiği (`stats.ts`).
+- **`worker/` + `migrations/`: sunucu (Cloudflare Worker + D1).** Oyunun dosyalarını Cloudflare sunar, worker yalnız
+  `/api/*`'ye bakar. Yapılandırma `wrangler.jsonc`.
+  - Bedava planda istek başına ~10 ms işlemci süresi var. Bu yüzden şifre tarayıcıda PBKDF2 ile uzatılır, sunucu
+    yalnız tuzlu SHA-256 yapar.
+  - Ad anahtarında I, İ, ı ve i aynı sayılır (`nameKey`); istemci ve sunucu aynı işlevi kullanır.
+  - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.
+  - Şifresini ve kurtarma kodunu unutan oyuncu: `tools/admin.mjs` (önce kimlik sorusu sor; bkz. dosyanın başı).
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
 - **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.

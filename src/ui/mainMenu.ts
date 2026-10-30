@@ -7,7 +7,7 @@ import { MAP_BASE, MAP_SIZES, MAP_SIZE_DEFAULT, TEAM_SITES, mapSizeName } from '
 import { MAPS, mapById } from '../sim/maps';
 import { terrainMap } from '../sim/terrain';
 import { mapPreview } from './mapPreview';
-import { NAME_MAX, cleanName, currentAccount, logout, nameError } from '../persist';
+import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError } from '../persist';
 import { SavesPanel } from './savesList';
 import { NEWS, newsCard } from './news';
 import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
@@ -15,8 +15,9 @@ import { $, esc } from './dom';
 import { LANG, L, lower, saveLang } from '../i18n';
 import { playLangSwap } from './langSwap';
 import { socialLinks } from './social';
+import { LeaderboardPanel } from './leaderboard';
 
-type Tab = 'new' | 'saves';
+type Tab = 'new' | 'saves' | 'scores';
 
 /** Dil değişirken (sayfa yeniden açılır) menüde yazılanlar kaybolmasın. */
 const DRAFT = 'warsim.menuDraft';
@@ -71,6 +72,7 @@ export class MainMenu {
   private error = '';
   private notice = '';
   readonly saves: SavesPanel;
+  readonly board: LeaderboardPanel;
 
   constructor(private readonly game: Game) {
     // Oyuna girerken tam ekran (tıklama anında istenmeli)
@@ -78,6 +80,7 @@ export class MainMenu {
       enterFullscreen();
       void this.game.loadSave(id);
     }, () => this.render());
+    this.board = new LeaderboardPanel(() => this.render());
     this.el.addEventListener('click', (e) => this.onClick(e));
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
@@ -103,7 +106,7 @@ export class MainMenu {
     this.el.classList.remove('hidden');
     const acc = currentAccount();
     if (!this.name && acc) this.name = acc.name;
-    if (!acc) this.tab = 'new';
+    if (!acc && this.tab === 'saves') this.tab = 'new';
     this.render();
     void this.saves.refresh(acc?.key ?? null);
     this.el.querySelector<HTMLInputElement>('input[name="cmd"]')?.focus();
@@ -171,10 +174,22 @@ export class MainMenu {
     return true;
   }
 
+  /** Giriş ya da yeni hesap sonrası: ileti, kayıt listesi ve skorlar yenilenir. */
+  private loggedIn(a: Account, created: boolean): void {
+    if (!cleanName(this.name)) this.name = a.name;
+    this.notice = created
+      ? L(`Hesap açıldı: ${a.name}. Kayıtların bulutta saklanır.`, `Account created: ${a.name}. Your saves are kept in the cloud.`)
+      : L(`Tekrar hoş geldin, ${a.name}.`, `Welcome back, ${a.name}.`);
+    this.render();
+    void this.saves.refresh(a.key);
+    void this.board.refresh(true);
+  }
+
   private onClick(e: Event): void {
     const t = e.target as HTMLElement;
     const acc = currentAccount();
     if (this.saves.handle(t, acc?.key ?? null)) return;
+    if (this.board.handle(t)) return;
     const b = t.closest<HTMLElement>('[data-mm]');
     if (!b) return;
     switch (b.dataset.mm) {
@@ -206,16 +221,26 @@ export class MainMenu {
         this.tab = b.dataset.v as Tab;
         this.render();
         if (this.tab === 'saves') void this.saves.refresh(acc?.key ?? null);
+        // Oyundan dönünce yeni skor hemen görünsün: sekmeye her geçişte yeniden
+        if (this.tab === 'scores') void this.board.refresh(true);
         return;
       case 'login':
-        this.game.login.open((a, created) => {
-          if (!cleanName(this.name)) this.name = a.name;
-          this.notice = created
-            ? L(`Hesap oluşturuldu: ${a.name}. Kayıtların bu adla saklanır.`, `Account created: ${a.name}. Your saves are kept under this name.`)
-            : L(`Tekrar hoş geldin, ${a.name}.`, `Welcome back, ${a.name}.`);
-          this.render();
-          void this.saves.refresh(a.key);
+        this.game.login.open((a, created) => this.loggedIn(a, created));
+        return;
+      case 'claim': {
+        // Eski (şifresiz) hesabın sahibi: şifre belirler, bu tarayıcıdaki kayıtları yeni hesaba geçer
+        const old = legacyAccountName() ?? '';
+        this.game.login.open((a, created) => this.loggedIn(a, created), {
+          mode: 'register', name: old,
+          note: L(
+            `Hesaplar artık şifreli. "${old}" için bir şifre belirle; bu cihazdaki kayıtların hesabına taşınır. Ad başkasınca alınmışsa başka bir ad seç, kayıtların yine taşınır.`,
+            `Accounts now have passwords. Set a password for "${old}"; the saves on this device move to your account. If the name is taken, pick another one and your saves still move over.`,
+          ),
         });
+        return;
+      }
+      case 'profile':
+        void this.game.profile.open();
         return;
       case 'news':
         this.game.news.open();
@@ -231,7 +256,7 @@ export class MainMenu {
         return;
       case 'logout':
         logout();
-        this.tab = 'new';
+        if (this.tab === 'saves') this.tab = 'new';
         this.notice = L('Çıkış yapıldı. Misafir oyunlar kaydedilmez.', 'Logged out. Guest games are not saved.');
         this.saves.list = [];
         this.render();
@@ -251,7 +276,7 @@ export class MainMenu {
     // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
     const newsBtn = `${lang}<button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;
     const top = acc
-      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" title="${esc(acc.name)}"><i></i><b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">${L('Çıkış yap', 'Log out')}</button></div>`
+      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" role="button" tabindex="0" data-mm="profile" title="${L('Profil', 'Profile')}: ${esc(acc.name)}"><i></i><b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">${L('Çıkış yap', 'Log out')}</button></div>`
       : `<div class="mm-acc">${newsBtn}${fs}<button class="mm-login" data-mm="login">${L('Giriş yap', 'Log in')}</button></div>`;
     const foes = TEAM_SITES.slice(1, this.enemies + 1)
       .map((t) => `<span class="mm-foe"><i style="background:${t.color}"></i>${t.name}</span>`).join('');
@@ -259,13 +284,23 @@ export class MainMenu {
         <img src="${mapPreview(m, 96)}" alt=""><span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></span></button>`).join('');
     const enemyBtns = Array.from({ length: MAX_ENEMIES }, (_, i) => i + 1)
       .map((n) => `<button class="${n === this.enemies ? 'active' : ''}" data-mm="enemies" data-v="${n}">${n}</button>`).join('');
-    const tabs = acc
-      ? `<div class="mm-tabs"><button class="${this.tab === 'new' ? 'active' : ''}" data-mm="tab" data-v="new">${L('Yeni harekât', 'New campaign')}</button>
-          <button class="${this.tab === 'saves' ? 'active' : ''}" data-mm="tab" data-v="saves">${L('Kayıtlar', 'Saves')}${this.saves.list.length ? ` <span class="cnt">${this.saves.list.length}</span>` : ''}</button></div>`
+    // Sekmeler: herkese yeni harekât ve skorlar; hesapla kayıtlar
+    const tab = (v: Tab, label: string) => `<button class="${this.tab === v ? 'active' : ''}" data-mm="tab" data-v="${v}">${label}</button>`;
+    const tabs = `<div class="mm-tabs">${tab('new', L('Yeni harekât', 'New campaign'))}
+      ${acc ? tab('saves', `${L('Kayıtlar', 'Saves')}${this.saves.list.length ? ` <span class="cnt">${this.saves.list.length}</span>` : ''}`) : ''}
+      ${tab('scores', L('Skorlar', 'Scores'))}</div>`;
+    const legacy = legacyAccountName();
+    const claim = legacy
+      ? `<div class="mm-note mm-claim"><span>${L(
+        `Hesaplar artık şifreli. Kayıtlarını korumak için <b>${esc(legacy)}</b> hesabına şifre belirle.`,
+        `Accounts now have passwords. Set a password for <b>${esc(legacy)}</b> to keep your saves.`,
+      )}</span><button class="primary mini" data-mm="claim">${L('Şifre belirle', 'Set password')}</button></div>`
       : '';
     const body = this.tab === 'saves' && acc
       ? `<div class="mm-saves">${this.saves.html()}</div>`
-      : `<div class="mm-body">
+      : this.tab === 'scores'
+        ? `<div class="mm-saves">${this.board.html()}</div>`
+        : `<div class="mm-body">
         <div class="mm-s-name">
         <label class="mm-label" for="mm-cmd">${L('Komutan adı', 'Commander name')}</label>
         <div class="mm-row">
@@ -306,6 +341,7 @@ export class MainMenu {
       <button class="mm-fb" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>
       <div class="mm-card">
         ${this.notice ? `<div class="mm-note">${esc(this.notice)}</div>` : ''}
+        ${claim}
         ${tabs}
         ${body}
       </div>`;

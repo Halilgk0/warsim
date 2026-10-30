@@ -8,3 +8,5 @@ tools/sfx/node_modules
 release
 tools/rec/out
 tools/rec/node_modules
+.wrangler
+.dev.vars

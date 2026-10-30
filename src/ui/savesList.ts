@@ -52,7 +52,7 @@ export class SavesPanel {
         : `<button class="mini" data-sv="del" data-id="${m.id}" title="${L('Kaydı sil', 'Delete save')}">${L('Sil', 'Delete')}</button>`;
       return `<div class="sv-row ${m.kind}">
         <span class="sv-ic">${m.kind === 'auto' ? '⟳' : '◆'}</span>
-        <div class="sv-main"><b>${esc(m.title)}</b>
+        <div class="sv-main"><b>${esc(m.title)}</b>${m.pending ? ` <span class="sv-pending" title="${L('Bağlantı gelince buluta yüklenecek', 'Will upload to the cloud when online')}">${L('bu cihazda', 'on this device')}</span>` : ''}
           <small>${m.v === 2 && m.mapId ? `${esc(mapById(m.mapId).name)} ${(m.mapSize ?? MAP_BASE) / 1000} km · ` : `<b class="warn-ink">${L('eski harita', 'old map')}</b> · `}${dateFmt.format(m.created)} · ${L('oyun', 'game')} ${fmtTime(m.gameTime)} · ${m.enemies} ${L('düşman', m.enemies === 1 ? 'enemy' : 'enemies')} · ${fmtMoney(m.money)} · ${m.structures} ${L('yapı', 'structures')}</small></div>
         <div class="sv-act"><button class="primary mini" data-sv="load" data-id="${m.id}">${L('Yükle', 'Load')}</button>${del}</div>
       </div>`;

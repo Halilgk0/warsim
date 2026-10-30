@@ -20,11 +20,13 @@ import { groundLevel, loadMap, mapKey, terrainMap } from './sim/terrain';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
-import { type SaveKind, currentAccount, pruneAutosaves, readSave, writeSave } from './persist';
+import { type SaveKind, currentAccount, readSave, refreshSession, syncPending, writeSave } from './persist';
+import { StatsTracker } from './net/stats';
 import { MainMenu } from './ui/mainMenu';
 import { PauseMenu } from './ui/pauseMenu';
 import { EndScreen } from './ui/endScreen';
 import { LoginBox } from './ui/loginBox';
+import { ProfileBox } from './ui/profile';
 import { NewsView } from './ui/news';
 import { FeedbackBox } from './ui/feedback';
 import { isFullscreen, onFullscreenChange } from './ui/fullscreen';
@@ -50,6 +52,13 @@ export type Interaction =
   | { mode: 'pickWaypoint' }
   | { mode: 'build'; kind: StructureKind; heading: number; x: number; z: number; ok: boolean; reason?: string };
 
+/** Kısa, sabit kimlik özeti (FNV-1a, onaltılık). */
+function hashId(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
 export class Game {
   world = new World();
   readonly renderer: GameRenderer;
@@ -61,6 +70,7 @@ export class Game {
   readonly build: BuildBar;
   readonly layout = new Layout();
   readonly login = new LoginBox();
+  readonly profile = new ProfileBox();
   readonly news = new NewsView();
   readonly feedback = new FeedbackBox();
   readonly menu: MainMenu;
@@ -71,6 +81,8 @@ export class Game {
   readonly tutorial: Tutorial;
   /** Boş yolda otomatik 2× (HUD'daki 1× düğmesi gösterir). */
   readonly autoFast = new AutoFast();
+  /** Skor tablosu istatistikleri (hesap açıkken harekâtta). */
+  readonly stats = new StatsTracker();
   /** Otomatik 2× ilk kez devreye girince bir kez açıklanır. */
   private autoFastTold = false;
   /** Savaş sesleri (yakınlaştıkça) ve oyuncuya uyarılar. */
@@ -121,6 +133,12 @@ export class Game {
     this.showMainMenu();
     // Dil değişince sayfa yeniden açıldı: ana menüdeki öğretici kaldığı yerden sürer
     this.tutorial.resume();
+    // Oturum hâlâ geçerli mi; bu cihazda bekleyen kayıtlar buluta
+    void refreshSession().then(() => {
+      if (this.mode === 'menu') this.menu.render();
+      const acc = currentAccount();
+      if (acc) void syncPending(acc.key).catch(() => {});
+    });
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');
   }
@@ -185,6 +203,7 @@ export class Game {
     this.withMap(mapId, size, () => {
       const w = new World();
       setupCampaign(w, { enemies, playerName });
+      w.campaignId = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
       this.enterPlay(w, 'kampanya');
       this.lastSave = null;
       this.focusHome();
@@ -200,6 +219,8 @@ export class Game {
       await new Promise<void>((resolve, reject) => this.withMap(d.mapId, d.mapSize ?? MAP_BASE, () => {
         try {
           this.applySave(d);
+          // Kimliksiz (eski) harekât kaydı: kimlik kayıttan türer, aynı kayıt yeniden yüklenince yine aynı
+          if (d.scenarioId === 'kampanya' && !this.world.campaignId) this.world.campaignId = `legacy-${hashId(id)}`;
           resolve();
         } catch (e) {
           reject(e);
@@ -314,11 +335,11 @@ export class Game {
       const d = serializeWorld(this.world, this.scenarioId);
       const rig = this.renderer.rig;
       d.camera = { x: rig.target.x, z: rig.target.z, distance: rig.distance, yaw: rig.yaw, pitch: rig.pitch };
-      await writeSave(acc.key, title ?? this.defaultSaveTitle(), kind, d);
-      if (kind === 'auto') await pruneAutosaves(acc.key, 3);
+      const { cloud } = await writeSave(acc.key, title ?? this.defaultSaveTitle(), kind, d);
       this.lastSave = { real: performance.now(), gameTime: this.world.time, kind };
       this.autosaveClock = 0;
-      this.toast(kind === 'auto' ? L('Otomatik kayıt alındı', 'Autosaved') : L('Oyun kaydedildi', 'Game saved'));
+      if (!cloud) this.toast(L('Bu cihaza kaydedildi; bağlantı gelince buluta yüklenecek', 'Saved on this device; it will upload when you are online'));
+      else this.toast(kind === 'auto' ? L('Otomatik kayıt alındı', 'Autosaved') : L('Oyun kaydedildi', 'Game saved'));
       return true;
     } catch (e) {
       this.toast(`${L('Kayıt başarısız', 'Save failed')}: ${(e as Error).message}`, true);
@@ -555,6 +576,11 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       const tgt = e.target as HTMLElement;
       if (tgt instanceof HTMLInputElement || tgt instanceof HTMLSelectElement || tgt instanceof HTMLTextAreaElement) return;
+      // Profil penceresi ana menüde de açılır: odak dışındayken de Esc kapatsın
+      if (this.profile.isOpen) {
+        if (e.code === 'Escape') this.profile.close();
+        return;
+      }
       if (this.mode === 'menu') return;
       // Öğretici açıkken kısayollar kapalı (yalnız gösterilen yere tıklanır)
       if (this.tutorial.capturesKeys) return;
@@ -628,6 +654,7 @@ export class Game {
   private bindPageLifecycle(): void {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'hidden' || this.mode !== 'play' || !currentAccount()) return;
+      this.stats.flush(this.world, this.playerTeam);
       if (this.lastSave && this.world.time - this.lastSave.gameTime < HIDE_SAVE_MIN) return;
       void this.saveNow('auto', `${L('Otomatik', 'Auto')} · ${this.defaultSaveTitle()}`);
     });
@@ -698,6 +725,7 @@ export class Game {
       this.tutorial.update();
       return;
     }
+    this.stats.update(real, this.world, this.playerTeam, !!currentAccount() && document.visibilityState === 'visible');
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
     if (!this.pause.isOpen && this.timeScale > 0) {
       this.autosaveClock += real;

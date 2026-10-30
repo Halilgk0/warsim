@@ -71,6 +71,9 @@ export interface Team {
   /** Toplam kazanç / harcama (istatistik). */
   earned: number;
   spent: number;
+  /** Düşürülen düşman uçağı ve harekât boyunca en büyük filo (skor tablosu). */
+  kills: number;
+  peakFleet: number;
   /** Araştırmanın dokunmayacağı birikim (yapay zekâ maden ve asgari filo için para ayırırken). */
   reserve: number;
   /** Harekâttan elendi (hava üssü kalmadı). */
@@ -272,6 +275,8 @@ export class World {
   setup: { enemies: number } | null = null;
   /** Harekâtın kazananı (haritada son kalan taraf); sürüyorsa null. */
   winner: number | null = null;
+  /** Harekâtın kimliği (skor tablosu: aynı harekât yeniden yüklenince istatistik iki kez sayılmasın); senaryoda boş. */
+  campaignId = '';
   private personnelTimer = 0;
   private flak: FlakShell[] = [];
   private acById = new Map<number, Aircraft>();
@@ -290,6 +295,7 @@ export class World {
       id: this.teams.length, name, color, research: new Research(initialTech), intel: new TeamIntel(), flightCounter: 0, ai,
       personnel: { people: 0, reserved: 0, capacity: 0, recruit: 0 },
       money: 0, ledger: [], earned: 0, spent: 0, reserve: 0, eliminated: false, repairAcc: 0, lastStand: null, incomeAcc: 0, incomeHist: [], mineAcc: 0,
+      kills: 0, peakFleet: 0,
     };
     this.teams.push(t);
     // Araştırma başlarken ödenir; iptalde kısmi iade
@@ -341,9 +347,11 @@ export class World {
     if (t.ledger.length > 60) t.ledger.shift();
   }
 
-  /** Saniyede bir: gelir kovası; maden geliri 30 sn'de bir tek satır olarak deftere. */
+  /** Saniyede bir: gelir kovası; maden geliri 30 sn'de bir tek satır olarak deftere; en büyük filo. */
   private tickIncome(): void {
     for (const t of this.teams) {
+      const fleet = this.airbasesOf(t.id).reduce((n, b) => n + b.inventory.length, 0);
+      if (fleet > t.peakFleet) t.peakFleet = fleet;
       t.incomeHist.push(t.incomeAcc);
       if (t.incomeHist.length > 60) t.incomeHist.shift();
       t.incomeAcc = 0;
@@ -1342,6 +1350,7 @@ export class World {
       if (af.plan.type === 'intercept' && (target.id === af.plan.targetAircraftId || tfid === af.stats.targetFlightId || tfid === af.interceptFlightId)) af.stats.targetKills++;
     }
     this.teams[team]?.research.award(50 + target.hpMax * 0.3);
+    if (team !== target.team && this.teams[team]) this.teams[team].kills++;
     if (team !== target.team) this.earn(team, Math.round(aircraftPrice(target.spec) * KILL_REWARD), `${L('Düşürülen', 'Kill')}: ${target.spec.abbr}`);
   }
 

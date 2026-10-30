@@ -92,6 +92,9 @@ export class PauseMenu {
           this.render();
         });
         return;
+      case 'profile':
+        void g.profile.open();
+        return;
       case 'saves':
         this.view = 'saves';
         this.render();
@@ -179,7 +182,7 @@ export class PauseMenu {
         ${saveBlock}
         <p class="muted small pm-last">${last}${auto}</p>
         <div class="pm-col">
-          ${acc ? `<button data-pm="saves">${L('Kayıtlar', 'Saves')}</button>` : ''}
+          ${acc ? `<button data-pm="saves">${L('Kayıtlar', 'Saves')}</button><button data-pm="profile">${L('Profil ve skorlar', 'Profile and scores')}</button>` : ''}
           <button data-pm="settings">${L('Ayarlar (ses, görünüm)', 'Settings (sound, display)')}</button>
           ${tutorial ? `<button data-pm="tutorial">${L('Öğretici', 'Tutorial')}</button>` : ''}
           <button data-pm="feedback">${L('Geri bildirim gönder', 'Send feedback')}</button>
