@@ -300,6 +300,8 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .qrow .icon-x { padding: 1px calc(7px * var(--ui)); font-size: calc(10px * var(--ui)); line-height: 1.4; }
 .opt small .cost { display: block; text-align: right; }
 
+.enc-link { color: var(--accent-ink); font-weight: 800; text-decoration: none; }
+.enc-link:hover { text-decoration: underline; }
 .info-title { font-size: calc(18px * var(--ui)); font-weight: 800; display: flex; align-items: center; gap: calc(8px * var(--ui)); flex-wrap: wrap; }
 .info-title.nowrap { flex-wrap: nowrap; align-items: baseline; font-size: calc(16px * var(--ui)); line-height: 1.25; }
 .info-title.nowrap .dot { transform: translateY(-1px); }
@@ -778,6 +780,8 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .mm-brand { font-size: calc(26px * var(--ui)); font-weight: 800; letter-spacing: 0.4px; color: var(--ink); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
 .mm-acc { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
 .mm-login { background: var(--panel); box-shadow: var(--shadow); padding: calc(9px * var(--ui)) calc(16px * var(--ui)); border-radius: calc(12px * var(--ui)); }
+/* Düğme görünümlü bağlantı (button'ın yazı biçimi) */
+.mm-link { display: inline-block; font-weight: 700; font-size: calc(13px * var(--ui)); color: var(--ink); text-decoration: none; }
 /* Dil düğmesi: iki yarım (EN | TR), seçili dilin yarısı koyu; tıklanınca koyu kısım öbür yana kayar */
 .mm-lang { position: relative; display: inline-flex; padding: 0; overflow: hidden; }
 .mm-lang span {

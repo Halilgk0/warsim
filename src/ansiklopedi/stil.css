@@ -1,0 +1,160 @@
+/* Ansiklopedi sayfaları (düz HTML, oyundan bağımsız). Oyunun pastel renkleri ve Nunito yazısı; telefonda tek sütun. */
+
+:root {
+  --bg: #eef1ec;
+  --paper: #fbf8f3;
+  --ink: #45434f;
+  --muted: #8b8797;
+  --line: #e5ded2;
+  --accent: #86b3a2;
+  --accent-ink: #3f6d5d;
+  --accent-soft: #e3efe9;
+  --sky: linear-gradient(165deg, #dbe8ee 0%, #eef0ea 55%, #f4ebdf 100%);
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(60, 55, 75, 0.06), 0 6px 18px rgba(60, 55, 75, 0.07);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 500 17px/1.6 Nunito, system-ui, sans-serif;
+}
+img { display: block; max-width: 100%; height: auto; }
+a { color: var(--accent-ink); }
+h1, h2 { line-height: 1.2; margin: 0; }
+
+/* ---- üst çubuk */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 1120px; margin: 0 auto; padding: 14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 22px; color: var(--ink); text-decoration: none; }
+.top nav { display: flex; align-items: center; gap: 8px; }
+.nav-link, .lang, .play {
+  display: inline-flex; align-items: center; height: 38px; border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none;
+}
+.nav-link { padding: 0 12px; color: var(--ink); background: var(--paper); box-shadow: var(--shadow); }
+.lang { background: var(--paper); box-shadow: var(--shadow); padding: 3px; gap: 2px; }
+.lang b, .lang a { display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 9px; font-size: 14px; }
+.lang b { background: #5d5a6b; color: #fff; }
+.lang a { color: var(--muted); text-decoration: none; }
+.play { padding: 0 16px; background: var(--accent); color: #fff; box-shadow: var(--shadow); }
+.play.big { height: 46px; padding: 0 22px; font-size: 17px; margin-top: 6px; }
+.nav-link:hover, .lang a:hover { color: var(--accent-ink); }
+.play:hover { background: #77a693; }
+
+main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
+
+/* ---- liste */
+.intro { padding: 18px 0 22px; max-width: 760px; }
+.intro h1 { font-size: 34px; font-weight: 800; }
+.intro p { color: var(--muted); margin: 8px 0 0; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card {
+  display: grid; grid-template-columns: 46% 1fr; min-height: 168px; overflow: hidden;
+  background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--ink); text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(60, 55, 75, 0.08), 0 12px 26px rgba(60, 55, 75, 0.1); }
+.card-img { background: var(--sky); display: flex; align-items: center; justify-content: center; padding: 8px; }
+.card-img img { width: 100%; object-fit: contain; }
+.card-text { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px 16px 16px; min-width: 0; }
+.card .meta { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
+.card h2 { font-size: 20px; font-weight: 800; }
+.card .sum { font-size: 15px; line-height: 1.45; color: #5d5a6b; }
+
+/* ---- uçak sayfası */
+.crumb { font-size: 14px; color: var(--muted); padding: 8px 0 14px; }
+.crumb a { text-decoration: none; font-weight: 700; }
+.hero {
+  display: grid; grid-template-columns: 1.15fr 1fr; gap: 0; overflow: hidden;
+  background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.hero-img { background: var(--sky); display: flex; align-items: center; justify-content: center; padding: 12px; }
+.hero-text { padding: 26px 28px; display: flex; flex-direction: column; justify-content: center; }
+.hero h1 { font-size: 34px; font-weight: 800; margin: 8px 0 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); }
+.lead { margin: 0; font-size: 17px; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: 'text facts'; gap: 28px; margin-top: 26px; align-items: start; }
+.text { grid-area: text; max-width: 720px; }
+.facts { grid-area: facts; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; position: sticky; top: 16px; }
+.facts h2 { font-size: 15px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.facts dl { margin: 0; }
+.facts dl > div { margin-top: 10px; }
+.facts dt { font-size: 13px; font-weight: 700; color: var(--muted); }
+.facts dd { margin: 1px 0 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
+
+.text section { margin-bottom: 26px; }
+.text h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.text p { margin: 0 0 12px; }
+.side { margin: 0 0 28px; }
+.side img { background: var(--sky); border-radius: var(--radius); }
+.side figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+.ingame { background: var(--accent-soft); border-radius: var(--radius); padding: 20px 22px; }
+.ingame h2 { color: var(--accent-ink); }
+.ingame .small { font-size: 13px; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 6px; }
+.stats div { background: var(--paper); border-radius: 12px; padding: 8px 10px; }
+.stats dt { font-size: 12px; font-weight: 700; color: var(--muted); }
+.stats dd { margin: 0; font-weight: 800; font-size: 15px; }
+
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 30px 0 10px; }
+.pager a {
+  display: flex; flex-direction: column; padding: 14px 18px; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow);
+  text-decoration: none; color: var(--ink);
+}
+.pager .next { text-align: right; }
+.pager small { font-weight: 700; color: var(--accent-ink); }
+.pager b { font-size: 17px; }
+.pager span { font-size: 13px; color: var(--muted); }
+
+/* ---- alt bilgi */
+.foot { max-width: 1120px; margin: 24px auto 0; padding: 18px max(16px, env(safe-area-inset-right)) 28px max(16px, env(safe-area-inset-left)); border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.foot-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.foot-row > a { font-weight: 700; }
+.foot p { margin: 10px 0 0; }
+.social { display: flex; gap: 8px; }
+.soc { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 50%; background: var(--paper); box-shadow: var(--shadow); }
+.soc svg { width: 18px; height: 18px; fill: var(--ink); }
+
+/* ---- dar ekran */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; grid-template-areas: 'facts' 'text'; gap: 20px; }
+  .facts { position: static; }
+  .facts dl { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+  .text { max-width: none; }
+}
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-text { padding: 18px 18px 20px; }
+  .hero h1, .intro h1 { font-size: 28px; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .cards { grid-template-columns: 1fr; }
+  .card { grid-template-columns: 42% 1fr; min-height: 140px; }
+  .card-text { padding: 12px 14px 12px 12px; }
+  .card h2 { font-size: 18px; }
+  .facts dl { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .brand { font-size: 19px; }
+  .nav-link { display: none; }
+  .pager { grid-template-columns: 1fr; }
+  .pager .next { text-align: left; }
+}
+/* Yatay telefon: kısa ekranda başlık alanı daha sıkı */
+@media (max-height: 430px) and (orientation: landscape) {
+  .top { padding-top: 8px; padding-bottom: 8px; }
+  .intro { padding: 8px 0 14px; }
+  .intro h1, .hero h1 { font-size: 26px; }
+  .card { min-height: 140px; }
+  .card .sum { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}

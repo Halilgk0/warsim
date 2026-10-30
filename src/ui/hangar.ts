@@ -6,7 +6,8 @@ import { aircraftNode, TECH, TECH_BY_ID, type Research } from '../sim/tech';
 import { modAppliesTo } from '../sim/mods';
 import { buildAircraftModel } from '../render/models';
 import { esc, nf } from './dom';
-import { L, LOCALE } from '../i18n';
+import { EN, L, LOCALE } from '../i18n';
+import { ENCYCLOPEDIA, encUrl } from '../ansiklopedi/liste';
 
 const nf1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 
@@ -201,6 +202,7 @@ export class Hangar {
       <div class="info-title">${esc(spec.name)} <span class="abbr">${esc(spec.abbr)}</span></div>
       <div class="badges"><span class="badge">${esc(originName(spec.origin))} · ${spec.year}</span><span class="badge">${gen.label} · ${gen.name}</span><span class="badge">${ROLE_NAMES[spec.role]}</span><span class="badge">${ENGINE_NAMES[e.kind]}</span></div>
       <p>${esc(spec.description)}</p>
+      ${ENCYCLOPEDIA[spec.id] ? `<p><a class="enc-link" href="${encUrl(EN, spec.id)}" target="_blank" rel="noopener">${L('Tarihçesini ansiklopedide oku', 'Read its history in the encyclopedia')} ↗</a></p>` : ''}
       ${perfChart(spec)}
       <div class="kv"><span>${L('Motor', 'Engine')}</span><span>${engine}</span>${rows.map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join('')}</div>
       <h3>${L('Silahlar', 'Guns')}</h3><div class="chips">${guns}</div>

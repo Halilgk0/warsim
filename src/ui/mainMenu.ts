@@ -17,6 +17,7 @@ import { playLangSwap } from './langSwap';
 import { socialLinks } from './social';
 import { LeaderboardPanel } from './leaderboard';
 import { NEW_SITE, OLD_SITE } from '../net/api';
+import { encUrl } from '../ansiklopedi/liste';
 
 type Tab = 'new' | 'saves' | 'scores';
 
@@ -278,7 +279,8 @@ export class MainMenu {
     const lang = `<button class="mm-login mm-lang ${LANG}" data-mm="lang" title="${L('Dil: Türkçe (İngilizceye geç)', 'Language: English (switch to Turkish)')}"
       aria-label="${L('Dili değiştir', 'Change language')}"><span class="en">EN</span><span class="tr">TR</span></button>`;
     // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
-    const newsBtn = `${lang}<button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;
+    // Ansiklopedi gerçek bağlantı (arama motorları düğmeyi değil bağlantıyı izler)
+    const newsBtn = `${lang}<a class="mm-login mm-link" href="${encUrl(LANG === 'en')}">${L('Ansiklopedi', 'Encyclopedia')}</a><button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;
     const top = acc
       ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" role="button" tabindex="0" data-mm="profile" title="${L('Profil', 'Profile')}: ${esc(acc.name)}"><i></i><b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">${L('Çıkış yap', 'Log out')}</button></div>`
       : `<div class="mm-acc">${newsBtn}${fs}<button class="mm-login" data-mm="login">${L('Giriş yap', 'Log in')}</button></div>`;
