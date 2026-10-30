@@ -218,6 +218,11 @@ export interface EngineSpec {
   /** Jet özgül yakıt tüketimi (kg / N·saat). */
   tsfc: number;
   /**
+   * İrtifa düşüşü üssü: pistonluda kritik irtifanın üstünde güç (σ/σkrit)^lapse, jette itki σ^lapse. Elle yazılmaz:
+   * uçağın CEILINGS'te tavanı varsa türetmede o tavana göre bulunur, yoksa varsayılan (aero.ts PISTON_LAPSE, JET_LAPSE).
+   */
+  lapse?: number;
+  /**
    * Şamandıralı karbüratör: eksi G'de yakıt kesilir, motor bir an susar (erken Merlin, Sakae, M-63, VK-105).
    * 1 = tam etki, 0,5 = kısıtlayıcıyla hafifletilmiş (1941 "Miss Shilling" deliği). Püskürtmeli ve basınçlı
    * karbüratörlü motorlarda (DB 601/605, BMW 801, ASh-82FN, Allison, Packard Merlin) yok.
@@ -268,6 +273,8 @@ export interface AircraftSpec {
   cdWave: number;
   /** Kritik Mach sayısı. */
   mcrit: number;
+  /** Sürükleme ıraksama Mach'ı: dalga sürüklemesi bunun ötesinde dik yükselir (aero.ts waveCd). */
+  mdd: number;
   /** Yüksek Mach'ta burun düşmesi / kumanda kilitlenmesi (0..1). */
   machTuck: number;
   /** Aşılmaması gereken gösterge hızı (m/s). */
@@ -468,6 +475,8 @@ interface AircraftDef {
   clMax: number;
   oswald?: number;
   mcrit: number;
+  /** Sürükleme ıraksama Mach'ı (yoksa mcrit + 0,1, Lock kuralının ΔCd ≈ 0,002 noktası). */
+  mdd?: number;
   cdWave?: number;
   machTuck?: number;
   vneKmh: number;
@@ -565,7 +574,7 @@ const DEFS: AircraftDef[] = [
     generation: 'J1', role: 'fighter', model: 'sabre',
     description: '35° ok kanatlı transonik avcı. Hidrolik kumandalar yüksek hızda bile çevik yuvarlanma verir; radar telemetreli nişangâh uzaktan isabet sağlar.',
     hp: 175, armor: 0.1, crew: 1, engine: jet('General Electric J47-GE-27', 26.3, { spool: 5, tsfc: 0.1 }),
-    massEmpty: 5350, fuelKg: 1310, wingArea: 28.1, span: 11.31, clMax: 1.45, oswald: 0.75, mcrit: 0.9, cdWave: 0.06, machTuck: 0.15, vneKmh: 1150, nMax: 8,
+    massEmpty: 5350, fuelKg: 1310, wingArea: 28.1, span: 11.31, clMax: 1.45, oswald: 0.75, mcrit: 0.9, mdd: 0.9, cdWave: 0.06, machTuck: 0.15, vneKmh: 1150, nMax: 8,
     roll: [180, 480, 900], tactic: 'energy', tailDragger: false, rearView: 0.65, gOnset: 8,
     guns: [gun('mg127', 6, 267, 'nose')], loadouts: [STD, tank(720), bombs('fb', '2 × 1000 lb', BOMBS.lb1000, 2, 0.08)],
     dive: { diveAngle: 45, releaseAlt: 900 },
@@ -645,7 +654,7 @@ const DEFS: AircraftDef[] = [
     generation: 'J1', role: 'fighter', model: 'mig15',
     description: 'Ok kanatlı, hafif ve tırmanışı çok güçlü önleyici. 37 mm ve iki 23 mm top bombardıman uçaklarına karşı tasarlandı; transonikte kumandası zorlaşır.',
     hp: 170, armor: 0.12, crew: 1, engine: jet('Klimov VK-1', 26.5, { spool: 5, tsfc: 0.11 }),
-    massEmpty: 3900, fuelKg: 1170, wingArea: 20.6, span: 10.08, clMax: 1.15, oswald: 0.75, mcrit: 0.86, cdWave: 0.06, machTuck: 0.4, vneKmh: 1050, nMax: 8,
+    massEmpty: 3900, fuelKg: 1170, wingArea: 20.6, span: 10.08, clMax: 1.15, oswald: 0.75, mcrit: 0.86, mdd: 0.87, cdWave: 0.06, machTuck: 0.4, vneKmh: 1050, nMax: 8,
     roll: [140, 450, 420], tactic: 'energy', tailDragger: false, rearView: 0.5, gOnset: 8,
     guns: [gun('n37', 1, 40, 'nose'), gun('nr23', 2, 80, 'nose')], loadouts: [STD, tank(480)],
     buildTime: 250, cruiseAlt: 10000, vmaxKmh: 1060, vmaxAlt: 1000,
@@ -701,7 +710,7 @@ const DEFS: AircraftDef[] = [
     generation: 'J1', role: 'fighter', model: 'f84',
     description: 'Düz kanatlı jet avcı-bombardıman. Kanat ucu tanklarıyla uzun menzil; bomba ve roketle yer hedeflerine dalar.',
     hp: 185, armor: 0.15, crew: 1, engine: jet('Allison J35-A-29', 25, { spool: 6, tsfc: 0.11 }),
-    massEmpty: 6000, fuelKg: 1350, wingArea: 24.2, span: 11.1, clMax: 1.25, mcrit: 0.72, cdWave: 0.09, machTuck: 0.45, vneKmh: 1000, nMax: 7.3,
+    massEmpty: 6000, fuelKg: 1350, wingArea: 24.2, span: 11.1, clMax: 1.25, mcrit: 0.72, mdd: 0.84, cdWave: 0.09, machTuck: 0.45, vneKmh: 1000, nMax: 7.3,
     roll: [110, 450, 600], tactic: 'energy', tailDragger: false, rearView: 0.6,
     guns: [gun('mg127', 6, 300, 'nose')],
     loadouts: [
@@ -928,7 +937,7 @@ const DEFS: AircraftDef[] = [
     generation: 'J1', role: 'bomber', model: 'canberra',
     description: 'İlk jet bombardıman uçaklarından. Savunma silahı yok: 12 km’nin üstünde, pervanelilerin ve uçaksavarın ulaşamayacağı yükseklikte ve hızda uçar.',
     hp: 420, armor: 0.1, crew: 3, engine: jet('2 × Rolls-Royce Avon RA.3', 28.9, { count: 2, spool: 6, tsfc: 0.1 }),
-    massEmpty: 10700, fuelKg: 5500, wingArea: 89.2, span: 19.51, clMax: 1.25, mcrit: 0.73, cdWave: 0.09, machTuck: 0.4, vneKmh: 830, nMax: 3.5,
+    massEmpty: 10700, fuelKg: 5500, wingArea: 89.2, span: 19.51, clMax: 1.25, mcrit: 0.73, mdd: 0.88, cdWave: 0.09, machTuck: 0.4, vneKmh: 830, nMax: 3.5,
     roll: [60, 450, 500], tactic: 'energy', tailDragger: false, gOnset: 3, visualRange: 5500,
     guns: [],
     loadouts: [bombs('lb1000x6', '6 × 1000 lb', BOMBS.lb1000, 6, 0), bombs('lb500x8', '8 × 500 lb', BOMBS.lb500, 8, 0)],
@@ -1290,6 +1299,23 @@ export function levelSpeed(s: AircraftSpec, h: number, mass: number, st: ThrustS
   return lo;
 }
 
+/**
+ * levelSpeed'in hızlısı, yaklaşık değer bilinirken (türetmedeki tepe hız denetimi): kökü beklenenin çevresinde ikiye
+ * bölerek arar; aralıkta kök yoksa tam aramaya döner.
+ */
+function levelSpeedNear(s: AircraftSpec, h: number, mass: number, st: ThrustState, guess: number): number {
+  const f = (v: number) => thrustAt(s, v, h, st, BASE_MODS) - dragAt(s, v, h, 1, mass, 1);
+  let lo = guess * 0.75;
+  let hi = guess * 1.25;
+  if (lo < stallSpeedAt(s, h, mass, false) * 1.05 || f(lo) <= 0 || f(hi) >= 0) return levelSpeed(s, h, mass, st);
+  for (let k = 0; k < 22; k++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
 /** En iyi tırmanma hızı (m/s) bu irtifada. */
 export function climbRateAt(s: AircraftSpec, h: number, mass: number, st: ThrustState = FULL): number {
   const vs = stallSpeedAt(s, h, mass, false);
@@ -1322,6 +1348,24 @@ const LENGTHS: Record<string, number> = {
   he162: 9.05, f80c: 10.49, vampire: 9.37, ar234: 12.64, il28: 17.65, mig21: 14.5, f4e: 19.2, f15a: 19.43, rafale: 15.27, f22a: 18.92,
 };
 
+/**
+ * Bilinen servis tavanları (m; tırmanışın 0,5 m/s'ye, 100 ft/dk'ya düştüğü irtifa, normal ağırlıkta), yaygın
+ * kaynaklardan, ve bu tavanı veren irtifa düşüşü üssü (EngineSpec.lapse). Genel formül tek kademeli kompresörlü
+ * avcıları ve erken jetleri 1–3 km fazla yükseltiyordu. Üsler `npm run sim:ceiling` ile bulunur (açılışta her seferinde
+ * aramak telefonda yavaş); motor, ağırlık, sürükleme ya da azami hız değişirse yeniden çalıştırıp tabloyu güncelle.
+ * Yalnız avcılar: bombardıman ve taarruz uçaklarının tavanı kaynaklarda yüklü ağırlıkta verilir, türetme ise yüksüz
+ * ağırlıkla yapılır (karşılaştırılamaz).
+ */
+export const CEILINGS: Record<string, [ceiling: number, lapse: number]> = {
+  hurricane1: [10400, 1.74], spitfire1: [10000, 1.92], spitfire5: [11100, 1.58], spitfire9: [12800, 1.09],
+  bf109e: [10500, 1.2], bf109f: [11600, 1.17], bf109g: [11600, 1.26], p51d: [12770, 1.03], bf110c: [10000, 1.04],
+  fw190a5: [10600, 1.41], p47d: [12800, 1.16], i16: [9700, 1.48], a6m2: [10000, 1.79], p40e: [8840, 1.57],
+  yak3: [10700, 1.27], la7: [10450, 1.63], p38j: [13400, 1.13], f6f5: [11370, 1.38], seafury: [10900, 1.8],
+  f8f: [11800, 1.46], f4u4: [12650, 1.19],
+  meteor3: [13400, 0.83], me262: [11450, 1.08], he162: [12000, 0.81], f80c: [14200, 0.96], vampire: [13000, 1],
+  mig15: [15500, 0.93], f84g: [12350, 1.03], f86f: [15100, 0.91],
+};
+
 function derive(dd: AircraftDef): AircraftSpec {
   const ab = !!dd.engine.abKn;
   const s: AircraftSpec = {
@@ -1329,7 +1373,7 @@ function derive(dd: AircraftDef): AircraftSpec {
     model: dd.model, description: EN ? DESC_EN[dd.id] ?? dd.description : dd.description, hp: dd.hp, size: Math.max(4.5, dd.span * 0.48), length: LENGTHS[dd.id] ?? dd.span * 0.85, armor: dd.armor,
     crew: dd.crew, engines: dd.engine.count, engine: dd.engine, massEmpty: dd.massEmpty, fuelKg: dd.fuelKg,
     wingArea: dd.wingArea, span: dd.span, clMax: dd.clMax, oswald: dd.oswald ?? 0.8, cd0: 0.02,
-    cdWave: dd.cdWave ?? 0.12, mcrit: dd.mcrit, machTuck: dd.machTuck ?? 0.6, vne: kmh(dd.vneKmh), nMax: dd.nMax,
+    cdWave: dd.cdWave ?? 0.12, mcrit: dd.mcrit, mdd: dd.mdd ?? dd.mcrit + 0.1, machTuck: dd.machTuck ?? 0.6, vne: kmh(dd.vneKmh), nMax: dd.nMax,
     rollPeak: d(dd.roll[0]), rollIas: kmh(dd.roll[1]), rollFade: kmh(dd.roll[2]),
     gOnset: dd.gOnset ?? (dd.role === 'bomber' ? 2.5 : 6),
     rearView: dd.rearView ?? 0.35, diveBrakes: !!dd.diveBrakes, tactic: dd.tactic,
@@ -1346,17 +1390,35 @@ function derive(dd: AircraftDef): AircraftSpec {
   // Saldırı rolündeki uçaklarda varsayılan (ilk) yük boş değil, ilk hazır yük olsun
   if (s.role !== 'fighter' && s.loadouts.length > 1) s.loadouts.push(s.loadouts.shift()!);
   const m = s.massEmpty + s.fuelKg * 0.75;
+  const st = state(1, ab);
+  // İrtifa düşüşü: bilinen servis tavanına göre bulunmuş üs (Cd0'dan önce: azami hız düşüş bölgesinde olabilir)
+  const ceil = CEILINGS[dd.id];
+  s.engine.lapse = ceil ? ceil[1] : undefined;
   // Cd0: bilinen azami hızda itki = sürükleme
   {
     const h = dd.vmaxAlt;
     const v = kmh(dd.vmaxKmh);
-    const T = thrustAt(s, v, h, state(1, ab), BASE_MODS);
+    const T = thrustAt(s, v, h, st, BASE_MODS);
     const q = 0.5 * RHO0 * sigma(h) * v * v;
     const CL = (m * G) / (q * s.wingArea);
     const cd0 = T / (q * s.wingArea) - inducedK(s) * CL * CL - waveCd(s, v / soundSpeed(h));
     s.cd0 = clamp(cd0, 0.007, 0.09);
+    // Belgelenen azami hız, uçağın en hızlı olduğu irtifadaki hızdır. Belgelenen irtifa kritik irtifanın biraz
+    // üstündeyse (hücum havası etkisi) ya da jet itkisi irtifayla dik düşüyorsa tepe başka irtifaya kayıp belgeleneni
+    // aşabilir: çevredeki irtifalarda tepe hız belgelenene eşitlenene dek Cd0 düzeltilir (pervanelide güç sınırlı,
+    // v ∝ Cd0^−1/3; jette itki sınırlı, v ∝ Cd0^−1/2).
+    const crit = s.engine.kind === 'jet' ? 0 : Math.min(s.engine.critAlt, h);
+    const top = Math.max(s.engine.kind === 'jet' ? 10000 : s.engine.critAlt, h) + 500;
+    const alts = [0];
+    for (let a = Math.max(500, crit - 1000); a <= top; a += 500) alts.push(a);
+    const k = s.engine.kind === 'jet' ? 2 : 3;
+    for (let i = 0; i < 6; i++) {
+      let peak = 0;
+      for (const a of alts) peak = Math.max(peak, levelSpeedNear(s, a, m, st, v));
+      if (Math.abs(peak / v - 1) < 0.002) break;
+      s.cd0 = clamp(s.cd0 * Math.pow(peak / v, k), 0.007, 0.09);
+    }
   }
-  const st = state(1, ab);
   for (let h = 0; h <= 16000; h += 500) {
     s.perf.alt.push(h);
     s.perf.vmax.push(levelSpeed(s, h, m, st));

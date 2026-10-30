@@ -4,7 +4,9 @@
 //  Kaldırma:  L = q·S·CL, q = ½ρV². Kullanılabilir G = q·S·CLmax / W  → yükseklerde ve ağır yükte azalır.
 //  Sürükleme: D = q·S·(Cd0 + K·CL² + ΔCd_dalga),  K = 1/(π·e·AR)
 //  Dalga sürüklemesi (Lock kuralı): kritik Mach üstünde ΔCd ≈ 20·(M − Mkr)⁴, kanat tipine göre tavanlı.
-//  Pistonlu motor: kritik irtifaya kadar ~sabit güç, üstünde yoğunlukla düşer; pervane itkisi T = η·P / V.
+//  Pistonlu motor: kritik irtifaya kadar ~sabit güç, üstünde yoğunlukla düşer (σ oranının üssü, lapse); pervane
+//  itkisi T = η·P / V. Jet itkisi σ^lapse ile düşer. lapse, belgelenmiş servis tavanı olan uçaklarda o tavana göre
+//  ayarlanır (specs.ts): yükseklikteki pervane verimi kaybını ve eski jetlerin irtifa zaafını da içine alır.
 //  Pervane verimi yüksek Mach'ta (kanat ucu sıkışması) düşer: pervaneli uçak dalışta ses hızına yaklaşamaz.
 //  Jet: itki ≈ T0·σ^0.75·(1 − 0,3·M + 0,45·M²): hava girişi direnci net itkiyi orta hızlarda statik değerin altına
 //  indirir, yüksek Mach'ta dinamik basınç toparlar. Motor devri gecikmeli (erken jetlerde gaz tepkisi yavaş).
@@ -30,14 +32,22 @@ export function inducedK(s: AircraftSpec): number {
   return 1 / (Math.PI * s.oswald * aspectRatio(s));
 }
 
-/** Kritik Mach üstü dalga sürüklemesi (ΔCd). */
+/**
+ * Kritik Mach üstü dalga sürüklemesi (ΔCd). Lock kuralı yalnız sürükleme ıraksama Mach'ına (Mdd, ΔCd ≈ 0,002) kadar
+ * geçerli; ötesinde sürükleme dik yükselir ve ~0,12 Mach içinde tavana (cdWave) varır. Eskiden Lock kuralı ötesine de
+ * uzatılıyordu: dalga sürüklemesi Mach 1'e yakın bile küçük kaldığı için jetler orta irtifada ses hızına yakın düz
+ * uçabiliyor, en hızlı oldukları irtifa gerçekteki gibi deniz seviyesi değil 4–6 km oluyordu.
+ */
 export function waveCd(s: AircraftSpec, M: number): number {
   const mc = s.mcrit;
   if (M <= mc) return 0;
-  const lock = (m: number) => Math.min(s.cdWave, 20 * Math.pow(m - mc, 4));
-  if (M < 1.05) return lock(M);
+  const at = (m: number) => {
+    const lock = 20 * Math.pow(Math.max(0, Math.min(m, s.mdd) - mc), 4);
+    return Math.min(s.cdWave, lock + (s.cdWave - lock) * smoothstep(s.mdd, s.mdd + 0.12, m));
+  };
+  if (M < 1.05) return at(M);
   // Ses üstünde dalga sürüklemesi tepe yaptıktan sonra yavaşça azalır
-  return lock(1.05) * (0.6 + 0.4 * Math.exp(-(M - 1.05) * 3));
+  return at(1.05) * (0.6 + 0.4 * Math.exp(-(M - 1.05) * 3));
 }
 
 /** Mach'a bağlı azami kaldırma katsayısı (buffet). */
@@ -69,9 +79,18 @@ export function enginePowerKW(s: AircraftSpec, h: number, mods: ModEffects): num
     const sl = e.sl ?? (e.twoStage ? 1.08 : 0.92);
     p *= (sl + (1 - sl) * k) * (1 + mods.lowAltBoost * (1 - k));
   } else {
-    p *= Math.pow(sigma(h) / sigma(crit), 1.15);
+    p *= Math.pow(sigma(h) / sigma(crit), e.lapse ?? PISTON_LAPSE);
   }
   return p;
+}
+
+/** Varsayılan irtifa düşüşü üssü (servis tavanı ayarı olmayan uçaklar). */
+export const PISTON_LAPSE = 1.15;
+export const JET_LAPSE = 0.75;
+
+/** Jet itkisinin irtifa çarpanı. */
+function jetAlt(s: AircraftSpec, h: number): number {
+  return Math.pow(sigma(h), s.engine.lapse ?? JET_LAPSE);
 }
 
 export interface ThrustState {
@@ -91,7 +110,7 @@ export function thrustAt(s: AircraftSpec, v: number, h: number, st: ThrustState,
   const e = s.engine;
   const M = v / soundSpeed(h);
   if (e.kind === 'jet') {
-    const sg = Math.pow(sigma(h), 0.75);
+    const sg = jetAlt(s, h);
     let T = (e.kn ?? 0) * 1000 * e.count * sg * (1 - 0.3 * M + 0.45 * M * M) * st.spool * mods.jetThrustMul;
     if (st.afterburner && e.abKn) T += (e.abKn - (e.kn ?? 0)) * 1000 * e.count * sg * (1 + 0.3 * M);
     return T * engineMul;
@@ -163,7 +182,7 @@ export function rollRateAt(s: AircraftSpec, iasV: number, mods: ModEffects): num
 export function fuelFlowAt(s: AircraftSpec, h: number, st: ThrustState, mods: ModEffects): number {
   const e = s.engine;
   if (e.kind === 'jet') {
-    const sg = Math.pow(sigma(h), 0.75);
+    const sg = jetAlt(s, h);
     let f = (e.kn ?? 0) * 1000 * e.count * sg * Math.max(st.spool, 0.08) * e.tsfc;
     if (st.afterburner && e.abKn) f += (e.abKn - (e.kn ?? 0)) * 1000 * e.count * sg * e.tsfc * 2.6;
     return f / 3600;

@@ -51,6 +51,7 @@ npm run build        # tsc --noEmit (sıkı: kullanılmayan değişken de hata) 
 npm run typecheck
 npm run sim:bench    # başsız simülasyon ölçümü (tools/sim)
 npm run sim:hits     # isabet/düşürme istatistikleri
+npm run sim:ceiling  # servis tavanı ayarı: specs.ts CEILINGS üslerini bulur ve denetler
 npm run db:local     # yerel D1 veritabanı (tablolar)
 npm run serve        # yerel Cloudflare sunucusu: dist/ + /api (http://localhost:8787; önce npm run build)
 npm run deploy       # Cloudflare'e elle yayın (normalde GitHub bağlantısıyla kendiliğinden)
@@ -63,6 +64,14 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 
 - **`src/sim/`: oyun mantığı, render bilmez.** 60 Hz sabit adım (`world.step`), Node'da başsız çalışır.
   - `aircraft/`: gerçek uçak katalogu (`specs.ts`), uçuş modeli, hasar.
+    - Belgelenen azami hız türetmede tutturulur: Cd0, uçağın en hızlı olduğu irtifadaki hız belgelenene eşit olacak
+      biçimde ayarlanır.
+    - Avcıların servis tavanı `CEILINGS`'teki irtifa düşüşü üssüyle tutturulur. Üsleri `npm run sim:ceiling` bulur;
+      açılışta aramak telefonda yavaş olduğu için tabloya yazılır. Motor, ağırlık, sürükleme ya da azami hız
+      değişince aracı yeniden çalıştır.
+    - Dalga sürüklemesi (`aero.ts` `waveCd`) Lock kuralıyla ıraksama Mach'ına (`mdd`, yoksa mcrit + 0,1) kadar artar,
+      ötesinde dik yükselir. Belgelenen hızı Mdd'nin üstünde olan jetin `mdd`'si tanımda verilir; F-86 ve MiG-15'inki,
+      gerçekteki gibi deniz seviyesinde en hızlı olacakları biçimde seçildi.
   - `ai/`: kol, dalaş, pike, taarruz, bombardıman, taret, pist operasyonları.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
@@ -115,6 +124,18 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron
   ses. Yayın derlemesine girmez.
+- **`src/ansiklopedi/`:** Uçak ansiklopedisi. Arama motorları için düz HTML: `/ansiklopedi/…` ve `/en/encyclopedia/…`.
+  - Metin döneme göre `makale/*.ts`'te (TR/EN; biçim `tur.ts`, toplayan `makaleler.ts`). Sıra, ad, yıl ve "Oyunda"
+    sayıları katalogdan (`specs.ts`) gelir. "Oyunda" metni yalnız oyunda gerçekten modellenmiş davranışı anlatır;
+    araştırma yolunu sayfa kendisi ekler, metinde tekrarlama. Uçurulamayan (`future`) uçaklarda oyun değerleri ve
+    "Bu uçakla oyna" gösterilmez.
+  - `liste.ts` adresleri tutar; oyun da okur (menüde Ansiklopedi düğmesi, hangarda bağlantı). Makale metni oyun
+    paketine girmez.
+  - Sayfaları `sayfalar.ts` üretir. Vite eklentisi `tools/ansiklopedi/vite.ts` derlemede dist/'e yazar, geliştirmede
+    anında sunar. Site haritası da oradan üretilir.
+  - Görseller oyunun modellerinden: `node tools/ansiklopedi/gorseller.mjs [uçak]` → `public/ansiklopedi/gorsel`.
+  - Yeni uçak: makale + `liste.ts` + görseller. Tarih ve sayılar yaygın kaynaklarla uyuşmalı; emin olunmayan bilgi
+    yazılmaz.
 
 ## Araçlar ve klasörler
 
