@@ -171,7 +171,28 @@ function load(): Settings {
   }
 }
 
-export const settings: Settings = load();
+/** Telefonda bir kerelik grafik sıfırlaması yapıldı mı (yeni anahtar; ayarların kendisi KEY'de). */
+const PHONE_KEY = 'warsim.phoneLow';
+
+/**
+ * Telefonda (dokunmatik, kısa kenarı 600 px'ten küçük) bir kez: grafik Düşük, çözünürlük otomatik. Varsayılan Düşük
+ * yalnız yeni oyunculara geçiyordu; eski kayıtlı Yüksek ayarla telefonda kasanlar için. Sonra oyuncu istediğini seçer.
+ */
+function phoneOnce(s: Settings): Settings {
+  try {
+    const phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
+    if (!phone || localStorage.getItem(PHONE_KEY)) return s;
+    localStorage.setItem(PHONE_KEY, '1');
+    s.graphics.quality = 'low';
+    s.graphics.resolution = 'auto';
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } catch {
+    /* başsız simülasyon ya da depolama kapalı */
+  }
+  return s;
+}
+
+export const settings: Settings = phoneOnce(load());
 
 /** Geçerli kalite basamağı. */
 export function quality(): QualityPreset {

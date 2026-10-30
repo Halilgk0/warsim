@@ -101,7 +101,13 @@ export class GameRenderer {
   readonly atmosphere: Atmosphere;
   readonly clouds: Clouds;
   /** Cihazın piksel oranı (en çok 2); çözünürlük ayarı bunun katı. */
-  private readonly baseRatio = Math.min(window.devicePixelRatio, 2);
+  /**
+   * Taban piksel oranı: en çok 2; Düşük kalitede 1,5 (telefonda sahne piksel sayısı ~%44 azalır, keskinlik çok az
+   * düşer; arayüz yazıları DOM'da, etkilenmez).
+   */
+  private get baseRatio(): number {
+    return Math.min(window.devicePixelRatio, settings.graphics.quality === 'low' ? 1.5 : 2);
+  }
   /** Otomatik çözünürlük: geçerli çarpan, kare süresi ortalaması (ms), son değişimden beri süre (s). */
   private readonly resAuto = { scale: 1, ema: 16.7, t: 0 };
   /** Video kaydı: çözünürlük sabit. */
@@ -283,10 +289,10 @@ export class GameRenderer {
     const a = this.resAuto;
     a.ema += (realDt * 1000 - a.ema) * 0.05;
     a.t += realDt;
-    // Yüksek piksel oranlı telefonda yarıya kadar, masaüstünde %75'e kadar
-    const min = this.baseRatio >= 1.5 ? 0.55 : 0.75;
+    // Yüksek piksel oranlı telefonda %45'e kadar, masaüstünde %75'e kadar
+    const min = this.baseRatio >= 1.5 ? 0.45 : 0.75;
     let next = a.scale;
-    if (a.t > 2 && a.ema > 21 && a.scale > min) next = Math.max(min, a.scale - 0.15);
+    if (a.t > 1.5 && a.ema > 20 && a.scale > min) next = Math.max(min, a.scale - 0.15);
     else if (a.t > 6 && a.ema < 13 && a.scale < 1) next = Math.min(1, a.scale + 0.1);
     if (next === a.scale) return;
     a.scale = next;

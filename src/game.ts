@@ -108,6 +108,8 @@ export class Game {
   private lastErrorLog = 0;
   /** withMap haritayı işçilerde yüklerken (döngü bekler). */
   private mapLoading = false;
+  /** Son işlenen karenin zamanı (kare sınırı). */
+  private lastDraw = 0;
   private errorShown = false;
 
   constructor() {
@@ -676,6 +678,9 @@ export class Game {
   /** Kare döngüsü: bir sonraki kare önce istenir, karedeki hata oyunu dondurmaz. */
   private loop = (now: number): void => {
     requestAnimationFrame(this.loop);
+    // 90–144 Hz ekranlarda saniyede ~60 kare: iş ve ısınma yarıya iner (telefon ısınıp yavaşlamaz); 60 Hz'de fark yok
+    if (now - this.lastDraw < 10) return;
+    this.lastDraw = now;
     if (this.mapLoading) {
       // Harita yükleniyor (withMap): dünya ve çizim bekler; dönüşte uzun bir adım atılmasın
       this.last = now;
