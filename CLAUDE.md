@@ -93,8 +93,25 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `effects.ts`: iki ponpon katmanı var: ışıkla gölgelenen duman/ateş ve ışıktan etkilenmeyen parlama.
   - `atmosphere.ts`: gök kubbesi, güneş, yükseklik sisi (three.js sis parçalarının yerine). Kendi `onBeforeCompile`'ı
     olan malzeme `linkAtmosphere` çağırmalı, yoksa sisi bozulur.
-  - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `models.ts` (kodla üretilen parametrik uçaklar),
-    `structures.ts`, `palette.ts`.
+  - `arch.ts`: yapı yüzeyleri tek gölgelendiricide yordamsal (doku dosyası yok). İnce ayrıntı `aFade` ile yalnız
+    yakında hesaplanır; yeni desen de böyle sönmeli (uzakta hem kıpırtı hem maliyet olmasın).
+  - `lamps.ts`: yapı ışıkları (kameraya dönük lambalar, yerde ışık havuzları). Akşam `archNight` ile yanar; gündüz
+    üçgenleri çöker, maliyeti yok.
+  - `structures.ts`: hava üssü, uçaksavar, radar, fabrika.
+    - Yeni üs yapıları `|x| ≤ 400` içinde kalsın: simülasyonun üs alanı bu (dışına başka yapı kurulabiliyor).
+    - Park eden uçaklar `placeParked`: en yeni yarısı hangar ağzı, T2, çadır hangar, sığınak ve siperlere, kalanı
+      aprona. Tür başına InstancedMesh (`models.ts` `parkedParts`).
+  - `models.ts`: kodla üretilen parametrik uçaklar. Modelde `+x` sol kanat (burun `+z`, üst `+y`).
+    - Hareketli parçalar eklemdir; şimdilik yalnız MiG-15'te.
+      - Kanat ve kuyruk `controlWing` / `controlFin` ile kurulur: ana yüzey ve kumanda yüzeyi aynı profilden kesilir
+        (`airfoilPart`), aralarında yalnız menteşe çizgisi kalır.
+      - Gövde (kapalı hava girişi ve egzoz) `migFuselage`, takım (içe ve öne katlanır, gövdeye girer) `migGear`.
+      - Hava freni `airbrakes`.
+    - Yerdeki uçak pist betonunun üstünde çizilir: `gameRenderer.ts` `RUNWAY_TOP`, büyütmede takım payı.
+    - Eklem menteşe ekseniyle döner. `gameRenderer.ts` `animateParts` kumandalara bağlar.
+    - Işıklar model tanımında (`lights`): seyir lambaları ve iniş farı. Ek çözünürlük `HIRES`.
+    - Yeni uçağa eklerken bu dört parçayı ve ışıkları tanıma ekle.
+  - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `palette.ts`.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
 - **`src/audio/`:**
   - `sound.ts`: Web Audio, kanallar, örnek bankası.

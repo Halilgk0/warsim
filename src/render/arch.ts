@@ -39,6 +39,8 @@ export const SURF = {
   earth: 20,
   hangarDoor: 21,
   aptWin: 22,
+  canvas: 23,
+  psp: 24,
 } as const;
 export type Surf = (typeof SURF)[keyof typeof SURF];
 
@@ -143,22 +145,37 @@ const COLOR = /* glsl */ `
       if ( s == 4 && side ) win = aWindows( uv, faceW, faceH, 3.0, 1.2, 1.35, 0.95, 2.9, 1.0 );
       if ( s == 22 && side ) win = aWindows( uv, faceW, faceH, 2.7, 1.5, 1.45, 0.9, 3.1, 1.2 );
     } else if ( s == 5 || s == 6 ) {
-      // Beton: kalıp tahtası izleri, yukarıdan inen yağmur lekeleri
+      // Beton: kalıp tahtası izleri, yakında benekli yüzey, yukarıdan inen yağmur lekeleri
       float f = aFade( uv, 0.6 );
       c = base * ( 0.92 + 0.1 * aNoise( vAP * 0.5 ) );
       c *= 1.0 - 0.06 * aLine( uv.y, 0.6, 0.012 ) * f;
+      float fm = aFade( uv, 0.25 );
+      if ( fm > 0.01 ) c *= 1.0 + ( aNoise( vAP * 4.0 ) - 0.5 ) * 0.12 * fm;
       float streak = aNoise( vec3( uv.x * 2.2, vAP.y * 0.08, 3.0 ) );
       if ( side ) c *= 1.0 - 0.12 * smoothstep( 0.55, 0.9, streak ) * smoothstep( faceH - 3.0, faceH, vPL.y + streak * 2.0 );
       if ( s == 6 && side ) win = aWindows( uv, faceW, faceH, 1.6, 1.42, 1.9, 1.0, 3.4, 0.8 );
     } else if ( s == 7 || s == 21 ) {
-      // Oluklu sac: oluklar (gölge dalgası), yatay levha birleşimleri, pas akıntıları
+      // Oluklu sac: oluklar (gölge dalgası), yatay levha birleşimleri, levha başına ton (sonradan değişen levhalar
+      // daha parlak), vida sıraları ve altlarından inen pas akıntıları, dipte toprak sıçraması
       float cc = abs( n.z ) > 0.7 ? vPL.x : vPL.z;
       float f = aFade( vec2( cc ), 0.15 );
       c = base * ( 1.0 + 0.09 * cos( 6.2832 * cc / 0.15 ) * f );
       c *= 1.0 - 0.1 * aLine( vPL.y, 2.4, 0.015 ) * f;
+      float fs = aFade( vec2( cc, vPL.y ), 0.9 );
+      vec2 sheet = floor( vec2( cc / 0.9, vPL.y / 2.4 ) );
+      float sh = aHash2( sheet + 3.0 );
+      c *= 1.0 + ( sh - 0.5 ) * 0.14 * fs + step( 0.94, sh ) * 0.12 * fs;
       float rust = smoothstep( 0.62, 0.85, aNoise( vec3( cc * 1.3, vAP.y * 0.12, 7.0 ) ) );
+      // Akıntı: levha üst kenarındaki vida sırasından aşağı incelen pas izi
+      float drip = smoothstep( 0.55, 0.85, aNoise( vec3( cc * 2.2, floor( vPL.y / 2.4 ), 11.0 ) ) ) * ( 1.0 - fract( vPL.y / 2.4 ) );
+      rust = max( rust, drip * 0.8 * fs );
       c = mix( c, vec3( 0.36, 0.2, 0.11 ), rust * 0.35 );
-      if ( s == 21 && side ) c *= 0.82 + 0.18 * aLine( uv.x, 3.0, 0.04 );
+      if ( side ) c *= 1.0 - 0.14 * ( 1.0 - smoothstep( 0.0, 1.2, vPL.y ) );
+      if ( s == 21 && side ) {
+        // Kapı panoları: dikey birleşim, yatay kuşaklar, ray altında kir
+        c *= 0.82 + 0.18 * aLine( uv.x, 3.0, 0.04 );
+        c *= 1.0 - 0.12 * aLine( vPL.y, 1.6, 0.05 ) * aFade( vec2( vPL.y ), 1.6 );
+      }
     } else if ( s == 8 ) {
       // Kiremit: eğim boyunca sıralar, sıra altında gölge, kiremit başına ton, yer yer yosun
       vec2 tq = vec2( ( xFace ? vPL.z : vPL.x ) / 0.24 + 0.5 * floor( vPL.y / 0.3 ), vPL.y / 0.3 );
@@ -193,20 +210,67 @@ const COLOR = /* glsl */ `
       c = base * mix( 1.0, 0.9 + 0.16 * aHash2( pq ), f );
       c *= 1.0 - 0.22 * max( aLine( vPL.x, 0.6, 0.012 ), aLine( vPL.z, 0.6, 0.012 ) );
     } else if ( s == 14 ) {
-      // Asfalt: koyu, yamalar ve çatlaklar
+      // Asfalt: koyu, büyük açık-koyu alanlar, dikdörtgen onarım yamaları (taze katran koyu, eski yama soluk), katranla
+      // doldurulmuş çatlaklar, yakında agrega taneleri
       c = base * ( 0.88 + 0.2 * aNoise( vAP * 0.3 ) ) * ( 0.95 + 0.1 * aNoise( vAP * 2.5 ) );
       c *= 1.0 - 0.15 * smoothstep( 0.72, 0.8, aNoise( vAP * 0.07 + 2.0 ) );
+      c *= 0.94 + 0.12 * aNoise( vAP * 0.015 + 9.0 );
+      if ( !side ) {
+        vec2 rc = vAP.xz / vec2( 7.0, 11.0 );
+        vec2 rq = floor( rc );
+        float rh = aHash2( rq + 41.0 );
+        vec2 rf = abs( fract( rc ) - 0.5 );
+        float repair = step( 0.86, rh ) * ( 1.0 - smoothstep( 0.3, 0.32, max( rf.x, rf.y ) ) );
+        c *= 1.0 - repair * ( rh > 0.93 ? 0.22 : -0.08 );
+        float fc = aFade( vAP.xz, 0.6 );
+        if ( fc > 0.01 ) {
+          float cr = abs( aNoise( vec3( vAP.xz * 0.45, 4.0 ) ) - 0.5 );
+          c *= 1.0 - 0.28 * ( 1.0 - smoothstep( 0.0, 0.01 + fwidth( cr ), cr ) ) * smoothstep( 0.62, 0.78, aNoise( vAP * 0.05 + 6.0 ) ) * fc;
+          float fg = aFade( vAP.xz, 0.12 );
+          if ( fg > 0.01 ) c *= 1.0 + ( aHash( floor( vAP * 14.0 ) ) - 0.5 ) * 0.16 * fg;
+        }
+      }
     } else if ( s == 15 ) {
-      // Pist betonu: 7,5 × 5 m plakalar, koyu derz dolgusu, plaka tonu, iniş bölgesinde lastik izleri
+      // Pist betonu: 7,5 × 5 m plakalar, koyu derz dolgusu ve iki yanına taşan katran, plaka tonu, sonradan dökülmüş
+      // açık ve katranla yamanmış koyu plakalar, köşeden kırık ve çatlak plakalar, yağ lekeleri, yakında benekli
+      // yüzey; iniş bölgesinde lastik izleri, orta çizgi boyunca motor yağı, kenarlarda toprak
       float f = aFade( vPL.xz, 5.0 );
       vec2 pq = floor( vPL.xz / vec2( 7.5, 5.0 ) );
-      c = base * ( 0.93 + 0.12 * aHash2( pq ) * f ) * ( 0.95 + 0.08 * aNoise( vAP * 0.2 ) );
-      c *= 1.0 - 0.3 * max( aLine( vPL.x, 7.5, 0.06 ), aLine( vPL.z, 5.0, 0.06 ) );
+      float h1 = aHash2( pq );
+      float h2 = aHash2( pq + 17.0 );
+      c = base * ( 0.93 + 0.12 * h1 * f ) * ( 0.95 + 0.08 * aNoise( vAP * 0.2 ) );
+      c *= 0.95 + 0.1 * aNoise( vAP * 0.012 + 3.0 );
+      c *= mix( 1.0, h2 > 0.94 ? 1.06 : ( h2 < 0.04 ? 0.84 : 1.0 ), f );
+      float joint = max( aLine( vPL.x, 7.5, 0.06 ), aLine( vPL.z, 5.0, 0.06 ) );
+      float bleed = max( aLine( vPL.x, 7.5, 0.25 ), aLine( vPL.z, 5.0, 0.25 ) ) * smoothstep( 0.35, 0.75, aNoise( vAP * 1.1 ) );
+      c *= 1.0 - 0.3 * joint - 0.12 * bleed * f;
+      float fn = aFade( vPL.xz, 0.5 );
+      if ( fn > 0.01 && !side ) {
+        vec2 pf = fract( vPL.xz / vec2( 7.5, 5.0 ) ) * vec2( 7.5, 5.0 );
+        // Kırık köşe: plakanın bir köşesinde üçgen koyu yama
+        vec2 cq = vec2( h1 > 0.5 ? pf.x : 7.5 - pf.x, h2 > 0.5 ? pf.y : 5.0 - pf.y );
+        float corner = step( 0.82, aHash2( pq + 5.0 ) ) * ( 1.0 - smoothstep( 1.1, 1.2, cq.x + cq.y ) );
+        c *= 1.0 - 0.18 * corner * fn;
+        // Çatlak: plaka içinde hafif kıvrımlı ince çizgi (az sayıda plakada)
+        float cr = abs( aNoise( vec3( vPL.xz * 0.28, h1 * 13.0 ) ) - 0.5 );
+        c *= 1.0 - 0.2 * ( 1.0 - smoothstep( 0.0, 0.006 + fwidth( cr ), cr ) ) * step( 0.9, h2 ) * fn;
+        // Yağ lekesi
+        float oil = smoothstep( 0.74, 0.92, aNoise( vec3( vPL.xz * vec2( 0.35, 0.6 ), 21.0 ) ) ) * step( 0.86, aHash2( pq + 9.0 ) );
+        c = mix( c, c * vec3( 0.66, 0.66, 0.7 ), oil * 0.45 * fn );
+        float fm = aFade( vPL.xz, 0.2 );
+        if ( fm > 0.01 ) c *= 1.0 + ( aNoise( vAP * 5.0 ) - 0.5 ) * 0.1 * fm + ( aHash( floor( vAP * 16.0 ) ) - 0.5 ) * 0.08 * fm;
+      }
       float mid = abs( vPL.x - vPS.x * 0.5 );
       float end = min( vPL.z, vPS.z - vPL.z );
       float tire = ( 1.0 - smoothstep( 6.0, 11.0, mid ) ) * smoothstep( 150.0, 300.0, end ) * ( 1.0 - smoothstep( 600.0, 1000.0, end ) );
       tire *= 0.5 + 0.5 * aNoise( vec3( vPL.x * 1.5, vPL.z * 0.02, 1.0 ) );
       c *= 1.0 - 0.45 * tire;
+      // Uzun pistte (yalnız pistin kendisi): orta çizgi boyunca yağ izi, kenarlarda toprak ve çim lekesi
+      if ( vPS.z > 500.0 ) {
+        c *= 1.0 - 0.1 * ( 1.0 - smoothstep( 1.5, 5.0, mid ) ) * aNoise( vec3( vPL.x * 0.8, vPL.z * 0.05, 2.0 ) );
+        float edge = 1.0 - smoothstep( 0.0, 4.0, min( vPL.x, vPS.x - vPL.x ) );
+        c = mix( c, c * vec3( 0.84, 0.86, 0.74 ), edge * ( 0.4 + 0.4 * aNoise( vAP * 0.3 ) ) );
+      }
     } else if ( s == 16 ) {
       // Kum torbası: kaydırmalı sıralar, şişkin torba gölgesi, çuval tonu
       vec2 sq = vec2( ( xFace ? vPL.z : vPL.x ) / 0.62 + 0.5 * floor( vPL.y / 0.17 ), vPL.y / 0.17 );
@@ -233,6 +297,31 @@ const COLOR = /* glsl */ `
     } else if ( s == 20 ) {
       // Toprak ve pasa: taşlı, alacalı
       c = base * ( 0.8 + 0.3 * aNoise( vAP * 0.4 ) ) * ( 0.92 + 0.14 * aNoise( vAP * 3.0 ) );
+    } else if ( s == 23 ) {
+      // Kanvas (çadır hangar): 1,2 m'lik dikişli enler, 4 m'de bir çerçeve kemeri arasında sarkma gölgesi, yağmur
+      // akıntısı, dipte çamur
+      float cc = abs( n.z ) > abs( n.x ) ? vPL.x : vPL.z;
+      c = base * ( 0.92 + 0.1 * aNoise( vAP * 0.5 ) ) * ( 0.96 + 0.06 * aNoise( vAP * 2.7 ) );
+      float fs = aFade( vec2( cc ), 1.2 );
+      c *= 1.0 - 0.05 * aLine( cc, 1.2, 0.015 ) * fs;
+      c *= 0.92 + 0.08 * ( 0.5 - 0.5 * cos( 6.2832 * cc / 4.0 ) );
+      float st = smoothstep( 0.6, 0.85, aNoise( vec3( cc * 1.7, vAP.y * 0.15, 5.0 ) ) );
+      c *= 1.0 - 0.12 * st;
+      if ( side ) c = mix( c, c * vec3( 0.7, 0.66, 0.58 ), 1.0 - smoothstep( 0.0, 1.0, vPL.y ) );
+    } else if ( s == 24 ) {
+      // Delikli çelik plaka (Marston): 0,38 m enli, 3 m boylu kaydırmalı planklar, plankta iki sıra delik (altından
+      // toprak ve çim görünür), plank kenarı çizgisi, yer yer pas; uzakta delikler ortalama renge karışır
+      float px = vPL.x / 0.38;
+      vec2 q = vec2( floor( px ), floor( vPL.z / 3.05 + 0.5 * floor( px ) ) );
+      c = base * ( 0.9 + 0.16 * aHash2( q ) ) * ( 0.94 + 0.1 * aNoise( vAP * 0.3 ) );
+      c = mix( c, vec3( 0.34, 0.22, 0.13 ), smoothstep( 0.6, 0.85, aNoise( vAP * 0.9 + 4.0 ) ) * 0.4 );
+      c *= 1.0 - 0.25 * aLine( vPL.x, 0.38, 0.012 ) * aFade( vec2( vPL.x ), 0.38 );
+      vec3 soil = vec3( 0.25, 0.27, 0.15 ) * ( 0.8 + 0.4 * aNoise( vAP * 1.5 ) );
+      float fh = aFade( vPL.xz, 0.15 );
+      float hx = abs( fract( fract( px ) * 2.0 ) - 0.5 ) * 0.19;
+      float hz = abs( fract( vPL.z / 0.15 ) - 0.5 ) * 0.15;
+      float hole = 1.0 - smoothstep( 0.04, 0.05, length( vec2( hx, hz ) ) );
+      c = mix( c, soil, mix( 0.22, hole * 0.9, fh ) );
     }
 
     // Pencereler: çerçeve beyaz-gri, cam göğü yansıtır; gece bir kısmı yanar

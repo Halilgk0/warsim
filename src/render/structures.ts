@@ -10,20 +10,49 @@ import { AASite, type AAWeaponId } from '../sim/structures/airDefense';
 import { RUNWAY_HALF } from '../sim/structures/airbase';
 import { SPECS } from '../sim/aircraft/specs';
 import { gearHeight } from '../sim/aircraft/flightModel';
-import { buildAircraftModel } from './models';
 import { quality } from '../ui/settings';
 import { buildCityModel } from './cityModels';
 import { PALETTE } from './palette';
 import { mulberry32 } from '../core/math';
 import { ArchBatch, SURF, archMaterial, setArchDamage, type Surf } from './arch';
 import { GABLE } from './props';
+import { LAMP, LampSet } from './lamps';
+import { parkedParts } from './models';
+import type { AircraftSpec } from '../sim/aircraft/specs';
+
+/** İçe bakan kopya (üçgen sırası ve normaller ters): kabuğun içi kapıdan bakınca görünsün. */
+function inward(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  for (const name of Object.keys(g.attributes)) {
+    const a = g.getAttribute(name) as THREE.BufferAttribute;
+    const n = a.itemSize;
+    const arr = a.array as Float32Array;
+    for (let i = 0; i < a.count; i += 3) {
+      for (let k = 0; k < n; k++) {
+        const t = arr[(i + 1) * n + k];
+        arr[(i + 1) * n + k] = arr[(i + 2) * n + k];
+        arr[(i + 2) * n + k] = t;
+      }
+    }
+  }
+  const nr = g.getAttribute('normal');
+  if (nr) for (let i = 0; i < nr.array.length; i++) (nr.array as Float32Array)[i] *= -1;
+  return g;
+}
 
 const BOX = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
 const BOXC = new THREE.BoxGeometry(1, 1, 1);
 const CYL = new THREE.CylinderGeometry(1, 1, 1, 16).translate(0, 0.5, 0);
 const CYLZ = new THREE.CylinderGeometry(1, 1, 1, 10).rotateX(Math.PI / 2).translate(0, 0, 0.5);
 /** Kemer çatılı hangar: yarım silindir, uzunluk Z ekseninde. */
-const ARCH = new THREE.CylinderGeometry(1, 1, 1, 18, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+const ARCH = new THREE.CylinderGeometry(1, 1, 1, 28, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+/** Uçları açık kemer kabuğu ve içe bakan yüzü (kapısı açık hangar, iki ucu açık sığınak). */
+const ARCH_OPEN = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+const ARCH_IN = inward(ARCH_OPEN);
+/** Beşik çatının içi (tavan; çatının altı açık). */
+const GABLE_IN = inward(GABLE);
+/** Altıgen sığınak (Type 22 tipi beton mevzi), taban y = 0, yarıçap 1. */
+const HEX = new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, 0.5, 0);
 /**
  * Testere dişi çatının bir dişi: dik üçgen prizma, tabanı çatıya düz oturur (y = 0). Uzunluk X'te; dik camlı yüz
  * −Z'de, eğik keçe yüz +Z'ye iner. Birim: −0,5..0,5 (X, Z), 0..1 (Y).
@@ -92,12 +121,70 @@ const handwheel = (b: B, x: number, y: number, z: number, r = 0.2) =>
 function archWall(a: number, h: number, d: number): THREE.BufferGeometry {
   const s = new THREE.Shape();
   s.moveTo(-a, 0);
-  for (let i = 1; i <= 16; i++) {
-    const t = Math.PI - (Math.PI * i) / 16;
+  for (let i = 1; i <= 28; i++) {
+    const t = Math.PI - (Math.PI * i) / 28;
     s.lineTo(Math.cos(t) * a, Math.sin(t) * h);
   }
   s.closePath();
   return new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 1 }).translate(0, 0, -d / 2);
+}
+
+/** Kapı açıklığı oyulmuş kemer duvar: archWall, altta ±open genişlik ve doorH yükseklikte boşluk. */
+function notchedWall(a: number, h: number, open: number, doorH: number, d: number): THREE.BufferGeometry {
+  const s = new THREE.Shape();
+  s.moveTo(-a, 0);
+  for (let i = 1; i <= 28; i++) {
+    const t = Math.PI - (Math.PI * i) / 28;
+    s.lineTo(Math.cos(t) * a, Math.sin(t) * h);
+  }
+  s.lineTo(open, 0);
+  s.lineTo(open, doorH);
+  s.lineTo(-open, doorH);
+  s.lineTo(-open, 0);
+  s.closePath();
+  return new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 1 }).translate(0, 0, -d / 2);
+}
+
+/**
+ * Park yeri (hangar ağzı, sığınak, siper, apron): burun bu çizgiye gelir. yaw: modelin Y dönüşü (burun yönü),
+ * width: yan yana uçakların sığdığı genişlik, depth: arkaya doğru boy, y: zeminin üst kotu, out: burnun çizgiden
+ * taşması (m).
+ */
+interface Bay { x: number; z: number; yaw: number; width: number; depth: number; y: number; out: number }
+
+/**
+ * Yerel çerçeve (hangar, sığınak gibi döndürülmüş yapılar için): (lx, lz) → üs ekseni; parçalar da aynı açıyla
+ * döner. Yerel +X yapının önü (kapı).
+ */
+class Frame {
+  private readonly c: number;
+  private readonly s: number;
+  constructor(readonly b: B, readonly ox: number, readonly oz: number, readonly ry: number, readonly lamps: LampSet) {
+    this.c = Math.cos(ry);
+    this.s = Math.sin(ry);
+  }
+  x(lx: number, lz: number): number {
+    return this.ox + lx * this.c + lz * this.s;
+  }
+  z(lx: number, lz: number): number {
+    return this.oz - lx * this.s + lz * this.c;
+  }
+  A(geo: THREE.BufferGeometry, sx: number, sy: number, sz: number, lx: number, y: number, lz: number, color: number, surf: Surf, lry = 0): void {
+    A(this.b, geo, sx, sy, sz, this.x(lx, lz), y, this.z(lx, lz), color, surf, this.ry + lry);
+  }
+  beam(ax: number, ay: number, az: number, bx: number, by: number, bz: number, w: number, color: number): void {
+    beam(this.b, this.x(ax, az), ay, this.z(ax, az), this.x(bx, bz), by, this.z(bx, bz), w, color);
+  }
+  lamp(lx: number, y: number, lz: number, color: number, r?: number, px?: number, blink?: number, phase?: number): void {
+    this.lamps.lamp(this.x(lx, lz), y, this.z(lx, lz), color, r, px, blink, phase);
+  }
+  pool(lx: number, y: number, lz: number, r: number, color?: number, k?: number): void {
+    this.lamps.pool(this.x(lx, lz), y, this.z(lx, lz), r, color, k);
+  }
+  /** Burnu yerel +X'e bakan park yeri. */
+  bay(lx: number, lz: number, width: number, depth: number, y: number, out: number): Bay {
+    return { x: this.x(lx, lz), z: this.z(lx, lz), yaw: this.ry + Math.PI / 2, width, depth, y, out };
+  }
 }
 
 /**
@@ -317,21 +404,129 @@ function sawtoothRoof(b: B, w: number, len: number, x: number, y: number, z: num
 
 /**
  * Kemer çatılı hangar (oluklu sac): ekseni X'te, kapılı ucu +X'te (aprona bakar). Kemer yarım elips (52 m açıklık,
- * h yükseklik). Sürgülü kapı panoları 36 m'lik açıklıkta, boyları en dış panonun köşesi kemer çizgisinin altında
- * kalacak kadar (kapı kemerin dışına taşmaz); üstte kapı kirişi, yerde ray; arka uçta personel kapısı.
+ * h yükseklik). Ön duvarda 36 m'lik kapı açıklığı; sürgülü kapı panoları iki yana toplanmış (ortada 24 m açık), üstte
+ * kapı kirişi, yerde ray. İçi görünür: koyu iç sac, kemer kirişleri, beton döşeme; gece tavan lambaları ve kapı
+ * projektörü yanar. Arka uçta personel kapısı. Dönüş: kapı ağzındaki park yeri.
  */
-function hangar(b: B, cx: number, cz: number, h: number, len = 60): void {
+function hangar(b: B, cx: number, cz: number, h: number, lamps: LampSet, len = 60): Bay {
   const HW = 26;
   const OPEN = 18;
-  A(b, ARCH, HW, h, len, cx, 0, cz, COL.corrugated, SURF.corrugated, Math.PI / 2);
   const doorH = 0.92 * h * Math.sqrt(1 - (OPEN / HW) ** 2);
   const ex = cx + len / 2;
-  const n = 6;
-  const pw = (OPEN * 2) / n;
-  for (let i = 0; i < n; i++) A(b, BOX, 0.35, doorH, pw - 0.12, ex + 0.25, 0, cz - OPEN + pw * (i + 0.5), 0x6a7064, SURF.hangarDoor);
+  const R = Math.PI / 2;
+  A(b, ARCH_OPEN, HW, h, len, cx, 0, cz, COL.corrugated, SURF.corrugated, R);
+  A(b, ARCH_IN, HW - 0.3, h - 0.3, len - 0.4, cx, 0, cz, 0x50544c, SURF.corrugated, R);
+  b.push(archWall(HW, h, 0.3).rotateY(R).translate(cx - len / 2 + 0.15, 0, cz), COL.corrugated, SURF.corrugated);
+  b.push(notchedWall(HW, h, OPEN, doorH, 0.3).rotateY(R).translate(ex - 0.15, 0, cz), COL.corrugated, SURF.corrugated);
+  // Kemer kirişleri (içeriden görünen çelik bantlar) ve döşeme
+  for (let x = cx - len / 2 + 6; x < ex - 3; x += 8) A(b, ARCH_IN, HW - 0.7, h - 0.7, 0.4, x, 0, cz, COL.steel, SURF.metal, R);
+  A(b, BOX, len - 0.4, 0.9, HW * 2 - 1, cx, 0, cz, COL.concrete, SURF.concrete);
+  // Kapı panoları iki yanda üçer üçer toplanmış (teleskop kapı)
+  const pw = 6;
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) A(b, BOX, 0.3, doorH, pw - 0.1, ex + 0.25 + k * 0.4, 0, cz + s * (OPEN - pw / 2), 0x6a7064, SURF.hangarDoor);
   A(b, BOX, 0.6, 0.7, OPEN * 2 + 1, ex + 0.35, doorH, cz, COL.steel, SURF.metal);
-  A(b, BOX, 1.2, 0.15, OPEN * 2 + 4, ex + 0.6, 0, cz, COL.steel, SURF.metal);
+  A(b, BOX, 1.8, 0.12, OPEN * 2 + 4, ex + 0.7, 0.9, cz, COL.steel, SURF.metal);
   A(b, BOX, 0.3, 2.4, 1.4, cx - len / 2 - 0.15, 0, cz, 0x4e5248, SURF.metal);
+  // Işıklar: tavanda üç lamba ve döşemede ışık, kapının üstünde projektör ve önünde ışık havuzu, tepede engel ışığı
+  for (const o of [-9, 0, 9]) lamps.lamp(ex - 8, h * 0.72, cz + o, LAMP.warm, 0.35, 1.0);
+  lamps.pool(ex - 12, 0.9, cz, 17, LAMP.warm, 0.3);
+  lamps.lamp(ex + 0.9, doorH + 1.1, cz, LAMP.flood, 0.4, 1.3);
+  lamps.pool(ex + 16, 0.9, cz, 20, LAMP.flood, 0.2);
+  lamps.lamp(cx, h + 0.4, cz, LAMP.red, 0.3, 1.1, 2.4, (cx * 7 + cz) % 1);
+  return { x: ex, z: cz, yaw: R, width: (OPEN - pw) * 2 - 1.5, depth: len - 4, y: 0.9, out: 1.2 };
+}
+
+/**
+ * T2 tipi çelik hangar (yerel çerçevede, kapısı +X): 46 × 34 m, oluklu sac kaplama, dışta çelik dikmeler, alçak
+ * beşik çatı (mahya boyuna), alnında kapı kirişi; sürgülü kapı kanatları iki yana toplanmış (ortada 22 m açık), yan
+ * duvarda tuğla atölye eklentisi. İçi görünür (tavan, döşeme), gece ışıklı.
+ */
+function t2Hangar(f: Frame): Bay {
+  const D = 46;
+  const W = 34;
+  const H = 8.6;
+  const clad = 0x5b6257;
+  f.A(BOX, D, 0.9, W, 0, 0, 0, COL.concrete, SURF.concrete);
+  for (const s of [-1, 1]) {
+    f.A(BOX, D, H, 0.3, 0, 0, s * (W / 2 - 0.15), clad, SURF.corrugated);
+    for (let x = -D / 2 + 0.2; x <= D / 2; x += D / 10) f.A(BOX, 0.35, H + 0.2, 0.45, x, 0, s * (W / 2 + 0.2), COL.steel, SURF.metal);
+  }
+  f.A(BOX, 0.3, H, W, -D / 2 + 0.15, 0, 0, clad, SURF.corrugated);
+  f.A(GABLE, W + 0.9, 3.6, D + 0.8, 0, H, 0, 0x4d524c, SURF.corrugated, Math.PI / 2);
+  f.A(GABLE_IN, W - 0.4, 3.3, D - 0.4, 0, H, 0, 0x3f433f, SURF.corrugated, Math.PI / 2);
+  // Kapı alnı: kapı kirişi ve üstü kaplama; kanatlar iki yanda ikişer (ray dışta)
+  f.A(BOX, 0.5, 1.0, W, D / 2 - 0.25, H - 1.0, 0, COL.steel, SURF.metal);
+  const lw = 3.3;
+  for (const s of [-1, 1]) for (let k = 0; k < 2; k++) f.A(BOX, 0.3, H - 1.0, lw, D / 2 + 0.3 + k * 0.4, 0, s * (W / 2 - 0.4 - lw / 2 - k * 2.4), 0x5a6158, SURF.hangarDoor);
+  f.A(BOX, 1.4, 0.12, W + 8, D / 2 + 0.6, 0.9, 0, COL.steel, SURF.metal);
+  // Atölye eklentisi (tuğla, düz çatı) ve personel kapısı
+  f.A(BOX, D * 0.55, 4.2, 6.5, -4, 0, W / 2 + 3.5, COL.brick, SURF.brickWin);
+  f.A(BOX, 0.2, 2.3, 1.3, -D / 2 - 0.1, 0, 4, 0x3e4240, SURF.metal);
+  for (const o of [-10, 0, 10]) f.lamp(D / 2 - 7, H + 1.4, o, LAMP.warm, 0.35, 1.0);
+  f.pool(D / 2 - 11, 0.9, 0, 16, LAMP.warm, 0.3);
+  f.lamp(D / 2 + 0.8, H + 0.3, 0, LAMP.flood, 0.4, 1.3);
+  f.pool(D / 2 + 15, 0.9, 0, 19, LAMP.flood, 0.2);
+  f.lamp(D / 2, H + 3.8, 0, LAMP.red, 0.3, 1.1, 2.4, 0.3);
+  f.lamp(-D / 2, H + 3.8, 0, LAMP.red, 0.3, 1.1, 2.4, 0.8);
+  return f.bay(D / 2, 0, W - 2 * (0.4 + lw + 2.4) - 1, D - 4, 0.9, 1.2);
+}
+
+/**
+ * Kanvas çadır hangar (Bessonneau tipi; yerel çerçevede, ağzı +X): 30 × 24 m, ahşap dikmeler, kanvas yan duvarlar
+ * ve beşik çatı, ön perde yukarı sarılmış, yanlarda bağlı kanatlar, gergi halatları. Tabanı delikli çelik plaka.
+ */
+function tentHangar(f: Frame): Bay {
+  const D = 30;
+  const W = 24;
+  const E = 4.2;
+  const canvas = 0xa29d7c;
+  for (const s of [-1, 1]) {
+    f.A(BOX, D, E, 0.12, 0, 0, s * W / 2, canvas, SURF.canvas);
+    for (let x = -D / 2; x <= D / 2 + 0.01; x += D / 8) {
+      f.A(BOX, 0.22, E + 0.1, 0.22, x, 0, s * (W / 2 + 0.12), COL.wood, SURF.wood);
+      // Gergi halatı ve kazık
+      if (Math.round((x + D / 2) / (D / 8)) % 2 === 0) f.beam(x, E, s * (W / 2 + 0.2), x, 0.15, s * (W / 2 + 3.6), 0.04, 0xc8bd9a);
+    }
+    // Yanlara bağlanmış ön kanatlar
+    f.A(BOX, 2.4, E, 0.1, D / 2 + 1.0, 0, s * (W / 2 - 0.6), canvas, SURF.canvas, s * 0.55);
+  }
+  f.A(BOX, 0.12, E, W, -D / 2, 0, 0, canvas, SURF.canvas);
+  f.A(GABLE, W + 0.7, 4.6, D + 0.5, 0, E, 0, canvas, SURF.canvas, Math.PI / 2);
+  f.A(GABLE_IN, W - 0.2, 4.4, D, 0, E, 0, 0x6c6550, SURF.canvas, Math.PI / 2);
+  // Ön perde: ağzın üstünde sarılı
+  f.A(CYLZ, 0.32, 0.32, W, D / 2 + 0.1, E - 0.25, -W / 2, 0x7d7456, SURF.canvas);
+  f.lamp(D / 2 - 8, E + 2.6, 0, LAMP.warm, 0.35, 1.0);
+  f.pool(D / 2 - 10, 0.3, 0, 13, LAMP.warm, 0.28);
+  return f.bay(D / 2, 0, W - 3, D - 2, 0.25, 1.5);
+}
+
+/** Kemer sığınak ("blister" hangar; yerel çerçevede, iki ucu açık, ekseni X): 21 m açıklık, 14 m boy. */
+function blister(f: Frame, y: number): Bay {
+  const L = 14;
+  const R = Math.PI / 2;
+  f.A(ARCH_OPEN, 10.5, 6.4, L, 0, 0, 0, 0x767b70, SURF.corrugated, R);
+  f.A(ARCH_IN, 10.2, 6.1, L - 0.1, 0, 0, 0, 0x4e524a, SURF.corrugated, R);
+  for (const x of [-L / 2 + 0.3, 0, L / 2 - 0.3]) f.A(ARCH_IN, 9.9, 5.8, 0.3, x, 0, 0, COL.steel, SURF.metal, R);
+  for (const s of [-1, 1]) f.A(BOX, L + 0.6, 0.5, 0.6, 0, 0, s * 10.4, COL.wood, SURF.wood);
+  f.lamp(0, 5.4, 0, LAMP.warm, 0.3, 1.0);
+  return f.bay(L / 2, 0, 18.5, L + 8, y, 2.5);
+}
+
+/**
+ * Dağıtma siperi (yerel çerçevede, ağzı +X): uçağı üç yandan saran çim örtülü toprak setler, iç yüzlerinde beton
+ * istinat duvarı, arka köşede küçük sığınak.
+ */
+function pen(f: Frame, y: number): Bay {
+  const W = 27;
+  const D = 26;
+  f.A(GABLE, 8, 3.6, W + 16, -D / 2 - 4, 0, 0, COL.turf, SURF.grass);
+  for (const s of [-1, 1]) {
+    f.A(GABLE, 8, 3.6, D + 4, -2, 0, s * (W / 2 + 4), COL.turf, SURF.grass, Math.PI / 2);
+    f.A(BOX, D, 2.8, 0.5, -0.5, 0, s * (W / 2 + 0.25), COL.concrete, SURF.concrete);
+  }
+  f.A(BOX, 0.5, 2.8, W, -D / 2 - 0.25, 0, 0, COL.concrete, SURF.concrete);
+  f.A(ARCH, 2.4, 2.2, 6, -D / 2 - 5, 0, W / 2 + 9, COL.turf, SURF.grass, Math.PI / 2);
+  return f.bay(D / 2 - 1, 0, 24, D, y, 0);
 }
 
 /**
@@ -412,6 +607,113 @@ function airfieldGrounds(b: B): void {
   A(b, BOX, 12, 0.25, 12, -250, 0, 690, 0x2a2b2d, SURF.plain);
   A(b, BOX, 9, 0.3, 1.2, -250, 0, 690, COL.white, SURF.plain);
   A(b, BOX, 1.2, 0.3, 9, -250, 0, 690, COL.white, SURF.plain);
+}
+
+/** Apron park sıraları: iki sıra × 8, burun taksi yoluna (+X); x burun çizgisi. */
+const APRON_BAYS: Bay[] = [0, 1].flatMap((r) => Array.from({ length: 8 }, (_, i) => (
+  { x: -204 - r * 62, z: -280 + i * 80, yaw: Math.PI / 2, width: 60, depth: 48, y: 0.9, out: 0 })));
+
+/** Projektör direği (x, z) ve ışığının yerde düştüğü yer (px, pz, yarıçap r, zemin kotu y). */
+function floodPole(b: B, l: LampSet, x: number, z: number, px: number, pz: number, r: number, y: number): void {
+  A(b, CYL, 0.18, 15, 0.18, x, 0, z, COL.steelLight, SURF.metal);
+  A(b, BOX, 1.4, 0.7, 0.9, x, 15, z, 0x3a3d3a, SURF.metal);
+  A(b, BOX, 0.8, 0.12, 0.8, x, 7.5, z, COL.steel, SURF.metal);
+  l.lamp(x, 15.1, z, LAMP.flood, 0.55, 1.7);
+  l.pool(px, y, pz, r, LAMP.flood, 0.2);
+}
+
+/**
+ * Hava üssünün ek yapıları ve park yerleri: kuzey ucunda iki T2 hangar ve önlerinde apron; doğuda delikli çelik plaka
+ * üstünde üç kanvas çadır hangar; doğu dağıtma platformlarında kemer sığınaklar ve toprak siperler, batıdakilerde
+ * siperler; teknik bölgede karargâh (H planlı), Nissen yatakhaneleri, kantin, paraşüt deposu, araç hangarı ve
+ * kamyonlar, pusula ayar pisti, çevrede altıgen beton mevziler, apron projektörleri. Dönüş: park yerleri (öncelik
+ * sırasıyla).
+ */
+function airfieldExtras(b: B, l: LampSet): Bay[] {
+  const bays: Bay[] = [];
+  // T2 hangarlar (kapıları güneye, apron ve taksi yoluna bağlantı)
+  A(b, BOX, 233, 0.9, 69, -255.5, 0, 1210.5, COL.concreteDark, SURF.runway);
+  for (const x of [-345, -280]) bays.push(t2Hangar(new Frame(b, x, 1268, Math.PI / 2, l)));
+  floodPole(b, l, -150, 1240, -200, 1205, 40, 0.9);
+  floodPole(b, l, -372, 1185, -312, 1208, 40, 0.9);
+  // Çadır hangarlar: ağızları batıya (taksi yoluna), önleri ve tabanları delikli çelik plaka
+  A(b, BOX, 112, 0.25, 116, 156, 0, 0, 0x6d7169, SURF.psp);
+  for (const z of [-40, 0, 40]) bays.push(tentHangar(new Frame(b, 195, z, Math.PI, l)));
+  floodPole(b, l, 112, 62, 140, 0, 46, 0.25);
+  // Doğu platformlarında kemer sığınaklar ve siperler, batıdakilerde siperler (ağızları taksi yoluna)
+  for (const z of [-900, -600, 600, 900]) bays.push(blister(new Frame(b, 142, z, Math.PI, l), 0.8));
+  for (const z of [-300, 300]) bays.push(pen(new Frame(b, 142, z, Math.PI, l), 0.8));
+  for (const z of [-560, -700, 980, 1110]) bays.push(pen(new Frame(b, -202, z, 0, l), 0.8));
+  // Apron projektörleri
+  for (const z of [-300, -150, 0, 150, 300]) floodPole(b, l, -180, z, -240, z, 44, 0.9);
+  // Yeni binalar üssün kendi alanında (|x| ≤ 400; ötesine başka yapılar kurulabilir): karargâh (H planlı tuğla),
+  // Nissen yatakhaneleri (tuğla bacalı), kantin, paraşüt deposu
+  for (const z of [452, 488]) A(b, BOX, 36, 6.5, 10, -275, 0, z, COL.brick, SURF.brickWin);
+  A(b, BOX, 10, 6.5, 26, -275, 0, 470, COL.brickDark, SURF.brickWin);
+  l.lamp(-256.8, 3.2, 470, LAMP.warm, 0.25, 1.0);
+  for (const z of [-400, -430, -460, -490]) {
+    A(b, ARCH, 5, 3.4, 16, -330, 0, z, 0x6f746a, SURF.corrugated, Math.PI / 2);
+    A(b, BOX, 0.7, 4.6, 0.7, -337.5, 0, z, COL.brickDark, SURF.brick);
+  }
+  A(b, BOX, 30, 4, 10, -265, 0, -420, COL.wood, SURF.wood);
+  A(b, GABLE, 10.8, 2.4, 30.8, -265, 4, -420, COL.felt, SURF.felt, Math.PI / 2);
+  A(b, BOX, 14, 5, 12, -290, 0, -560, COL.brick, SURF.brickWin);
+  A(b, BOX, 6, 10.5, 6, -290, 0, -560, COL.brickDark, SURF.brick);
+  // Araç hangarı: önü açık uzun sundurma, içinde kamyonlar, önünde beton saha
+  A(b, BOX, 124, 0.3, 40, -330, 0, -1246, COL.concrete, SURF.concrete);
+  A(b, BOX, 120, 5.2, 0.3, -330, 0, -1265, COL.wood, SURF.wood);
+  for (const x of [-390, -270]) A(b, BOX, 0.3, 5.2, 20, x, 0, -1255, COL.wood, SURF.wood);
+  for (let x = -390; x <= -270; x += 12) A(b, BOX, 0.3, 5.2, 0.3, x, 0, -1245.2, COL.wood, SURF.wood);
+  A(b, GABLE, 21, 1.6, 121, -330, 5.2, -1255, COL.felt, SURF.felt, Math.PI / 2);
+  const veh = [0x4f5638, 0x5c6142, 0x3d4232, 0x6b6f63];
+  for (let i = 0; i < 8; i++) {
+    const x = -382 + i * 15;
+    A(b, BOX, 2.4, 2.4, 5, x, 0.3, -1257, veh[i % 4], SURF.canvas);
+    A(b, BOX, 2.3, 2.0, 2.2, x, 0.3, -1252.6, veh[(i + 1) % 4], SURF.metal);
+  }
+  // Pusula ayar pisti: beton daire, beyaz derece çemberi ve yön çizgileri
+  b.push(new THREE.CylinderGeometry(18, 18, 0.5, 40).translate(-265, 0.25, -1000), COL.concrete, SURF.concrete);
+  A(b, RING, 15, 1, 15, -265, 0.53, -1000, COL.white, SURF.plain);
+  for (let k = 0; k < 4; k++) A(b, BOX, 0.45, 0.05, 30, -265, 0.5, -1000, COL.white, SURF.plain, (k * Math.PI) / 4);
+  // Altıgen beton mevziler (mazgallı)
+  for (const [x, z] of [[-385, 1330], [120, 1330], [-385, -1330], [120, -1330], [205, 760], [205, -760]]) {
+    A(b, HEX, 2.4, 2.1, 2.4, x, 0, z, COL.concrete, SURF.concrete);
+    A(b, HEX, 2.65, 0.32, 2.65, x, 2.1, z, COL.concreteDark, SURF.concrete);
+    for (let k = 0; k < 6; k++) {
+      const a = ((k + 0.5) * Math.PI) / 3;
+      A(b, BOX, 0.6, 0.22, 0.08, x + Math.sin(a) * 2.1, 1.25, z + Math.cos(a) * 2.1, 0x1c1d1f, SURF.plain, a);
+    }
+  }
+  // Apron sıralarının yanında çalıştırma arabaları
+  for (const p of APRON_BAYS) A(b, BOX, 1.0, 0.9, 1.7, p.x - 6, 0.9, p.z + 9, 0x3c4436, SURF.metal);
+  return bays;
+}
+
+/**
+ * Hava üssünün ışıkları: pist kenarı (60 m'de bir), eşikte yeşil ve pist sonunda kırmızı sıra, yaklaşma orta hattı ve
+ * çapraz barı, taksi yollarında mavi kenar lambaları, kule tepesinde yanıp sönen yeşil işaret, telsiz direği ve su
+ * kulesinde kırmızı engel ışıkları, kapılarda ve rüzgâr tulumlarında küçük lambalar.
+ */
+function airfieldLights(l: LampSet): void {
+  const Y = 1.5;
+  for (const s of [-1, 1]) l.row(s * 33.5, -RUNWAY_HALF + 5, s * 33.5, RUNWAY_HALF - 5, 60, Y, LAMP.edge, 0.22, 1.3);
+  for (const e of [-1, 1]) {
+    l.row(-31, e * (RUNWAY_HALF + 1), 31, e * (RUNWAY_HALF + 1), 8, Y, LAMP.green, 0.24, 1.3);
+    l.row(-27, e * (RUNWAY_HALF + 9), 27, e * (RUNWAY_HALF + 9), 9, Y, LAMP.red, 0.24, 1.3);
+    l.row(0, e * 1195, 0, e * 1340, 48, 1.4, LAMP.edge, 0.3, 1.4);
+    l.row(-21, e * 1290, 21, e * 1290, 10.5, 1.4, LAMP.edge, 0.3, 1.4);
+  }
+  for (const s of [-1, 1]) {
+    l.row(-150 + s * 12, -1165, -150 + s * 12, 1165, 80, 1.2, LAMP.blue, 0.16, 1.1);
+    l.row(92 + s * 9, -1165, 92 + s * 9, 1165, 90, 1.2, LAMP.blue, 0.16, 1.1);
+    for (const z of [-800, 0, 800]) l.row(-136, z + s * 12, -38, z + s * 12, 33, 1.2, LAMP.blue, 0.16, 1.1);
+    for (const e of [-1, 1]) l.row(-136, e * 1170 + s * 10, 80, e * 1170 + s * 10, 54, 1.2, LAMP.blue, 0.16, 1.1);
+  }
+  l.lamp(-330, 16.4, 700, LAMP.green, 0.45, 1.7, 1.6, 0);
+  l.lamp(-360, 32.4, 720, LAMP.red, 0.35, 1.4, 2.0, 0.1);
+  l.lamp(-580, 21.6, 520, LAMP.red, 0.35, 1.3, 2.6, 0.5);
+  for (const z of [900, -900]) l.lamp(70, 7.7, z, LAMP.warm, 0.25, 1.0);
+  for (const [x, y, z] of [[-330, 3.2, 706.5], [-405, 3.4, 734.4], [-300, 5.2, 752.6], [-671, 3.4, 662]]) l.lamp(x, y, z, LAMP.warm, 0.25, 1.0);
 }
 
 /**
@@ -495,6 +797,9 @@ export class StructureView {
   private craterCount = -1;
   private parkedGroup = new THREE.Group();
   private parkedSig = '';
+  /** Hava üssünün park yerleri (öncelik sırasıyla) ve tesis hangarlarınınkiler. */
+  private bays: Bay[] = [];
+  private upgradeBays: Bay[] = [];
   private upgradeGroup = new THREE.Group();
   private upgradeSig = '';
   private scaffold: THREE.Mesh | null = null;
@@ -580,8 +885,14 @@ export class StructureView {
   private buildAirbase(b: B, rng: () => number): void {
     const g = this.group;
     const L = RUNWAY_HALF * 2;
-    // Pist: plakalı beton, pist başı çizgileri, orta çizgi, iniş bölgesi işaretleri
+    const lamps = new LampSet();
+    // Pist: plakalı beton, iki yanda asfalt omuz ve kenar lambası yuvaları, pist başı çizgileri, orta çizgi, iniş
+    // bölgesi işaretleri
     A(b, BOX, 64, 1.2, L, 0, 0, 0, COL.runway, SURF.runway);
+    for (const s of [-1, 1]) {
+      A(b, BOX, 6, 1.05, L + 24, s * 35, 0, 0, 0x676864, SURF.asphalt);
+      for (let z = -RUNWAY_HALF + 5; z <= RUNWAY_HALF - 5; z += (L - 10) / Math.round((L - 10) / 60)) A(b, BOX, 0.3, 0.35, 0.3, s * 33.5, 1.05, z, 0x8f9085, SURF.metal);
+    }
     const W = COL.white;
     for (const end of [-1, 1]) {
       for (let k = -3; k <= 3; k++) A(b, BOX, 3.5, 1.3, 30, k * 7.5, 0, end * (RUNWAY_HALF - 40), W, SURF.plain);
@@ -592,18 +903,31 @@ export class StructureView {
     A(b, BOX, 22, 1, L * 0.8, -150, 0, 0, COL.asphalt, SURF.asphalt);
     for (const z of [-800, 0, 800]) A(b, BOX, 150, 0.95, 22, -75, 0, z, COL.asphalt, SURF.asphalt);
     A(b, BOX, 205, 0.9, 640, -277.5, 0, 0, COL.concreteDark, SURF.runway);
-    // Kemer çatılı hangarlar: kapılı uçları aprona bakar
-    for (let i = 0; i < 3; i++) hangar(b, -410, -300 + i * 300, 18 + rng() * 3);
+    // Kemer çatılı hangarlar: kapılı uçları aprona bakar (kapı ağızları en önde gelen park yerleri)
+    const bays: Bay[] = [];
+    for (let i = 0; i < 3; i++) bays.push(hangar(b, -410, -300 + i * 300, 18 + rng() * 3, lamps));
     airfieldGrounds(b);
-    // Kule: iki katlı sıvalı bina, cam kabin, keçe çatı
+    bays.push(...airfieldExtras(b, lamps));
+    this.bays = bays;
+    // Kule: iki katlı sıvalı bina, cam kabin, keçe çatı; ikinci kat çatısında korkuluklu balkon, dış merdiven
     A(b, BOX, 12, 9, 12, -330, 0, 700, COL.plaster, SURF.plasterWin);
     A(b, BOX, 9, 4, 9, -330, 9, 700, COL.plaster, SURF.plasterWin);
     A(b, BOX, 10, 2.6, 10, -330, 13, 700, COL.glass, SURF.curtain);
     A(b, BOX, 11, 0.4, 11, -330, 15.6, 700, COL.felt, SURF.felt);
     A(b, BOX, 12.4, 0.3, 12.4, -330, 9, 700, COL.concrete, SURF.concrete);
-    // İtfaiye (tuğla, kapılar), barakalar (ahşap, keçe beşik çatı), yakıt tankları, rüzgâr tulumu
+    for (const s of [-1, 1]) {
+      A(b, BOX, 12.4, 0.08, 0.08, -330, 10.2, 700 + s * 6.15, COL.white, SURF.metal);
+      A(b, BOX, 0.08, 0.08, 12.4, -330 + s * 6.15, 10.2, 700, COL.white, SURF.metal);
+    }
+    beam(b, -336.8, 0.3, 707.5, -336.8, 9.1, 697.5, 0.9, COL.concrete);
+    // İtfaiye (tuğla, kapılar) ve önünde iki itfaiye aracı, barakalar (ahşap, keçe beşik çatı), yakıt tankları,
+    // rüzgâr tulumları
     A(b, BOX, 20, 6, 14, -300, 0, 760, COL.brick, SURF.brickWin);
     A(b, BOX, 20.6, 0.5, 14.6, -300, 6, 760, COL.felt, SURF.felt);
+    for (const x of [-305, -295]) {
+      A(b, BOX, 2.5, 2.4, 7.5, x, 0.3, 744, 0x8e2a22, SURF.metal);
+      A(b, BOX, 2.3, 0.5, 5, x, 2.7, 743, COL.steelLight, SURF.metal);
+    }
     for (let i = 0; i < 4; i++) {
       A(b, BOX, 9, 4, 42, -500, 0, 180 + i * 90, COL.wood, SURF.wood);
       A(b, GABLE, 9.8, 2.2, 42.8, -500, 4, 180 + i * 90, COL.felt, SURF.felt);
@@ -612,19 +936,22 @@ export class StructureView {
       A(b, CYL, 6, 7, 6, -470, 0, -720 + i * 16, 0x7e8476, SURF.metal);
       b.push(CONE.clone().scale(6.2, 1.2, 6.2).translate(-470, 7, -720 + i * 16), 0x737a6c, SURF.metal);
     }
-    A(b, CYL, 0.25, 7, 0.25, 70, 0, 900, COL.steelLight, SURF.metal);
-    A(b, CYLZ, 0.6, 0.6, 3, 70, 6.6, 900, 0xe2702c, SURF.plain);
+    for (const z of [900, -900]) {
+      A(b, CYL, 0.25, 7, 0.25, 70, 0, z, COL.steelLight, SURF.metal);
+      A(b, CYLZ, 0.6, 0.6, 3, 70, 6.6, z, 0xe2702c, SURF.plain);
+    }
     // Telsiz direği, takım bayrağı
     A(b, CYL, 0.35, 32, 0.35, -360, 0, 720, COL.steelLight, SURF.metal);
     for (const y of [10, 20, 30]) A(b, BOX, 4, 0.2, 0.2, -360, y, 720, COL.steelLight, SURF.metal);
     A(b, CYL, 0.12, 12, 0.12, -310, 0, 690, COL.white, SURF.metal);
     A(b, BOX, 0.1, 1.6, 2.6, -310, 10.2, 691.4, PALETTE.team[this.s.team], SURF.plain);
-    // Apron araçları: yakıt tankerleri (zeytin yeşili), çekiciler, personel arabaları
+    // Apron araçları: yakıt tankerleri (zeytin yeşili), çekiciler, personel arabaları (hangar ağızlarının önü boş)
     const veh = [0x4f5638, 0x5c6142, 0x2d2e30, 0x6b6f63];
-    for (let i = 0; i < 9; i++) {
-      const z = -300 + i * 72 + rng() * 10;
+    const vz = [-245, -190, -130, -70, 60, 120, 180, 240];
+    for (let i = 0; i < vz.length; i++) {
+      const z = vz[i] + rng() * 8;
       const big = i % 3 === 0;
-      const x = -360 + rng() * 20;
+      const x = -350 + rng() * 14;
       A(b, BOX, big ? 2.6 : 1.9, big ? 2.8 : 1.6, big ? 8 : 4, x, 0.4, z, veh[i % veh.length], SURF.metal);
       if (big) A(b, CYLZ, 1.1, 1.1, 5, x, 2.1, z - 3, 0x5a6140, SURF.metal);
     }
@@ -634,6 +961,8 @@ export class StructureView {
       A(b, BOX, 7, 3.6, 7, -100, 0, -1100 + i * 30, COL.wood, SURF.wood);
       A(b, GABLE, 7.6, 1.6, 7.6, -100, 3.6, -1100 + i * 30, COL.felt, SURF.felt);
     }
+    airfieldLights(lamps);
+    lamps.build(g);
     g.add(this.craterGroup);
     g.add(this.parkedGroup);
     g.add(this.upgradeGroup);
@@ -946,44 +1275,100 @@ export class StructureView {
       this.upgradeSig = usig;
       this.upgradeGroup.clear();
       const ub = new ArchBatch();
+      const ul = new LampSet();
+      this.upgradeBays = [];
       if (ab.upgrades.has('workshop')) {
         A(ub, BOX, 40, 13, 60, -470, 0, -470, COL.brick, SURF.brickWin);
         sawtoothRoof(ub, 40, 60, -470, 13, -470);
       }
       if (ab.upgrades.has('hangars')) {
         for (const z of [-620, 630]) {
-          hangar(ub, -410, z, 19);
+          this.upgradeBays.push(hangar(ub, -410, z, 19, ul));
           // Kapı önünde beton ve taksi yoluna bağlantı
           A(ub, BOX, 40, 0.8, 52, -360, 0, z, COL.concreteDark, SURF.runway);
           A(ub, BOX, 190, 0.75, 18, -245, 0, z, COL.asphalt, SURF.asphalt);
         }
       }
       if (ab.upgrades.has('revetments')) {
-        // Toprak siperler: çim örtülü set, iç yüzü kum torbası
-        for (let i = 0; i < 8; i++) {
-          const z = -280 + i * 80;
-          A(ub, BOX, 30, 3.5, 3, -340, 0, z - 14, COL.sandbag, SURF.sandbag);
-          A(ub, BOX, 30, 3.5, 3, -340, 0, z + 14, COL.sandbag, SURF.sandbag);
-          A(ub, BOX, 3, 3.5, 31, -356, 0, z, COL.turf, SURF.grass);
+        // Toprak siperler: apron park yerlerini üç yandan saran kum torbası duvarlar, arkada çim örtülü set
+        for (const p of APRON_BAYS) {
+          for (const s of [-1, 1]) A(ub, BOX, 28, 3.2, 2.6, p.x - 12, 0, p.z + s * 16, COL.sandbag, SURF.sandbag);
+          A(ub, BOX, 3, 3.2, 34.6, p.x - 27.5, 0, p.z, COL.turf, SURF.grass);
         }
       }
       ub.build(this.upgradeGroup, this.mat);
+      ul.build(this.upgradeGroup);
     }
-    // Apronda bekleyen uçaklar (gerçek ölçekte)
-    const parked = ab.inventory.filter((a) => a.status !== 'airborne').slice(0, 16);
-    const sig = parked.map((a) => a.specId + a.status[0]).join(',');
+    // Yerde bekleyen uçaklar (gerçek ölçekte): en yenisi önce, sığdığı ilk park yerine (hangar ağızları, T2 hangarlar,
+    // çadır hangarlar, sığınaklar, siperler), kalanlar aprona
+    const parked = ab.inventory.filter((a) => a.status !== 'airborne');
+    const detail = quality().models;
+    const sig = `${detail}|${usig}|${parked.map((a) => a.specId).sort().join(',')}`;
     if (sig !== this.parkedSig) {
       this.parkedSig = sig;
-      this.parkedGroup.clear();
-      parked.forEach((af, i) => {
-        const sp = SPECS[af.specId];
-        const mdl = buildAircraftModel(sp.model, { gear: true, detail: quality().models });
-        const row = Math.floor(i / 8);
-        mdl.root.position.set(-220 - row * 55, gearHeight(sp), -280 + (i % 8) * 80);
-        mdl.root.rotation.y = -Math.PI / 2;
-        if (af.status === 'servicing') mdl.root.rotation.z = 0.04;
-        this.parkedGroup.add(mdl.root);
-      });
+      this.placeParked(parked.map((a) => SPECS[a.specId]), detail);
+    }
+  }
+
+  /**
+   * Park eden uçakları yerleştir ve çiz. Sıra: yapım yılı (yeniden eskiye), sonra küçükten büyüğe. En yeni yarısı
+   * (yukarı yuvarlanmış) kanat açıklığı ve boyu sığan ilk park yerine (hangar ağızları, T2 ve çadır hangarlar,
+   * sığınaklar, siperler; aynı yerde yan yana, 3 m arayla); geri kalanlar ve sığmayanlar apron sıralarına, apron
+   * dolarsa yine boş park yerlerine. Aynı türden uçaklar tek InstancedMesh (malzeme başına): çizim çağrısı uçak
+   * sayısından bağımsız.
+   */
+  private placeParked(specs: AircraftSpec[], detail: number): void {
+    for (const ch of this.parkedGroup.children) if (ch instanceof THREE.InstancedMesh) ch.dispose();
+    this.parkedGroup.clear();
+    const bays = [...this.bays.slice(0, 3), ...this.upgradeBays, ...this.bays.slice(3)];
+    const fill: AircraftSpec[][] = bays.map(() => []);
+    const used = bays.map(() => 0);
+    const apron: AircraftSpec[] = [];
+    const shelter = (sp: AircraftSpec): boolean => {
+      const k = bays.findIndex((bay, i) => used[i] + sp.span + (fill[i].length ? 3 : 0) <= bay.width && sp.length <= bay.depth);
+      if (k < 0) return false;
+      used[k] += sp.span + (fill[k].length ? 3 : 0);
+      fill[k].push(sp);
+      return true;
+    };
+    const order = [...specs].sort((a, b) => b.year - a.year || a.span - b.span);
+    const inside = Math.ceil(order.length / 2);
+    order.forEach((sp, i) => {
+      if (i < inside && shelter(sp)) return;
+      if (apron.length < APRON_BAYS.length) apron.push(sp);
+      else shelter(sp);
+    });
+    const byKind = new Map<string, THREE.Matrix4[]>();
+    const put = (sp: AircraftSpec, bay: Bay, lat: number) => {
+      const parts = parkedParts(sp.model, detail);
+      const geo = parts[0].geo;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      // Burun modelde +Z: burun ucu park çizgisinden out kadar öne taşar
+      const back = geo.boundingBox!.max.z - bay.out;
+      const dx = Math.sin(bay.yaw);
+      const dz = Math.cos(bay.yaw);
+      const m = new THREE.Matrix4().makeRotationY(bay.yaw).setPosition(
+        bay.x - dx * back + dz * lat, bay.y + gearHeight(sp), bay.z - dz * back - dx * lat);
+      let list = byKind.get(sp.model);
+      if (!list) byKind.set(sp.model, (list = []));
+      list.push(m);
+    };
+    fill.forEach((list, i) => {
+      const total = list.reduce((s, sp) => s + sp.span, 0) + 3 * Math.max(0, list.length - 1);
+      let at = -total / 2;
+      for (const sp of list) {
+        put(sp, bays[i], at + sp.span / 2);
+        at += sp.span + 3;
+      }
+    });
+    apron.forEach((sp, i) => put(sp, APRON_BAYS[i], 0));
+    for (const [kind, ms] of byKind) {
+      for (const p of parkedParts(kind, detail)) {
+        const im = new THREE.InstancedMesh(p.geo, p.mat, ms.length);
+        ms.forEach((m, i) => im.setMatrixAt(i, m));
+        im.computeBoundingSphere();
+        this.parkedGroup.add(im);
+      }
     }
   }
 }
