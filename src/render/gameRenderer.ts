@@ -7,6 +7,7 @@ import { detectProbabilityAt } from '../sim/structures/radar';
 import { RUNWAY_HALF, corridorMargin } from '../sim/structures/airbase';
 import { turretWorldPos } from '../sim/ai/gunner';
 import { groundLevel, loadMap, terrainEdits, terrainMap } from '../sim/terrain';
+import { gearHeight } from '../sim/aircraft/flightModel';
 import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
@@ -20,6 +21,7 @@ import { Atmosphere, FIXED_HOUR, dayHour } from './atmosphere';
 import { Contrails, contrailAmount } from './contrails';
 import { Clouds } from './clouds';
 import { archU } from './arch';
+import { updateLamps } from './lamps';
 import { onSettingsChange, quality, settings } from '../ui/settings';
 import { L } from '../i18n';
 
@@ -51,7 +53,18 @@ interface AircraftView {
   visible: boolean;
   /** Küçük ayrıntılar çiziliyor mu (ekrandaki boyuta göre, eşikte gidip gelmesin diye payla). */
   fine: boolean;
+  /** Hareketli parçaların o anki konumu (rad; takım 0 kalkık … 1 inik): kumandaya yumuşakça yaklaşır. */
+  surf: { ail: number; ele: number; rud: number; flap: number; brake: number; gear: number; chk: number };
 }
+
+const _jq = new THREE.Vector3(0, 1, 0);
+/** Eklemi menteşe ekseninde döndür (eksen yoksa dikey). */
+function hinge(j: THREE.Object3D | undefined, a: number): void {
+  if (j) j.quaternion.setFromAxisAngle((j.userData.axis as THREE.Vector3 | undefined) ?? _jq, a);
+}
+const clampN = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+/** Pist betonunun araziden yüksekliği (structures.ts: pist kutusu 1,2 m). */
+const RUNWAY_TOP = 1.2;
 
 /**
  * Küçük ayrıntıların (cam, koyu parçalar, pilot, lambalar, küçük eklemler) çizildiği en küçük ekran yarıçapı
@@ -369,6 +382,7 @@ export class GameRenderer {
     this.atmosphere.update(this.camera);
     waterU.waterTime.value = w.time;
     archU.archNight.value = this.atmosphere.night;
+    updateLamps(this.camera, this.renderer.domElement.clientHeight, w.time);
     this.clouds.update(
       this.camera, w.time, this.rig.distance, this.rig.target, this.atmosphere.sunDir, this.atmosphere.skyLight,
       this.atmosphere.cloudGlow, !this.rig.director || this.cinemaClearClouds,
@@ -533,6 +547,52 @@ export class GameRenderer {
 
   // --- Uçaklar ---------------------------------------------------------------
 
+  /**
+   * Hareketli parçalar (eklemi olan modellerde): kanatçık yuvarlanma hızına, irtifa dümeni istenen yüke, istikamet
+   * dümeni dönüşe uyum için yuvarlanmaya göre; flap kalkışta 20°, inişte 55°; hava freni 55°. Takım ~4 sn'de katlanır
+   * (ana bacaklar içe, burun bacağı öne), kalkıkken gizlenir; iniş farı takım inikken açık. Hepsi yumuşak geçişle.
+   */
+  private animateParts(v: AircraftView, dt: number, gearDown: boolean): void {
+    const j = v.model.joints;
+    if (!j.aileronL && !j.takimL) return;
+    const ac = v.ac;
+    const c = ac.controls;
+    const s = v.surf;
+    const fly = ac.status === 'flying' && !ac.onGround;
+    const k = 1 - Math.exp(-dt * 10);
+    const slow = 1 - Math.exp(-dt * 1.6);
+    const roll = fly ? clampN(ac.rollRate / 2.5, -1, 1) : 0;
+    // Pist başında dururken kumanda denetimi: kanatçıklar, irtifa ve istikamet dümeni sırayla bir yana bir yana
+    const check = ac.onGround && ac.status === 'flying' && ac.speed < 4;
+    s.chk = check ? s.chk + dt : 0;
+    const w = s.chk * 2.4;
+    s.ail += ((check ? Math.sin(w) * 0.3 : roll * 0.3) - s.ail) * k;
+    s.ele += ((check ? Math.sin(w - 1.6) * 0.3 : fly ? clampN((c.nCmd - 1) / 6, -0.5, 1) * 0.35 : 0) - s.ele) * k;
+    s.rud += ((check ? Math.sin(w * 0.7 - 3) * 0.35 : roll * 0.07) - s.rud) * k;
+    // Flap: kalkış koşusunda 20° (havalanınca kalkar), inişte 55°
+    const takeoffFlap = ac.onGround && c.throttle > 0.6 ? 0.35 : 0;
+    s.flap += ((c.flaps ? takeoffFlap || 0.96 : takeoffFlap) - s.flap) * slow;
+    s.brake += ((c.diveBrake ? 0.96 : 0) - s.brake) * slow;
+    s.gear = gearDown ? Math.min(1, s.gear + dt / 4) : Math.max(0, s.gear - dt / 4);
+    hinge(j.aileronL, -s.ail);
+    hinge(j.aileronR, s.ail);
+    hinge(j.elevatorL, s.ele);
+    hinge(j.elevatorR, s.ele);
+    hinge(j.flapL, -s.flap);
+    hinge(j.flapR, -s.flap);
+    hinge(j.rudder, s.rud);
+    hinge(j.airbrakeL, -s.brake);
+    hinge(j.airbrakeR, s.brake);
+    const up = (1 - s.gear) * (Math.PI / 2);
+    hinge(j.takimL, -up);
+    hinge(j.takimR, up);
+    hinge(j.takimN, -up);
+    const show = s.gear > 0.01 && v.fine;
+    for (const n of ['takimL', 'takimR', 'takimN']) if (j[n]) j[n].visible = show;
+    if (v.model.landing) v.model.landing.visible = s.gear > 0.95 && (fly || ac.controls.throttle > 0.3);
+    if (v.model.landingPool) v.model.landingPool.visible = !!v.model.landing?.visible && ac.onGround;
+  }
+
   private createView(ac: Aircraft): AircraftView {
     // Gerçek boya (takım rengi yok: dost ve düşman etiket renginden); ayrıntı kaliteye göre
     const model = buildAircraftModel(ac.spec.model, { detail: this.modelDetail });
@@ -559,6 +619,7 @@ export class GameRenderer {
       lastSample: -1, lastSmoke: -1, lastMuzzle: -1,
       trailColor: this.teamColors[ac.team] ?? this.teamColors[0],
       label, visible: true, fine: true,
+      surf: { ail: 0, ele: 0, rud: 0, flap: 0, brake: 0, gear: ac.onGround ? 1 : 0, chk: 0 },
     };
   }
 
@@ -601,6 +662,14 @@ export class GameRenderer {
         v.iq.copy(ac.quat);
       }
       v.root.position.copy(v.ip);
+      // Yere yakın uçak: tekerlekler pist betonunun üstünde (pist araziden 1,2 m yüksek çizilir) ve büyütülmüş model
+      // de tekerleği üstünde kalsın (büyütme gövde ekseninden); 25 m'nin üstünde etkisi söner
+      if (ac.status === 'flying') {
+        const gh = gearHeight(ac.spec);
+        const agl = v.ip.y - groundLevel(v.ip.x, v.ip.z) - gh;
+        const near = 1 - Math.min(1, Math.max(0, (agl - 4) / 21));
+        v.root.position.y += (RUNWAY_TOP + (scale - 1) * gh) * near;
+      }
       v.root.quaternion.copy(v.iq);
       v.root.scale.setScalar(scale);
       const running = ac.status === 'flying' && ac.totalFuel > 0;
@@ -632,7 +701,9 @@ export class GameRenderer {
       });
 
       const g = groundLevel(ac.pos.x, ac.pos.z);
-      if (v.model.gear) v.model.gear.visible = ac.onGround || (ac.status === 'flying' && ac.controls.flaps && ac.pos.y - g < 350);
+      const gearDown = ac.onGround || (ac.status === 'flying' && ac.controls.flaps && ac.pos.y - g < 350);
+      if (v.model.gear) v.model.gear.visible = gearDown;
+      this.animateParts(v, simDt, gearDown);
       v.shadow.visible = m.shadows && v.visible && !ac.onGround;
       v.shadow.position.set(v.ip.x, g + 1, v.ip.z);
       v.shadow.scale.setScalar(scale * ac.spec.span * 0.4);

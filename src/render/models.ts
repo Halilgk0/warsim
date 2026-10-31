@@ -8,17 +8,22 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SPEC_LIST, type AircraftSpec } from '../sim/aircraft/specs';
 import type { Hardpoint, StoreDef } from '../sim/aircraft/stores';
+import { gearHeight } from '../sim/aircraft/flightModel';
 import { ATMO_PARS, linkAtmosphere } from './atmosphere';
 import { FALLBACK_LIVERY, LIVERIES, nationOf, type MarkSpot } from './liveries';
 import { skinMaterial, type SkinInfo } from './skin';
+import { LAMP, LampSet } from './lamps';
 
 type V3 = [number, number, number];
 type Geo = THREE.BufferGeometry;
 
 /** Ayrıntı düzeyi: 0 low-poly (düşük kalite), 1 yüksek. cached() model kurarken ayarlar. */
 let DETAIL = 1;
+/** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
+let RES = 1;
+const HIRES: Record<string, number> = { mig15: 2.4 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
-const sg = (n: number) => (DETAIL ? Math.round(n * 2.25) : n);
+const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
 /** Profil yumuşatma (Chaikin köşe kesme, uçlar sabit): taşma yapmaz, kırık çizgi kavise döner. */
 function chaikin(p: [number, number][], it: number): [number, number][] {
@@ -42,8 +47,8 @@ function tag(g: Geo, part: 'glass' | 'dark'): Geo {
   return g;
 }
 
-/** Eklem bilgisi: ad, dönme noktası (model ekseninde), gövde siluetinin parçası mı. */
-interface JointTag { name: string; pivot: V3; big: boolean }
+/** Eklem bilgisi: ad, dönme noktası (model ekseninde), gövde siluetinin parçası mı, menteşe ekseni (varsa). */
+interface JointTag { name: string; pivot: V3; big: boolean; axis?: V3 }
 
 /**
  * Hareketli parça (eklem): pervane, taret, kumanda yüzeyi, kapak, değişken açılı kanat. Eklemin parçaları sabit
@@ -52,8 +57,8 @@ interface JointTag { name: string; pivot: V3; big: boolean }
  * deseni ve armalar dönen parçada kaymaz. big: siluetin parçası (kanat gibi), uzakta da çizilir; değilse küçük
  * ayrıntı sayılır, ekranda küçük kalan uçakta gizlenir. Yapılardaki dönen top ve antenler de aynı ilkeyle kurulu.
  */
-function joint(name: string, pivot: V3, geos: Geo[], big = false): Geo[] {
-  const j: JointTag = { name, pivot, big };
+function joint(name: string, pivot: V3, geos: Geo[], big = false, axis?: V3): Geo[] {
+  const j: JointTag = { name, pivot, big, axis };
   for (const g of geos) g.userData.joint = j;
   return geos;
 }
@@ -88,13 +93,93 @@ function flipWinding(g: Geo): Geo {
 }
 
 /** Profil kesitinin veter noktaları (0 hücum, 1 firar kenarı), kosinüs aralıklı: burun yuvarlaklığı sık örneklenir. */
-const AF_N = 10;
-const AF_X = Array.from({ length: AF_N + 1 }, (_, i) => 0.5 * (1 - Math.cos((Math.PI * i) / AF_N)));
+let AF_N = 10;
+const afX = (n: number) => Array.from({ length: n + 1 }, (_, i) => 0.5 * (1 - Math.cos((Math.PI * i) / n)));
+let AF_X = afX(AF_N);
+/** Profil nokta sayısı (RES ile): cached() ayarlar, bitince 10'a döner. */
+function setAirfoilRes(n: number): void {
+  if (n === AF_N) return;
+  AF_N = n;
+  AF_X = afX(n);
+}
 /** NACA 00xx yarım kalınlık (tam kalınlık 1 için; en kalın yer %30 veterde 0,5), firar kenarında 0. */
 const nacaT = (x: number) => 5 * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x ** 3 - 0.1036 * x ** 4);
 
 /** Profil kesiti: hücum kenarı noktası, veter (−z yönünde), kalınlık (m). */
 interface Section { le: THREE.Vector3; c: number; t: number }
+
+/**
+ * Taşıyıcı yüzeyin veter aralığı [x0, x1] (0 hücum, 1 firar kenarı): kesitler aynı profilden kesilir, böylece ana yüzey
+ * ve kumanda yüzeyi aynı kalınlıkta birleşir (aralarında yalnız menteşe aralığı kalır). Eğri yüz pürüzsüz, kesik kenar
+ * (ana yüzeyin arkası, kumanda yüzeyinin önü) ve iki uç düz yüzle kapanır (keskin köşe).
+ */
+function airfoilPart(secs: Section[], thick: THREE.Vector3, x0: number, x1: number): Geo {
+  const M = AF_N;
+  const xs = AF_X.map((a) => x0 + (x1 - x0) * a);
+  const sharedLe = x0 === 0;
+  const pt = (s: Section, x: number, up: boolean) => {
+    const h = s.t * nacaT(x) * (up ? 1 : -1) + s.t * 0.12 * Math.sin(Math.PI * x);
+    return new THREE.Vector3(s.le.x + thick.x * h, s.le.y + thick.y * h, s.le.z - s.c * x + thick.z * h);
+  };
+  // Halka: üst yüz x1 → x0, alt yüz x0 → x1 (hücum kenarından kesilmemişse burun noktası ortak)
+  const ring = (s: Section) => [
+    ...xs.slice().reverse().map((x) => pt(s, x, true)),
+    ...xs.slice(sharedLe ? 1 : 0).map((x) => pt(s, x, false)),
+  ];
+  const rings = secs.map(ring);
+  const R = rings[0].length;
+  const cut = sharedLe ? -1 : M; // kumanda yüzeyinde ön kesik: M (üst x0) ile M+1 (alt x0) arası
+  const pos: number[] = [];
+  for (const r of rings) for (const p of r) pos.push(p.x, p.y, p.z);
+  const surf: number[] = [];
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let k = 0; k < R - 1; k++) {
+      if (k === cut) continue;
+      const a = i * R + k;
+      const b = (i + 1) * R + k;
+      surf.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  // Üst yüzün ortasındaki üçgen kalınlık yönüne baksın
+  const P = (i: number) => new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+  const mid = Math.floor(M * 0.5) * 6;
+  const n0 = P(surf[mid + 1]).sub(P(surf[mid])).cross(P(surf[mid + 2]).sub(P(surf[mid])));
+  if (n0.dot(thick) < 0) for (let i = 0; i < surf.length; i += 3) [surf[i + 1], surf[i + 2]] = [surf[i + 2], surf[i + 1]];
+  const sg0 = new THREE.BufferGeometry();
+  sg0.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  sg0.setIndex(surf);
+  sg0.computeVertexNormals();
+  const smooth = sg0.toNonIndexed();
+  // Düz yüzler: kesik kenar şeritleri ve iki uç kapağı, istenen yöne bakacak sarımla
+  const flat: number[] = [];
+  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, want: THREE.Vector3) => {
+    const n = b.clone().sub(a).cross(c.clone().sub(a));
+    if (n.dot(want) < 0) [b, c] = [c, b];
+    flat.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  };
+  const chord = new THREE.Vector3(0, 0, -1);
+  for (let i = 0; i < rings.length - 1; i++) {
+    const [ra, rb] = [rings[i], rings[i + 1]];
+    if (sharedLe) {
+      // Arka kesik: üst x1 (0) ile alt x1 (R-1)
+      tri(ra[0], rb[0], ra[R - 1], chord);
+      tri(ra[R - 1], rb[0], rb[R - 1], chord);
+    } else {
+      const want = chord.clone().negate();
+      tri(ra[M], rb[M], ra[M + 1], want);
+      tri(ra[M + 1], rb[M], rb[M + 1], want);
+    }
+  }
+  const span = secs[secs.length - 1].le.clone().sub(secs[0].le).normalize();
+  for (const [r, want] of [[rings[0], span.clone().negate()], [rings[rings.length - 1], span]] as [THREE.Vector3[], THREE.Vector3][]) {
+    const c = r.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(r.length);
+    for (let k = 0; k < R; k++) tri(c, r[k], r[(k + 1) % R], want);
+  }
+  const fg = new THREE.BufferGeometry();
+  fg.setAttribute('position', new THREE.Float32BufferAttribute(flat, 3));
+  fg.computeVertexNormals();
+  return mergeGeometries([smooth, fg], false)!;
+}
 
 /**
  * Taşıyıcı yüzey (kanat, yatay ve dikey kuyruk): kesitler arası pürüzsüz profil yüzeyi, uçta kapak. thick: kalınlık
@@ -403,6 +488,161 @@ interface FinRec { x: number; yTop: number; yRoot: number; zTop: number; zMid: n
 let canopySink: CanopyRec[] = [];
 let finSink: FinRec[] = [];
 
+/** Menteşe aralığı (veter oranı): ana yüzeyle kumanda yüzeyi arasında ince çizgi. */
+const HINGE_GAP = 0.005;
+
+/** Sivrilen yüzeyin açıklık oranı f'deki kesiti (wing() ile aynı biçim); side +1 sol (+x), −1 sağ. */
+function taperSec(w: WingOpts, f: number, side: number): Section {
+  const span = w.tipX - w.x0;
+  return {
+    le: new THREE.Vector3(side * (w.x0 + span * f), w.y + tailLift(w.z - w.root * 0.5) + span * f * tanD(w.dihedral), w.z - w.sweep * f),
+    c: w.root + (w.tip - w.root) * f,
+    t: w.t * (1 - 0.55 * f),
+  };
+}
+
+/** Kesitin veterin x'indeki orta çizgi noktası (menteşe). */
+function chordPt(s: Section, thick: THREE.Vector3, x: number): THREE.Vector3 {
+  const h = s.t * 0.12 * Math.sin(Math.PI * x);
+  return new THREE.Vector3(s.le.x + thick.x * h, s.le.y + thick.y * h, s.le.z - s.c * x + thick.z * h);
+}
+
+/**
+ * Kumanda yüzeyli kanat ya da yatay kuyruk (iki yan). parts: açıklık parçaları [f0, f1, ad]: adlı parçada veterin
+ * xh'tan arkası eklem (ad + 'L' sol/+x, 'R'; menteşe ekseni iki yanda da +x'e bakar, pozitif açı firar kenarını
+ * kaldırır), önü sabit; ad null ise tam veter (kumanda yüzeyleri arası, uç). İki parça aynı profilden kesilir.
+ */
+function controlWing(w: WingOpts, xh: number, parts: [number, number, string | null][]): Geo[] {
+  const up = new THREE.Vector3(0, 1, 0);
+  const out: Geo[] = [];
+  for (const s of [1, -1]) {
+    for (const [f0, f1, name] of parts) {
+      const secs = [taperSec(w, f0, s), taperSec(w, f1, s)];
+      if (!name) {
+        out.push(airfoilPart(secs, up, 0, 1));
+        continue;
+      }
+      out.push(airfoilPart(secs, up, 0, xh));
+      const a = chordPt(secs[0], up, xh + HINGE_GAP);
+      const ax = chordPt(secs[1], up, xh + HINGE_GAP).sub(a).multiplyScalar(s);
+      out.push(...joint(`${name}${s > 0 ? 'L' : 'R'}`, [a.x, a.y, a.z], [airfoilPart(secs, up, xh + HINGE_GAP, 1)], true, [ax.x, ax.y, ax.z]));
+    }
+  }
+  return out;
+}
+
+/** Dikey kuyruk kesiti (fins() ile aynı biçim): yükseklik oranı k, veter ve kalınlık çarpanı, uçta geri kayma. */
+function finSec(f: Fin, k: number, cm = 1, back = 0, tm = 1): Section {
+  const y0 = f.y0 + tailLift(f.z0 - f.root * 0.5);
+  return { le: new THREE.Vector3(0, y0 - 0.25 + (f.h + 0.25) * k, f.z0 - f.sweep * k - f.tip * back), c: (f.root + (f.tip - f.root) * k) * cm, t: f.t * (1 - 0.5 * k) * tm };
+}
+
+/**
+ * İstikamet dümenli dikey kuyruk (ortada, tek): [k0, k1] yükseklik aralığında veterin xh'tan arkası 'rudder' eklemi
+ * (menteşe ekseni yukarı), altı ve yuvarlak tepesi tam veter. Arma ve anten yerleri için finSink'e yazar.
+ */
+function controlFin(f: Fin, xh: number, k0: number, k1: number): Geo[] {
+  const side = new THREE.Vector3(1, 0, 0);
+  const y0 = f.y0 + tailLift(f.z0 - f.root * 0.5);
+  const chordMid = (f.root + f.tip) / 2;
+  finSink.push({ x: 0, yTop: y0 + f.h, yRoot: y0, zTop: f.z0 - f.sweep - f.tip * 0.35, zMid: f.z0 - f.sweep * 0.5 - chordMid * 0.5, chordMid });
+  const a = finSec(f, k0);
+  const b = finSec(f, k1);
+  const h0 = chordPt(a, side, xh + HINGE_GAP);
+  const ax = chordPt(b, side, xh + HINGE_GAP).sub(h0);
+  return [
+    airfoilPart([finSec(f, 0), a], side, 0, 1),
+    airfoilPart([a, b], side, 0, xh),
+    ...joint('rudder', [h0.x, h0.y, h0.z], [airfoilPart([a, b], side, xh + HINGE_GAP, 1)], true, [ax.x, ax.y, ax.z]),
+    airfoilPart([b, finSec(f, 0.965, 0.88, 0.05, 0.85), finSec(f, 1, 0.6, 0.18, 0.6)], side, 0, 1),
+  ];
+}
+
+/** Lastikli tekerlek (aks X ekseninde): yuvarlak omuzlu lastik, jant, göbek. */
+function wheelParts(r: number, w: number, x: number, y: number, z: number): Geo[] {
+  const prof: [number, number][] = [[r * 0.6, w * 0.46], [r * 0.84, w * 0.5], [r * 0.96, w * 0.38], [r, w * 0.12], [r, -w * 0.12], [r * 0.96, -w * 0.38], [r * 0.84, -w * 0.5], [r * 0.6, -w * 0.46]];
+  return [
+    new THREE.LatheGeometry(prof.map(([a, b]) => new THREE.Vector2(a, b)), sg(18)).rotateZ(Math.PI / 2).translate(x, y, z),
+    new THREE.CylinderGeometry(r * 0.6, r * 0.6, w * 0.86, sg(14)).rotateZ(Math.PI / 2).translate(x, y, z),
+    new THREE.CylinderGeometry(r * 0.22, r * 0.28, w * 1.1, sg(10)).rotateZ(Math.PI / 2).translate(x, y, z),
+  ];
+}
+
+/**
+ * MiG-15 iniş takımı (katlanır, eklemli). Ana bacaklar kanat kökünde, içe (gövdenin içine) toplanır; burun bacağı öne,
+ * burnun içine. Her bacakta amortisör silindiri ve krom piston, makas bağlantısı, aks, lastikli tekerlek ve bacakla
+ * dönen kapak (toplanınca altta kalır, yuvayı örter). Tekerlek altları yer çizgisinde (−gh).
+ */
+function migGear(gh: number): Geo[] {
+  const out: Geo[] = [];
+  const cyl = (r: number, y0: number, y1: number, x: number, z: number) => new THREE.CylinderGeometry(r, r, y0 - y1, sg(10)).translate(x, (y0 + y1) / 2, z);
+  const bar = (a: V3, b: V3, w: number) => rod(new THREE.Vector3(...a), new THREE.Vector3(...b), w, 6);
+  const RW = 0.33;
+  for (const s of [1, -1]) {
+    const x = s * 1.55;
+    const z = -0.45;
+    const top = -0.12;
+    const axle = -gh + RW;
+    const parts = [
+      cyl(0.075, top, -0.95, x, z),
+      cyl(0.052, -0.9, axle + 0.04, x, z),
+      new THREE.CylinderGeometry(0.045, 0.045, 0.2, sg(8)).rotateZ(Math.PI / 2).translate(x - s * 0.1, axle, z),
+      bar([x, -0.92, z - 0.06], [x, -1.18, z - 0.17], 0.022),
+      bar([x, -1.18, z - 0.17], [x, axle + 0.05, z - 0.05], 0.022),
+      bar([x, -0.7, z], [x - s * 0.4, -0.16, z + 0.04], 0.03),
+      ...wheelParts(RW, 0.16, x - s * 0.17, axle, z),
+    ];
+    // Kapak gövde boyasında (gümüş), bacak ve tekerlek koyu
+    const door = new THREE.BoxGeometry(0.025, 0.85, 0.42).translate(x + s * 0.11, -0.62, z);
+    out.push(...joint(s > 0 ? 'takimL' : 'takimR', [x, top, z], [...parts.map((g) => tag(g, 'dark')), door], false, [0, 0, 1]));
+  }
+  const NR = 0.24;
+  const nz = 2.35;
+  const ntop = -0.4;
+  const naxle = -gh + NR;
+  const nose = [
+    cyl(0.06, ntop, -0.8, 0, nz),
+    cyl(0.044, -0.75, -1.0, 0, nz),
+    new THREE.BoxGeometry(0.3, 0.07, 0.12).translate(0, -1.02, nz),
+    ...[1, -1].map((s) => new THREE.BoxGeometry(0.03, -1.02 - naxle + 0.04, 0.1).translate(s * 0.11, (-1.02 + naxle) / 2, nz)),
+    new THREE.CylinderGeometry(0.03, 0.03, 0.26, sg(8)).rotateZ(Math.PI / 2).translate(0, naxle, nz),
+    ...wheelParts(NR, 0.13, 0, naxle, nz),
+  ];
+  const nDoor = new THREE.BoxGeometry(0.36, 0.6, 0.025).translate(0, -0.7, nz - 0.13);
+  out.push(...joint('takimN', [0, ntop, nz], [...nose.map((g) => tag(g, 'dark')), nDoor], false, [1, 0, 0]));
+  return out;
+}
+
+/**
+ * MiG-15 gövdesi: yuvarlak dudaklı burun hava girişi, içinde kanal, ortada dikey ayırıcı, dipte kompresör yüzü ve
+ * göbeği; arkaya incelen gövde, kuyrukta egzoz borusu, türbin yüzü ve göbeği. Kesit biraz yüksek. Profil çizgileri dış
+ * yüzde burundan kuyruğa, kanal ve borunun içinde ters yönde (yüzleri içe bakar).
+ */
+function migFuselage(): Geo[] {
+  const sy = 1.08;
+  const skin: [number, number][] = [
+    [4.36, 0.405], [4.48, 0.42], [4.55, 0.45], [4.54, 0.485], [4.47, 0.51], [4.3, 0.545], [3.8, 0.6], [3.0, 0.665], [2.0, 0.72],
+    [1.0, 0.74], [0.0, 0.735], [-1.0, 0.705], [-2.0, 0.65], [-3.0, 0.575], [-4.0, 0.49], [-4.7, 0.425], [-5.08, 0.39], [-5.12, 0.37],
+  ];
+  const disc = (r: number, z: number, back: boolean) => {
+    const g = new THREE.CircleGeometry(r, sg(14)).scale(1, sy, 1);
+    if (back) g.rotateY(Math.PI);
+    return tag(g.translate(0, 0, z), 'dark');
+  };
+  const hubCone = (r: number, len: number, z: number, dir: number) =>
+    tag(new THREE.ConeGeometry(r, len, sg(10)).rotateX((dir * Math.PI) / 2).translate(0, 0, z + (dir * len) / 2), 'dark');
+  return [
+    body(skin, 12, { sy, smooth: true }),
+    tag(body([[3.9, 0.376], [4.1, 0.388], [4.36, 0.405]], 12, { sy }), 'dark'),
+    disc(0.377, 3.9, false),
+    hubCone(0.12, 0.26, 3.9, 1),
+    new THREE.BoxGeometry(0.04, 0.8, 0.6).translate(0, 0, 4.2),
+    tag(body([[-5.12, 0.37], [-5.06, 0.35], [-4.75, 0.336]], 12, { sy }), 'dark'),
+    disc(0.337, -4.75, true),
+    hubCone(0.13, 0.3, -4.75, -1),
+  ];
+}
+
 /**
  * Kanopi: gövde üstünde yarı gömülü damla. Çerçeve: ön cam kenarında ince koyu bant; kabarcık olmayan (çerçeveli)
  * kanopide ortada ve arkada da birer bant.
@@ -503,6 +743,8 @@ interface ModelDef {
   bombs?: Geo[];
   rockets?: Geo[];
   tank?: Geo[];
+  /** Dış ışıklar (model ekseninde): seyir lambaları ve iniş farı (yalnız ışıkları tanımlı uçaklarda). */
+  lights?: { p: V3; kind: 'red' | 'green' | 'white' | 'landing' }[];
 }
 
 interface FuseOpts {
@@ -741,19 +983,34 @@ function defineModel(key: string): ModelDef {
         props: [],
         bombs: mirror(0.3, (x) => bombAt(x, -0.95, 1.0, 1.3)),
       };
-    case 'mig15':
+    case 'mig15': {
+      // Hareketli yüzeyler (eklem, menteşe ekseninde döner): kanadın firar kenarında içte flap, dışta kanatçık (%25
+      // veter); yatay kuyrukta irtifa dümeni, dikey kuyrukta istikamet dümeni (%30). Hava frenleri ve katlanır iniş
+      // takımı cached()'te (gövde yüzeyine göre). Işıklar: kanat uçlarında seyir lambaları (sol kırmızı, sağ yeşil),
+      // dümen firar kenarında beyaz kuyruk lambası, sol kanat altında iniş farı (MiG-15bis).
+      const W: WingOpts = { x0: 0.65, z: 1.4, root: 3.3, y: -0.1, tipX: 5.04, tip: 1.6, sweep: 3.0, dihedral: -2, t: 0.3 };
+      const T: WingOpts = { x0: 0.05, z: -4.35, root: 1.2, y: 2.3, tipX: 1.7, tip: 0.6, sweep: 1.0, dihedral: 0, t: 0.1 };
+      const F: Fin = { y0: 0.5, z0: -2.4, h: 2.4, root: 2.8, tip: 1.2, sweep: 2.4, t: 0.15 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
       return {
         solids: [
-          intake(5.0, 0.55),
-          fuselage({ noseZ: 4.3, tailZ: -5.1, r: 0.74, sy: 1.08, noseR: 0.88, peak: 0.28, rise: 0 }),
+          ...migFuselage(),
           canopy(2.2, 1.6, 0.46, 0.72, 0.42, true),
-          ...wing({ x0: 0.65, z: 1.4, root: 3.3, y: -0.1, tipX: 5.04, tip: 1.6, sweep: 3.0, dihedral: -2, t: 0.3 }),
-          ...fins({ y0: 0.5, z0: -2.4, h: 2.4, root: 2.8, tip: 1.2, sweep: 2.4, t: 0.15 }),
-          ...wing({ x0: 0.05, z: -4.35, root: 1.2, y: 2.3, tipX: 1.7, tip: 0.6, sweep: 1.0, dihedral: 0, t: 0.1 }),
+          // Kanat: kökten (gövde içinden) flap, arada kısa sabit parça, kanatçık, uç; firar kenarının arka %25'i hareketli
+          ...controlWing(W, 0.75, [[-0.1, 0.46, 'flap'], [0.46, 0.48, null], [0.48, 0.96, 'aileron'], [0.96, 1, null]]),
+          ...controlFin(F, 0.7, 0.1, 0.93),
+          ...controlWing(T, 0.7, [[0, 0.96, 'elevator'], [0.96, 1, null]]),
         ],
         props: [],
         tank: mirror(2.6, (x) => tankAt(-0.4, 0.6, x, 0.85)),
+        lights: [
+          { p: [W.tipX + 0.04, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.04, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, F.y0 - 0.25 + (F.h + 0.25) * 0.85, F.z0 - F.sweep * 0.85 - (F.root + (F.tip - F.root) * 0.85) + 0.04], kind: 'white' },
+          { p: [1.9, W.y - 0.3, 0.25], kind: 'landing' },
+        ],
       };
+    }
     case 'f84':
       return {
         solids: [
@@ -1383,7 +1640,7 @@ function merge(list: Geo[]): Geo {
 }
 
 /** Eklemin birleşmiş ağları (gövde rengi, cam, küçük parçalar). */
-interface JointModel { name: string; pivot: THREE.Vector3; big: boolean; solid: Geo | null; glass: Geo | null; detail: Geo | null }
+interface JointModel { name: string; pivot: THREE.Vector3; big: boolean; axis: THREE.Vector3 | null; solid: Geo | null; glass: Geo | null; detail: Geo | null }
 
 interface CachedModel {
   solid: Geo;
@@ -1399,6 +1656,7 @@ interface CachedModel {
   gear: Geo | null;
   props: PropDef[];
   emitters: THREE.Vector3[];
+  lights: NonNullable<ModelDef['lights']>;
   length: number;
   radius: number;
   probe: Probe;
@@ -1530,8 +1788,30 @@ function markSpots(probe: Probe, bb: THREE.Box3, fins: FinRec[], markZ?: number)
 }
 
 /** Katlanır iniş takımı: ana bacaklar kanat altında, kuyruk ya da burun tekerleği. */
+/** İniş takımı katlanarak açılıp kapanan (eklemli) modeller; diğerlerinde takım görünür ya da gizli. */
+const FOLDING_GEAR = new Set(['mig15']);
+
+/**
+ * Hava frenleri (MiG-15): arka gövdenin iki yanında, gövde yüzeyine oturan dikdörtgen kapaklar; ön kenarından
+ * menteşeli (dikey eksen), dışa 55° açılır. Eklemler airbrakeL (+x) ve airbrakeR.
+ */
+function airbrakes(probe: Probe, zf: number, len: number, h: number, y: number): Geo[] {
+  const front = probe.side(y, zf);
+  const back = probe.side(y, zf - len);
+  if (!front || !back) return [];
+  const xf = front.point.x;
+  const xb = back.point.x;
+  const tilt = Math.atan2(xf - xb, len);
+  return [1, -1].flatMap((s) => {
+    const g = new THREE.BoxGeometry(0.04, h, len).rotateY(s * tilt);
+    g.translate(s * ((xf + xb) / 2 + 0.02), y, zf - len / 2);
+    return joint(s > 0 ? 'airbrakeL' : 'airbrakeR', [s * (xf + 0.02), y, zf], [g], false, [0, 1, 0]);
+  });
+}
+
 function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefined, kind: string): Geo[] {
   if (!spec || kind === 'ju87b' || kind === 'ju87d') return [];
+  if (kind === 'mig15') return migGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
@@ -1560,20 +1840,30 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
       out.push(hub);
     }
   };
+  // Katlanır takım (FOLDING_GEAR): her bacak kendi ekleminde, üst ucundan döner; ana bacaklar içe (Z ekseni), burun
+  // bacağı öne (X ekseni) toplanır
+  const fold = FOLDING_GEAR.has(kind);
+  const leg = (from: number, name: string, pivot: V3, axis: V3) => {
+    if (fold) for (const g of out.slice(from)) joint(name, pivot, [tag(g, 'dark')], false, axis);
+  };
   for (const s of [1, -1]) {
+    const n0 = out.length;
     strut(x * s, yb, z, wr * 0.35);
     wheel(x * s, z, wr, wr * 0.55);
     // Kapak
     const door = new THREE.BoxGeometry(0.05, (yb + gh) * 0.6, wr * 1.6);
     door.translate(x * s + s * wr * 0.6, yb - (yb + gh) * 0.3, z);
     out.push(door);
+    leg(n0, s > 0 ? 'takimL' : 'takimR', [x * s, yb, z], [0, 0, 1]);
   }
   if (tricycle) {
     const zn = bb.max.z * 0.62;
     const nb = probe.vertical(0, zn, false);
     const yn = nb ? nb.point.y : -0.3;
+    const n0 = out.length;
     strut(0, yn, zn, wr * 0.3);
     wheel(0, zn, wr * 0.75, wr * 0.45);
+    leg(n0, 'takimN', [0, yn, zn], [1, 0, 0]);
   } else {
     const zt = bb.min.z * 0.86;
     const tb = probe.vertical(0, zt, false);
@@ -1677,8 +1967,8 @@ function smallParts(
     const top = probe.vertical(tipX, zc, true);
     if (top) {
       const r = Math.min(0.07, Math.max(0.035, spec.span * 0.004));
-      navGreen.push(new THREE.SphereGeometry(r, sg(5), sg(3)).translate(top.point.x, top.point.y - r * 0.3, zc));
-      navRed.push(new THREE.SphereGeometry(r, sg(5), sg(3)).translate(-top.point.x, top.point.y - r * 0.3, zc));
+      navRed.push(new THREE.SphereGeometry(r, sg(5), sg(3)).translate(top.point.x, top.point.y - r * 0.3, zc));
+      navGreen.push(new THREE.SphereGeometry(r, sg(5), sg(3)).translate(-top.point.x, top.point.y - r * 0.3, zc));
     }
   }
   const c0 = canopies[0];
@@ -1688,8 +1978,17 @@ function smallParts(
       ? [[c0.w * 0.32, c0.z], [-c0.w * 0.32, c0.z]]
       : c0.len > 3.2 ? [[0, c0.z + c0.len * 0.18], [0, c0.z - c0.len * 0.22]] : [[0, c0.z - c0.len * 0.05]];
     for (const [x, z] of seats) {
-      pilot.push(new THREE.SphereGeometry(0.12 * s, sg(6), sg(4)).translate(x, c0.y + c0.h * 0.42, z));
-      pilot.push(new THREE.BoxGeometry(0.44 * s, 0.34 * s, 0.26 * s).translate(x, c0.y + c0.h * 0.02, z - 0.04));
+      // Pilot: omuzlu gövde (kapsül), boyun, kask; kask üstünde gözlük, önünde gösterge kaplaması ve nişangâh
+      const yb = c0.y + c0.h * 0.02;
+      // Kokpit içi: koyu tekne (taban ve yan konsollar), camdan görünür
+      dark.push(new THREE.BoxGeometry(c0.w * 1.7, 0.06, c0.len * 0.8).translate(x, c0.y - 0.12, z));
+      for (const k of [1, -1]) dark.push(new THREE.BoxGeometry(0.1 * s, 0.14 * s, c0.len * 0.45).translate(x + k * c0.w * 0.62, c0.y - 0.04, z + 0.1));
+      pilot.push(new THREE.CapsuleGeometry(0.15 * s, 0.16 * s, sg(3), sg(8)).scale(1.45, 1, 0.85).translate(x, yb, z - 0.04));
+      pilot.push(new THREE.CylinderGeometry(0.05 * s, 0.06 * s, 0.1 * s, sg(6)).translate(x, yb + 0.19 * s, z - 0.03));
+      pilot.push(new THREE.SphereGeometry(0.118 * s, sg(9), sg(7)).scale(1, 1.05, 1.12).translate(x, c0.y + c0.h * 0.42, z - 0.01));
+      dark.push(new THREE.BoxGeometry(0.17 * s, 0.045 * s, 0.05 * s).translate(x, c0.y + c0.h * 0.42, z + 0.1 * s));
+      dark.push(new THREE.BoxGeometry(0.46 * s, 0.1 * s, 0.22 * s).translate(x, c0.y + c0.h * 0.08, z + 0.52 * s));
+      dark.push(new THREE.BoxGeometry(0.07 * s, 0.12 * s, 0.07 * s).translate(x, c0.y + c0.h * 0.08 + 0.1 * s, z + 0.5 * s));
       dark.push(new THREE.BoxGeometry(0.34 * s, 0.32 * s, 0.04).translate(x, c0.y + c0.h * 0.38, z - 0.2 * s));
     }
   }
@@ -1743,6 +2042,8 @@ function cached(kind: string, detail: number): CachedModel {
   // Yerleşim yoklamaları (arma, takım, egzoz, namlu) düşük ayrıntılı geometride: sonuç aynı, ışın testi çok daha az
   const low = detail ? cached(kind, 0) : null;
   DETAIL = detail;
+  RES = detail ? HIRES[kind] ?? 1 : 1;
+  setAirfoilRes(Math.round(10 * RES));
   frameSink = [];
   canopySink = [];
   finSink = [];
@@ -1774,18 +2075,21 @@ function cached(kind: string, detail: number): CachedModel {
     livery: LIVERIES[kind] ?? FALLBACK_LIVERY, noseZ: bb.max.z, span: bb.max.x * 2, soot: ex.soot,
     marks: markSpots(probe, bb, finRecs, def.markZ), nation: nationOf(spec?.origin),
   };
-  const gear = landingGear(probe, bb, spec, kind);
+  // Katlanır takımın bacakları ve hava frenleri eklem olur
+  const gearAll = landingGear(probe, bb, spec, kind);
+  const gear = gearAll.filter((g) => !jointOf(g));
+  const extraJoints = [...gearAll.filter((g) => jointOf(g)), ...(kind === 'mig15' ? airbrakes(probe, -2.85, 0.85, 0.55, 0.05) : [])];
   const opt = (g?: Geo[]) => (g && g.length ? merge(g) : null);
   all.computeBoundingSphere();
   const dark = LOOK.dark[detail];
   // Eklemler: model tanımındakiler ve pervaneler (palalar göbek çevresinde döner)
-  const jointGeos = [...def.solids.filter((g) => jointOf(g)), ...def.props.flatMap((p, i) => joint(`pervane${i}`, [p.x ?? 0, p.y ?? 0, p.z], [bladeSet(p)]))];
+  const jointGeos = [...def.solids.filter((g) => jointOf(g)), ...extraJoints, ...def.props.flatMap((p, i) => joint(`pervane${i}`, [p.x ?? 0, p.y ?? 0, p.z], [bladeSet(p)]))];
   const joints: JointModel[] = [...new Set(jointGeos.map((g) => jointOf(g)!.name))].map((name) => {
     const list = jointGeos.filter((g) => jointOf(g)!.name === name);
     const j = jointOf(list[0])!;
     const bp = split(list);
     return {
-      name, pivot: new THREE.Vector3(...j.pivot), big: j.big, solid: opt(bp.body), glass: opt(bp.glass),
+      name, pivot: new THREE.Vector3(...j.pivot), big: j.big, axis: j.axis ? new THREE.Vector3(...j.axis).normalize() : null, solid: opt(bp.body), glass: opt(bp.glass),
       detail: detailGeo([{ geos: bp.dark, ...dark }, { geos: bp.pilot, ...LOOK.pilot }]),
     };
   });
@@ -1804,12 +2108,15 @@ function cached(kind: string, detail: number): CachedModel {
     gear: opt(gear),
     props: def.props,
     emitters: contrailEmitters(bb, spec, def.props),
+    lights: def.lights ?? [],
     length: bb.max.z - bb.min.z,
     radius: all.boundingSphere!.radius,
     probe,
     bb,
   };
   DETAIL = 1;
+  RES = 1;
+  setAirfoilRes(10);
   geoCache.set(key, c);
   return c;
 }
@@ -2028,6 +2335,10 @@ export interface AircraftModel {
   emitters: THREE.Vector3[];
   /** Katlanır iniş takımı (yerde ve son yaklaşmada görünür). */
   gear: THREE.Object3D | null;
+  /** İniş farı (ışıkları tanımlı uçaklarda; takım inikken açılır). */
+  landing: THREE.Object3D | null;
+  /** İniş farının yerdeki ışığı (yalnız yerde). */
+  landingPool: THREE.Object3D | null;
   length: number;
   /** Sınır küresi yarıçapı (kanat açıklığı dahil). */
   radius: number;
@@ -2060,10 +2371,13 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     add(inner, j.solid, c.skin);
     add(inner, j.glass, GLASS[detail]);
     add(inner, j.detail, DETAIL_MAT[detail]);
+    if (j.axis) outer.userData.axis = j.axis;
     root.add(outer);
     joints[j.name] = outer;
     if (!j.big && !j.name.startsWith('pervane')) fine.push(outer);
   }
+  // Katlanır takımın bacakları: takımsız istenirse (uçuşta) gizli; oyunda animateParts açar
+  if (!opts.gear) for (const n of ['takimL', 'takimR', 'takimN']) if (joints[n]) joints[n].visible = false;
   const props = c.props.map((_, i) => joints[`pervane${i}`]);
   const disc = add(root, c.disc, discMaterial(c.props[0]?.blades ?? 3));
   if (disc) {
@@ -2072,7 +2386,60 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     // uçakta camdan diske gölgelendirici değişmesin (ikisi de bulut ve dumandan önce, eskisi gibi)
     disc.renderOrder = 0.5;
   }
-  return { root, props, disc, joints, fine, emitters: c.emitters, gear, length: c.length, radius: c.radius };
+  // Işıklar (tanımlı uçaklarda): seyir lambaları sürekli, iniş farı ayrı grupta (takım inince açılır); gece yanar
+  let landing: THREE.Object3D | null = null;
+  let landingPool: THREE.Object3D | null = null;
+  if (c.lights.length) {
+    const nav = new LampSet();
+    const land = new LampSet();
+    const pool = new LampSet();
+    for (const l of c.lights) {
+      if (l.kind === 'landing') {
+        land.lamp(...l.p, LAMP.white, 0.3, 3.2);
+        // Farın yerde aydınlattığı yer (takım inikken gövde ekseni yerden ~1,9 m yukarıda); yalnız yerdeyken görünür
+        pool.pool(l.p[0], -1.85, l.p[2] + 24, 12, LAMP.white, 0.3);
+      }
+      else nav.lamp(...l.p, l.kind === 'red' ? LAMP.red : l.kind === 'green' ? LAMP.green : LAMP.white, 0.035, 1.1);
+    }
+    nav.build(root);
+    landingPool = new THREE.Group();
+    pool.build(landingPool);
+    landingPool.visible = false;
+    root.add(landingPool);
+    landing = new THREE.Group();
+    land.build(landing);
+    landing.visible = false;
+    root.add(landing);
+  }
+  return { root, props, disc, joints, fine, emitters: c.emitters, gear, landing, landingPool, length: c.length, radius: c.radius };
+}
+
+const parkedCache = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material }[]>();
+
+/**
+ * Yerde duran uçağın parçaları malzeme başına tek geometride (eklemler dönmemiş hâlde model ekseninde kalır): gövde ve
+ * hareketli yüzeyler, cam, küçük parçalar, iniş takımı. Hava üssünde aynı türden uçaklar InstancedMesh ile tek çizimde.
+ */
+export function parkedParts(kind: string, detail: number): { geo: THREE.BufferGeometry; mat: THREE.Material }[] {
+  const key = `${kind}|${detail}`;
+  const hit = parkedCache.get(key);
+  if (hit) return hit;
+  const c = cached(kind, detail);
+  const out: { geo: THREE.BufferGeometry; mat: THREE.Material }[] = [];
+  const add = (list: (Geo | null)[], mat: THREE.Material) => {
+    const geos = list.filter((g): g is Geo => !!g);
+    if (!geos.length) return;
+    const m = geos.length > 1 ? mergeGeometries(geos, false) : geos[0];
+    if (m) out.push({ geo: m, mat });
+    else for (const g of geos) out.push({ geo: g, mat });
+  };
+  add([c.solid, ...c.joints.map((j) => j.solid)], c.skin);
+  add([c.glass, ...c.joints.map((j) => j.glass)], GLASS[detail]);
+  add([c.detail, ...c.joints.map((j) => j.detail)], DETAIL_MAT[detail]);
+  add([c.gear], DARK[detail]);
+  for (const p of out) p.geo.computeBoundingSphere();
+  parkedCache.set(key, out);
+  return out;
 }
 
 // ---------------------------------------------------------------- dış yükler

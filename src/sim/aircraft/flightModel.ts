@@ -71,6 +71,8 @@ export function approachSpeed(ac: Aircraft): number {
 
 /** Model merkezinin tekerleklere yüksekliği. */
 export function gearHeight(spec: AircraftSpec): number {
+  // MiG-15 alçak durur (kısa takım; gövde ekseni yerden ~1,55 m)
+  if (spec.id === 'mig15') return 1.55;
   return spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
 }
 
