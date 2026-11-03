@@ -587,8 +587,10 @@ export class GameRenderer {
     hinge(j.takimL, -up);
     hinge(j.takimR, up);
     hinge(j.takimN, -up);
+    hinge(j.kapakL, -up);
+    hinge(j.kapakR, up);
     const show = s.gear > 0.01 && v.fine;
-    for (const n of ['takimL', 'takimR', 'takimN']) if (j[n]) j[n].visible = show;
+    for (const n of ['takimL', 'takimR', 'takimN', 'kapakL', 'kapakR']) if (j[n]) j[n].visible = show;
     if (v.model.landing) v.model.landing.visible = s.gear > 0.95 && (fly || ac.controls.throttle > 0.3);
     if (v.model.landingPool) v.model.landingPool.visible = !!v.model.landing?.visible && ac.onGround;
   }
