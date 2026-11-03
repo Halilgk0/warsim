@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5 };
+const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5, canberra: 1.5 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -1027,7 +1027,7 @@ interface JetGearOpts {
   /** Ana bacak: x, z, üst ucu (menteşe) y, aks y, tekerlek yarıçapı ve genişliği, tekerleğin bacağa göre içe kayması; out: dışa katlanır. */
   main: { out?: boolean; x: number; z: number; top: number; axle: number; rw: number; tw: number; dx: number; door: { dx: number; top: number; bot: number; w: number; r: number } };
   /** Burun bacağı: menteşe (üst uç) y ve z, aks y ve z, tekerlek; öne bakan küçük kapak (varsa). */
-  nose: { topY: number; topZ: number; axle: number; z: number; rw: number; tw: number; door?: { top: number; bot: number; w: number } };
+  nose: { topY: number; topZ: number; axle: number; z: number; rw: number; tw: number; twin?: number; door?: { top: number; bot: number; w: number } };
   /** Burun takımı yuvasının boyuna iki kapağı: menteşe x'i ve y'si, z aralığı, yükseklik. */
   belly: { x: number; y: number; z0: number; z1: number; h: number };
 }
@@ -1070,7 +1070,7 @@ function jetGear(o: JetGearOpts): Geo[] {
     rod(axle.clone().setX(-fork * 0.4), axle.clone().setX(fork), 0.026, 5),
     rod(along(0.5).add(v(0, 0, -0.05)), along(0.68).add(v(0, 0, -0.14)), 0.016, 4),
     rod(along(0.68).add(v(0, 0, -0.14)), along(0.88).add(v(0, 0, -0.04)), 0.016, 4),
-    ...wheelParts(n.rw, n.tw, 0, n.axle, n.z),
+    ...(n.twin ? [1, -1].flatMap((sd) => wheelParts(n.rw, n.tw, sd * n.twin!, n.axle, n.z)) : wheelParts(n.rw, n.tw, 0, n.axle, n.z)),
   ];
   const noseDoor = n.door
     ? [new THREE.BoxGeometry(n.door.w, n.door.top - n.door.bot, 0.024).translate(0, (n.door.top + n.door.bot) / 2, n.topZ + 0.09)]
@@ -1154,6 +1154,15 @@ function blitzGear(gh: number): Geo[] {
     main: { x: 0.71, z: -0.5, top: -0.33, axle: -gh + 0.38, rw: 0.38, tw: 0.18, dx: -0.03, door: { dx: 0.12, top: -0.4, bot: -0.95, w: 0.45, r: 0.12 } },
     nose: { topY: -0.58, topZ: 3.85, axle: -gh + 0.33, z: 4.0, rw: 0.33, tw: 0.16 },
     belly: { x: 0.2, y: -0.62, z0: 3.8, z1: 2.75, h: 0.2 },
+  });
+}
+
+/** Canberra takımı: ana bacaklar naselin içinde ve dışa toplanır, büyük lastikler; burunda çift tekerlek. */
+function canberraGear(gh: number): Geo[] {
+  return jetGear({
+    main: { out: true, x: 2.5, z: -1.0, top: -0.25, axle: -gh + 0.45, rw: 0.45, tw: 0.22, dx: 0.05, door: { dx: 0.14, top: -0.35, bot: -1.0, w: 0.7, r: 0.15 } },
+    nose: { topY: -0.88, topZ: 3.9, axle: -gh + 0.3, z: 4.0, rw: 0.3, tw: 0.13, twin: 0.14 },
+    belly: { x: 0.26, y: -0.92, z0: 3.85, z1: 2.9, h: 0.24 },
   });
 }
 
@@ -1998,18 +2007,74 @@ function defineModel(key: string): ModelDef {
         ],
       };
     }
-    case 'canberra':
+    case 'canberra': {
+      // Canberra B.2, ölçüler üç görünüş siluetinden. Yuvarlak, kalın gövde; alçak, sivri burun ve ucunda bomba nişancısının
+      // saydam konisi; önde damla kanopi. Çok geniş kök veterli kanat, kalın Avon naselleri kanadın ortasından geçer:
+      // yuvarlak giriş ve ortada üç kollu göbek. Geniş dihedralli yatay kuyruk, kavisle kalkan büyük dikey kuyruk.
+      const NOSE: JetSec[] = [[8.1, 0.01, -0.48, -0.52, -0.5], [8.0, 0.2, -0.3, -0.64, -0.48], [7.62, 0.41, -0.07, -0.69, -0.38]];
+      const GL = new JetHull(NOSE, 2.1);
+      const H = new JetHull([
+        [7.62, 0.41, -0.07, -0.69, -0.38], [6.79, 0.68, 0.33, -0.86, -0.25], [5.72, 0.85, 0.6, -0.95, -0.15], [4.77, 0.98, 0.9, -0.98, -0.05], [-0.23, 1.0, 0.98, -0.98, 0], [-4.52, 0.98, 0.98, -0.79, 0.08],
+        [-7.4, 0.5, 1.02, 0.17, 0.6], [-8.8, 0.45, 1.0, 0.4, 0.7], [-10.4, 0.25, 0.95, 0.55, 0.75], [-11.5, 0.06, 0.85, 0.7, 0.77],
+      ], 2.05);
+      const Wi: WingOpts = { x0: 0.4, z: 1.81, root: 5.75, y: 0.0, tipX: 3.5, tip: 5.55, sweep: 0.03, dihedral: 3, t: 0.75 };
+      const W: WingOpts = { x0: 3.78, z: 1.76, root: 5.44, y: 0.2, tipX: 9.5, tip: 1.7, sweep: 1.42, dihedral: 4.5, t: 0.68 };
+      const T: WingOpts = { x0: 0.3, z: -8.35, root: 2.3, y: 0.72, tipX: 3.78, tip: 1.27, sweep: 1.55, dihedral: 9.5, t: 0.2 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const NX = 3.17;
+      const NY = 0.15;
+      const nacelle = (sd: number): Geo[] => {
+        const o = { x: sd * NX, y: NY };
+        return [
+          body([[2.2, 0.3], [2.7, 0.34], [2.92, 0.4], [2.96, 0.46], [2.88, 0.52], [2.5, 0.6], [1.6, 0.64], [0, 0.63], [-2, 0.56], [-3.6, 0.38], [-4.3, 0.3], [-4.4, 0.29]], 12, { ...o, smooth: true }),
+          tag(body([[1.8, 0.27], [2.22, 0.3]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.27, sg(12)).translate(o.x, o.y, 1.8), 'dark'),
+          body([[3.0, 0.001], [2.88, 0.08], [2.62, 0.13], [1.9, 0.14]], 8, { ...o, smooth: true }),
+          ...[0, 1, 2].map((i) => {
+            const an = Math.PI / 2 + (i * Math.PI * 2) / 3;
+            return tag(rod(new THREE.Vector3(o.x + Math.cos(an) * 0.1, o.y + Math.sin(an) * 0.1, 2.5), new THREE.Vector3(o.x + Math.cos(an) * 0.32, o.y + Math.sin(an) * 0.32, 2.5), 0.02, 4), 'dark');
+          }),
+          tag(body([[-4.4, 0.26], [-3.9, 0.24]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.24, sg(12)).rotateY(Math.PI).translate(o.x, o.y, -3.9), 'dark'),
+          tag(new THREE.ConeGeometry(0.12, 0.3, sg(8)).rotateX(-Math.PI / 2).translate(o.x, o.y, -4.05), 'dark'),
+        ];
+      };
       return {
         solids: [
-          fuselage({ noseZ: 9.8, tailZ: -10.0, r: 0.98, sy: 1.05, noseR: 0.3, peak: 0.35, rise: 0.3 }),
-          canopy(6.6, 2.0, 0.55, 0.92, 0.5, true),
-          ...wing({ x0: 1.0, z: 3.5, root: 6.5, y: 0, tipX: 9.75, tip: 2.6, sweep: 3.0, dihedral: 2, t: 0.6, shape: 'rounded' }),
-          ...mirror(3.4, (x) => jetPod(x, 0, 2.7, 6.0, 0.82)),
-          ...fins({ y0: 0.6, z0: -6.4, h: 3.0, root: 3.0, tip: 1.3, sweep: 2.0, t: 0.18 }),
-          ...wing({ x0: 0.1, z: -7.6, root: 2.4, y: 1.1, tipX: 4.25, tip: 1.0, sweep: 1.0, dihedral: 10, t: 0.16 }),
+          tag(GL.geo(13), 'glass'),
+          tag(H.disc(7.62, 1, 13), 'dark'),
+          H.geo(14),
+          tag(H.patch(1, 5.95, 4.85, Math.PI / 2 - 0.42, Math.PI / 2 + 0.42, 0.006), 'dark'),
+          ...jetCanopy({
+            screen: [[6.35, 0.2, 0.5, 0.1, 0.45], [5.95, 0.38, 0.84, 0.1, 0.55]],
+            glass: [[5.95, 0.38, 0.84, 0.1, 0.55], [5.6, 0.44, 0.97, 0.1, 0.6], [5.1, 0.44, 0.99, 0.1, 0.62], [4.75, 0.38, 0.99, 0.2, 0.68]],
+            aft: [[4.8, 0.39, 1.0, 0.2, 0.68], [4.2, 0.22, 0.98, 0.2, 0.72], [3.4, 0.02, 0.93, 0.3, 0.7]],
+            frames: [5.95, 4.78],
+            posts: [[0.1, 0.5, 6.32], [0.27, 0.8, 5.97]],
+            pilot: { z: 5.35, len: 1.5, h: 0.42, y: 0.62, w: 0.4 },
+          }),
+          // İç kanat flaplı, dış kanat kanatçıklı; uç yuvarlak. Parmak hava frenleri iç kanadın üstünde
+          ...controlWing(Wi, 0.85, [[0, 0.75, 'flap'], [0.75, 1, null]]),
+          ...controlWing(W, 0.8, [[-0.15, 0, null], [0, 0.36, 'flapD'], [0.36, 0.37, null], [0.37, 0.98, 'aileron'], [0.98, 1, null]], 2.5),
+          ...nacelle(1),
+          ...nacelle(-1),
+          ...[1, -1].flatMap((sd) => [
+            tag(new THREE.BoxGeometry(1.4, 0.008, 0.72).translate(sd * 1.9, 0.46, -0.2), 'dark'),
+            ...joint(sd > 0 ? 'airbrakeL' : 'airbrakeR', [sd * 1.9, 0.47, -0.6], [new THREE.BoxGeometry(1.5, 0.02, 0.8).translate(sd * 1.9, 0.47, -0.2)], false, [sd, 0, 0]),
+          ]),
+          ...controlWing(T, 0.7, [[0, 0.96, 'elevator'], [0.96, 1, null]], 3),
+          ...jetFin([[0.85, -6.8, 4.6], [1.25, -7.38, 3.95], [1.7, -7.85, 3.4], [2.4, -8.6, 2.6], [3.0, -9.1, 2.05], [3.12, -9.3, 1.8], [3.19, -9.75, 1.25]], 0.24, 0.68, 2, 4),
         ],
         props: [],
+        markZ: -5.6,
+        lights: [
+          { p: [W.tipX + 0.26, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.26, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, 2.2, -11.28], kind: 'white' },
+          { p: [1.6, -0.36, 1.6], kind: 'landing' },
+        ],
       };
+    }
     // ================================================================ Çeşitlilik: pervaneliler
     case 'i16':
       return {
@@ -2745,6 +2810,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'vampire') return vampireGear(gearHeight(spec));
   if (kind === 'he162') return salamanderGear(gearHeight(spec));
   if (kind === 'ar234') return blitzGear(gearHeight(spec));
+  if (kind === 'canberra') return canberraGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;

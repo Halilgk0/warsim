@@ -580,6 +580,8 @@ export class GameRenderer {
     hinge(j.elevatorR, s.ele);
     hinge(j.flapL, -s.flap);
     hinge(j.flapR, -s.flap);
+    hinge(j.flapDL, -s.flap);
+    hinge(j.flapDR, -s.flap);
     hinge(j.rudder, s.rud);
     hinge(j.rudderR, s.rud);
     hinge(j.airbrakeL, -s.brake);
