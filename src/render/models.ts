@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6 };
+const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -594,7 +594,7 @@ function controlFin(f: Fin, xh: number, k0: number, k1: number): Geo[] {
  * Çizimden alınan dikey kuyruk (ortada, tek): yükseklik başına [y, hücum kenarı z, veter], alttan üste (ilk kesit
  * gövdeye gömülü). [i0, i1] kesitleri arasında veterin xh'tan arkası 'rudder' eklemi. Kalınlık tepeye doğru incelir.
  */
-function jetFin(raw: [number, number, number][], t: number, xh: number, r0: number, r1: number, x = 0, rudder = 'rudder'): Geo[] {
+function jetFin(raw: [number, number, number][], t: number, xh: number, r0: number, r1: number, x = 0, rudder = 'rudder', lean = 0, yRef = 0): Geo[] {
   const side = new THREE.Vector3(1, 0, 0);
   // Yüksek ayrıntıda kesitler yumuşar (kenar köşeli kalmasın); dümen sınırları en yakın kesite
   const list = (DETAIL ? chaikinN(raw, 2) : raw) as [number, number, number][];
@@ -605,7 +605,7 @@ function jetFin(raw: [number, number, number][], t: number, xh: number, r0: numb
   const top = list[list.length - 1];
   const mid = list[Math.floor(list.length / 2)];
   finSink.push({ x, yTop: top[0], yRoot: list[1][0], zTop: top[1] - top[2] * 0.35, zMid: mid[1] - mid[2] * 0.5, chordMid: mid[2] });
-  const secs: Section[] = list.map(([y, le, c]) => ({ le: new THREE.Vector3(x, y, le), c, t: t * (1 - (0.6 * (y - y0)) / (top[0] - y0)) }));
+  const secs: Section[] = list.map(([y, le, c]) => ({ le: new THREE.Vector3(x + lean * (y - yRef), y, le), c, t: t * (1 - (0.6 * (y - y0)) / (top[0] - y0)) }));
   const span = secs.slice(i0, i1 + 1);
   const h0 = chordPt(secs[i0], side, xh + HINGE_GAP);
   const ax = chordPt(secs[i1], side, xh + HINGE_GAP).sub(h0);
@@ -1136,6 +1136,15 @@ function vampireGear(gh: number): Geo[] {
     main: { out: true, x: 1.72, z: -0.06, top: -0.02, axle: -gh + 0.335, rw: 0.335, tw: 0.15, dx: 0.04, door: { dx: 0.1, top: -0.05, bot: -0.7, w: 0.4, r: 0.1 } },
     nose: { topY: -0.42, topZ: 3.05, axle: -gh + 0.216, z: 3.38, rw: 0.216, tw: 0.12 },
     belly: { x: 0.24, y: -0.52, z0: 2.9, z1: 2.0, h: 0.22 },
+  });
+}
+
+/** He 162 takımı: kısa, dar iz (1,5 m), ana bacaklar gövdeye yakın; burun tekerleği kokpitin önünde, büyük kapaklı. */
+function salamanderGear(gh: number): Geo[] {
+  return jetGear({
+    main: { x: 0.6, z: 0.15, top: -0.18, axle: -gh + 0.32, rw: 0.32, tw: 0.13, dx: -0.16, door: { dx: 0.26, top: -0.3, bot: -0.62, w: 0.45, r: 0.14 } },
+    nose: { topY: -0.33, topZ: 3.25, axle: -gh + 0.235, z: 3.65, rw: 0.235, tw: 0.12 },
+    belly: { x: 0.22, y: -0.34, z0: 3.2, z1: 2.25, h: 0.22 },
   });
 }
 
@@ -2166,21 +2175,76 @@ function defineModel(key: string): ModelDef {
         props: [{ x: 2.45, y: -0.15, z: 4.35, r: 1.65, blades: 3 }, { x: -2.45, y: -0.15, z: 4.35, r: 1.65, blades: 3 }],
       };
     // ================================================================ Çeşitlilik: ilk nesil jetler
-    case 'he162':
+    case 'he162': {
+      // He 162 A-2, ölçüler üç görünüş çiziminden. Küçük gövde, sivri burun ve burun borusu, altında iki top ağzı, tek
+      // parça damla kanopi. Sırtta BMW 003: geniş dudaklı giriş kanopinin hemen üstünde, alt çizgisi düz, üstü arkaya
+      // incelir. Hücum kenarı düz kanat, firar kenarı kökte kırılır, uçları aşağı kıvrık. Yukarı açılı yatay kuyruk ve
+      // uçlarında ona dik, içe yatık ikiz dikey kuyruk.
+      const H = new JetHull([
+        [4.2, 0.01, 0.0, -0.03, -0.01], [4.06, 0.14, 0.16, -0.19, -0.01], [3.74, 0.26, 0.29, -0.3, -0.01], [3.24, 0.41, 0.38, -0.37, 0], [1.88, 0.53, 0.45, -0.45, -0.03], [1.1, 0.53, 0.56, -0.44, -0.03],
+        [0.74, 0.53, 0.66, -0.43, -0.03], [-1.1, 0.41, 0.73, -0.26, 0.04], [-2.05, 0.3, 0.73, -0.1, 0.12], [-2.4, 0.28, 0.52, -0.07, 0.13], [-3.85, 0.21, 0.36, 0.06, 0.2], [-4.5, 0.08, 0.33, 0.16, 0.24], [-4.87, 0.005, 0.25, 0.22, 0.235],
+      ], 2.1);
+      const W: WingOpts = { x0: 1.01, z: 0.68, root: 1.84, y: 0.47, tipX: 3.3, tip: 0.87, sweep: 0, dihedral: 5.5, t: 0.26 };
+      const T: WingOpts = { x0: 0.12, z: -3.91, root: 0.84, y: 0.33, tipX: 1.66, tip: 0.84, sweep: 0, dihedral: 12.5, t: 0.09 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const up = new THREE.Vector3(0, 1, 0);
+      const pod = new JetHull([
+        [1.05, 0.2, 1.28, 0.88, 1.08], [1.3, 0.22, 1.3, 0.86, 1.08], [1.38, 0.27, 1.35, 0.81, 1.08], [1.34, 0.32, 1.41, 0.75, 1.08], [1.2, 0.36, 1.47, 0.69, 1.08], [0.59, 0.38, 1.54, 0.62, 1.08],
+        [-0.62, 0.37, 1.45, 0.62, 1.06], [-1.26, 0.31, 1.31, 0.64, 1.0], [-1.84, 0.2, 1.14, 0.72, 0.96], [-2.05, 0.135, 1.09, 0.85, 0.97], [-2.09, 0.13, 1.09, 0.85, 0.97],
+      ], 2.1);
+      const duct = new JetHull([[0.6, 0.17, 1.25, 0.91, 1.08], [1.06, 0.19, 1.27, 0.89, 1.08]], 2.05, false);
+      const pipe = new JetHull([[-2.08, 0.11, 1.07, 0.87, 0.97], [-1.6, 0.095, 1.06, 0.88, 0.97]], 2.05, false);
+      const FIN: [number, number, number][] = [[0.06, -4.05, 0.5], [0.2, -3.89, 0.82], [0.7, -3.87, 0.87], [1.2, -3.89, 0.85], [1.33, -3.97, 0.78], [1.43, -4.12, 0.58], [1.46, -4.3, 0.3]];
       return {
         solids: [
-          fuselage({ noseZ: 4.3, tailZ: -4.6, r: 0.6, sy: 1.15, noseR: 0.35, peak: 0.4, rise: 0 }),
-          canopy(2.0, 1.6, 0.42, 0.62, 0.4, true),
-          // Sırtta tek motor
-          jetPod(0, 1.05, 1.0, 3.9, 0.45),
-          tag(body([[1.02, 0.3], [0.9, 0.4], [0.5, 0.44]], 9, { y: 1.05 }), 'dark'),
-          ...wing({ x0: 0.5, z: 1.4, root: 2.3, y: 0.2, tipX: 3.6, tip: 1.2, sweep: 0.4, dihedral: 3, t: 0.28 }),
-          // Ters dihedralli yatay kuyruk, uçlarında ikiz dikey kuyruk
-          ...wing({ x0: 0.1, z: -3.6, root: 1.2, y: 0.55, tipX: 1.6, tip: 0.85, sweep: 0.3, dihedral: -14, t: 0.11 }),
-          ...fins({ x: 1.6, y0: 0.15, z0: -3.55, h: 1.15, root: 1.0, tip: 0.7, sweep: 0.3, t: 0.1 }),
+          H.geo(12),
+          tag(rod(new THREE.Vector3(0, -0.02, 4.15), new THREE.Vector3(0, -0.02, 5.05), 0.012, 4), 'dark'),
+          ...[1, -1].map((sd) => portAt(sd * H.sideX(2.88, -0.29), -0.29, 2.88, 0.035, 0.3)),
+          tag(H.patch(1, 2.7, 1.9, Math.PI / 2 - 0.45, Math.PI / 2 + 0.45, 0.006), 'dark'),
+          ...jetCanopy({
+            screen: [[3.24, 0.12, 0.4, 0.1, 0.36], [2.72, 0.33, 0.76, 0.1, 0.44]],
+            glass: [[2.72, 0.33, 0.76, 0.1, 0.44], [2.31, 0.37, 0.83, 0.1, 0.46], [1.95, 0.37, 0.82, 0.1, 0.46], [1.76, 0.35, 0.77, 0.1, 0.46]],
+            aft: [[1.78, 0.36, 0.78, 0.1, 0.46], [1.65, 0.3, 0.68, 0.1, 0.44], [1.4, 0.12, 0.6, 0.1, 0.44], [1.2, 0.02, 0.55, 0.1, 0.42]],
+            frames: [2.72, 1.77],
+            posts: [[0.08, 0.41, 3.22], [0.22, 0.72, 2.74]],
+            pilot: { z: 2.2, len: 1.4, h: 0.33, y: 0.56, w: 0.33 },
+          }),
+          // Sırttaki motor: giriş dudağı, koyu kanal, egzoz
+          pod.geo(12),
+          tag(duct.geo(11), 'dark'),
+          tag(duct.disc(0.6, 1, 11), 'dark'),
+          new THREE.BoxGeometry(0.34, 0.02, 0.3).translate(0, 1.08, 0.95),
+          tag(pipe.geo(11), 'dark'),
+          tag(pipe.disc(-1.6, -1, 11), 'dark'),
+          tag(new THREE.ConeGeometry(0.06, 0.2, sg(8)).rotateX(-Math.PI / 2).translate(0, 0.97, -1.72), 'dark'),
+          // Kök parça (firar kenarı kırılır), dışında flap ve kanatçık; uçta aşağı kıvrık kanatçık
+          ...[1, -1].flatMap((sd) => [
+            airfoilPart([
+              { le: new THREE.Vector3(sd * 0.3, 0.42, W.z), c: 2.4, t: 0.32 },
+              { le: new THREE.Vector3(sd * W.x0, W.y, W.z), c: W.root, t: W.t },
+            ], up, 0, 1),
+            airfoilPart([
+              { le: new THREE.Vector3(sd * W.tipX, tipY, W.z), c: W.tip, t: W.t * 0.45 },
+              { le: new THREE.Vector3(sd * (W.tipX + 0.16), tipY - 0.11, W.z - 0.04), c: W.tip * 0.82, t: W.t * 0.34 },
+              { le: new THREE.Vector3(sd * (W.tipX + 0.3), tipY - 0.25, W.z - 0.14), c: W.tip * 0.5, t: W.t * 0.16 },
+            ], new THREE.Vector3(sd * 0.6, 0.8, 0), 0, 1),
+          ]),
+          ...controlWing(W, 0.78, [[0, 0.5, 'flap'], [0.5, 0.51, null], [0.51, 0.97, 'aileron'], [0.97, 1, null]]),
+          ...controlWing(T, 0.6, [[0, 1, 'elevator']]),
+          ...jetFin(FIN, 0.1, 0.57, 1, 4, 1.66, 'rudder', -0.27, 0.67),
+          ...jetFin(FIN, 0.1, 0.57, 1, 4, -1.66, 'rudderR', 0.27, 0.67),
         ],
         props: [],
+        markZ: -2.6,
+        lights: [
+          { p: [W.tipX + 0.31, tipY - 0.25, W.z - 0.3], kind: 'red' },
+          { p: [-W.tipX - 0.31, tipY - 0.25, W.z - 0.3], kind: 'green' },
+          { p: [1.5, 1.0, -4.75], kind: 'white' },
+          { p: [-1.5, 1.0, -4.75], kind: 'white' },
+          { p: [0, -0.46, 3.0], kind: 'landing' },
+        ],
       };
+    }
     case 'p80': {
       // F-80C, ölçüler üç görünüş çiziminden. Sivri, kapalı burun (altı makineli tüfek), kanat köküne inen eğik yan hava
       // girişleri, kuyruğa doğru alçalan gövde ve uzun sırt yüzgeci, yuvarlak uçlu dikey ve yatay kuyruk. Kanat kökünde
@@ -2614,6 +2678,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'me262') return schwalbeGear(gearHeight(spec));
   if (kind === 'meteor') return meteorGear(gearHeight(spec));
   if (kind === 'vampire') return vampireGear(gearHeight(spec));
+  if (kind === 'he162') return salamanderGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
