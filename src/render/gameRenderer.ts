@@ -581,6 +581,7 @@ export class GameRenderer {
     hinge(j.flapL, -s.flap);
     hinge(j.flapR, -s.flap);
     hinge(j.rudder, s.rud);
+    hinge(j.rudderR, s.rud);
     hinge(j.airbrakeL, -s.brake);
     hinge(j.airbrakeR, s.brake);
     const up = (1 - s.gear) * (Math.PI / 2);
