@@ -81,6 +81,7 @@ export function gearHeight(spec: AircraftSpec): number {
   if (spec.id === 'meteor3') return 1.62;
   if (spec.id === 'vampire') return 1.2;
   if (spec.id === 'he162') return 1.13;
+  if (spec.id === 'ar234') return 1.45;
   return spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
 }
 

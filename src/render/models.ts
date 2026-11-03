@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6 };
+const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -1145,6 +1145,15 @@ function salamanderGear(gh: number): Geo[] {
     main: { x: 0.6, z: 0.15, top: -0.18, axle: -gh + 0.32, rw: 0.32, tw: 0.13, dx: -0.16, door: { dx: 0.26, top: -0.3, bot: -0.62, w: 0.45, r: 0.14 } },
     nose: { topY: -0.33, topZ: 3.25, axle: -gh + 0.235, z: 3.65, rw: 0.235, tw: 0.12 },
     belly: { x: 0.22, y: -0.34, z0: 3.2, z1: 2.25, h: 0.22 },
+  });
+}
+
+/** Ar 234 B takımı: gövdeye toplanan çok dar izli ana bacaklar (1,4 m), camlı burnun arkasında uzun burun bacağı. */
+function blitzGear(gh: number): Geo[] {
+  return jetGear({
+    main: { x: 0.71, z: -0.5, top: -0.33, axle: -gh + 0.38, rw: 0.38, tw: 0.18, dx: -0.03, door: { dx: 0.12, top: -0.4, bot: -0.95, w: 0.45, r: 0.12 } },
+    nose: { topY: -0.58, topZ: 3.85, axle: -gh + 0.33, z: 4.0, rw: 0.33, tw: 0.16 },
+    belly: { x: 0.2, y: -0.62, z0: 3.8, z1: 2.75, h: 0.2 },
   });
 }
 
@@ -2377,21 +2386,77 @@ function defineModel(key: string): ModelDef {
         ],
       };
     }
-    case 'ar234':
+    case 'ar234': {
+      // Ar 234 B-2, ölçüler üç görünüş çiziminden. Burun tamamen cam: kokpit gövdenin ön ucu, çerçeveleri ve yanlarda
+      // perçinli yatay bant, tepesinde nişan periskopu. Gövde arkaya doğru yükselen ince tüp, omuz kanat dihedralsiz,
+      // altında Jumo 004 naselleri. Yatay kuyruk dikey kuyruğun ortasında.
+      const FRONT: JetSec[] = [[5.4, 0.01, -0.08, -0.14, -0.11], [5.37, 0.14, 0.04, -0.27, -0.11], [5.25, 0.3, 0.24, -0.44, -0.1], [4.95, 0.5, 0.42, -0.58, -0.09], [4.4, 0.65, 0.53, -0.65, -0.07], [3.39, 0.72, 0.58, -0.66, -0.06]];
+      const GL = new JetHull(FRONT, 2.2);
+      const H = new JetHull([
+        [3.39, 0.72, 0.58, -0.66, -0.06], [0.1, 0.69, 0.66, -0.53, 0.04], [-2.36, 0.58, 0.74, -0.28, 0.2], [-4.83, 0.36, 0.82, -0.03, 0.38], [-6.2, 0.2, 0.66, 0.16, 0.4], [-6.8, 0.1, 0.5, 0.24, 0.38], [-7.5, 0.004, 0.42, 0.38, 0.4],
+      ], 2.2);
+      const W: WingOpts = { x0: 0.67, z: 1.07, root: 2.5, y: 0.52, tipX: 6.84, tip: 0.91, sweep: 0.85, dihedral: 0, t: 0.33 };
+      const T: WingOpts = { x0: 0.12, z: -5.6, root: 1.14, y: 0.95, tipX: 2.32, tip: 0.66, sweep: 0.38, dihedral: 0, t: 0.12 };
+      const NX = 1.99;
+      const NY = -0.09;
+      const nacelle = (sd: number): Geo[] => {
+        const o = { x: sd * NX, y: NY };
+        return [
+          body([[1.85, 0.17], [2.06, 0.2], [2.14, 0.25], [2.1, 0.3], [1.95, 0.37], [1.6, 0.43], [1.0, 0.44], [-0.4, 0.44], [-1.0, 0.41], [-1.45, 0.3], [-1.72, 0.2], [-1.8, 0.17]], 12, { ...o, smooth: true }),
+          tag(body([[1.3, 0.14], [1.87, 0.17]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.14, sg(12)).translate(o.x, o.y, 1.3), 'dark'),
+          body([[2.02, 0.001], [1.9, 0.06], [1.65, 0.09], [1.3, 0.09]], 8, { ...o, smooth: true }),
+          tag(body([[-1.8, 0.16], [-1.3, 0.14]], 12, o), 'dark'),
+          tag(body([[-2.0, 0.001], [-1.85, 0.05], [-1.6, 0.09], [-1.3, 0.08]], 8, { ...o, smooth: true }), 'dark'),
+        ];
+      };
+      // Camın dış yüzeyine oturan ince çerçeve: z aralığında a açısı boyunca kısa çubuklar
+      const glassLine = (a0: number, s0: number): Geo[] => {
+        const zs = [5.36, 5.28, 5.1, 4.8, 4.4, 3.9, 3.42];
+        return zs.slice(1).map((z, i) => {
+          const p = GL.pt(zs[i], a0, 0.006, s0);
+          const q = GL.pt(z, a0, 0.006, s0);
+          return tag(rod(new THREE.Vector3(...p), new THREE.Vector3(...q), 0.014, 4), 'dark');
+        });
+      };
+      const glassBand = (z: number) => {
+        const q = GL.at(z);
+        const grow = (zz: number): JetSec => [zz, q[1] + 0.01, q[2] + 0.01, q[3] - 0.01, q[4]];
+        return tag(new JetHull([grow(z + 0.02), grow(z - 0.02)], 2.2, false).geo(14), 'dark');
+      };
+      canopySink.push({ z: 4.0, len: 1.6, h: 0.5, y: 0.12, w: 0.5, bubble: false });
       return {
         solids: [
-          fuselage({ noseZ: 5.8, tailZ: -6.6, r: 0.72, sy: 1.25, noseR: 0.7, peak: 0.12, rise: 0.3 }),
-          // Tamamen camlı burun kokpiti
-          tag(body([[6.6, 0], [6.35, 0.35], [5.7, 0.55]], 9, { sy: 1.25 }), 'glass'),
-          // Yüksek kanat, altında iki motor
-          ...wing({ x0: 0.6, z: 1.5, root: 3.0, y: 0.45, tipX: 7.2, tip: 1.3, sweep: 0.5, dihedral: 2, t: 0.38 }),
-          ...mirror(2.9, (x) => jetPod(x, -0.2, 2.6, 4.2, 0.48)),
-          ...mirror(2.9, (x) => tag(body([[2.65, 0.32], [2.5, 0.38], [2.2, 0.4]], 9, { x, y: -0.2 }), 'dark')),
-          ...wing({ x0: 0.1, z: -4.9, root: 1.6, y: 0.4, tipX: 2.6, tip: 0.8, sweep: 0.5, dihedral: 0, t: 0.12 }),
-          ...fins({ y0: 0.5, z0: -4.4, h: 2.0, root: 2.0, tip: 0.9, sweep: 1.0, t: 0.14 }),
+          tag(GL.geo(14), 'glass'),
+          H.geo(14),
+          tag(H.disc(3.39, 1, 14), 'dark'),
+          glassBand(3.42),
+          glassBand(4.35),
+          ...glassLine(0, 1),
+          ...glassLine(0, -1),
+          ...glassLine(Math.PI / 2, 1),
+          ...glassLine(-Math.PI / 2, 1),
+          // Tepedeki periskop
+          tag(new THREE.CylinderGeometry(0.035, 0.05, 0.5, sg(6)).translate(0, 0.72, 4.46), 'dark'),
+          tag(new THREE.SphereGeometry(0.05, sg(5), sg(3)).scale(1, 1.4, 1).translate(0, 0.99, 4.46), 'dark'),
+          // Kanat: gövdeden flap, sonra kanatçık, uç yuvarlak
+          ...controlWing(W, 0.78, [[-0.1, 0.56, 'flap'], [0.56, 0.57, null], [0.57, 0.97, 'aileron'], [0.97, 1, null]], 6),
+          ...nacelle(1),
+          ...nacelle(-1),
+          ...controlWing(T, 0.7, [[0, 0.96, 'elevator'], [0.96, 1, null]], 4),
+          ...jetFin([[0.6, -4.7, 2.8], [0.82, -4.91, 2.52], [1.3, -5.27, 2.1], [1.9, -5.72, 1.53], [2.4, -6.1, 1.02], [2.68, -6.31, 0.74], [2.78, -6.55, 0.45]], 0.16, 0.77, 1, 4),
+          body([[-5.4, 0.01], [-5.6, 0.07], [-6.6, 0.07], [-6.9, 0.01]], 8, { y: 0.95, sy: 0.7, smooth: true }),
         ],
         props: [],
+        markZ: -4.0,
+        lights: [
+          { p: [W.tipX + 0.38, W.y, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.38, W.y, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, 2.0, -7.26], kind: 'white' },
+          { p: [1.2, 0.33, 0.9], kind: 'landing' },
+        ],
       };
+    }
     case 'il28':
       return {
         solids: [
@@ -2679,6 +2744,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'meteor') return meteorGear(gearHeight(spec));
   if (kind === 'vampire') return vampireGear(gearHeight(spec));
   if (kind === 'he162') return salamanderGear(gearHeight(spec));
+  if (kind === 'ar234') return blitzGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
