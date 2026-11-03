@@ -14,14 +14,14 @@ export interface NewsText {
 export const NEWS_EN: Record<string, NewsText> = {
   ansiklopedi: {
     title: 'Aircraft encyclopedia, faster start, real ceilings',
-    summary: 'The history and data of all 56 aircraft in the game are now in the encyclopedia. The game starts much faster on phones, and fighters climb to their real ceilings.',
+    summary: 'The history and data of all 51 aircraft in the game are now in the encyclopedia. The game starts much faster on phones, and fighters climb to their real ceilings.',
     captions: [
       'Every aircraft page has its history, key facts, pictures of the in-game model and its figures in the game.',
     ],
     sections: [
       {
         text: [
-          'Every aircraft in the game, from the 1937 Hurricane to supersonic jets, now has its own page: warsimbox.com/en/encyclopedia.',
+          'Every aircraft in the game, from the 1937 Hurricane to Korean War jets, now has its own page: warsimbox.com/en/encyclopedia.',
         ],
       },
       {

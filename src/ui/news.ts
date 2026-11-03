@@ -34,7 +34,7 @@ const NEWS_TR: NewsItem[] = [
     id: 'ansiklopedi',
     date: '2026-10-30',
     title: 'Uçak ansiklopedisi, daha hızlı açılış, gerçek tavanlar',
-    summary: 'Oyundaki 56 uçağın tarihçesi ve verileri artık ansiklopedide. Oyun telefonda çok daha çabuk açılıyor; avcılar gerçek tavanlarına tırmanıyor.',
+    summary: 'Oyundaki 51 uçağın tarihçesi ve verileri artık ansiklopedide. Oyun telefonda çok daha çabuk açılıyor; avcılar gerçek tavanlarına tırmanıyor.',
     cover: img('ansiklopedi.jpg'),
     images: [
       { src: img('ansiklopedi-ucak.jpg'), caption: 'Her uçağın sayfasında tarihçe, künye, oyundaki modelin görselleri ve oyundaki değerleri.' },
@@ -42,7 +42,7 @@ const NEWS_TR: NewsItem[] = [
     sections: [
       {
         text: [
-          'Oyundaki bütün uçakların, 1937’nin Hurricane’inden süpersonik jetlere, artık kendi sayfası var: warsimbox.com/ansiklopedi.',
+          'Oyundaki bütün uçakların, 1937’nin Hurricane’inden Kore Savaşı jetlerine, artık kendi sayfası var: warsimbox.com/ansiklopedi.',
         ],
       },
       {

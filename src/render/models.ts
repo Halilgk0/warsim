@@ -613,17 +613,79 @@ function migGear(gh: number): Geo[] {
   return out;
 }
 
+/** MiG-15 gövde çizgisi [z, yarıçap] (dudak içinden kuyruğa) ve kesitin yükseklik oranı. */
+const MIG_SKIN: [number, number][] = [
+  [4.36, 0.405], [4.48, 0.42], [4.55, 0.45], [4.54, 0.485], [4.47, 0.51], [4.3, 0.545], [3.8, 0.6], [3.0, 0.665], [2.0, 0.72],
+  [1.0, 0.74], [0.0, 0.735], [-1.0, 0.705], [-2.0, 0.65], [-3.0, 0.575], [-4.0, 0.49], [-4.7, 0.425], [-5.08, 0.39], [-5.12, 0.37],
+];
+const MIG_SY = 1.08;
+/** Hava freni kapağı: ön kenar z, boy, yükseklik, orta y. */
+const MIG_BRAKE = { zf: -2.85, len: 0.85, h: 0.55, y: 0.05 };
+
+/** Gövdenin z'deki yarıçapı (dış çizgiden). */
+function migRadius(z: number): number {
+  for (let i = 3; i < MIG_SKIN.length - 1; i++) {
+    const [z0, r0] = MIG_SKIN[i];
+    const [z1, r1] = MIG_SKIN[i + 1];
+    if (z <= z0 && z >= z1) return r0 + ((z - z0) / (z1 - z0)) * (r1 - r0);
+  }
+  return MIG_SKIN[MIG_SKIN.length - 1][1];
+}
+
+/**
+ * Gövde yüzeyine oturan kavisli yama (hava freni kapağı ve yuvası): s yanında, z ve y aralığında. off: yüzeyden dışarı
+ * pay; inner verilirse iç yüzü ve kenarları da kurulur (kalınlıklı kapak, açılınca içi de görünür).
+ */
+function brakeShell(s: number, z0: number, z1: number, y0: number, y1: number, off: number, inner: number | null): Geo {
+  const NZ = sg(4);
+  const NY = sg(3);
+  const at = (i: number, j: number, o: number): V3 => {
+    const z = z0 + ((z1 - z0) * i) / NZ;
+    const y = y0 + ((y1 - y0) * j) / NY;
+    const r = migRadius(z);
+    return [s * (Math.sqrt(Math.max(r * r - (y / MIG_SY) ** 2, 0.01)) + o), y, z];
+  };
+  const pos: number[] = [];
+  const quad = (a: V3, b: V3, c: V3, d: V3, want: V3) => {
+    const n = new THREE.Vector3(...b).sub(new THREE.Vector3(...a)).cross(new THREE.Vector3(...c).sub(new THREE.Vector3(...a)));
+    const flip = n.dot(new THREE.Vector3(...want)) < 0;
+    const list = flip ? [a, c, b, b, c, d] : [a, b, c, c, b, d];
+    for (const p of list) pos.push(...p);
+  };
+  for (let i = 0; i < NZ; i++) {
+    for (let j = 0; j < NY; j++) {
+      quad(at(i, j, off), at(i + 1, j, off), at(i, j + 1, off), at(i + 1, j + 1, off), [s, 0, 0]);
+      if (inner !== null) quad(at(i, j, inner), at(i + 1, j, inner), at(i, j + 1, inner), at(i + 1, j + 1, inner), [-s, 0, 0]);
+    }
+  }
+  if (inner !== null) {
+    for (let i = 0; i < NZ; i++) {
+      quad(at(i, 0, off), at(i + 1, 0, off), at(i, 0, inner), at(i + 1, 0, inner), [0, -1, 0]);
+      quad(at(i, NY, off), at(i + 1, NY, off), at(i, NY, inner), at(i + 1, NY, inner), [0, 1, 0]);
+    }
+    for (let j = 0; j < NY; j++) {
+      quad(at(0, j, off), at(0, j + 1, off), at(0, j, inner), at(0, j + 1, inner), [0, 0, 1]);
+      quad(at(NZ, j, off), at(NZ, j + 1, off), at(NZ, j, inner), at(NZ, j + 1, inner), [0, 0, -1]);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /**
  * MiG-15 gövdesi: yuvarlak dudaklı burun hava girişi, içinde kanal, ortada dikey ayırıcı, dipte kompresör yüzü ve
  * göbeği; arkaya incelen gövde, kuyrukta egzoz borusu, türbin yüzü ve göbeği. Kesit biraz yüksek. Profil çizgileri dış
  * yüzde burundan kuyruğa, kanal ve borunun içinde ters yönde (yüzleri içe bakar).
  */
 function migFuselage(): Geo[] {
-  const sy = 1.08;
-  const skin: [number, number][] = [
-    [4.36, 0.405], [4.48, 0.42], [4.55, 0.45], [4.54, 0.485], [4.47, 0.51], [4.3, 0.545], [3.8, 0.6], [3.0, 0.665], [2.0, 0.72],
-    [1.0, 0.74], [0.0, 0.735], [-1.0, 0.705], [-2.0, 0.65], [-3.0, 0.575], [-4.0, 0.49], [-4.7, 0.425], [-5.08, 0.39], [-5.12, 0.37],
-  ];
+  const sy = MIG_SY;
+  const skin = MIG_SKIN;
+  const { zf, len, h, y } = MIG_BRAKE;
+  // Hava freni yuvası: kapağın altında koyu, gövdeye oturan kavisli yama. Kapaktan küçük: kapalıyken görünmez, uzakta
+  // kesik kesik çizgi vermez; kapak açılınca ortaya çıkar.
+  const wells = [1, -1].map((s) => tag(brakeShell(s, zf - 0.02, zf - len + 0.02, y - h / 2 + 0.02, y + h / 2 - 0.02, 0.004, null), 'dark'));
   const disc = (r: number, z: number, back: boolean) => {
     const g = new THREE.CircleGeometry(r, sg(14)).scale(1, sy, 1);
     if (back) g.rotateY(Math.PI);
@@ -632,6 +694,7 @@ function migFuselage(): Geo[] {
   const hubCone = (r: number, len: number, z: number, dir: number) =>
     tag(new THREE.ConeGeometry(r, len, sg(10)).rotateX((dir * Math.PI) / 2).translate(0, 0, z + (dir * len) / 2), 'dark');
   return [
+    ...wells,
     body(skin, 12, { sy, smooth: true }),
     tag(body([[3.9, 0.376], [4.1, 0.388], [4.36, 0.405]], 12, { sy }), 'dark'),
     disc(0.377, 3.9, false),
@@ -1795,17 +1858,12 @@ const FOLDING_GEAR = new Set(['mig15']);
  * Hava frenleri (MiG-15): arka gövdenin iki yanında, gövde yüzeyine oturan dikdörtgen kapaklar; ön kenarından
  * menteşeli (dikey eksen), dışa 55° açılır. Eklemler airbrakeL (+x) ve airbrakeR.
  */
-function airbrakes(probe: Probe, zf: number, len: number, h: number, y: number): Geo[] {
-  const front = probe.side(y, zf);
-  const back = probe.side(y, zf - len);
-  if (!front || !back) return [];
-  const xf = front.point.x;
-  const xb = back.point.x;
-  const tilt = Math.atan2(xf - xb, len);
+function airbrakes(): Geo[] {
+  const { zf, len, h, y } = MIG_BRAKE;
   return [1, -1].flatMap((s) => {
-    const g = new THREE.BoxGeometry(0.04, h, len).rotateY(s * tilt);
-    g.translate(s * ((xf + xb) / 2 + 0.02), y, zf - len / 2);
-    return joint(s > 0 ? 'airbrakeL' : 'airbrakeR', [s * (xf + 0.02), y, zf], [g], false, [0, 1, 0]);
+    const r = migRadius(zf);
+    const x = s * (Math.sqrt(Math.max(r * r - ((y - 0) / MIG_SY) ** 2, 0.01)) + 0.02);
+    return joint(s > 0 ? 'airbrakeL' : 'airbrakeR', [x, y, zf], [brakeShell(s, zf, zf - len, y - h / 2, y + h / 2, 0.012, 0.012 - 0.022)], false, [0, 1, 0]);
   });
 }
 
@@ -2078,7 +2136,7 @@ function cached(kind: string, detail: number): CachedModel {
   // Katlanır takımın bacakları ve hava frenleri eklem olur
   const gearAll = landingGear(probe, bb, spec, kind);
   const gear = gearAll.filter((g) => !jointOf(g));
-  const extraJoints = [...gearAll.filter((g) => jointOf(g)), ...(kind === 'mig15' ? airbrakes(probe, -2.85, 0.85, 0.55, 0.05) : [])];
+  const extraJoints = [...gearAll.filter((g) => jointOf(g)), ...(kind === 'mig15' ? airbrakes() : [])];
   const opt = (g?: Geo[]) => (g && g.length ? merge(g) : null);
   all.computeBoundingSphere();
   const dark = LOOK.dark[detail];

@@ -9,8 +9,7 @@ import { A1940_1941 } from './makale/1940-1941';
 import { A1942_1943 } from './makale/1942-1943';
 import { A1944 } from './makale/1944';
 import { A1945_1952 } from './makale/1945-1952';
-import { A1960 } from './makale/1960-sonrasi';
 
 export type { Article, Tx } from './tur';
 
-export const ARTICLES: Article[] = [...A1937_1939, ...A1940_1941, ...A1942_1943, ...A1944, ...A1945_1952, ...A1960];
+export const ARTICLES: Article[] = [...A1937_1939, ...A1940_1941, ...A1942_1943, ...A1944, ...A1945_1952];

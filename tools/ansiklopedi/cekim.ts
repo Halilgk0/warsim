@@ -81,7 +81,11 @@ export function shot(id: string, view: View): string {
     cam.lookAt(0, 0, 0);
   }
   root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root, true);
+  // Yalnız görünen parçalar: gizli takım ve iniş farının yerdeki ışığı kadrajı büyütmesin
+  const box = new THREE.Box3();
+  root.traverseVisible((o) => {
+    if ((o as THREE.Mesh).isMesh) box.expandByObject(o, true);
+  });
   const c = box.getCenter(new THREE.Vector3());
   // Kutunun ortasına bak (yalnız kamera kayar, yön aynı kalır)
   cam.position.add(c);

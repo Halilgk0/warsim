@@ -37,11 +37,15 @@ interface Entry {
   slug: string;
 }
 
-/** Makalesi olan uçaklar, eskiden yeniye. */
+/** Araştırma ağacında olan, makalesi yazılmış uçaklar, eskiden yeniye. Oyunda uçurulamayan uçağın sayfası olmaz. */
 function entries(): Entry[] {
   const order = new Map(SPEC_LIST.map((s, i) => [s.id, i]));
+  const inTree = (id: string) => {
+    const node = aircraftNode(id);
+    return !!node && !node.future;
+  };
   return ARTICLES
-    .filter((a) => ENCYCLOPEDIA[a.id] && SPEC_LIST.some((s) => s.id === a.id))
+    .filter((a) => ENCYCLOPEDIA[a.id] && inTree(a.id) && SPEC_LIST.some((s) => s.id === a.id))
     .map((art) => ({ art, spec: SPEC_LIST.find((s) => s.id === art.id)!, slug: ENCYCLOPEDIA[art.id] }))
     .sort((a, b) => a.spec.year - b.spec.year || order.get(a.spec.id)! - order.get(b.spec.id)!);
 }
@@ -195,8 +199,7 @@ function unlock(s: AircraftSpec, l: Lang): string {
     const n = ids.map((id) => `<b>${esc(techName(id))}</b>`);
     return n.length > 1 ? `${n.slice(0, -1).join(', ')} ${T(l, 've', 'and')} ${n.at(-1)}` : n[0];
   };
-  // Sonraki aşamanın uçakları: makale metni bunu zaten söyler (makale/1960-sonrasi.ts)
-  if (!node || node.future) return '';
+  if (!node) return '';
   const how = node.starting
     ? T(l, 'Başlangıçta açık; araştırma gerekmez.', 'Available from the start; no research needed.')
     : T(l, `Araç ağacında açılır: önce ${list(node.requires)} araştırılmalı.`, `Unlocked in the aircraft tree after researching ${list(node.requires)}.`);
@@ -249,10 +252,10 @@ function aircraftPage(l: Lang, e: Entry, prev: Entry | undefined, next: Entry | 
     <section class="ingame">
       <h2>${T(l, 'WarSimBox’ta', 'In WarSimBox')}</h2>
       ${a.inGame.map((p) => `<p>${esc(tx(p, l))}</p>`).join('\n      ')}
-      ${s.playable ? `<p>${unlock(s, l)}</p>` : ''}
-      ${s.playable ? `<dl class="stats">${stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+      <p>${unlock(s, l)}</p>
+      <dl class="stats">${stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
       <p class="small">${T(l, 'Bu değerler oyunun uçuş modelinden hesaplanır (tırmanma, dönüş ve tutunma deniz seviyesinde).', 'These figures come from the game’s flight model (climb, turn and stall at sea level).')}</p>
-      <a class="play big" href="/" data-play="${l}">${T(l, 'Bu uçakla oyna', 'Fly it in WarSimBox')}</a>` : `<a class="play big" href="/" data-play="${l}">${T(l, 'WarSimBox’ı oyna', 'Play WarSimBox')}</a>`}
+      <a class="play big" href="/" data-play="${l}">${T(l, 'Bu uçakla oyna', 'Fly it in WarSimBox')}</a>
     </section>
   </article>
 </div>

@@ -53,11 +53,6 @@ export const ENCYCLOPEDIA: Record<string, string> = {
   f84g: 'republic-f-84g-thunderjet',
   canberra: 'english-electric-canberra',
   f86f: 'north-american-f-86f-sabre',
-  mig21: 'mikoyan-gurevich-mig-21',
-  f4e: 'mcdonnell-douglas-f-4e-phantom-ii',
-  f15a: 'mcdonnell-douglas-f-15a-eagle',
-  rafale: 'dassault-rafale',
-  f22a: 'lockheed-martin-f-22a-raptor',
 };
 
 export const ENC_TR = '/ansiklopedi/';

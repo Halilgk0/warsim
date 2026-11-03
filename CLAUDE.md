@@ -155,13 +155,15 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **`src/ansiklopedi/`:** Uçak ansiklopedisi. Arama motorları için düz HTML: `/ansiklopedi/…` ve `/en/encyclopedia/…`.
   - Metin döneme göre `makale/*.ts`'te (TR/EN; biçim `tur.ts`, toplayan `makaleler.ts`). Sıra, ad, yıl ve "Oyunda"
     sayıları katalogdan (`specs.ts`) gelir. "Oyunda" metni yalnız oyunda gerçekten modellenmiş davranışı anlatır;
-    araştırma yolunu sayfa kendisi ekler, metinde tekrarlama. Uçurulamayan (`future`) uçaklarda oyun değerleri ve
-    "Bu uçakla oyna" gösterilmez.
+    araştırma yolunu sayfa kendisi ekler, metinde tekrarlama. Yalnız araştırma ağacındaki uçakların sayfası olur;
+    uçurulamayanlar (`future`) girmez.
   - `liste.ts` adresleri tutar; oyun da okur (menüde Ansiklopedi düğmesi, hangarda bağlantı). Makale metni oyun
     paketine girmez.
   - Sayfaları `sayfalar.ts` üretir. Vite eklentisi `tools/ansiklopedi/vite.ts` derlemede dist/'e yazar, geliştirmede
     anında sunar. Site haritası da oradan üretilir.
   - Görseller oyunun modellerinden: `node tools/ansiklopedi/gorseller.mjs [uçak]` → `public/ansiklopedi/gorsel`.
+    Uçağın modeli değişince görselleri de yeniden üret; kendiliğinden güncellenmez.
+  - Arka plan ana menünün haritası: `node tools/ansiklopedi/arkaplan.mjs` → `public/ansiklopedi/arka.webp`.
   - Yeni uçak: makale + `liste.ts` + görseller. Tarih ve sayılar yaygın kaynaklarla uyuşmalı; emin olunmayan bilgi
     yazılmaz.
 

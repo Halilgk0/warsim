@@ -20,6 +20,12 @@ body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 500 17px/1.6 Nunito, system-ui, sans-serif;
 }
+/* Ana menüyle aynı arka plan: haritanın üstten görünüşü ve aynı örtü; sayfa kayarken yerinde durur.
+   Görsel tools/ansiklopedi/arkaplan.mjs ile çekilir (bulanıklığı içinde, telefonda backdrop-filter maliyeti olmasın). */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 50% 45%, rgba(250, 247, 241, 0.42), rgba(240, 236, 228, 0.68)), url(/ansiklopedi/arka.webp) center / cover no-repeat;
+}
 img { display: block; max-width: 100%; height: auto; }
 a { color: var(--accent-ink); }
 h1, h2 { line-height: 1.2; margin: 0; }
@@ -29,7 +35,7 @@ h1, h2 { line-height: 1.2; margin: 0; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   max-width: 1120px; margin: 0 auto; padding: 14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
 }
-.brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 22px; color: var(--ink); text-decoration: none; }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 22px; color: var(--ink); text-decoration: none; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
 .top nav { display: flex; align-items: center; gap: 8px; }
 .nav-link, .lang, .play {
   display: inline-flex; align-items: center; height: 38px; border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none;
@@ -47,9 +53,9 @@ h1, h2 { line-height: 1.2; margin: 0; }
 main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
 
 /* ---- liste */
-.intro { padding: 18px 0 22px; max-width: 760px; }
+.intro { padding: 20px 24px; margin: 6px 0 18px; max-width: 760px; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); }
 .intro h1 { font-size: 34px; font-weight: 800; }
-.intro p { color: var(--muted); margin: 8px 0 0; }
+.intro p { color: #5d5a6b; margin: 8px 0 0; }
 .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .card {
   display: grid; grid-template-columns: 46% 1fr; min-height: 168px; overflow: hidden;
@@ -65,7 +71,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .card .sum { font-size: 15px; line-height: 1.45; color: #5d5a6b; }
 
 /* ---- uçak sayfası */
-.crumb { font-size: 14px; color: var(--muted); padding: 8px 0 14px; }
+.crumb { font-size: 14px; font-weight: 600; color: var(--ink); padding: 8px 0 14px; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
 .crumb a { text-decoration: none; font-weight: 700; }
 .hero {
   display: grid; grid-template-columns: 1.15fr 1fr; gap: 0; overflow: hidden;
@@ -79,7 +85,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .lead { margin: 0; font-size: 17px; }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: 'text facts'; gap: 28px; margin-top: 26px; align-items: start; }
-.text { grid-area: text; max-width: 720px; }
+.text { grid-area: text; padding: 24px 28px 28px; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; }
 .facts { grid-area: facts; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; position: sticky; top: 16px; }
 .facts h2 { font-size: 15px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
 .facts dl { margin: 0; }
@@ -88,6 +94,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .facts dd { margin: 1px 0 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
 
 .text section { margin-bottom: 26px; }
+.text section:last-child { margin-bottom: 0; }
 .text h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 .text p { margin: 0 0 12px; }
 .side { margin: 0 0 28px; }
@@ -113,7 +120,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .pager span { font-size: 13px; color: var(--muted); }
 
 /* ---- alt bilgi */
-.foot { max-width: 1120px; margin: 24px auto 0; padding: 18px max(16px, env(safe-area-inset-right)) 28px max(16px, env(safe-area-inset-left)); border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.foot {
+  width: calc(100% - 2 * max(16px, env(safe-area-inset-left), env(safe-area-inset-right))); max-width: 1088px; margin: 24px auto 16px; padding: 16px 20px;
+  background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--muted); font-size: 14px;
+}
 .foot-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .foot-row > a { font-weight: 700; }
 .foot p { margin: 10px 0 0; }
@@ -126,7 +136,6 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
   .layout { grid-template-columns: 1fr; grid-template-areas: 'facts' 'text'; gap: 20px; }
   .facts { position: static; }
   .facts dl { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
-  .text { max-width: none; }
 }
 @media (max-width: 760px) {
   .hero { grid-template-columns: 1fr; }
@@ -139,6 +148,9 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
   .card { grid-template-columns: 42% 1fr; min-height: 140px; }
   .card-text { padding: 12px 14px 12px 12px; }
   .card h2 { font-size: 18px; }
+  .intro { padding: 16px 18px; }
+  .text { padding: 18px 16px 20px; }
+  .ingame { padding: 16px; }
   .facts dl { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; }
   .brand { font-size: 19px; }
@@ -149,7 +161,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 /* Yatay telefon: kısa ekranda başlık alanı daha sıkı */
 @media (max-height: 430px) and (orientation: landscape) {
   .top { padding-top: 8px; padding-bottom: 8px; }
-  .intro { padding: 8px 0 14px; }
+  .intro { padding: 12px 18px; margin-top: 0; }
   .intro h1, .hero h1 { font-size: 26px; }
   .card { min-height: 140px; }
   .card .sum { font-size: 14px; }
