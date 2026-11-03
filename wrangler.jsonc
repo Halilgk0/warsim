@@ -6,6 +6,8 @@
   "main": "worker/index.ts",
   "compatibility_date": "2025-10-01",
   "assets": { "directory": "./dist", "binding": "ASSETS" },
+  // Doğrulama e-postalarının gönderildiği hesap. Google uygulama şifresi Cloudflare sırrı olarak: MAIL_PASSWORD.
+  "vars": { "MAIL_FROM": "warsimbox@gmail.com" },
   "d1_databases": [
     {
       "binding": "DB",

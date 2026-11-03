@@ -21,7 +21,7 @@ import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
-import { type SaveKind, currentAccount, readSave, refreshSession, syncPending, writeSave } from './persist';
+import { type SaveKind, currentAccount, readSave, refreshSession, shouldAskEmail, syncPending, writeSave } from './persist';
 import { StatsTracker } from './net/stats';
 import { MainMenu } from './ui/mainMenu';
 import { PauseMenu } from './ui/pauseMenu';
@@ -71,7 +71,7 @@ export class Game {
   readonly build: BuildBar;
   readonly layout = new Layout();
   readonly login = new LoginBox();
-  readonly profile = new ProfileBox();
+  readonly profile = new ProfileBox((notice) => this.showMainMenu(notice));
   readonly news = new NewsView();
   readonly feedback = new FeedbackBox();
   readonly menu: MainMenu;
@@ -143,6 +143,8 @@ export class Game {
       if (this.mode === 'menu') this.menu.render();
       const acc = currentAccount();
       if (acc) void syncPending(acc.key).catch(() => {});
+      // E-postası olmayan eski hesaba sorulur, zorunlu değil
+      if (shouldAskEmail() && this.mode === 'menu' && !this.login.isOpen) this.login.askEmail();
     });
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');

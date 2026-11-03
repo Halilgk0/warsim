@@ -24,6 +24,20 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'name_short': return L('Ad en az 2 karakter olmalı', 'The name must be at least 2 characters');
     case 'name_chars': return L('Adda yalnız harf, rakam, boşluk, - _ . olabilir', 'Only letters, digits, spaces, - _ . are allowed');
     case 'taken': return L('Bu ad alınmış; başka bir ad seç', 'This name is taken; choose another one');
+    case 'email_bad': return L('E-posta adresini kontrol et (ör. ad@ornek.com)', 'Check your email address (e.g. name@example.com)');
+    case 'code_wrong': {
+      const left = Number(extra.left ?? 0);
+      return L(`Kod yanlış (${left} deneme hakkın kaldı)`, `Wrong code (${left} ${left === 1 ? 'try' : 'tries'} left)`);
+    }
+    case 'code_expired': return L('Bu kodun süresi doldu; yeni kod iste', 'This code is no longer valid; request a new one');
+    case 'mail_wait': {
+      const s = Number(extra.wait ?? 60);
+      return L(`Yeni kod için ${s} saniye bekle`, `Wait ${s} seconds for a new code`);
+    }
+    case 'mail_limit': return L('Çok fazla kod istendi; daha sonra tekrar dene', 'Too many codes requested; try again later');
+    case 'mail_off':
+    case 'mail_failed': return L('Kod şu an gönderilemedi; biraz sonra tekrar dene', 'Could not send the code right now; try again later');
+    case 'not_accepted': return L('Devam etmek için Gizlilik Politikası’nı ve KVKK metnini kabul etmelisin', 'To continue, accept the Privacy Policy and the KVKK notice');
     case 'no_account': return L('Bu adla bir hesap yok', 'There is no account with this name');
     case 'wrong': {
       const left = Number(extra.left ?? 0);

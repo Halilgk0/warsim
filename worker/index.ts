@@ -3,16 +3,22 @@
 //
 // - Hesap: ad + şifre. Şifre tarayıcıda PBKDF2 ile uzatılır (bedava planda istek başına ~10 ms işlemci süresi var;
 //   ağır özetleme sunucuda yapılamaz). Sunucu gelen istemci özetini rastgele tuzla SHA-256'dan geçirip saklar.
+// - Hesap açılırken e-posta adresi ve Gizlilik/KVKK onayı zorunlu; eski hesaplar isterse sonradan ekler. Adres, ona
+//   gönderilen 6 haneli kodla doğrulanmadan kaydedilmez. Kod gönderimi sınırlı (başkasının kutusuna yağdırılmasın, Gmail
+//   sınırı aşılmasın). Yenilik e-postası izni ayrı ve isteğe bağlı. Aynı adres birden çok hesapta olabilir. Adres yalnız
+//   sahibinin profilinde döner; publicAccount'a girmez (tarayıcıda saklanmaz, skor tablosuna gitmez).
 // - Oturum: rastgele belirteç; veritabanında yalnız özeti. Art arda 8 yanlış şifrede hesap 15 dakika kilitlenir.
 // - Kurtarma kodu: hesap açılınca bir kez gösterilir; şifre unutulunca bununla yenilenir (kod da yenilenir).
 // - Kayıtlar: gzip'li veri + liste için özet; otomatik kayıtlardan en yeni 3'ü, elle kayıtlardan en çok 30'u kalır.
 // - İstatistik: istemci harekâtın o anki toplamlarını yollar; sunucu harekâtın önceki en yüksek değerlerine göre artışı
 //   hesaplar, akla yatkınlık sınırlarıyla kırpar ve tüm zamanlar + bu haftanın toplamlarına ekler.
-// - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için) ve kurtarma kodu sıfırlama.
+// - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
+//   hesap silme.
 
-import { METRICS, type LeaderRow, type Metric, type StatsReport, cleanName, nameKey, nameProblem } from '../src/net/shared';
+import { LEGAL_VERSION, METRICS, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { type MailEnv, mailReady, sendMail } from './mail';
 
-interface Env {
+interface Env extends MailEnv {
   DB: D1Database;
   ADMIN_KEY?: string;
   /** Oyunun dosyaları (dist/): olmayan adreste 404.html buradan. */
@@ -31,6 +37,10 @@ interface AccountRow {
   no_tutorial: number;
   fails: number;
   locked_until: number;
+  email: string | null;
+  legal_version: string | null;
+  news_opt: number;
+  news_at: number | null;
 }
 
 const SESSION_DAYS = 90;
@@ -39,6 +49,14 @@ const LOCK_MS = 15 * 60 * 1000;
 const AUTO_KEEP = 3;
 const MANUAL_MAX = 30;
 const SAVE_MAX_BYTES = 1_500_000;
+const CODE_MS = 10 * 60 * 1000;
+const CODE_GAP_MS = 60 * 1000;
+const CODE_TRIES = 5;
+const DAY_MS = 86400000;
+/** Gönderim sınırları: adres başına, IP başına (telefon operatörlerinde çok oyuncu aynı IP'de olabilir), toplam (Gmail ~500/gün). */
+const LIMIT_ADDRESS = { max: 6, ms: DAY_MS };
+const LIMIT_IP = { max: 20, ms: 60 * 60 * 1000 };
+const LIMIT_ALL = { max: 400, ms: DAY_MS };
 
 // ---------------------------------------------------------------- yardımcılar
 
@@ -110,13 +128,17 @@ async function body<T>(req: Request): Promise<T | null> {
   }
 }
 
-const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial });
+const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email });
 
 async function openSession(env: Env, accountId: number): Promise<string> {
   const token = randomHex(32);
   const now = Date.now();
-  await env.DB.prepare('INSERT INTO sessions (token_hash, account_id, created, expires) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), accountId, now, now + SESSION_DAYS * 86400000).run();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO sessions (token_hash, account_id, created, expires) VALUES (?, ?, ?, ?)')
+      .bind(await sha256(token), accountId, now, now + SESSION_DAYS * 86400000),
+    // Süresi dolan oturumlar burada temizlenir (zamanlanmış iş yok)
+    env.DB.prepare('DELETE FROM sessions WHERE expires <= ?').bind(now),
+  ]);
   return token;
 }
 
@@ -141,22 +163,133 @@ async function noteFail(env: Env, a: AccountRow): Promise<Response> {
   return lock ? fail(429, 'locked', { until: lock }) : fail(401, 'wrong', { left: MAX_FAILS - fails });
 }
 
+// ---------------------------------------------------------------- e-posta doğrulama
+
+const codeHash = (email: string, code: string): Promise<string> => sha256(`${email}:${code}`);
+
+/** Sınır sayaçlarını artırır; biri aşıldıysa true. Süresi dolan pencere baştan başlar. */
+async function mailLimited(env: Env, email: string, ip: string, now: number): Promise<boolean> {
+  const hit = (key: string, l: { max: number; ms: number }) => env.DB.prepare(
+    `INSERT INTO mail_limits (key, window_start, count) VALUES (?1, ?2, 1)
+     ON CONFLICT (key) DO UPDATE SET count = CASE WHEN window_start <= ?3 THEN 1 ELSE count + 1 END,
+       window_start = CASE WHEN window_start <= ?3 THEN ?2 ELSE window_start END
+     RETURNING count`,
+  ).bind(key, now, now - l.ms);
+  const limits = [LIMIT_ADDRESS, LIMIT_IP, LIMIT_ALL];
+  const res = await env.DB.batch<{ count: number }>([
+    hit(`to:${await sha256(email)}`, LIMIT_ADDRESS),
+    hit(`ip:${await sha256(ip)}`, LIMIT_IP),
+    hit('all', LIMIT_ALL),
+  ]);
+  return res.some((r, i) => r.results[0].count > limits[i].max);
+}
+
+/** Doğrulama kodu gönder. Hesap açarken ad da gelir: alınmışsa kod gönderilmeden söylenir. */
+async function emailCode(req: Request, env: Env): Promise<Response> {
+  const b = await body<{ email?: string; name?: string; lang?: string }>(req);
+  const email = cleanEmail(String(b?.email ?? ''));
+  if (!validEmail(email)) return fail(400, 'email_bad');
+  if (typeof b?.name === 'string') {
+    const problem = nameProblem(b.name);
+    if (problem) return fail(400, `name_${problem}`);
+    if (await env.DB.prepare('SELECT 1 FROM accounts WHERE name_key = ?').bind(nameKey(b.name)).first()) return fail(409, 'taken');
+  }
+  if (!mailReady(env)) return fail(503, 'mail_off');
+  const now = Date.now();
+  const prev = await env.DB.prepare('SELECT sent_at FROM email_codes WHERE email = ?').bind(email).first<{ sent_at: number }>();
+  const wait = prev ? Math.ceil((prev.sent_at + CODE_GAP_MS - now) / 1000) : 0;
+  if (wait > 0) return fail(429, 'mail_wait', { wait });
+  if (await mailLimited(env, email, req.headers.get('cf-connecting-ip') ?? 'yerel', now)) return fail(429, 'mail_limit');
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  const code = String(n).padStart(6, '0');
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM email_codes WHERE expires <= ?').bind(now),
+    env.DB.prepare('DELETE FROM mail_limits WHERE window_start <= ?').bind(now - 2 * DAY_MS),
+    env.DB.prepare('INSERT OR REPLACE INTO email_codes (email, code_hash, expires, tries, sent_at) VALUES (?, ?, ?, 0, ?)')
+      .bind(email, await codeHash(email, code), now + CODE_MS, now),
+  ]);
+  const en = b?.lang === 'en';
+  try {
+    await sendMail(
+      env, email,
+      en ? `Your WarSimBox verification code: ${code}` : `WarSimBox doğrulama kodun: ${code}`,
+      en
+        ? `Your WarSimBox email verification code: ${code}\n\nThe code is valid for 10 minutes. If you did not request it, you can ignore this email; your address will not be added to any account.\n\nWarSimBox · https://warsimbox.com`
+        : `WarSimBox e-posta doğrulama kodun: ${code}\n\nKod 10 dakika geçerli. Bunu sen istemediysen bu e-postayı yok sayabilirsin; adresin hiçbir hesaba eklenmez.\n\nWarSimBox · https://warsimbox.com`,
+    );
+  } catch (e) {
+    console.error(e);
+    await env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(email).run();
+    return fail(502, 'mail_failed');
+  }
+  return json({ ok: true });
+}
+
+/** Kodu denetler: doğruysa kod silinir ve null döner, değilse hata yanıtı (art arda yanlışta kod geçersiz olur). */
+async function wrongCode(env: Env, email: string, code: unknown): Promise<Response | null> {
+  const row = await env.DB.prepare('SELECT code_hash, expires, tries FROM email_codes WHERE email = ?').bind(email)
+    .first<{ code_hash: string; expires: number; tries: number }>();
+  if (!row || row.expires <= Date.now()) return fail(400, 'code_expired');
+  if (same(await codeHash(email, String(code ?? '').replace(/\D/g, '')), row.code_hash)) {
+    await env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(email).run();
+    return null;
+  }
+  const left = CODE_TRIES - row.tries - 1;
+  if (left > 0) await env.DB.prepare('UPDATE email_codes SET tries = tries + 1 WHERE email = ?').bind(email).run();
+  else await env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(email).run();
+  return left > 0 ? fail(400, 'code_wrong', { left }) : fail(400, 'code_expired');
+}
+
 // ---------------------------------------------------------------- hesap
 
+/** Hesabı ve ona bağlı bütün verileri siler. Hesaba bağlı yeni tablo eklenirse buraya da eklenmeli. */
+async function eraseAccount(env: Env, a: AccountRow): Promise<{ sessions: number; saves: number; campaigns: number; stats: number }> {
+  const done = await env.DB.batch([
+    ...['sessions', 'saves', 'campaigns', 'stats'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE account_id = ?`).bind(a.id)),
+    env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(a.email ?? ''),
+    env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(a.id),
+  ]);
+  const [sessions, saves, campaigns, stats] = done.map((r) => r.meta.changes);
+  return { sessions, saves, campaigns, stats };
+}
+
+/** Oyuncu kendi hesabını siler: şifre gerekir. */
+async function deleteMe(req: Request, env: Env, a: AccountRow): Promise<Response> {
+  const b = await body<{ pass?: string }>(req);
+  if (!validClientHash(b?.pass)) return fail(400, 'bad_pass');
+  if (!unlocked(a)) return fail(429, 'locked', { until: a.locked_until });
+  if (!same(await passHash(a.pass_salt, b!.pass!), a.pass_hash)) return noteFail(env, a);
+  await eraseAccount(env, a);
+  return json({ ok: true });
+}
+
 async function register(req: Request, env: Env): Promise<Response> {
-  const b = await body<{ name?: string; pass?: string }>(req);
+  const b = await body<{ name?: string; pass?: string; email?: string; code?: string; accepted?: boolean; news?: boolean }>(req);
   const name = cleanName(b?.name ?? '');
   const problem = nameProblem(name);
   if (problem) return fail(400, `name_${problem}`);
   if (!validClientHash(b?.pass)) return fail(400, 'bad_pass');
+  // Eski adresteki paket e-posta sormaz: oradaki eski oyuncular kayıtlarını taşımak için hesap açabilsin
+  const email = req.headers.get('origin') === OLD_ORIGIN ? null : cleanEmail(String(b?.email ?? ''));
+  if (email !== null) {
+    if (!validEmail(email)) return fail(400, 'email_bad');
+    if (b?.accepted !== true) return fail(400, 'not_accepted');
+  }
   const key = nameKey(name);
   if (await env.DB.prepare('SELECT 1 FROM accounts WHERE name_key = ?').bind(key).first()) return fail(409, 'taken');
+  // Kod en sonda: yanlış ad ya da şifre yüzünden harcanmasın
+  if (email !== null) {
+    const bad = await wrongCode(env, email, b?.code);
+    if (bad) return bad;
+  }
   const salt = randomHex(16);
   const code = newRecoveryCode();
   const now = Date.now();
+  const news = b!.news === true;
   const res = await env.DB.prepare(
-    'INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now).run();
+    `INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login, email, legal_version, legal_at, news_opt, news_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now, email, email && LEGAL_VERSION, email && now, news ? 1 : 0, news ? now : null).run();
   const id = res.meta.last_row_id;
   const acc = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(id).first<AccountRow>();
   return json({ token: await openSession(env, id), account: publicAccount(acc!), recoveryCode: code });
@@ -210,6 +343,25 @@ async function updateMe(req: Request, env: Env, a: AccountRow): Promise<Response
   return json({ account: publicAccount(a) });
 }
 
+/** E-posta ekle ya da değiştir (yeni adres kodla doğrulanır), yenilik iznini aç ya da kapat. Metin onayı yoksa bu sırada alınır. */
+async function setEmail(req: Request, env: Env, a: AccountRow): Promise<Response> {
+  const b = await body<{ email?: string; code?: string; accepted?: boolean; news?: boolean }>(req);
+  const email = cleanEmail(String(b?.email ?? ''));
+  if (!validEmail(email)) return fail(400, 'email_bad');
+  if (!a.legal_version && b?.accepted !== true) return fail(400, 'not_accepted');
+  if (email !== a.email) {
+    const bad = await wrongCode(env, email, b?.code);
+    if (bad) return bad;
+  }
+  const news = b?.news === true;
+  const now = Date.now();
+  await env.DB.prepare(
+    'UPDATE accounts SET email = ?, legal_version = COALESCE(legal_version, ?), legal_at = COALESCE(legal_at, ?), news_opt = ?, news_at = ? WHERE id = ?',
+  ).bind(email, LEGAL_VERSION, now, news ? 1 : 0, news ? a.news_at ?? now : null, a.id).run();
+  a.email = email;
+  return json({ account: publicAccount(a), email, news });
+}
+
 /** Profil: hesap bilgisi, skorlar (tüm zamanlar + bu hafta), her ölçütte tüm zamanlar sırası, kayıt sayısı. */
 async function profile(env: Env, a: AccountRow): Promise<Response> {
   const week = isoWeek(Date.now());
@@ -223,6 +375,7 @@ async function profile(env: Env, a: AccountRow): Promise<Response> {
   return json({
     account: publicAccount(a), all: all.results[0] ?? null, week: wk.results[0] ?? null, ranks: rank.results[0] ?? null,
     saves: (saves.results[0] as { n: number } | undefined)?.n ?? 0,
+    email: a.email, news: !!a.news_opt, accepted: !!a.legal_version,
   });
 }
 
@@ -368,12 +521,17 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   const name = url.searchParams.get('name') ?? '';
   const a = await env.DB.prepare('SELECT * FROM accounts WHERE name_key = ?').bind(nameKey(name)).first<AccountRow>();
   if (!a) return fail(404, 'no_account');
+  if (req.method === 'DELETE') {
+    // KVKK silme başvurusu (oyuncu Profil'den kendi de silebilir)
+    return json({ name: a.name, deleted: await eraseAccount(env, a) });
+  }
   if (req.method === 'GET') {
     // Kimlik doğrulama soruları için: açılış tarihi, son giriş, son harekâtlar ve kayıtlar
     const saves = await env.DB.prepare('SELECT meta FROM saves WHERE account_id = ? ORDER BY created DESC LIMIT 5').bind(a.id).all<{ meta: string }>();
     const stats = await env.DB.prepare("SELECT * FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id).first();
     return json({
-      name: a.name, created: new Date(a.created).toISOString(), lastLogin: new Date(a.last_login).toISOString(), stats,
+      name: a.name, email: a.email, legalVersion: a.legal_version, newsOpt: !!a.news_opt,
+      created: new Date(a.created).toISOString(), lastLogin: new Date(a.last_login).toISOString(), stats,
       saves: saves.results.map((r) => {
         const m = JSON.parse(r.meta);
         return { title: m.title, created: new Date(m.created).toISOString(), mapId: m.mapId, mapSize: m.mapSize, enemies: m.enemies, gameTime: m.gameTime };
@@ -391,6 +549,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
 async function api(req: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname.replace(/^\/api/, '');
   const m = req.method;
+  if (m === 'POST' && path === '/email/code') return emailCode(req, env);
   if (m === 'POST' && path === '/register') return register(req, env);
   if (m === 'POST' && path === '/login') return login(req, env);
   if (m === 'POST' && path === '/recover') return recover(req, env);
@@ -399,9 +558,10 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   if (m === 'GET' && path === '/leaderboard') return leaderboard(url, env, await authed(req, env));
   const a = await authed(req, env);
   if (!a) return fail(401, 'no_session');
-  if (path === '/me') return m === 'PATCH' ? updateMe(req, env, a) : json({ account: publicAccount(a) });
+  if (path === '/me') return m === 'PATCH' ? updateMe(req, env, a) : m === 'DELETE' ? deleteMe(req, env, a) : json({ account: publicAccount(a) });
   if (m === 'GET' && path === '/profile') return profile(env, a);
   if (m === 'POST' && path === '/password') return changePassword(req, env, a);
+  if (m === 'POST' && path === '/email') return setEmail(req, env, a);
   if (m === 'GET' && path === '/saves') return listSaves(env, a);
   const save = /^\/saves\/([\w:.-]{1,120})$/.exec(path);
   if (save) {

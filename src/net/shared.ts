@@ -25,6 +25,19 @@ export function nameProblem(n: string): 'short' | 'chars' | null {
   return null;
 }
 
+export const EMAIL_MAX = 254;
+
+export const cleanEmail = (e: string): string => e.trim().toLowerCase();
+
+/** Yazım denetimi: bütün e-posta sağlayıcıları geçerli. Adresin gerçekten var olduğunu göstermez. */
+export function validEmail(e: string): boolean {
+  const c = cleanEmail(e);
+  return c.length <= EMAIL_MAX && /^[a-z0-9][a-z0-9._%+-]*@([a-z0-9-]+\.)+[a-z][a-z0-9-]+$/.test(c);
+}
+
+/** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
+export const LEGAL_VERSION = '2026-11-03';
+
 /** Skor tablosu ölçütleri (veritabanı sütunu). */
 export const METRICS = ['kills', 'wins', 'earned', 'peak', 'play_sec'] as const;
 export type Metric = (typeof METRICS)[number];

@@ -97,6 +97,16 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-ins
 .text section:last-child { margin-bottom: 0; }
 .text h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 .text p { margin: 0 0 12px; }
+/* ---- Gizlilik ve KVKK */
+.legal { max-width: 800px; margin: 6px auto 0; overflow-wrap: anywhere; }
+.legal h1 { font-size: 32px; font-weight: 800; margin-bottom: 4px; }
+.legal h2 { font-size: 20px; margin: 22px 0 6px; }
+.legal ul { margin: 0 0 12px; padding-left: 22px; }
+.legal li { margin-bottom: 6px; }
+.legal-date { font-size: 14px; color: var(--muted); }
+.legal-scroll { overflow-x: auto; }
+.legal table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 15px; line-height: 1.45; overflow-wrap: normal; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
 .side { margin: 0 0 28px; }
 .side img { background: var(--sky); border-radius: var(--radius); }
 .side figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }

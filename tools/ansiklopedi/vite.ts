@@ -1,4 +1,4 @@
-// Vite eklentisi: ansiklopedi sayfalarını (src/ansiklopedi/sayfalar.ts) derlemede dist/'e yazar, geliştirmede
+// Vite eklentisi: ansiklopedi ve yasal metin sayfalarını (src/ansiklopedi/sayfalar.ts) derlemede dist/'e yazar, geliştirmede
 // (npm run dev) her istekte yeniden üretip sunar; metin ya da veri değişince sayfayı yenilemek yeter. Site haritası
 // (sitemap.xml) da buradan üretilir: ana sayfa ve bütün ansiklopedi sayfaları.
 
@@ -39,9 +39,10 @@ export function encyclopedia(): Plugin {
             res.end((await load()).sitemap(today()));
             return;
           }
-          if (!url.startsWith('/ansiklopedi') && !url.startsWith('/en/encyclopedia')) return next();
+          if (!/^\/(ansiklopedi|gizlilik|kvkk|en\/(encyclopedia|privacy|kvkk))/.test(url)) return next();
           const path = url.endsWith('/') ? url : `${url}/`;
-          const page = (await load()).encyclopediaPages(today()).find((p) => p.path === path);
+          const m = await load();
+          const page = [...m.encyclopediaPages(today()), ...m.legalPages()].find((p) => p.path === path);
           if (!page) return next();
           if (path !== url) {
             res.statusCode = 301;
@@ -58,7 +59,7 @@ export function encyclopedia(): Plugin {
     },
     async generateBundle() {
       const m = await load();
-      for (const p of m.encyclopediaPages(today())) this.emitFile({ type: 'asset', fileName: `${p.path.slice(1)}index.html`, source: p.html });
+      for (const p of [...m.encyclopediaPages(today()), ...m.legalPages()]) this.emitFile({ type: 'asset', fileName: `${p.path.slice(1)}index.html`, source: p.html });
       this.emitFile({ type: 'asset', fileName: 'ansiklopedi/stil.css', source: readFileSync(join(root, CSS), 'utf8') });
       this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: m.sitemap(today()) });
     },

@@ -18,6 +18,7 @@ import { socialLinks } from './social';
 import { LeaderboardPanel } from './leaderboard';
 import { NEW_SITE, OLD_SITE } from '../net/api';
 import { encUrl } from '../ansiklopedi/liste';
+import { legalUrl } from '../yasal/liste';
 
 type Tab = 'new' | 'saves' | 'scores';
 
@@ -349,7 +350,8 @@ export class MainMenu {
         </div>
         <div class="mm-foot"><p>${acc
           ? L(`Oyun <b>${esc(acc.name)}</b> hesabına kaydedilir; her 5 dakikada otomatik kayıt alınır.`, `The game is saved to the <b>${esc(acc.name)}</b> account and autosaved every 5 minutes.`)
-          : L('Misafir olarak oynuyorsun: oyun kapanınca ilerleme silinir. Kaydetmek için sağ üstten <b>giriş yap</b>.', 'You are playing as a guest: progress is lost when the game closes. To save, <b>log in</b> at the top right.')}</p>${socialLinks()}</div>
+          : L('Misafir olarak oynuyorsun: oyun kapanınca ilerleme silinir. Kaydetmek için sağ üstten <b>giriş yap</b>.', 'You are playing as a guest: progress is lost when the game closes. To save, <b>log in</b> at the top right.')}
+          <span class="mm-legal"><a href="${legalUrl('privacy', LANG === 'en')}" target="_blank" rel="noopener">${L('Gizlilik', 'Privacy')}</a> · <a href="${legalUrl('kvkk', LANG === 'en')}" target="_blank" rel="noopener">KVKK</a></span></p>${socialLinks()}</div>
         </div>`;
     this.el.innerHTML = `
       <div class="mm-veil"></div>

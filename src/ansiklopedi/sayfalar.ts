@@ -10,6 +10,8 @@ import { TECH_EN } from '../sim/techEn';
 import { SOCIAL } from '../ui/social';
 import { ARTICLES, type Article, type Tx } from './makaleler';
 import { ENC_EN, ENC_TR, ENCYCLOPEDIA } from './liste';
+import { LEGAL_PATHS, type LegalKind } from '../yasal/liste';
+import { LEGAL_TEXT } from '../yasal/metin';
 
 type Lang = 'tr' | 'en';
 
@@ -74,6 +76,8 @@ interface PageOpts {
   image: string;
   body: string;
   ld: object[];
+  /** Alttaki not (yoksa kaynak notu). */
+  foot?: string;
 }
 
 function page(o: PageOpts): string {
@@ -129,7 +133,7 @@ ${o.body}
 </main>
 <footer class="foot">
   <div class="foot-row"><a href="/" data-play="${l}">${T(l, 'WarSimBox’ı tarayıcıda ücretsiz oyna', 'Play WarSimBox free in your browser')}</a><span class="social">${social}</span></div>
-  <p>${T(l, 'Tarih ve teknik veriler yaygın kaynaklardan derlenmiştir; sürüme ve kaynağa göre küçük farklar olabilir.', 'History and specifications are compiled from widely used sources; figures can vary slightly between versions and sources.')}</p>
+  ${o.foot ?? `<p>${T(l, 'Tarih ve teknik veriler yaygın kaynaklardan derlenmiştir; sürüme ve kaynağa göre küçük farklar olabilir.', 'History and specifications are compiled from widely used sources; figures can vary slightly between versions and sources.')}</p>`}
 </footer>
 <script>
 // Dil seçimi oyuna da geçsin; "Oyna" bu sayfanın diliyle açar
@@ -296,6 +300,22 @@ export function encyclopediaPages(today: string): { path: string; html: string }
 }
 
 /** Site haritası: ana sayfa ve ansiklopedi (iki dil birbirinin karşılığı olarak). */
+/** Gizlilik Politikası ve KVKK Aydınlatma Metni: ansiklopediyle aynı çerçeve. */
+export function legalPages(): { path: string; html: string }[] {
+  const kinds = Object.keys(LEGAL_PATHS) as LegalKind[];
+  return kinds.flatMap((k) => (['tr', 'en'] as Lang[]).map((lang) => {
+    const t = LEGAL_TEXT[k][lang];
+    const path = LEGAL_PATHS[k][lang];
+    return {
+      path,
+      html: page({
+        lang, path, alt: LEGAL_PATHS[k][lang === 'en' ? 'tr' : 'en'], title: `${t.title} | WarSimBox`, desc: t.desc, image: '/og.jpg', ld: [], foot: '',
+        body: `<article class="text legal"><h1>${esc(t.title)}</h1>${t.html}</article>`,
+      }),
+    };
+  }));
+}
+
 export function sitemap(today: string): string {
   const pairs: [string, string][] = [[ENC_TR, ENC_EN], ...entries().map((e): [string, string] => [pagePath('tr', e.slug), pagePath('en', e.slug)])];
   const url = (loc: string, tr: string, en: string) => `  <url>

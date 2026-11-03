@@ -6,7 +6,7 @@
 // hesabın sahibi şifre belirleyip giriş yapınca bu tarayıcıdaki kayıtları yeni hesaba geçer ve buluta yüklenir.
 
 import type { SaveData } from './sim/save';
-import { L } from './i18n';
+import { L, LANG } from './i18n';
 import { ApiError, api, authToken, clientHash, gunzip, gzip, storeAuth, storedAccount } from './net/api';
 import { NAME_MAX, cleanName, nameKey, nameProblem } from './net/shared';
 
@@ -26,6 +26,8 @@ export interface Account {
   lastLogin: number;
   /** Öğretici "Oyuna başla"da sorulmasın ("Bir daha sorma"). */
   noTutorial?: boolean;
+  /** Hesapta e-posta var mı (false ise sorulur; sunucudan gelmemişse bilinmiyor, sorulmaz). */
+  hasEmail?: boolean;
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -107,9 +109,14 @@ export async function login(name: string, password: string): Promise<Account> {
   return r.account;
 }
 
-/** Yeni hesap; kurtarma kodu bir kez döner (oyuncuya gösterilmeli). */
-export async function register(name: string, password: string): Promise<{ account: Account; recoveryCode: string }> {
-  const r = await api<AuthResult>('POST', '/register', { name: cleanName(name), pass: await clientHash(name, password) });
+/** Adrese doğrulama kodu gönder. Hesap açarken ad da verilir: alınmışsa kod gönderilmeden hata döner. */
+export async function requestEmailCode(email: string, name?: string): Promise<void> {
+  await api('POST', '/email/code', { email, name: name === undefined ? undefined : cleanName(name), lang: LANG });
+}
+
+/** Yeni hesap (adres koduyla doğrulanır); kurtarma kodu bir kez döner (oyuncuya gösterilmeli). */
+export async function register(name: string, password: string, email: string, news: boolean, code: string): Promise<{ account: Account; recoveryCode: string }> {
+  const r = await api<AuthResult>('POST', '/register', { name: cleanName(name), pass: await clientHash(name, password), email, code, accepted: true, news });
   setSession(r.token, r.account);
   adoptLegacy(r.account);
   return { account: r.account, recoveryCode: r.recoveryCode ?? '' };
@@ -132,6 +139,11 @@ export interface Profile {
   /** Tüm zamanlar sırası (ölçüt başına). */
   ranks: StatsRow | null;
   saves: number;
+  email: string | null;
+  /** Yenilik e-postası izni. */
+  news: boolean;
+  /** Gizlilik ve KVKK metinleri kabul edildi mi. */
+  accepted: boolean;
 }
 
 export async function fetchProfile(): Promise<Profile> {
@@ -139,6 +151,29 @@ export async function fetchProfile(): Promise<Profile> {
   session = p.account;
   storeAuth(authToken(), p.account);
   return p;
+}
+
+/** E-posta ekle ya da değiştir (yeni adres için kod gerekir), yenilik iznini ayarla (metin onayı arayüzde alınır). */
+export async function saveEmail(email: string, news: boolean, code?: string): Promise<{ email: string; news: boolean }> {
+  const r = await api<{ account: Account; email: string; news: boolean }>('POST', '/email', { email, code, accepted: true, news });
+  session = r.account;
+  storeAuth(authToken(), r.account);
+  return r;
+}
+
+/** Hesabı kalıcı olarak sil (şifreyle); bu cihazdaki kopyalar da silinir, oturum kapanır. */
+export async function deleteAccount(password: string): Promise<void> {
+  const acc = currentAccount();
+  if (!acc) throw new ApiError('no_session', 401);
+  await api('DELETE', '/me', { pass: await clientHash(acc.name, password) });
+  for (const m of await localList(acc.key).catch(() => [] as SaveMeta[])) await localDelete(m.id).catch(() => {});
+  try {
+    localStorage.removeItem(EMAIL_LATER_KEY + acc.key);
+  } catch {
+    /* depolama kapalı */
+  }
+  session = null;
+  storeAuth(null);
 }
 
 /** Şifre değiştir (mevcut şifreyle); öbür cihazlardaki oturumlar kapanır. */
@@ -179,6 +214,31 @@ function adoptLegacy(acc: Account): void {
   const keys = new Set([acc.key]);
   if (oldKey) keys.add(oldKey);
   void rekeyLocal(keys, acc.key).catch(() => {});
+}
+
+/** E-posta sorusunu erteleme zamanı: hesap başına, bu tarayıcıda. */
+const EMAIL_LATER_KEY = 'warsim.emailLater.';
+const EMAIL_LATER_MS = 7 * 86400000;
+
+/** Eski hesaba e-posta sorulacak mı: hesapta adres yoksa ve son 7 günde ertelenmediyse. */
+export function shouldAskEmail(): boolean {
+  const acc = currentAccount();
+  if (acc?.hasEmail !== false) return false;
+  try {
+    return Date.now() - Number(localStorage.getItem(EMAIL_LATER_KEY + acc.key)) >= EMAIL_LATER_MS;
+  } catch {
+    return true;
+  }
+}
+
+export function postponeEmailAsk(): void {
+  const acc = currentAccount();
+  if (acc?.hasEmail !== false) return;
+  try {
+    localStorage.setItem(EMAIL_LATER_KEY + acc.key, String(Date.now()));
+  } catch {
+    /* depolama kapalı: bir sonraki açılışta yine sorulur */
+  }
 }
 
 /** Misafirin "Bir daha sorma" tercihi (bu tarayıcıda). */

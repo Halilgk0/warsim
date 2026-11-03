@@ -138,8 +138,22 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Bedava planda istek başına ~10 ms işlemci süresi var. Bu yüzden şifre tarayıcıda PBKDF2 ile uzatılır, sunucu
     yalnız tuzlu SHA-256 yapar.
   - Ad anahtarında I, İ, ı ve i aynı sayılır (`nameKey`); istemci ve sunucu aynı işlevi kullanır.
+  - Hesap açmak için e-posta (her sağlayıcı; `shared.ts` `validEmail`) ve Gizlilik/KVKK onayı zorunlu; yenilik e-postası
+    izni ayrı ve isteğe bağlı. Adres yalnız sahibinin profilinde döner, tekil değildir. Eski adresin (vercel.app) paketi
+    e-posta sormadığı için o kaynak muaftır.
+  - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`;
+    Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
+    `LIMIT_*`: başkasının kutusuna yağdırılmasın, Gmail'in günlük sınırı (~500) aşılmasın.
+  - Yerel deneme: `node tools/mail-dev.mjs` (sahte SMTP; kodlar http://localhost:2526), `.dev.vars` ayarları dosyasında.
+  - E-postası olmayan eski hesaba oyun açılınca ve girişte sorulur (`loginBox.ts` `askEmail`), zorunlu değil. Kapatınca
+    7 gün sorulmaz (`persist.ts` `shouldAskEmail`; hesap başına, tarayıcıda). Sonradan Profil'den eklenir; yenilik izni
+    de oradan kapanır.
+  - Yeni migration canlı veritabanına push'tan önce uygulanır (`wrangler d1 migrations apply warsimbox --remote`);
+    Workers Builds'in bunu yaptığını varsayma. Yalnız eklemeli değişiklik: eski worker yeni tabloyla çalışabilsin.
   - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.
-  - Şifresini ve kurtarma kodunu unutan oyuncu: `tools/admin.mjs` (önce kimlik sorusu sor; bkz. dosyanın başı).
+  - Şifresini ve kurtarma kodunu unutan oyuncu ve yazılı silme başvurusu: `tools/admin.mjs` (önce kimlik sorusu sor; bkz.
+    dosyanın başı). Oyuncu hesabını Profil'den şifresiyle kendi siler. Hesaba bağlı yeni tablo eklenirse
+    `worker/index.ts` `eraseAccount`'a da ekle; yasal metinler hesabın bütün verisinin silindiğini söylüyor.
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
 - **Açılış ve harita yükleme:**
   - `main.ts` önce yükleme ekranını (arka görsel `public/yukleme.jpg`) çizdirir.
@@ -152,6 +166,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Başsız simülasyonda (Node) ilk harita `terrain.ts` yüklenirken eski yolla üretilir.
   - Kayıt kipi ve görsel denetim haritayı önceden yüklemez: `GameRenderer` kurulurken yüklü harita yoksa ilk haritayı
     300 km'de yükler (eski çekimler aynı kalır).
+- **`src/yasal/`:** Gizlilik Politikası (`/gizlilik/`, `/en/privacy/`) ve KVKK Aydınlatma Metni (`/kvkk/`, `/en/kvkk/`).
+  Metin `metin.ts`'te; sayfaları ansiklopedinin çerçevesiyle `ansiklopedi/sayfalar.ts` üretir, oyun paketine girmez.
+  Metinler oyunun gerçekten yaptığını anlatır: toplanan veri ya da hizmet sağlayıcı (analitik, e-posta servisi…) değişirse
+  metni ve `shared.ts` `LEGAL_VERSION`'ı güncelle.
 - **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron

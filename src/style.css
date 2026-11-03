@@ -878,6 +878,8 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .mm-map text { font-size: calc(9px * var(--ui)); font-weight: 800; fill: var(--ink); paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 3px; }
 .mm-foot { display: flex; align-items: center; gap: calc(12px * var(--ui)); font-size: calc(12px * var(--ui)); color: var(--muted); margin: calc(12px * var(--ui)) 0 0; line-height: 1.45; }
 .mm-foot p { flex: 1; margin: 0; }
+.mm-legal { white-space: nowrap; }
+.mm-legal a { color: inherit; }
 
 /* Sosyal medya bağlantıları (social.ts): yuvarlak, tek renk simgeler */
 .social { display: inline-flex; align-items: center; gap: calc(6px * var(--ui)); flex: none; }
@@ -940,6 +942,9 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .pf-stats td { font-weight: 700; font-variant-numeric: tabular-nums; }
 .pf-rank { color: var(--accent-ink); font-weight: 900; }
 .pf-pw { display: flex; flex-direction: column; gap: calc(8px * var(--ui)); }
+.pf-email { display: flex; align-items: center; justify-content: space-between; gap: calc(8px * var(--ui)); }
+.pf-email span { min-width: 0; overflow-wrap: anywhere; }
+.pf-email button { flex: none; }
 .pf-pw-toggle { align-self: center; }
 
 /* kayıt listesi */
@@ -1119,6 +1124,13 @@ button.danger:hover { background: #ecc7bf; }
 .login-card button.link { align-self: center; }
 .login-tabs { display: flex; }
 .login-tabs button { flex: 1; }
+.login-check { display: flex; align-items: flex-start; gap: calc(8px * var(--ui)); font-size: calc(12px * var(--ui)); font-weight: 600; line-height: 1.4; color: var(--ink); cursor: pointer; }
+.login-check input { flex: none; width: calc(18px * var(--ui)); height: calc(18px * var(--ui)); margin: 0; padding: 0; accent-color: var(--accent-ink); cursor: pointer; }
+.login-check a { color: var(--accent-ink); font-weight: 800; }
+.login-links { display: flex; justify-content: space-between; }
+.login-card .mm-note { margin-bottom: 0; }
+.login-card .mm-note.hidden { display: none; }
+input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: center; }
 .login-code {
   font-family: ui-monospace, Consolas, monospace; font-size: calc(24px * var(--ui)); font-weight: 800; letter-spacing: 1px; text-align: center;
   background: var(--accent-soft); color: var(--accent-ink); border-radius: calc(10px * var(--ui)); padding: calc(10px * var(--ui));
