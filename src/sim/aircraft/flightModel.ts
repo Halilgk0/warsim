@@ -76,6 +76,7 @@ export function gearHeight(spec: AircraftSpec): number {
   // Çizimden: F-86 ve F-84 de kısa takımlı (karın yerden ~0,85 m)
   if (spec.id === 'f86f') return 1.72;
   if (spec.id === 'f84g') return 1.62;
+  if (spec.id === 'f80c') return 1.45;
   return spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
 }
 

@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6 };
+const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -533,9 +533,9 @@ function hingeStrip(secs: Section[], thick: THREE.Vector3, xh: number): Geo {
  * Kumanda yüzeyli kanat ya da yatay kuyruk (iki yan). parts: açıklık parçaları [f0, f1, ad]: adlı parçada veterin
  * xh'tan arkası eklem (ad + 'L' sol/+x, 'R'; menteşe ekseni iki yanda da +x'e bakar, pozitif açı firar kenarını
  * kaldırır), önü sabit; ad null ise tam veter (kumanda yüzeyleri arası, uç). İki parça aynı profilden kesilir.
- * roundTip: uçta düz kapak yerine yuvarlanan kısa parça (son f = 1 olmalı).
+ * roundTip: uçta düz kapak yerine yuvarlanan parça, boyu katsayıyla (son f = 1 olmalı; 0 düz kapak).
  */
-function controlWing(w: WingOpts, xh: number, parts: [number, number, string | null][], roundTip = false): Geo[] {
+function controlWing(w: WingOpts, xh: number, parts: [number, number, string | null][], roundTip = 0): Geo[] {
   const up = new THREE.Vector3(0, 1, 0);
   const out: Geo[] = [];
   for (const s of [1, -1]) {
@@ -554,7 +554,7 @@ function controlWing(w: WingOpts, xh: number, parts: [number, number, string | n
       const t = taperSec(w, 1, s);
       // Uç kesitinden dışa: veter hücum kenarından da firar kenarından da kısalır, kalınlık incelir
       const cap = ([dx, cm, back, tm]: number[]): Section => ({
-        le: new THREE.Vector3(t.le.x + s * dx * t.c, t.le.y, t.le.z - t.c * back), c: t.c * cm, t: t.t * tm,
+        le: new THREE.Vector3(t.le.x + s * dx * roundTip * t.c, t.le.y, t.le.z - t.c * back), c: t.c * cm, t: t.t * tm,
       });
       out.push(airfoilPart([t, ...[[0.018, 0.96, 0.012, 0.86], [0.04, 0.86, 0.05, 0.66], [0.056, 0.68, 0.13, 0.44], [0.066, 0.4, 0.27, 0.22]].map(cap)], up, 0, 1));
     }
@@ -955,6 +955,30 @@ const portAt = (x: number, y: number, z: number, h: number, l: number) =>
   tag(new THREE.SphereGeometry(1, sg(3), sg(2)).scale(0.018, h, l).translate(x, y, z), 'dark');
 
 /**
+ * Gövde yanı hava girişi (iki yan): kanaldan dudağa dönüp arkaya kanat köküne inen çıkıntı, içinde koyu kanal. rake:
+ * ağız eğimi (üst dudak bu kadar geride; birim yükseklik başına), z0'ın gerisine etki etmez. İç yarısı gövdeye gömülür.
+ */
+function sideIntake(x: number, secs: JetSec[], duct: JetSec[], rake: number, z0: number): Geo[] {
+  const zf = Math.max(...secs.map((q) => q[0]));
+  const yc = secs[0][4];
+  const shear = (g: Geo) => {
+    const p = g.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      const k = Math.min(1, Math.max(0, (p.getZ(i) - z0) / (zf - z0)));
+      p.setZ(i, p.getZ(i) - rake * (p.getY(i) - yc) * k);
+    }
+    g.computeVertexNormals();
+    return g;
+  };
+  const dh = new JetHull(duct, 2.1, false);
+  return [1, -1].flatMap((sd) => [
+    shear(new JetHull(secs, 2.1).geo(10)).translate(sd * x, 0, 0),
+    tag(shear(dh.geo(10)).translate(sd * x, 0, 0), 'dark'),
+    tag(shear(dh.disc(duct[0][0], 1, 10)).translate(sd * x, 0, 0), 'dark'),
+  ]);
+}
+
+/**
  * Damla kanopi: öndeki köşeli ön cam, sürgülü kapağın kavisli camı, arkasında gövdeye inen metal bitiş. Çerçeveler
  * (ön cam dikmeleri ve kavisi, kapakta verilen z'ler) koyu, cam kesitinin biraz dışında. Pilot ve gösterge paneli
  * cached()'te canopySink'teki kayda göre yerleşir.
@@ -1070,6 +1094,15 @@ function thunderjetGear(gh: number): Geo[] {
     main: { x: 2.78, z: -0.54, top: -0.22, axle: -gh + 0.36, rw: 0.36, tw: 0.2, dx: 0.06, door: { dx: 0.13, top: -0.24, bot: -1.16, w: 0.78, r: 0.28 } },
     nose: { topY: -0.38, topZ: 4.5, axle: -gh + 0.25, z: 4.98, rw: 0.25, tw: 0.14 },
     belly: { x: 0.3, y: -0.6, z0: 4.25, z1: 2.85, h: 0.24 },
+  });
+}
+
+/** F-80C takımı: 2,65 m iz, geniş kapaklı ana bacak, burun tekerleği kokpitin önünde. */
+function shootingStarGear(gh: number): Geo[] {
+  return jetGear({
+    main: { x: 1.33, z: -0.21, top: -0.35, axle: -gh + 0.345, rw: 0.345, tw: 0.18, dx: 0.08, door: { dx: 0.12, top: -0.42, bot: -1.0, w: 0.66, r: 0.16 } },
+    nose: { topY: -0.46, topZ: 3.25, axle: -gh + 0.28, z: 3.37, rw: 0.28, tw: 0.15 },
+    belly: { x: 0.24, y: -0.58, z0: 3.3, z1: 2.35, h: 0.2 },
   });
 }
 
@@ -1335,9 +1368,9 @@ function defineModel(key: string): ModelDef {
             pilot: { z: 2.35, len: 1.7, h: 0.42, y: 0.86, w: 0.42 },
           }),
           // Kanat: flap açıklığın yarısına, sonra kanatçık; uç yuvarlak. Çit üst yüzde, hücum kenarından veterin ortasına
-          ...controlWing(W, 0.72, [[-0.1, 0.455, 'flap'], [0.455, 0.47, null], [0.47, 0.95, 'aileron'], [0.95, 1, null]], true),
+          ...controlWing(W, 0.72, [[-0.1, 0.455, 'flap'], [0.455, 0.47, null], [0.47, 0.95, 'aileron'], [0.95, 1, null]], 1),
           ...mirror(fenceX, (x) => wingFence(x, fenceSec)),
-          ...controlWing(T, 0.68, [[0, 0.96, 'elevator'], [0.96, 1, null]], true),
+          ...controlWing(T, 0.68, [[0, 0.96, 'elevator'], [0.96, 1, null]], 1),
           ...jetFin([[0.55, -3.02, 2.3], [0.85, -3.29, 2.11], [1.05, -3.46, 1.95], [1.4, -3.77, 1.75], [2.0, -4.31, 1.38], [2.55, -4.79, 1.04], [2.76, -4.96, 0.9], [2.86, -5.1, 0.72], [2.89, -5.28, 0.42]], 0.15, 0.7, 2, 5),
           // Sırt yüzgeci: gövdeden dikey kuyruğun hücum kenarına kavisle kalkar
           airfoilPart([[0.7, -1.9, 1.7], [0.9, -2.62, 1.0], [1.02, -3.12, 0.55], [1.12, -3.53, 0.2]].map(([y, le, c]) => ({ le: new THREE.Vector3(0, y, le), c, t: 0.1 })), new THREE.Vector3(1, 0, 0), 0, 1),
@@ -1537,7 +1570,7 @@ function defineModel(key: string): ModelDef {
             tank(1), tank(-1),
             ...[1, -1].flatMap((s) => [new THREE.BoxGeometry(0.34, 0.012, 0.36).translate(s * 5.97, 0.22, -2.4), new THREE.BoxGeometry(0.012, 0.34, 0.36).translate(s * 5.97, 0.22, -2.4)]),
           ], true),
-          ...controlWing(T, 0.68, [[0, 0.96, 'elevator'], [0.96, 1, null]], true),
+          ...controlWing(T, 0.68, [[0, 0.96, 'elevator'], [0.96, 1, null]], 1),
           ...jetFin([[0.49, -3.95, 2.6], [0.6, -4.2, 2.33], [0.7, -4.42, 2.09], [1.03, -4.72, 1.75], [1.64, -5.06, 1.34], [2.3, -5.38, 0.88], [2.54, -5.54, 0.61], [2.6, -5.62, 0.45], [2.65, -5.74, 0.2]], 0.14, 0.72, 2, 5),
           // Yatay kuyruğun dikey kuyruktaki kaportası
           body([[-4.6, 0.01], [-4.85, 0.1], [-5.6, 0.11], [-6.05, 0.02]], 8, { y: 0.78, sy: 0.6, smooth: true }),
@@ -2007,21 +2040,71 @@ function defineModel(key: string): ModelDef {
         ],
         props: [],
       };
-    case 'p80':
+    case 'p80': {
+      // F-80C, ölçüler üç görünüş çiziminden. Sivri, kapalı burun (altı makineli tüfek), kanat köküne inen eğik yan hava
+      // girişleri, kuyruğa doğru alçalan gövde ve uzun sırt yüzgeci, yuvarlak uçlu dikey ve yatay kuyruk. Kanat kökünde
+      // hücum kenarı öne genişler. Uçlarda altta sabit tanklar (Kore'de hep tanklı uçtu). Hava frenleri ön karında.
+      const H = new JetHull([
+        [5.0, 0.01, 0.0, -0.04, -0.02], [4.91, 0.08, 0.09, -0.15, -0.03], [4.78, 0.16, 0.2, -0.25, -0.03], [4.23, 0.29, 0.45, -0.5, -0.02],
+        [3.54, 0.48, 0.58, -0.575, -0.02], [2.48, 0.59, 0.67, -0.64, -0.02], [1.33, 0.7, 0.69, -0.66, -0.02], [-0.35, 0.71, 0.69, -0.67, -0.02],
+        [-1.61, 0.725, 0.655, -0.63, -0.02], [-2.48, 0.61, 0.575, -0.585, -0.02], [-3.63, 0.48, 0.32, -0.495, -0.08], [-4.42, 0.35, 0.26, -0.41, -0.07],
+        [-5.13, 0.27, 0.23, -0.29, -0.03], [-5.38, 0.215, 0.215, -0.235, -0.01], [-5.42, 0.205, 0.205, -0.225, -0.01],
+      ], 2.1);
+      const W: WingOpts = { x0: 1.7, z: 0.96, root: 2.33, y: -0.27, tipX: 5.73, tip: 1.08, sweep: 0.61, dihedral: 3, t: 0.3 };
+      const T: WingOpts = { x0: 0.1, z: -3.77, root: 1.38, y: 0.31, tipX: 2.19, tip: 0.42, sweep: 0.66, dihedral: 0, t: 0.12 };
+      const up = new THREE.Vector3(0, 1, 0);
+      const tank = (sd: number) => body([[1.19, 0.001], [1.06, 0.16], [0.71, 0.29], [0, 0.365], [-0.71, 0.3], [-1.42, 0.12], [-1.93, 0.01]], 9, { x: sd * 6.05, y: -0.4, smooth: true });
+      const pipe = new JetHull([[-5.41, 0.188, 0.188, -0.208, -0.01], [-4.9, 0.165, 0.165, -0.185, -0.01]], 2.05, false);
+      const mid = -Math.PI / 2;
       return {
         solids: [
-          fuselage({ noseZ: 5.3, tailZ: -5.3, r: 0.75, sy: 1.12, noseR: 0.3, peak: 0.42, rise: 0 }),
-          tag(body([[-5.0, 0.4], [-5.4, 0.36]], 8), 'dark'),
-          canopy(2.6, 1.9, 0.48, 0.76, 0.44, true),
-          // Gövde yanı hava alıkları
-          ...mirror(0.72, (x) => body([[2.2, 0.32], [1.7, 0.4], [-0.5, 0.3], [-1.2, 0.05]], 7, { x, y: -0.05 })),
-          ...mirror(0.72, (x) => tag(body([[2.25, 0.2], [2.15, 0.27], [1.9, 0.3]], 7, { x, y: -0.05 }), 'dark')),
-          ...wing({ x0: 0.7, z: 1.3, root: 3.1, y: -0.45, tipX: 5.9, tip: 1.3, sweep: 0.5, dihedral: 4, t: 0.36 }),
-          ...wing({ x0: 0.1, z: -3.9, root: 1.5, y: 0.25, tipX: 2.4, tip: 0.8, sweep: 0.5, dihedral: 0, t: 0.11 }),
-          ...fins({ y0: 0.5, z0: -3.2, h: 2.0, root: 2.0, tip: 0.8, sweep: 1.1, t: 0.13 }),
+          H.geo(12),
+          tag(pipe.geo(12), 'dark'),
+          tag(pipe.disc(-4.9, -1, 12), 'dark'),
+          tag(new THREE.ConeGeometry(0.09, 0.26, sg(10)).rotateX(-Math.PI / 2).translate(0, -0.01, -5.05), 'dark'),
+          ...sideIntake(0.6, [
+            [1.4, 0.25, -0.05, -0.56, -0.31], [1.85, 0.27, -0.03, -0.59, -0.31], [1.96, 0.29, -0.01, -0.61, -0.31], [2.02, 0.325, 0.02, -0.635, -0.31], [1.99, 0.355, 0.05, -0.655, -0.31],
+            [1.8, 0.375, 0.07, -0.67, -0.31], [1.25, 0.375, 0.06, -0.66, -0.31], [0.5, 0.33, 0.0, -0.62, -0.31], [-0.2, 0.2, -0.12, -0.5, -0.31], [-0.7, 0.03, -0.27, -0.35, -0.31],
+          ], [[0.85, 0.22, -0.09, -0.52, -0.31], [1.42, 0.245, -0.055, -0.555, -0.31]], 0.55, 0.2),
+          ...[1, -1].flatMap((sd) => [[-0.28, 4.5], [-0.12, 4.32], [0.05, 4.2]].map(([y, z]) => portAt(sd * H.sideX(z, y), y, z, 0.026, 0.11))),
+          tag(H.patch(1, 1.95, 1.0, Math.PI / 2 - 0.38, Math.PI / 2 + 0.38, 0.006), 'dark'),
+          ...jetCanopy({
+            screen: [[2.48, 0.2, 0.69, 0.35, 0.66], [2.02, 0.31, 0.965, 0.35, 0.72]],
+            glass: [[2.02, 0.31, 0.965, 0.35, 0.72], [1.73, 0.35, 1.01, 0.35, 0.72], [1.3, 0.35, 0.95, 0.35, 0.72], [0.9, 0.26, 0.84, 0.35, 0.72], [0.66, 0.15, 0.755, 0.35, 0.7]],
+            aft: [[0.7, 0.165, 0.77, 0.35, 0.7], [0.55, 0.09, 0.72, 0.35, 0.68], [0.38, 0.02, 0.69, 0.4, 0.66]],
+            frames: [2.02, 0.68],
+            posts: [[0.13, 0.7, 2.46], [0.2, 0.94, 2.04]],
+            pilot: { z: 1.65, len: 1.4, h: 0.34, y: 0.68, w: 0.35 },
+          }),
+          // Kanat: kökten (gövde içinden) flap, kanatçık; uç yuvarlak. Kökte hücum kenarının öne genişlemesi ayrı parça
+          ...controlWing(W, 0.75, [[-0.3, 0.417, 'flap'], [0.417, 0.43, null], [0.43, 0.97, 'aileron'], [0.97, 1, null]], 7),
+          ...[1, -1].map((sd) => airfoilPart([
+            { le: new THREE.Vector3(sd * 0.6, -0.33, 1.4), c: 0.75, t: 0.26 },
+            { le: new THREE.Vector3(sd * 1.72, -0.27, 0.97), c: 0.12, t: 0.15 },
+          ], up, 0, 1)),
+          ...joint('ucTank', [0, 0, 0], [tank(1), tank(-1)], true),
+          ...controlWing(T, 0.64, [[0, 0.96, 'elevator'], [0.96, 1, null]], 8),
+          ...jetFin([[0.25, -1.77, 3.57], [0.66, -2.26, 3.0], [0.72, -3.27, 1.96], [0.92, -3.76, 1.42], [1.27, -4.04, 1.07], [1.8, -4.29, 0.73], [2.04, -4.4, 0.6], [2.2, -4.53, 0.42], [2.31, -4.65, 0.2]], 0.16, 0.79, 2, 6),
+          body([[-3.75, 0.01], [-4.0, 0.08], [-4.8, 0.09], [-5.2, 0.015]], 8, { y: 0.31, sy: 0.7, smooth: true }),
+          // Hava frenleri: ön karında yan yana iki kapak, ön kenarından menteşeli, firar kenarı iner
+          ...[1, -1].flatMap((sd) => {
+            const [a0, a1, zf, zb] = [mid + 0.08, mid + 0.8, 2.1, 0.95];
+            return [
+              tag(H.patch(sd, zf - 0.03, zb + 0.03, a0 + 0.02, a1 - 0.02, 0.004), 'dark'),
+              ...joint(sd > 0 ? 'airbrakeL' : 'airbrakeR', H.pt(zf, (a0 + a1) / 2, 0.02, sd), [H.patch(sd, zf, zb, a0, a1, 0.012, -0.012)], false, [sd, 0, 0]),
+            ];
+          }),
         ],
         props: [],
+        markZ: -3.3,
+        lights: [
+          { p: [6.2, -0.03, -0.28], kind: 'red' },
+          { p: [-6.2, -0.03, -0.28], kind: 'green' },
+          { p: [0, 1.6, -5.07], kind: 'white' },
+          { p: [0, -0.85, 3.4], kind: 'landing' },
+        ],
       };
+    }
     case 'vampire': {
       const bx = 1.75;
       return {
@@ -2338,6 +2421,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'mig15') return migGear(gearHeight(spec));
   if (kind === 'sabre') return sabreGear(gearHeight(spec));
   if (kind === 'f84') return thunderjetGear(gearHeight(spec));
+  if (kind === 'p80') return shootingStarGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
