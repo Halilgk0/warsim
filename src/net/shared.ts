@@ -35,6 +35,18 @@ export function validEmail(e: string): boolean {
   return c.length <= EMAIL_MAX && /^[a-z0-9][a-z0-9._%+-]*@([a-z0-9-]+\.)+[a-z][a-z0-9-]+$/.test(c);
 }
 
+/**
+ * Tek hesap kuralının eşleştirme anahtarı: aynı kutuya giden yazımlar aynı sayılır. "+etiket" atılır; Gmail noktaları da
+ * yok sayar. E-posta yine yazıldığı adrese gider.
+ */
+export function emailKey(e: string): string {
+  const c = cleanEmail(e);
+  const at = c.indexOf('@');
+  const local = c.slice(0, at).split('+')[0];
+  const domain = c.slice(at + 1);
+  return domain === 'gmail.com' || domain === 'googlemail.com' ? `${local.replace(/\./g, '')}@gmail.com` : `${local}@${domain}`;
+}
+
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
 export const LEGAL_VERSION = '2026-11-03';
 

@@ -25,6 +25,7 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'name_chars': return L('Adda yalnız harf, rakam, boşluk, - _ . olabilir', 'Only letters, digits, spaces, - _ . are allowed');
     case 'taken': return L('Bu ad alınmış; başka bir ad seç', 'This name is taken; choose another one');
     case 'email_bad': return L('E-posta adresini kontrol et (ör. ad@ornek.com)', 'Check your email address (e.g. name@example.com)');
+    case 'email_taken': return L('Bu e-posta başka bir hesapta kayıtlı; o hesapla giriş yap ya da başka bir adres yaz', 'This email is already on another account; log in to it or enter another address');
     case 'code_wrong': {
       const left = Number(extra.left ?? 0);
       return L(`Kod yanlış (${left} deneme hakkın kaldı)`, `Wrong code (${left} ${left === 1 ? 'try' : 'tries'} left)`);

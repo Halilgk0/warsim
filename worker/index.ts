@@ -5,8 +5,9 @@
 //   ağır özetleme sunucuda yapılamaz). Sunucu gelen istemci özetini rastgele tuzla SHA-256'dan geçirip saklar.
 // - Hesap açılırken e-posta adresi ve Gizlilik/KVKK onayı zorunlu; eski hesaplar isterse sonradan ekler. Adres, ona
 //   gönderilen 6 haneli kodla doğrulanmadan kaydedilmez. Kod gönderimi sınırlı (başkasının kutusuna yağdırılmasın, Gmail
-//   sınırı aşılmasın). Yenilik e-postası izni ayrı ve isteğe bağlı. Aynı adres birden çok hesapta olabilir. Adres yalnız
-//   sahibinin profilinde döner; publicAccount'a girmez (tarayıcıda saklanmaz, skor tablosuna gitmez).
+//   sınırı aşılmasın). Yenilik e-postası izni ayrı ve isteğe bağlı. Bir adresle tek hesap (email_key): kod doğrulanmadan
+//   söylenmez, adresin kayıtlı olup olmadığını yalnız kutunun sahibi öğrenir. Adres yalnız sahibinin profilinde döner;
+//   publicAccount'a girmez (tarayıcıda saklanmaz, skor tablosuna gitmez).
 // - Oturum: rastgele belirteç; veritabanında yalnız özeti. Art arda 8 yanlış şifrede hesap 15 dakika kilitlenir.
 // - Kurtarma kodu: hesap açılınca bir kez gösterilir; şifre unutulunca bununla yenilenir (kod da yenilenir).
 // - Kayıtlar: gzip'li veri + liste için özet; otomatik kayıtlardan en yeni 3'ü, elle kayıtlardan en çok 30'u kalır.
@@ -15,7 +16,7 @@
 // - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
 //   hesap silme.
 
-import { LEGAL_VERSION, METRICS, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { LEGAL_VERSION, METRICS, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
 interface Env extends MailEnv {
@@ -177,7 +178,8 @@ async function mailLimited(env: Env, email: string, ip: string, now: number): Pr
   ).bind(key, now, now - l.ms);
   const limits = [LIMIT_ADDRESS, LIMIT_IP, LIMIT_ALL];
   const res = await env.DB.batch<{ count: number }>([
-    hit(`to:${await sha256(email)}`, LIMIT_ADDRESS),
+    // Aynı kutuya giden yazımlar sınırı aşamasın
+    hit(`to:${await sha256(emailKey(email))}`, LIMIT_ADDRESS),
     hit(`ip:${await sha256(ip)}`, LIMIT_IP),
     hit('all', LIMIT_ALL),
   ]);
@@ -240,6 +242,11 @@ async function wrongCode(env: Env, email: string, code: unknown): Promise<Respon
   return left > 0 ? fail(400, 'code_wrong', { left }) : fail(400, 'code_expired');
 }
 
+/** Adres başka bir hesapta mı (accountId: bu hesabın kendisi sayılmaz). Kod doğrulandıktan sonra sorulur. */
+async function emailTaken(env: Env, email: string, accountId = 0): Promise<boolean> {
+  return !!(await env.DB.prepare('SELECT 1 FROM accounts WHERE email_key = ? AND id != ?').bind(emailKey(email), accountId).first());
+}
+
 // ---------------------------------------------------------------- hesap
 
 /** Hesabı ve ona bağlı bütün verileri siler. Hesaba bağlı yeni tablo eklenirse buraya da eklenmeli. */
@@ -281,15 +288,16 @@ async function register(req: Request, env: Env): Promise<Response> {
   if (email !== null) {
     const bad = await wrongCode(env, email, b?.code);
     if (bad) return bad;
+    if (await emailTaken(env, email)) return fail(409, 'email_taken');
   }
   const salt = randomHex(16);
   const code = newRecoveryCode();
   const now = Date.now();
   const news = b!.news === true;
   const res = await env.DB.prepare(
-    `INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login, email, legal_version, legal_at, news_opt, news_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now, email, email && LEGAL_VERSION, email && now, news ? 1 : 0, news ? now : null).run();
+    `INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login, email, email_key, legal_version, legal_at, news_opt, news_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now, email, email && emailKey(email), email && LEGAL_VERSION, email && now, news ? 1 : 0, news ? now : null).run();
   const id = res.meta.last_row_id;
   const acc = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(id).first<AccountRow>();
   return json({ token: await openSession(env, id), account: publicAccount(acc!), recoveryCode: code });
@@ -352,12 +360,13 @@ async function setEmail(req: Request, env: Env, a: AccountRow): Promise<Response
   if (email !== a.email) {
     const bad = await wrongCode(env, email, b?.code);
     if (bad) return bad;
+    if (await emailTaken(env, email, a.id)) return fail(409, 'email_taken');
   }
   const news = b?.news === true;
   const now = Date.now();
   await env.DB.prepare(
-    'UPDATE accounts SET email = ?, legal_version = COALESCE(legal_version, ?), legal_at = COALESCE(legal_at, ?), news_opt = ?, news_at = ? WHERE id = ?',
-  ).bind(email, LEGAL_VERSION, now, news ? 1 : 0, news ? a.news_at ?? now : null, a.id).run();
+    'UPDATE accounts SET email = ?, email_key = ?, legal_version = COALESCE(legal_version, ?), legal_at = COALESCE(legal_at, ?), news_opt = ?, news_at = ? WHERE id = ?',
+  ).bind(email, emailKey(email), LEGAL_VERSION, now, news ? 1 : 0, news ? a.news_at ?? now : null, a.id).run();
   a.email = email;
   return json({ account: publicAccount(a), email, news });
 }

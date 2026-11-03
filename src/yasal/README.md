@@ -36,7 +36,7 @@ Reklam ya da izleme çerezi ve analitik aracı kullanmıyoruz.
 
 ### E-posta adresin
 
-Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.
+Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Bir adresle yalnız bir hesap kullanılabilir. Adresin başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.
 
 Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.
 
@@ -159,7 +159,7 @@ We use no advertising or tracking cookies and no analytics tools.
 
 ### Your email address
 
-An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.
+An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. An address can be used for only one account. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.
 
 News and announcement emails are sent only if you ticked the separate box. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.
 

@@ -139,8 +139,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     yalnız tuzlu SHA-256 yapar.
   - Ad anahtarında I, İ, ı ve i aynı sayılır (`nameKey`); istemci ve sunucu aynı işlevi kullanır.
   - Hesap açmak için e-posta (her sağlayıcı; `shared.ts` `validEmail`) ve Gizlilik/KVKK onayı zorunlu; yenilik e-postası
-    izni ayrı ve isteğe bağlı. Adres yalnız sahibinin profilinde döner, tekil değildir. Eski adresin (vercel.app) paketi
-    e-posta sormadığı için o kaynak muaftır.
+    izni ayrı ve isteğe bağlı. Adres yalnız sahibinin profilinde döner. Bir adresle tek hesap (`emailKey`: Gmail noktaları
+    ve "+etiket" yok sayılır); çakışma kod doğrulanınca söylenir, kayıtlı adresler sızmasın. Eski adresin (vercel.app)
+    paketi e-posta sormadığı için o kaynak muaftır.
   - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`;
     Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
     `LIMIT_*`: başkasının kutusuna yağdırılmasın, Gmail'in günlük sınırı (~500) aşılmasın.

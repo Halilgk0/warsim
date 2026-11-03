@@ -47,7 +47,7 @@ const privacyTr: LegalText = {
 </ul>
 
 <h2>E-posta adresin</h2>
-<p>Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.</p>
+<p>Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Bir adresle yalnız bir hesap kullanılabilir. Adresin başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.</p>
 <p>Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.</p>
 
 <h2>Herkese görünenler</h2>
@@ -108,7 +108,7 @@ const privacyEn: LegalText = {
 </ul>
 
 <h2>Your email address</h2>
-<p>An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.</p>
+<p>An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. An address can be used for only one account. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.</p>
 <p>News and announcement emails are sent only if you ticked the separate box. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.</p>
 
 <h2>What is public</h2>
