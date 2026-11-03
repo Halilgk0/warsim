@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6 };
+const HIRES: Record<string, number> = { mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -594,8 +594,13 @@ function controlFin(f: Fin, xh: number, k0: number, k1: number): Geo[] {
  * Çizimden alınan dikey kuyruk (ortada, tek): yükseklik başına [y, hücum kenarı z, veter], alttan üste (ilk kesit
  * gövdeye gömülü). [i0, i1] kesitleri arasında veterin xh'tan arkası 'rudder' eklemi. Kalınlık tepeye doğru incelir.
  */
-function jetFin(list: [number, number, number][], t: number, xh: number, i0: number, i1: number): Geo[] {
+function jetFin(raw: [number, number, number][], t: number, xh: number, r0: number, r1: number): Geo[] {
   const side = new THREE.Vector3(1, 0, 0);
+  // Yüksek ayrıntıda kesitler yumuşar (kenar köşeli kalmasın); dümen sınırları en yakın kesite
+  const list = (DETAIL ? chaikinN(raw, 2) : raw) as [number, number, number][];
+  const near = (y: number) => list.reduce((b, q, i) => (Math.abs(q[0] - y) < Math.abs(list[b][0] - y) ? i : b), 0);
+  const i0 = near(raw[r0][0]);
+  const i1 = near(raw[r1][0]);
   const y0 = list[0][0];
   const top = list[list.length - 1];
   const mid = list[Math.floor(list.length / 2)];
@@ -1116,6 +1121,15 @@ function schwalbeGear(gh: number): Geo[] {
   });
 }
 
+/** Meteor takımı: iç kanattan iner (3,1 m iz), burun bacağı arkaya toplanır. */
+function meteorGear(gh: number): Geo[] {
+  return jetGear({
+    main: { x: 1.57, z: 0, top: -0.4, axle: -gh + 0.39, rw: 0.39, tw: 0.2, dx: 0.04, door: { dx: 0.11, top: -0.46, bot: -1.14, w: 0.52, r: 0.12 } },
+    nose: { topY: -0.5, topZ: 3.75, axle: -gh + 0.31, z: 3.97, rw: 0.31, tw: 0.15 },
+    belly: { x: 0.26, y: -0.58, z0: 3.7, z1: 2.6, h: 0.26 },
+  });
+}
+
 /**
  * Kanopi: gövde üstünde yarı gömülü damla. Çerçeve: ön cam kenarında ince koyu bant; kabarcık olmayan (çerçeveli)
  * kanopide ortada ve arkada da birer bant.
@@ -1325,19 +1339,77 @@ function defineModel(key: string): ModelDef {
         rockets: rocketRow([3.0, 3.5, 4.0, 4.5], -0.85, 1.4),
         bombs: mirror(2.4, (x) => bombAt(x, -0.9, 1.0, 1.3)),
       };
-    case 'meteor':
+    case 'meteor': {
+      // Meteor F.3, ölçüler F.4 üç görünüş çiziminden; kanat ucu F.3'ün 13,1 m açıklığına uzatıldı. İnce uzun gövde,
+      // burun yanlarında dört 20 mm ağzı. Kanadın ortasından geçen kalın Derwent naselleri: geniş dudak, ortada dikey
+      // ayırıcı. Kökte büyük içbükey firar kaplaması, iç kanat üstünde dalış frenleri. Yatay kuyruk dikey kuyruğu haç
+      // gibi keser; dikey kuyruk gövdenin altına da iner, tepesi yuvarlak.
+      const H = new JetHull([
+        [4.6, 0.01, -0.1, -0.14, -0.12], [4.46, 0.26, 0.11, -0.355, -0.12], [4.09, 0.4, 0.33, -0.51, -0.1], [3.24, 0.56, 0.51, -0.635, -0.08], [2.31, 0.63, 0.64, -0.69, -0.04],
+        [1.0, 0.645, 0.72, -0.73, -0.02], [-0.87, 0.61, 0.68, -0.61, 0.02], [-2.92, 0.5, 0.65, -0.42, 0.08], [-5.54, 0.26, 0.58, -0.14, 0.22], [-6.5, 0.14, 0.53, -0.08, 0.24], [-7.0, 0.03, 0.46, 0.0, 0.24],
+      ], 2.15);
+      const Wi: WingOpts = { x0: 0.4, z: 1.25, root: 3.4, y: -0.28, tipX: 2.5, tip: 3.25, sweep: 0.08, dihedral: 0, t: 0.42 };
+      const W: WingOpts = { x0: 2.97, z: 1.05, root: 2.96, y: -0.26, tipX: 6.55, tip: 1.07, sweep: 0.93, dihedral: 3.9, t: 0.35 };
+      const T: WingOpts = { x0: 0.06, z: -6.01, root: 1.85, y: 1.28, tipX: 2.0, tip: 0.95, sweep: 0.55, dihedral: 0, t: 0.13 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const up = new THREE.Vector3(0, 1, 0);
+      const NX = 2.3;
+      const NY = -0.31;
+      const nacelle = (sd: number): Geo[] => {
+        const o = { x: sd * NX, y: NY };
+        return [
+          body([[1.75, 0.24], [2.1, 0.26], [2.24, 0.31], [2.26, 0.37], [2.2, 0.43], [1.84, 0.55], [0.86, 0.62], [0.21, 0.625], [-0.87, 0.56], [-2.32, 0.37], [-2.92, 0.26], [-3.02, 0.25]], 12, { ...o, smooth: true }),
+          tag(body([[1.4, 0.21], [1.76, 0.235]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.21, sg(12)).translate(o.x, o.y, 1.4), 'dark'),
+          new THREE.BoxGeometry(0.13, 0.5, 0.55).translate(o.x, o.y, 1.72),
+          tag(body([[-3.01, 0.235], [-2.5, 0.2]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.2, sg(12)).rotateY(Math.PI).translate(o.x, o.y, -2.5), 'dark'),
+          tag(new THREE.ConeGeometry(0.09, 0.26, sg(8)).rotateX(-Math.PI / 2).translate(o.x, o.y, -2.64), 'dark'),
+        ];
+      };
       return {
         solids: [
-          fuselage({ noseZ: 6.0, tailZ: -6.5, r: 0.78, sy: 1.1, noseR: 0.3, peak: 0.4, rise: 0.35 }),
-          canopy(2.6, 2.0, 0.48, 0.78, 0.45, true),
-          ...wing({ x0: 0.7, z: 1.6, root: 3.6, y: -0.15, tipX: 6.55, tip: 1.3, sweep: 0.7, dihedral: 4, t: 0.42, shape: 'rounded' }),
-          ...mirror(2.3, (x) => jetPod(x, -0.15, 2.2, 4.4, 0.62)),
-          ...fins({ y0: 0.5, z0: -4.4, h: 2.2, root: 2.0, tip: 1.0, sweep: 0.9, t: 0.14 }),
-          ...wing({ x0: 0.05, z: -5.0, root: 1.3, y: 1.7, tipX: 2.5, tip: 0.7, sweep: 0.4, dihedral: 0, t: 0.12 }),
+          H.geo(13),
+          ...[1, -1].flatMap((sd) => [[-0.02, 3.5], [-0.31, 3.5]].map(([y, z]) => portAt(sd * H.sideX(z, y), y, z, 0.035, 0.27))),
+          tag(H.patch(1, 2.7, 1.3, Math.PI / 2 - 0.4, Math.PI / 2 + 0.4, 0.006), 'dark'),
+          ...jetCanopy({
+            screen: [[3.29, 0.16, 0.56, 0.3, 0.52], [2.64, 0.355, 0.95, 0.3, 0.68]],
+            glass: [[2.64, 0.355, 0.95, 0.3, 0.68], [2.31, 0.38, 1.01, 0.3, 0.7], [1.98, 0.38, 0.98, 0.3, 0.7], [1.5, 0.33, 0.88, 0.3, 0.7], [1.12, 0.12, 0.76, 0.4, 0.7]],
+            aft: [[1.15, 0.14, 0.77, 0.4, 0.7], [1.05, 0.06, 0.745, 0.4, 0.69], [0.92, 0.015, 0.725, 0.5, 0.68]],
+            frames: [2.64, 1.98],
+            posts: [[0.1, 0.57, 3.27], [0.26, 0.92, 2.66]],
+            pilot: { z: 2.15, len: 1.6, h: 0.34, y: 0.68, w: 0.36 },
+          }),
+          // İç kanat (nasele kadar, flaplı) ve dış kanat (kanatçık); uç yuvarlak
+          ...controlWing(Wi, 0.78, [[0, 0.62, 'flap'], [0.62, 1, null]]),
+          ...controlWing(W, 0.76, [[-0.2, 0, null], [0, 0.92, 'aileron'], [0.92, 1, null]], 3),
+          // Kökteki içbükey firar kaplaması
+          ...[1, -1].map((sd) => airfoilPart([
+            { le: new THREE.Vector3(sd * 0.35, -0.28, -1.95), c: 1.0, t: 0.13 },
+            { le: new THREE.Vector3(sd * 0.72, -0.28, -2.0), c: 0.42, t: 0.08 },
+            { le: new THREE.Vector3(sd * 1.25, -0.28, -2.05), c: 0.1, t: 0.03 },
+          ], up, 0, 1)),
+          ...nacelle(1),
+          ...nacelle(-1),
+          // Dalış frenleri: iç kanat üstünde, arka kenarından menteşeli, ön kenarı kalkar; altında koyu yuva
+          ...[1, -1].flatMap((sd) => [
+            tag(new THREE.BoxGeometry(0.74, 0.008, 0.17).translate(sd * 1.26, -0.178, -1.2), 'dark'),
+            ...joint(sd > 0 ? 'airbrakeL' : 'airbrakeR', [sd * 1.26, -0.17, -1.3], [new THREE.BoxGeometry(0.78, 0.014, 0.2).translate(sd * 1.26, -0.17, -1.2)], false, [sd, 0, 0]),
+          ]),
+          ...controlWing(T, 0.6, [[0, 0.96, 'elevator'], [0.96, 1, null]], 2.5),
+          ...jetFin([[-0.35, -6.1, 0.7], [-0.14, -5.96, 1.26], [0.6, -5.8, 2.12], [1.12, -6.05, 1.93], [1.4, -6.24, 1.71], [1.78, -6.52, 1.31], [2.06, -6.77, 0.82], [2.2, -7.04, 0.33]], 0.17, 0.58, 1, 5),
+          body([[-5.75, 0.01], [-6.1, 0.08], [-7.2, 0.08], [-8.08, 0.01]], 8, { y: 1.28, sy: 0.7, smooth: true }),
         ],
         props: [],
-        tank: [tankAt(-0.95, 0.4, 0, 1.0)],
+        markZ: -3.6,
+        lights: [
+          { p: [W.tipX + 0.2, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.2, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, 0.9, -8.0], kind: 'white' },
+          { p: [1.2, -0.56, 0.9], kind: 'landing' },
+        ],
       };
+    }
     case 'sabre': {
       // F-86F, ölçüler üç görünüş çiziminden. Yumurta kesitli derin gövde, üst dudağında siyah radar kubbesi olan oval
       // burun girişi, burun yanlarında üçer silah ağzı, damla kanopi. 6-3 kanat (35° ok, 3° dihedral, açıklığın
@@ -2481,6 +2553,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'f84') return thunderjetGear(gearHeight(spec));
   if (kind === 'p80') return shootingStarGear(gearHeight(spec));
   if (kind === 'me262') return schwalbeGear(gearHeight(spec));
+  if (kind === 'meteor') return meteorGear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
