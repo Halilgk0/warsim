@@ -102,11 +102,11 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Park eden uçaklar `placeParked`: en yeni yarısı hangar ağzı, T2, çadır hangar, sığınak ve siperlere, kalanı
       aprona. Tür başına InstancedMesh (`models.ts` `parkedParts`).
   - `models.ts`: kodla üretilen parametrik uçaklar. Modelde `+x` sol kanat (burun `+z`, üst `+y`).
-    - F-84 ve F-86 üç görünüş çiziminden kurulur (ölçüler px/m ile çizimden okunur, fotoğrafla karşılaştırılır):
-      `JetHull` kesit listesinden gövde, kanopi ve kanal yapar; `jetCanopy`, `jetFin`, `jetGear`. Yeni uçak için önce
-      Wikimedia Commons'ta "<uçak> 3-view line drawing" ara. Sim'deki `gearHeight` takımla uyuşmalı.
-    - Hareketli parçalar eklemdir; şimdilik MiG-15, F-84 ve F-86'da. Bu uçakları değiştirince ansiklopedi görsellerini
-      de yeniden üret.
+    - Araştırma ağacındaki bütün jetler üç görünüş çiziminden kurulur (ölçüler px/m ile çizimden okunur, fotoğrafla
+      karşılaştırılır): `JetHull` kesit listesinden gövde, kanopi ve kanal yapar; `jetCanopy`, `jetFin`, `jetGear`,
+      `sideIntake`, `glassFrames`. Yeni uçak için önce Wikimedia Commons'ta "<uçak> 3-view" ara. Sim'deki `gearHeight`
+      takımla uyuşmalı.
+    - Hareketli parçalar eklemdir; şimdilik jetlerde. Modeli değiştirince ansiklopedi görsellerini de yeniden üret.
       - Kanat ve kuyruk `controlWing` / `controlFin` ile kurulur: ana yüzey ve kumanda yüzeyi aynı profilden kesilir
         (`airfoilPart`), aralarında yalnız menteşe çizgisi kalır.
       - Gövde (kapalı hava girişi ve egzoz) `migFuselage`, takım (içe ve öne katlanır, gövdeye girer) `migGear`.
