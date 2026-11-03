@@ -77,6 +77,7 @@ export function gearHeight(spec: AircraftSpec): number {
   if (spec.id === 'f86f') return 1.72;
   if (spec.id === 'f84g') return 1.62;
   if (spec.id === 'f80c') return 1.45;
+  if (spec.id === 'me262') return 1.88;
   return spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
 }
 
