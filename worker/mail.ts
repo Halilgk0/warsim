@@ -2,6 +2,7 @@
 // Cloudflare sırrı olarak durur (MAIL_PASSWORD). Geliştirmede SMTP_HOST verilirse TLS'siz ona bağlanır (tools/mail-dev.mjs).
 
 import { connect } from 'cloudflare:sockets';
+import type { Mail } from './codeMail';
 
 export interface MailEnv {
   MAIL_FROM?: string;
@@ -22,7 +23,7 @@ function b64(s: string): string {
 export const mailReady = (env: MailEnv): boolean => !!env.MAIL_FROM && !!env.MAIL_PASSWORD;
 
 /** Alıcı adresi validEmail'den geçmiş olmalı (satır sonu taşıyamaz). Başarısızsa hata fırlatır; iletide adres ve şifre olmaz. */
-export async function sendMail(env: MailEnv, to: string, subject: string, text: string): Promise<void> {
+export async function sendMail(env: MailEnv, to: string, mail: Mail): Promise<void> {
   const from = env.MAIL_FROM!;
   const socket = connect(
     { hostname: env.SMTP_HOST ?? 'smtp.gmail.com', port: Number(env.SMTP_PORT ?? 465) },
@@ -56,18 +57,28 @@ export async function sendMail(env: MailEnv, to: string, subject: string, text: 
     await reply(name, want);
   };
 
-  const body = b64(text).replace(/.{1,76}/g, '$&\r\n');
+  // İki sürüm: HTML gösteremeyen program düz metni okur
+  const boundary = `wsb-${crypto.randomUUID()}`;
+  const part = (type: string, content: string) => [
+    `--${boundary}`,
+    `Content-Type: ${type}; charset=UTF-8`,
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64(content).replace(/.{1,76}/g, '$&\r\n'),
+  ].join('\r\n');
   const message = [
     `From: WarSimBox <${from}>`,
     `To: <${to}>`,
-    `Subject: =?UTF-8?B?${b64(subject)}?=`,
+    `Subject: =?UTF-8?B?${b64(mail.subject)}?=`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomUUID()}@warsimbox.com>`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
-    `${body}.`,
+    part('text/plain', mail.text),
+    part('text/html', mail.html),
+    `--${boundary}--`,
+    '.',
   ].join('\r\n');
 
   const dialog = async (): Promise<void> => {

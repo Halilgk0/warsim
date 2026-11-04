@@ -28,7 +28,7 @@ const privacyTr: LegalText = {
 
 <h2>Hangi verileri işliyoruz</h2>
 <ul>
-  <li><b>Hesap açarsan:</b> kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.</li>
+  <li><b>Hesap açarsan:</b> kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.</li>
   <li><b>E-postanı doğrularken:</b> doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.</li>
   <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren ve öğretici tercihin.</li>
   <li><b>Geri bildirim gönderirsen:</b> yazdığın ad, ileti ve fiyat önerisi. Bunlar için hesap gerekmez; bilgiler Google Forms’a gider.</li>
@@ -48,7 +48,7 @@ const privacyTr: LegalText = {
 
 <h2>E-posta adresin</h2>
 <p>Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Bir adresle yalnız bir hesap kullanılabilir. Adresin başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.</p>
-<p>Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.</p>
+<p>Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen, hesabında seçili dilde gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.</p>
 
 <h2>Herkese görünenler</h2>
 <p>Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.</p>
@@ -89,7 +89,7 @@ const privacyEn: LegalText = {
 
 <h2>What we process</h2>
 <ul>
-  <li><b>If you create an account:</b> your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.</li>
+  <li><b>If you create an account:</b> your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.</li>
   <li><b>While verifying your email:</b> a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.</li>
   <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time and tutorial preference.</li>
   <li><b>If you send feedback:</b> the name, message and price suggestion you enter. No account is needed; this goes to Google Forms.</li>
@@ -109,7 +109,7 @@ const privacyEn: LegalText = {
 
 <h2>Your email address</h2>
 <p>An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. An address can be used for only one account. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.</p>
-<p>News and announcement emails are sent only if you ticked the separate box. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.</p>
+<p>News and announcement emails are sent only if you ticked the separate box, in the language selected on your account. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.</p>
 
 <h2>What is public</h2>
 <p>Your user name and scores are visible to every visitor on the leaderboard. Your user name does not have to be your real name or contain personal details.</p>
@@ -158,7 +158,7 @@ const kvkkTr: LegalText = {
     <tr><td>Doğrulama kodu özeti, e-posta ve IP adresi özetleri</td><td>E-posta adresinin doğrulanması, kod gönderiminin kötüye kullanılmasının önlenmesi</td><td>Sözleşmenin kurulması (m. 5/2-c); meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>IP adresi ve tarayıcı bilgileri</td><td>Sitenin sunulması ve güvenliği</td><td>Meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>Geri bildirimde yazılan ad ve ileti</td><td>Görüşlerin değerlendirilmesi</td><td>Meşru menfaat (m. 5/2-f)</td></tr>
-    <tr><td>E-posta adresi (yalnız izin verdiysen)</td><td>Yenilik ve duyuru e-postaları</td><td>Açık rıza (m. 5/1)</td></tr>
+    <tr><td>E-posta adresi ve dil seçimi (yalnız izin verdiysen)</td><td>Yenilik ve duyuru e-postaları</td><td>Açık rıza (m. 5/1)</td></tr>
   </tbody>
 </table></div>
 
@@ -208,7 +208,7 @@ const kvkkEn: LegalText = {
     <tr><td>Verification code hash, email and IP address hashes</td><td>Verifying the email address, preventing abuse of code sending</td><td>Formation of a contract (5/2-c); legitimate interest (5/2-f)</td></tr>
     <tr><td>IP address and browser details</td><td>Serving and securing the site</td><td>Legitimate interest (5/2-f)</td></tr>
     <tr><td>Name and message entered as feedback</td><td>Reviewing feedback</td><td>Legitimate interest (5/2-f)</td></tr>
-    <tr><td>Email address (only if you gave permission)</td><td>News and announcement emails</td><td>Explicit consent (5/1)</td></tr>
+    <tr><td>Email address and language (only if you gave permission)</td><td>News and announcement emails</td><td>Explicit consent (5/1)</td></tr>
   </tbody>
 </table></div>
 

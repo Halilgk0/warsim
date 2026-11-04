@@ -5,9 +5,9 @@
 //   ağır özetleme sunucuda yapılamaz). Sunucu gelen istemci özetini rastgele tuzla SHA-256'dan geçirip saklar.
 // - Hesap açılırken e-posta adresi ve Gizlilik/KVKK onayı zorunlu; eski hesaplar isterse sonradan ekler. Adres, ona
 //   gönderilen 6 haneli kodla doğrulanmadan kaydedilmez. Kod gönderimi sınırlı (başkasının kutusuna yağdırılmasın, Gmail
-//   sınırı aşılmasın). Yenilik e-postası izni ayrı ve isteğe bağlı. Bir adresle tek hesap (email_key): kod doğrulanmadan
-//   söylenmez, adresin kayıtlı olup olmadığını yalnız kutunun sahibi öğrenir. Adres yalnız sahibinin profilinde döner;
-//   publicAccount'a girmez (tarayıcıda saklanmaz, skor tablosuna gitmez).
+//   sınırı aşılmasın). Yenilik e-postası izni ayrı ve isteğe bağlı (news_opt); e-postalar hesabın dilinde gider. Bir adresle
+//   tek hesap (email_key): kod doğrulanmadan söylenmez, adresin kayıtlı olup olmadığını yalnız kutunun sahibi öğrenir. Adres
+//   yalnız sahibinin profilinde döner; publicAccount'a girmez (tarayıcıda saklanmaz, skor tablosuna gitmez).
 // - Oturum: rastgele belirteç; veritabanında yalnız özeti. Art arda 8 yanlış şifrede hesap 15 dakika kilitlenir.
 // - Kurtarma kodu: hesap açılınca bir kez gösterilir; şifre unutulunca bununla yenilenir (kod da yenilenir).
 // - Kayıtlar: gzip'li veri + liste için özet; otomatik kayıtlardan en yeni 3'ü, elle kayıtlardan en çok 30'u kalır.
@@ -17,6 +17,7 @@
 //   hesap silme.
 
 import { LEGAL_VERSION, METRICS, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { codeMail } from './codeMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
 interface Env extends MailEnv {
@@ -42,6 +43,7 @@ interface AccountRow {
   legal_version: string | null;
   news_opt: number;
   news_at: number | null;
+  lang: string | null;
 }
 
 const SESSION_DAYS = 90;
@@ -129,7 +131,10 @@ async function body<T>(req: Request): Promise<T | null> {
   }
 }
 
-const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email });
+const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang });
+
+/** Geçerli dil kodu ya da yok. */
+const langCode = (v: unknown): 'tr' | 'en' | null => (v === 'tr' || v === 'en' ? v : null);
 
 async function openSession(env: Env, accountId: number): Promise<string> {
   const token = randomHex(32);
@@ -210,15 +215,8 @@ async function emailCode(req: Request, env: Env): Promise<Response> {
     env.DB.prepare('INSERT OR REPLACE INTO email_codes (email, code_hash, expires, tries, sent_at) VALUES (?, ?, ?, 0, ?)')
       .bind(email, await codeHash(email, code), now + CODE_MS, now),
   ]);
-  const en = b?.lang === 'en';
   try {
-    await sendMail(
-      env, email,
-      en ? `Your WarSimBox verification code: ${code}` : `WarSimBox doğrulama kodun: ${code}`,
-      en
-        ? `Your WarSimBox email verification code: ${code}\n\nThe code is valid for 10 minutes. If you did not request it, you can ignore this email; your address will not be added to any account.\n\nWarSimBox · https://warsimbox.com`
-        : `WarSimBox e-posta doğrulama kodun: ${code}\n\nKod 10 dakika geçerli. Bunu sen istemediysen bu e-postayı yok sayabilirsin; adresin hiçbir hesaba eklenmez.\n\nWarSimBox · https://warsimbox.com`,
-    );
+    await sendMail(env, email, codeMail(code, b?.lang === 'en'));
   } catch (e) {
     console.error(e);
     await env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(email).run();
@@ -271,7 +269,7 @@ async function deleteMe(req: Request, env: Env, a: AccountRow): Promise<Response
 }
 
 async function register(req: Request, env: Env): Promise<Response> {
-  const b = await body<{ name?: string; pass?: string; email?: string; code?: string; accepted?: boolean; news?: boolean }>(req);
+  const b = await body<{ name?: string; pass?: string; email?: string; code?: string; accepted?: boolean; news?: boolean; lang?: string }>(req);
   const name = cleanName(b?.name ?? '');
   const problem = nameProblem(name);
   if (problem) return fail(400, `name_${problem}`);
@@ -293,11 +291,11 @@ async function register(req: Request, env: Env): Promise<Response> {
   const salt = randomHex(16);
   const code = newRecoveryCode();
   const now = Date.now();
-  const news = b!.news === true;
+  const news = !!email && b?.news === true;
   const res = await env.DB.prepare(
-    `INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login, email, email_key, legal_version, legal_at, news_opt, news_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now, email, email && emailKey(email), email && LEGAL_VERSION, email && now, news ? 1 : 0, news ? now : null).run();
+    `INSERT INTO accounts (name, name_key, pass_salt, pass_hash, recovery_hash, created, last_login, email, email_key, legal_version, legal_at, news_opt, news_at, lang)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(name, key, salt, await passHash(salt, b!.pass!), await sha256(normCode(code)), now, now, email, email && emailKey(email), email && LEGAL_VERSION, email && now, news ? 1 : 0, news ? now : null, langCode(b?.lang)).run();
   const id = res.meta.last_row_id;
   const acc = await env.DB.prepare('SELECT * FROM accounts WHERE id = ?').bind(id).first<AccountRow>();
   return json({ token: await openSession(env, id), account: publicAccount(acc!), recoveryCode: code });
@@ -343,10 +341,15 @@ async function logout(req: Request, env: Env): Promise<Response> {
 }
 
 async function updateMe(req: Request, env: Env, a: AccountRow): Promise<Response> {
-  const b = await body<{ noTutorial?: boolean }>(req);
+  const b = await body<{ noTutorial?: boolean; lang?: string }>(req);
   if (typeof b?.noTutorial === 'boolean') {
     await env.DB.prepare('UPDATE accounts SET no_tutorial = ? WHERE id = ?').bind(b.noTutorial ? 1 : 0, a.id).run();
     a.no_tutorial = b.noTutorial ? 1 : 0;
+  }
+  const lang = langCode(b?.lang);
+  if (lang && lang !== a.lang) {
+    await env.DB.prepare('UPDATE accounts SET lang = ? WHERE id = ?').bind(lang, a.id).run();
+    a.lang = lang;
   }
   return json({ account: publicAccount(a) });
 }
@@ -539,7 +542,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
     const saves = await env.DB.prepare('SELECT meta FROM saves WHERE account_id = ? ORDER BY created DESC LIMIT 5').bind(a.id).all<{ meta: string }>();
     const stats = await env.DB.prepare("SELECT * FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id).first();
     return json({
-      name: a.name, email: a.email, legalVersion: a.legal_version, newsOpt: !!a.news_opt,
+      name: a.name, email: a.email, lang: a.lang, legalVersion: a.legal_version, newsOpt: !!a.news_opt,
       created: new Date(a.created).toISOString(), lastLogin: new Date(a.last_login).toISOString(), stats,
       saves: saves.results.map((r) => {
         const m = JSON.parse(r.meta);

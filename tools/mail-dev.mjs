@@ -13,7 +13,11 @@ function decode(raw) {
   const to = /^To: <(.+)>$/m.exec(head)?.[1] ?? '?';
   const from = /^From: (.+)$/m.exec(head)?.[1] ?? '?';
   const sub = /^Subject: =\?UTF-8\?B\?(.+)\?=$/m.exec(head)?.[1] ?? '';
-  return { to, from, subject: Buffer.from(sub, 'base64').toString(), text: Buffer.from(rest.join('').replace(/\s/g, ''), 'base64').toString() };
+  const part = (type) => {
+    const m = new RegExp(`Content-Type: text/${type};[^]*?\\r\\n\\r\\n([^-]+)`).exec(rest.join('\r\n\r\n'));
+    return m ? Buffer.from(m[1].replace(/\s/g, ''), 'base64').toString() : '';
+  };
+  return { to, from, subject: Buffer.from(sub, 'base64').toString(), text: part('plain'), html: part('html') };
 }
 
 tcp((s) => {
@@ -74,7 +78,7 @@ http((req, res) => {
   res.setHeader('content-type', 'text/html; charset=utf-8');
   res.end(`<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>Yerel e-postalar</title>
 <body style="font:16px system-ui;max-width:640px;margin:24px auto;padding:0 16px"><h1>Yerel e-postalar</h1><p>Gerçek e-posta gönderilmez.</p>
-${inbox.map((m) => `<hr><p><b>${esc(m.subject)}</b><br>Kime: ${esc(m.to)}<br>Kimden: ${esc(m.from)}</p><pre style="white-space:pre-wrap">${esc(m.text)}</pre>`).join('') || '<p>Henüz e-posta yok.</p>'}`);
+${inbox.map((m) => `<hr><p><b>${esc(m.subject)}</b><br>Kime: ${esc(m.to)}<br>Kimden: ${esc(m.from)}</p><iframe sandbox title="E-posta" style="width:100%;height:440px;border:1px solid #ccc" srcdoc="${esc(m.html).replace(/"/g, '&quot;')}"></iframe><pre style="white-space:pre-wrap">${esc(m.text)}</pre>`).join('') || '<p>Henüz e-posta yok.</p>'}`);
 }).listen(2526, '127.0.0.1');
 
 console.log('Sahte SMTP 127.0.0.1:2525, kutu http://localhost:2526');

@@ -138,17 +138,19 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Bedava planda istek başına ~10 ms işlemci süresi var. Bu yüzden şifre tarayıcıda PBKDF2 ile uzatılır, sunucu
     yalnız tuzlu SHA-256 yapar.
   - Ad anahtarında I, İ, ı ve i aynı sayılır (`nameKey`); istemci ve sunucu aynı işlevi kullanır.
-  - Hesap açmak için e-posta (her sağlayıcı; `shared.ts` `validEmail`) ve Gizlilik/KVKK onayı zorunlu; yenilik e-postası
-    izni ayrı ve isteğe bağlı. Adres yalnız sahibinin profilinde döner. Bir adresle tek hesap (`emailKey`: Gmail noktaları
+  - Hesap açmak için e-posta (her sağlayıcı; `shared.ts` `validEmail`) ve Gizlilik/KVKK onayı zorunlu. Yenilik e-postası
+    izni ayrı ve isteğe bağlı: yalnız `news_opt = 1` olanlara, hesabın dilinde (`accounts.lang`) gider. Toplu gönderimde her
+    e-postada çıkma bağlantısı olmalı. Dil oyun açılınca eşitlenir (`persist.ts` `syncLang`). Adres yalnız sahibinin
+    profilinde döner. Bir adresle tek hesap (`emailKey`: Gmail noktaları
     ve "+etiket" yok sayılır); çakışma kod doğrulanınca söylenir, kayıtlı adresler sızmasın. Eski adresin (vercel.app)
     paketi e-posta sormadığı için o kaynak muaftır.
-  - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`;
-    Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
+  - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`,
+    içerik `worker/codeMail.ts`; Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
     `LIMIT_*`: başkasının kutusuna yağdırılmasın, Gmail'in günlük sınırı (~500) aşılmasın.
   - Yerel deneme: `node tools/mail-dev.mjs` (sahte SMTP; kodlar http://localhost:2526), `.dev.vars` ayarları dosyasında.
   - E-postası olmayan eski hesaba oyun açılınca ve girişte sorulur (`loginBox.ts` `askEmail`), zorunlu değil. Kapatınca
     7 gün sorulmaz (`persist.ts` `shouldAskEmail`; hesap başına, tarayıcıda). Sonradan Profil'den eklenir; yenilik izni
-    de oradan kapanır.
+    de oradan açılıp kapanır.
   - Yeni migration canlı veritabanına push'tan önce uygulanır (`wrangler d1 migrations apply warsimbox --remote`);
     Workers Builds'in bunu yaptığını varsayma. Yalnız eklemeli değişiklik: eski worker yeni tabloyla çalışabilsin.
   - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.

@@ -1,6 +1,6 @@
-// Profil penceresi (ana menüde ad etiketine ya da oyunda Menü → Profil'e dokununca): hesap bilgisi, e-posta (yeni adres
-// kodla doğrulanır) ve yenilik izni, skorlar (tüm zamanlar, sıra, bu hafta), buluttaki kayıt sayısı, şifre değiştirme
-// ve hesabı silme.
+// Profil penceresi (ana menüde ad etiketine ya da oyunda Menü → Profil'e dokununca): hesap bilgisi, hesabın dili, e-posta
+// (yeni adres kodla doğrulanır) ve yenilik izni, skorlar (tüm zamanlar, sıra, bu hafta), buluttaki kayıt sayısı, şifre
+// değiştirme ve hesabı silme.
 
 import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail } from '../persist';
 import { apiMessage } from '../net/api';
@@ -8,7 +8,7 @@ import { METRICS, PASS_MAX, PASS_MIN, cleanEmail, validEmail } from '../net/shar
 import { $, esc } from './dom';
 import { HINT, LABEL, fmtValue } from './leaderboard';
 import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
-import { L, LOCALE } from '../i18n';
+import { L, LANG, LOCALE } from '../i18n';
 
 const dateFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -314,7 +314,7 @@ export class ProfileBox {
         </form>`
       : '';
     this.el.innerHTML = `<div class="login-card pf-card" role="dialog" aria-modal="true">${head}
-      <div class="pf-who"><b>${esc(a.name)}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)} · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}</span></div>
+      <div class="pf-who"><b>${esc(a.name)}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)} · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
       <div class="pf-email"><span class="small ${p.email ? '' : 'muted'}">${p.email ? esc(p.email) : L('E-posta eklenmemiş', 'No email added')}</span>
         <button type="button" class="link" data-pf="mail">${this.mailOpen ? L('Vazgeç', 'Cancel') : p.email ? L('Düzenle', 'Edit') : L('Ekle', 'Add')}</button></div>
       ${mail}

@@ -48,7 +48,7 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-03';
+export const LEGAL_VERSION = '2026-11-04';
 
 /** Skor tablosu ölçütleri (veritabanı sütunu). */
 export const METRICS = ['kills', 'wins', 'earned', 'peak', 'play_sec'] as const;

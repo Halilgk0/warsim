@@ -28,6 +28,8 @@ export interface Account {
   noTutorial?: boolean;
   /** Hesapta e-posta var mı (false ise sorulur; sunucudan gelmemişse bilinmiyor, sorulmaz). */
   hasEmail?: boolean;
+  /** Hesabın dili: e-postalar bu dilde gider. */
+  lang?: 'tr' | 'en' | null;
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -78,6 +80,15 @@ export function currentAccount(): Account | null {
 function setSession(token: string, acc: Account): void {
   session = acc;
   storeAuth(token, acc);
+  syncLang(acc);
+}
+
+/** Hesaptaki dil oyuncunun seçtiği dille aynı olsun. Dil düğmesi sayfayı yeniden açar: yeni dil açılışta buradan gider. */
+function syncLang(acc: Account): void {
+  if (acc.lang === LANG) return;
+  acc.lang = LANG;
+  storeAuth(authToken(), acc);
+  void api('PATCH', '/me', { lang: LANG }).catch(() => {});
 }
 
 /** Sayfa açılınca: oturum hâlâ geçerli mi (kapanmışsa çıkış). Bağlantı yoksa son bilinen hâl kalır. */
@@ -87,6 +98,7 @@ export async function refreshSession(): Promise<void> {
     const r = await api<{ account: Account }>('GET', '/me');
     session = r.account;
     storeAuth(authToken(), r.account);
+    syncLang(r.account);
   } catch (e) {
     if (e instanceof ApiError && e.code === 'no_session') {
       session = null;
@@ -116,7 +128,7 @@ export async function requestEmailCode(email: string, name?: string): Promise<vo
 
 /** Yeni hesap (adres koduyla doğrulanır); kurtarma kodu bir kez döner (oyuncuya gösterilmeli). */
 export async function register(name: string, password: string, email: string, news: boolean, code: string): Promise<{ account: Account; recoveryCode: string }> {
-  const r = await api<AuthResult>('POST', '/register', { name: cleanName(name), pass: await clientHash(name, password), email, code, accepted: true, news });
+  const r = await api<AuthResult>('POST', '/register', { name: cleanName(name), pass: await clientHash(name, password), email, code, accepted: true, news, lang: LANG });
   setSession(r.token, r.account);
   adoptLegacy(r.account);
   return { account: r.account, recoveryCode: r.recoveryCode ?? '' };

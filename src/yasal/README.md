@@ -7,7 +7,7 @@ Gizlilik Politikası ve KVKK Aydınlatma Metni'nin okunmak için kopyası. Sited
 
 Sitedeki adresi: `/gizlilik/`
 
-*Yürürlük tarihi: 3 Kasım 2026*
+*Yürürlük tarihi: 4 Kasım 2026*
 
 Bu metin, WarSimBox oynarken hangi verilerinin işlendiğini, neden işlendiğini ve bu veriler üzerindeki haklarını anlatır. Oyunu hesap açmadan, misafir olarak da oynayabilirsin. Kişisel verilerin işlenmesine ilişkin yasal bilgilendirme [KVKK Aydınlatma Metni](https://warsimbox.com/kvkk/)’ndedir.
 
@@ -17,7 +17,7 @@ Veri sorumlusu: Halil (WarSimBox). İletişim: warsimbox@gmail.com.
 
 ### Hangi verileri işliyoruz
 
-- **Hesap açarsan:** kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.
+- **Hesap açarsan:** kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.
 - **E-postanı doğrularken:** doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.
 - **Hesabınla oynarsan:** buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren ve öğretici tercihin.
 - **Geri bildirim gönderirsen:** yazdığın ad, ileti ve fiyat önerisi. Bunlar için hesap gerekmez; bilgiler Google Forms’a gider.
@@ -38,7 +38,7 @@ Reklam ya da izleme çerezi ve analitik aracı kullanmıyoruz.
 
 Yeni hesap açmak için e-posta adresi gereklidir; daha önce açılmış hesaplarda isteğe bağlıdır. Adresin, ona gönderdiğimiz 6 haneli kodla doğrulanmadan kaydedilmez. Bir adresle yalnız bir hesap kullanılabilir. Adresin başka oyunculara ve skor tablosunda görünmez. Profil’den ekleyebilir ve değiştirebilirsin. Adresini satmayız, başkalarının reklamı için paylaşmayız.
 
-Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.
+Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen, hesabında seçili dilde gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.
 
 ### Herkese görünenler
 
@@ -77,7 +77,7 @@ Bu metin değişirse yürürlük tarihi güncellenir. Önemli değişiklikleri o
 
 Sitedeki adresi: `/kvkk/`
 
-*Yürürlük tarihi: 3 Kasım 2026*
+*Yürürlük tarihi: 4 Kasım 2026*
 
 Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu’nun (KVKK) 10. maddesi uyarınca hazırlanmıştır. Ayrıntılar [Gizlilik Politikası](https://warsimbox.com/gizlilik/)’ndadır.
 
@@ -95,7 +95,7 @@ Halil (WarSimBox). İletişim: warsimbox@gmail.com.
 | Doğrulama kodu özeti, e-posta ve IP adresi özetleri | E-posta adresinin doğrulanması, kod gönderiminin kötüye kullanılmasının önlenmesi | Sözleşmenin kurulması (m. 5/2-c); meşru menfaat (m. 5/2-f) |
 | IP adresi ve tarayıcı bilgileri | Sitenin sunulması ve güvenliği | Meşru menfaat (m. 5/2-f) |
 | Geri bildirimde yazılan ad ve ileti | Görüşlerin değerlendirilmesi | Meşru menfaat (m. 5/2-f) |
-| E-posta adresi (yalnız izin verdiysen) | Yenilik ve duyuru e-postaları | Açık rıza (m. 5/1) |
+| E-posta adresi ve dil seçimi (yalnız izin verdiysen) | Yenilik ve duyuru e-postaları | Açık rıza (m. 5/1) |
 
 ### Toplama yöntemi
 
@@ -130,7 +130,7 @@ Haklarını kullanmak için, kullanıcı adını belirterek warsimbox@gmail.com 
 
 Sitedeki adresi: `/en/privacy/`
 
-*Effective date: 3 November 2026. This is a translation; the Turkish text prevails.*
+*Effective date: 4 November 2026. This is a translation; the Turkish text prevails.*
 
 This policy explains what data is processed when you play WarSimBox, why, and your rights over it. You can also play as a guest without an account. The statutory notice on personal data is in the [KVKK Privacy Notice](https://warsimbox.com/en/kvkk/).
 
@@ -140,7 +140,7 @@ Data controller: Halil (WarSimBox). Contact: warsimbox@gmail.com.
 
 ### What we process
 
-- **If you create an account:** your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.
+- **If you create an account:** your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.
 - **While verifying your email:** a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.
 - **If you play with an account:** saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time and tutorial preference.
 - **If you send feedback:** the name, message and price suggestion you enter. No account is needed; this goes to Google Forms.
@@ -161,7 +161,7 @@ We use no advertising or tracking cookies and no analytics tools.
 
 An email address is required to create a new account and optional for accounts created earlier. It is not saved until verified with a 6-digit code we send to it. An address can be used for only one account. It is not shown to other players or on the leaderboard. You can add or change it in your Profile. We do not sell it or share it for other parties’ advertising.
 
-News and announcement emails are sent only if you ticked the separate box. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.
+News and announcement emails are sent only if you ticked the separate box, in the language selected on your account. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.
 
 ### What is public
 
@@ -200,7 +200,7 @@ If this policy changes, the effective date is updated. We announce important cha
 
 Sitedeki adresi: `/en/kvkk/`
 
-*Effective date: 3 November 2026. This is a translation; the Turkish text prevails.*
+*Effective date: 4 November 2026. This is a translation; the Turkish text prevails.*
 
 This notice is given under Article 10 of Turkish Personal Data Protection Law No. 6698 (KVKK). See the [Privacy Policy](https://warsimbox.com/en/privacy/) for details.
 
@@ -218,7 +218,7 @@ Halil (WarSimBox). Contact: warsimbox@gmail.com.
 | Verification code hash, email and IP address hashes | Verifying the email address, preventing abuse of code sending | Formation of a contract (5/2-c); legitimate interest (5/2-f) |
 | IP address and browser details | Serving and securing the site | Legitimate interest (5/2-f) |
 | Name and message entered as feedback | Reviewing feedback | Legitimate interest (5/2-f) |
-| Email address (only if you gave permission) | News and announcement emails | Explicit consent (5/1) |
+| Email address and language (only if you gave permission) | News and announcement emails | Explicit consent (5/1) |
 
 ### How data is collected
 
