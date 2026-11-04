@@ -4,6 +4,7 @@
 import { $, esc } from './dom';
 import { SOUND_CREDITS } from '../audio/credits';
 import { EN, L } from '../i18n';
+import { markNewsSeen, newsSeenByAccount } from '../persist';
 import { NEWS_EN } from './newsEn';
 import { socialLinks } from './social';
 
@@ -30,6 +31,135 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
+  {
+    id: 'jetler',
+    date: '2026-11-04',
+    title: 'Jetler gerçek çizimlerden yeniden yapıldı, hava üsleri yenilendi',
+    summary: 'Araştırma ağacındaki 11 jetin hepsi üç görünüş çizimlerinden yeniden kuruldu: kumanda yüzeyleri oynuyor, iniş takımı gövdeye katlanıyor. Hava üslerinde açık hangarlar ve gece ışıkları var.',
+    cover: img('jetler.jpg'),
+    images: [
+      { src: img('jetler-liste.jpg'), caption: 'Yenilenen 11 jet: Me 262, Meteor, He 162, Ar 234, Vampire, F-80, F-84, F-86, MiG-15, Canberra ve Il-28.' },
+      { src: img('jetler-takim.jpg'), caption: 'Kalkıştan hemen sonra MiG-15: takım gövdeye katlanıyor.' },
+      { src: img('us-hangar.jpg'), caption: 'Gece, kapısı açık hangarda bekleyen bir MiG-15.' },
+    ],
+    sections: [
+      {
+        heading: 'Yenilenen jetler',
+        text: [
+          'Me 262, Meteor F.3, He 162, Ar 234, Vampire, F-80C, F-84G, F-86F, MiG-15, Canberra ve Il-28. Ölçüler gerçek üç görünüş çizimlerinden okundu, sonuç fotoğraflarla karşılaştırıldı.',
+        ],
+        bullets: [
+          'Gövde, kanopi, hava girişi ve egzoz baştan yapıldı. Her uçağın kendine özgü ayrıntıları var: Ar 234’ün camlı burnu, F-84’ün kanat ucu tankları, Vampire’ın kuyruk kirişleri, Il-28’in nişancı kabini.',
+          'Kanatçık, flap, irtifa ve istikamet dümeni uçağın o anki manevrasına göre oynar.',
+          'İniş takımı kalkıştan sonra gövdeye katlanır.',
+          'Seyir lambaları sol kanatta kırmızı, sağ kanatta yeşil yanar. Geceleri iniş farı önündeki yeri aydınlatır.',
+          'Ayrıntılar en çok Orta ve Yüksek grafik kalitesinde görünür. Düşük’te biçim aynıdır, çizim sadedir; telefonda kare hızı korunur.',
+          'Pervaneli uçaklar şimdilik eski modelleriyle uçuyor.',
+        ],
+      },
+      {
+        heading: 'Hava üsleri',
+        bullets: [
+          'Kapıları açık kemer hangarlar, T2 hangarlar, çadır hangarlar, kemer sığınaklar ve toprak siperler.',
+          'En yeni uçakların hangarlarda ve sığınaklarda, diğerleri apronda durur.',
+          'Akşam olunca pist, taksi yolu, apron ve hangar ışıkları yanar.',
+          'Pist betonu, asfalt, oluklu sac, kanvas ve delikli çelik plakalar daha ayrıntılı.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'eposta',
+    date: '2026-11-04',
+    title: 'Hesaplara e-posta: doğrulama, hesap silme, yeni geri bildirim',
+    summary: 'Yeni hesap açmak için e-posta doğrulaması gerekiyor. Mevcut hesaplar için zorunlu değil. Hesabını Profil’den silebilir, geri bildirimini doğrudan bize e-postayla ulaştırabilirsin.',
+    cover: img('eposta.jpg'),
+    images: [
+      { src: img('eposta-kod.jpg'), caption: 'warsimbox@gmail.com adresinden gelen 6 haneli kodu yazman yeterli.' },
+      { src: img('eposta-profil.jpg'), caption: 'E-posta adresi, haber izni, dil ve hesap silme Profil’de.' },
+    ],
+    sections: [
+      {
+        heading: 'Yeni hesap açarken',
+        bullets: [
+          'E-posta adresin gerekir; herhangi bir e-posta servisi olur. warsimbox@gmail.com adresinden gelen 6 haneli kodu yazınca adres kaydedilir.',
+          'Gizlilik Politikası ve KVKK Aydınlatma Metni’ni kabul etmen gerekir. İki metne ana menüden de ulaşabilirsin.',
+          'Bir e-posta adresiyle tek hesap açılır. Gmail’de noktalı ve “+etiketli” yazımlar aynı adres sayılır.',
+        ],
+      },
+      {
+        heading: 'Mevcut hesabın varsa',
+        bullets: [
+          'Oyun açılınca ya da giriş yapınca e-posta adresin sorulur, ama zorunlu değildir; kayıtların ve skorların yerinde kalır.',
+          'Pencereyi kapatırsan 7 gün boyunca sorulmaz. Adresi istediğin zaman Profil’den ekleyebilirsin.',
+        ],
+      },
+      {
+        heading: 'Yenilik e-postaları isteğe bağlı',
+        bullets: [
+          'Yenilik e-postaları yalnız izin verene gönderilir. Bu izni kayıt olurken verebilir, sonra Profil’den açıp kapatabilirsin.',
+          'Hesabın dili oyunda seçtiğin dille eşitlenir ve Profil’de görünür. E-postalar o dilde gelir.',
+        ],
+      },
+      {
+        heading: 'Hesabını silme',
+        bullets: [
+          'Profil’den şifrenle hesabını kendin silebilirsin. Kayıtların, skorların ve e-posta adresin de silinir; bu işlem geri alınamaz.',
+        ],
+      },
+      {
+        heading: 'Geri bildirim',
+        bullets: [
+          'Görüş ve önerilerin artık doğrudan e-posta kutumuza düşüyor. Bunları göndermek için e-postalı bir hesap gerekir.',
+          '“Ben bu oyuna Steam’de … $ veririm” kısmı herkese açık: hesabın yoksa yalnız komutan adın yeter, hesabın varsa ad da sorulmaz.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'gorunum',
+    date: '2026-11-04',
+    title: 'Yeni görünüm, düzenli hangar, telefonda kolay yazma',
+    summary: 'Arayüz sadeleşti, hangar nesil sekmelerine ayrıldı. Telefonda klavye yazılan alanı artık örtmüyor. Haberlerde okunmamış işareti de var.',
+    cover: img('gorunum.jpg'),
+    images: [
+      { src: img('gorunum-tel.jpg'), caption: 'Kısa telefon ekranında ana menü. Haberler’in üstünde okunmamış haber sayısı var.' },
+    ],
+    sections: [
+      {
+        heading: 'Arayüz',
+        bullets: [
+          'Seçili öğe açık zeminde ve altında sönen bir uçak iziyle görünür.',
+          'Oyun içi üst çubuklar ekranın tepesinden sarkar, pencere köşeleri çapraz kanat biçiminde.',
+          'Pazar sadeleşti: kutu içinde kutu yerine düz satırlar var.',
+          'Yan panellerin kapatma tuşları panelin hemen yanında.',
+        ],
+      },
+      {
+        heading: 'Hangar',
+        bullets: [
+          'Uçaklar nesil sekmelerine ayrıldı; liste artık ekrandan taşmıyor.',
+          'Henüz uçurulamayan gelecek jetler listeden çıkarıldı. Hangarda gördüğün her uçak oyunda var.',
+        ],
+      },
+      {
+        heading: 'Telefon',
+        bullets: [
+          'Adres çubuğu açıkken ve kısa ekranlarda ana menü ve pencereler sığıyor.',
+          'Klavye açılınca pencere ekranın üstüne dayanır, yazdığın alan görünür kalır.',
+          'Giriş penceresi açılınca klavye kendiliğinden açılmaz; yazı alanına dokununca açılır.',
+          '90–144 Hz ekranlarda oyun saniyede yaklaşık 60 kare çizer: telefon daha az ısınır.',
+          'Otomatik çözünürlük, kasma başlayınca daha çabuk düşer. Telefonlarda grafik bir kereliğine Düşük’e alındı; sonra seçimin korunur.',
+        ],
+      },
+      {
+        heading: 'Okunmamış haberler',
+        bullets: [
+          'Hesabınla girdiğinde yeni haberler için Haberler’in üstünde sayı çıkar, listede “Yeni” yazar. Haberi açınca işaret kalkar; başka cihazda da kalkmış olur.',
+        ],
+      },
+    ],
+  },
   {
     id: 'ansiklopedi',
     date: '2026-10-30',
@@ -599,7 +729,14 @@ export const NEWS: NewsItem[] = EN
   ? NEWS_TR.map((n) => {
     const t = NEWS_EN[n.id];
     if (!t) return n;
-    return { ...n, title: t.title, summary: t.summary, sections: t.sections, images: n.images.map((g, i) => ({ ...g, caption: t.captions?.[i] ?? g.caption })) };
+    return {
+      ...n,
+      title: t.title,
+      summary: t.summary,
+      sections: t.sections,
+      cover: t.cover ? img(t.cover) : n.cover,
+      images: n.images.map((g, i) => ({ src: t.files?.[i] ? img(t.files[i]) : g.src, caption: t.captions?.[i] ?? g.caption })),
+    };
   })
   : NEWS_TR;
 
@@ -612,10 +749,35 @@ function fmtDate(d: string): string {
   return `${day} ${MONTHS[m - 1]} ${y}`;
 }
 
-/** Görsel ve üstünde tabana ortalanmış başlık (kutu, listede de aynı). */
+// Okunmamış işareti yalnız hesapta: okunanlar hesaba yazılır (persist.ts), misafirde işaret yok.
+/** İşaret bu günden önceki haberlere konmaz: eski oyuncu bütün arşivi okunmamış görmesin. */
+const MARK_FROM = '2026-11-04';
+/** Bu kadar günden eski haber işaretlenmez: yeni açılan ya da uzun süre sonra dönen hesapta sayı birikmesin. */
+const MARK_DAYS = 30;
+
+function isUnread(n: NewsItem): boolean {
+  if (n.date < MARK_FROM || newsSeenByAccount(n.id) !== false) return false;
+  return Date.now() - Date.parse(n.date) <= MARK_DAYS * 86400000;
+}
+
+/** Haberler'i açan düğmelerdeki sayıyı günceller (ana menü her çizildiğinde ve haber okununca). */
+export function syncNewsMarks(): void {
+  const count = NEWS.filter(isUnread).length;
+  document.querySelectorAll<HTMLElement>('[data-mm="news"]').forEach((b) => {
+    b.querySelector('.news-count')?.remove();
+    if (!count) return;
+    const mark = document.createElement('span');
+    mark.className = 'news-count';
+    mark.textContent = b.classList.contains('news-card') ? L(`${count} yeni`, `${count} new`) : String(count);
+    b.append(mark);
+  });
+}
+
+/** Görsel ve üstünde tabana ortalanmış başlık (kutu, listede de aynı). Listede okunmamış haberde "Yeni" yazar. */
 export function newsCard(n: NewsItem, attrs: string, small = false): string {
   return `<button class="news-card${small ? ' small' : ''}" ${attrs}>
     <img src="${n.cover}" alt="" width="1280" height="720" loading="lazy">
+    ${!small && isUnread(n) ? `<span class="news-count">${L('Yeni', 'New')}</span>` : ''}
     <span class="news-cap"><b>${esc(n.title)}</b><small>${fmtDate(n.date)}</small></span>
   </button>`;
 }
@@ -663,6 +825,10 @@ export class NewsView {
   private show(id: string | null): void {
     this.current = id;
     const n = id ? NEWS.find((x) => x.id === id) : undefined;
+    if (n) {
+      markNewsSeen(n.id);
+      syncNewsMarks();
+    }
     this.el.innerHTML = `<div class="news-sheet" tabindex="-1">${n ? this.article(n) : this.list()}</div>`;
     const sheet = this.el.querySelector<HTMLElement>('.news-sheet');
     sheet?.focus();

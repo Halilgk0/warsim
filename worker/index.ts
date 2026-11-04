@@ -47,8 +47,11 @@ interface AccountRow {
   news_opt: number;
   news_at: number | null;
   lang: string | null;
+  /** Okunan haberlerin kimlikleri (JSON dizisi). */
+  news_seen?: string;
 }
 
+const NEWS_SEEN_MAX = 200;
 const SESSION_DAYS = 90;
 const MAX_FAILS = 8;
 const LOCK_MS = 15 * 60 * 1000;
@@ -138,7 +141,16 @@ async function body<T>(req: Request): Promise<T | null> {
   }
 }
 
-const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang });
+function newsSeenList(a: AccountRow): string[] {
+  try {
+    const v: unknown = JSON.parse(a.news_seen ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang, newsSeen: newsSeenList(a) });
 
 /** Geçerli dil kodu ya da yok. */
 const langCode = (v: unknown): 'tr' | 'en' | null => (v === 'tr' || v === 'en' ? v : null);
@@ -377,7 +389,16 @@ async function logout(req: Request, env: Env): Promise<Response> {
 }
 
 async function updateMe(req: Request, env: Env, a: AccountRow): Promise<Response> {
-  const b = await body<{ noTutorial?: boolean; lang?: string }>(req);
+  const b = await body<{ noTutorial?: boolean; lang?: string; newsSeen?: string }>(req);
+  const seen = b?.newsSeen;
+  if (typeof seen === 'string' && /^[a-z0-9-]{1,40}$/.test(seen)) {
+    // Tek komutta: art arda açılan iki haberden biri kaybolmaz
+    await env.DB.prepare(
+      `UPDATE accounts SET news_seen = json_insert(news_seen, '$[#]', ?) WHERE id = ? AND json_array_length(news_seen) < ${NEWS_SEEN_MAX} AND NOT EXISTS (SELECT 1 FROM json_each(accounts.news_seen) WHERE value = ?)`,
+    ).bind(seen, a.id, seen).run();
+    const list = newsSeenList(a);
+    if (!list.includes(seen) && list.length < NEWS_SEEN_MAX) a.news_seen = JSON.stringify([...list, seen]);
+  }
   if (typeof b?.noTutorial === 'boolean') {
     await env.DB.prepare('UPDATE accounts SET no_tutorial = ? WHERE id = ?').bind(b.noTutorial ? 1 : 0, a.id).run();
     a.no_tutorial = b.noTutorial ? 1 : 0;

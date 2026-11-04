@@ -136,6 +136,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   (`feedback.ts`; sunucudan warsimbox@gmail.com'a e-posta: görüş için e-postalı hesap, yalnız fiyat için misafire komutan
   adı yeter; `worker/index.ts` `sendFeedback`), hesap penceresi (`loginBox.ts`), skor tablosu (`leaderboard.ts`, ana menüde Skorlar sekmesi), profil
   (`profile.ts`: ad etiketi ya da Menü → Profil; skorlar, sıra, şifre değiştirme).
+  - `news.ts`: haberler. Yeni haber listenin en üstüne yazılır (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
+    İngilizce görseli `cover` ve `files` ile verilir). Okunmamış işareti kendiliğinden çıkar: açılan haberin kimliği hesaba
+    yazılır (`accounts.news_seen`), misafirde işaret yok. `MARK_DAYS`'ten eski haber işaretlenmez.
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
     Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
     güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.

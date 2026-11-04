@@ -30,6 +30,8 @@ export interface Account {
   hasEmail?: boolean;
   /** Hesabın dili: e-postalar bu dilde gider. */
   lang?: 'tr' | 'en' | null;
+  /** Okunan haberlerin kimlikleri (okunmamış işareti). */
+  newsSeen?: string[];
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -251,6 +253,21 @@ export function postponeEmailAsk(): void {
   } catch {
     /* depolama kapalı: bir sonraki açılışta yine sorulur */
   }
+}
+
+/** Hesap bu haberi okudu mu. Hesabı olmayan için okundu bilgisi tutulmaz: null. */
+export function newsSeenByAccount(id: string): boolean | null {
+  const acc = currentAccount();
+  return acc ? !!acc.newsSeen?.includes(id) : null;
+}
+
+/** Haber okundu: hesaba yazılır, başka cihazda da işaret kalkar. Misafirde bir şey yapmaz. */
+export function markNewsSeen(id: string): void {
+  const acc = currentAccount();
+  if (!acc || acc.newsSeen?.includes(id)) return;
+  acc.newsSeen = [...(acc.newsSeen ?? []), id];
+  storeAuth(authToken(), acc);
+  void api('PATCH', '/me', { newsSeen: id }).catch(() => {});
 }
 
 /** Misafirin "Bir daha sorma" tercihi (bu tarayıcıda). */

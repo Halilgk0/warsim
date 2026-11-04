@@ -30,7 +30,7 @@ const privacyTr: LegalText = {
 <ul>
   <li><b>Hesap açarsan:</b> kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.</li>
   <li><b>E-postanı doğrularken:</b> doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.</li>
-  <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren ve öğretici tercihin.</li>
+  <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici tercihin ve okuduğun haberler.</li>
   <li><b>Geri bildirim gönderirsen:</b> görüş ve önerin, fiyat önerin ve adın; hesabınla gönderdiysen e-posta adresin ve dil seçimin. Görüş ve öneri için e-postalı hesap gerekir, yalnız fiyat önerisi için gerekmez (komutan adı yazman yeterli). Bunlar ${OWNER.email} kutusuna e-posta olarak gelir ve orada saklanır.</li>
   <li><b>Siteye giren herkes için:</b> sayfanın sunulabilmesi için IP adresin ve tarayıcı bilgilerin barındırma ve yazı tipi hizmetlerince (aşağıda) işlenir.</li>
 </ul>
@@ -91,7 +91,7 @@ const privacyEn: LegalText = {
 <ul>
   <li><b>If you create an account:</b> your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.</li>
   <li><b>While verifying your email:</b> a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.</li>
-  <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time and tutorial preference.</li>
+  <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial preference and the news items you have read.</li>
   <li><b>If you send feedback:</b> your thoughts and suggestions, price suggestion and name; if sent with your account, also your email address and language. Feedback and suggestions need an account with an email; a price suggestion alone does not (a commander name is enough). These arrive as email in the ${OWNER.email} mailbox and are kept there.</li>
   <li><b>For every visitor:</b> to serve the page, your IP address and browser details are processed by the hosting and font services listed below.</li>
 </ul>
@@ -153,7 +153,7 @@ const kvkkTr: LegalText = {
   <thead><tr><th>Veri</th><th>Amaç</th><th>Hukuki sebep (KVKK m. 5)</th></tr></thead>
   <tbody>
     <tr><td>Kullanıcı adı, e-posta adresi, şifre ve kurtarma kodu özetleri, hesap tarihleri, oturum özeti</td><td>Hesabın açılması ve yönetimi, hesap sahibinin doğrulanması, hesapla ilgili önemli bildirimler</td><td>Sözleşmenin kurulması ve ifası (m. 5/2-c); meşru menfaat (m. 5/2-f)</td></tr>
-    <tr><td>Oyun kayıtları, skorlar, harekât istatistikleri, oynama süresi, tercihler</td><td>Oyun hizmetinin sunulması, skor tablosu, oyunun toplu bilgilerle geliştirilmesi</td><td>Sözleşmenin ifası (m. 5/2-c); meşru menfaat (m. 5/2-f)</td></tr>
+    <tr><td>Oyun kayıtları, skorlar, harekât istatistikleri, oynama süresi, tercihler, okunan haberler</td><td>Oyun hizmetinin sunulması, skor tablosu, oyunun toplu bilgilerle geliştirilmesi</td><td>Sözleşmenin ifası (m. 5/2-c); meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>Metinlerin kabul tarihi ve sürümü, e-posta izni kaydı</td><td>Kabulün ve iznin kanıtlanması</td><td>Bir hakkın tesisi, kullanılması veya korunması (m. 5/2-e)</td></tr>
     <tr><td>Doğrulama kodu özeti, e-posta ve IP adresi özetleri</td><td>E-posta adresinin doğrulanması, kod gönderiminin kötüye kullanılmasının önlenmesi</td><td>Sözleşmenin kurulması (m. 5/2-c); meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>IP adresi ve tarayıcı bilgileri</td><td>Sitenin sunulması ve güvenliği</td><td>Meşru menfaat (m. 5/2-f)</td></tr>
@@ -203,7 +203,7 @@ const kvkkEn: LegalText = {
   <thead><tr><th>Data</th><th>Purpose</th><th>Legal basis (KVKK Art. 5)</th></tr></thead>
   <tbody>
     <tr><td>User name, email address, password and recovery code hashes, account dates, session hash</td><td>Creating and managing the account, verifying its owner, important account notices</td><td>Formation and performance of a contract (5/2-c); legitimate interest (5/2-f)</td></tr>
-    <tr><td>Saves, scores, campaign statistics, play time, preferences</td><td>Providing the game, the leaderboard, improving the game with aggregate figures</td><td>Performance of a contract (5/2-c); legitimate interest (5/2-f)</td></tr>
+    <tr><td>Saves, scores, campaign statistics, play time, preferences, news items read</td><td>Providing the game, the leaderboard, improving the game with aggregate figures</td><td>Performance of a contract (5/2-c); legitimate interest (5/2-f)</td></tr>
     <tr><td>Date and version of accepted texts, email permission record</td><td>Proving acceptance and permission</td><td>Establishing, exercising or protecting a right (5/2-e)</td></tr>
     <tr><td>Verification code hash, email and IP address hashes</td><td>Verifying the email address, preventing abuse of code sending</td><td>Formation of a contract (5/2-c); legitimate interest (5/2-f)</td></tr>
     <tr><td>IP address and browser details</td><td>Serving and securing the site</td><td>Legitimate interest (5/2-f)</td></tr>

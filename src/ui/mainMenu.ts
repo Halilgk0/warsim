@@ -9,7 +9,7 @@ import { terrainMap } from '../sim/terrain';
 import { mapPreview } from './mapPreview';
 import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError } from '../persist';
 import { SavesPanel } from './savesList';
-import { NEWS, newsCard } from './news';
+import { NEWS, newsCard, syncNewsMarks } from './news';
 import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
 import { $, esc, focusField } from './dom';
 import { LANG, L, lower, saveLang } from '../i18n';
@@ -367,5 +367,6 @@ export class MainMenu {
         ${tabs}
         ${body}
       </div>`;
+    syncNewsMarks();
   }
 }

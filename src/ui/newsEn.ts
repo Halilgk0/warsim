@@ -1,5 +1,6 @@
 // Haberlerin İngilizcesi (kimliğe göre). Türkçeleri news.ts'te; yeni haber eklenince buraya da yaz (yoksa İngilizcede
-// Türkçe görünür). Görseller ve tarih Türkçe kayıttan gelir; captions görsellerle aynı sırada.
+// Türkçe görünür). Tarih ve görseller Türkçe kayıttan gelir; captions görsellerle aynı sırada. Görselde yazı varsa
+// İngilizcesi cover ve files ile verilir (public/news'teki dosya adı).
 
 import type { NewsSection } from './news';
 import { SOUND_CREDITS } from '../audio/credits';
@@ -7,11 +8,137 @@ import { SOUND_CREDITS } from '../audio/credits';
 export interface NewsText {
   title: string;
   summary: string;
+  cover?: string;
+  files?: string[];
   captions?: string[];
   sections: NewsSection[];
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  jetler: {
+    title: 'Jets rebuilt from real drawings, air bases renewed',
+    summary: 'All 11 jets in the research tree were rebuilt from three-view drawings: control surfaces move and the landing gear folds into the airframe. Air bases now have open hangars and night lights.',
+    captions: [
+      'The 11 renewed jets: Me 262, Meteor, He 162, Ar 234, Vampire, F-80, F-84, F-86, MiG-15, Canberra and Il-28.',
+      'A MiG-15 just after takeoff: the gear is folding into the airframe.',
+      'A MiG-15 waiting at night in a hangar with its doors open.',
+    ],
+    sections: [
+      {
+        heading: 'The renewed jets',
+        text: [
+          'Me 262, Meteor F.3, He 162, Ar 234, Vampire, F-80C, F-84G, F-86F, MiG-15, Canberra and Il-28. Dimensions were read from real three-view drawings and the results compared with photographs.',
+        ],
+        bullets: [
+          'Fuselage, canopy, air intakes and exhausts were built from scratch. Each aircraft has its own details: the Ar 234’s glazed nose, the F-84’s wingtip tanks, the Vampire’s tail booms, the Il-28’s gunner’s cabin.',
+          'Ailerons, flaps, elevators and rudders move with the aircraft’s manoeuvres.',
+          'The landing gear folds into the airframe after takeoff.',
+          'Navigation lights glow red on the left wing and green on the right. At night the landing light lights up the ground ahead.',
+          'The details show best at Medium and High graphics quality. On Low the shape is the same but drawn more simply, which keeps the frame rate up on phones.',
+          'Propeller aircraft still fly with their older models for now.',
+        ],
+      },
+      {
+        heading: 'Air bases',
+        bullets: [
+          'Arched hangars with open doors, T2 hangars, tent hangars, blister shelters and earth revetments.',
+          'Your newest aircraft stand in hangars and shelters, the rest on the apron.',
+          'At dusk the runway, taxiway, apron and hangar lights come on.',
+          'Runway concrete, asphalt, corrugated sheet, canvas and pierced steel planking have more detail.',
+        ],
+      },
+    ],
+  },
+  eposta: {
+    title: 'Email for accounts: verification, account deletion, new feedback',
+    summary: 'New accounts now need a verified email address. Existing accounts don’t have to add one. You can delete your account from Profile, and your feedback now reaches us directly by email.',
+    cover: 'eposta-en.jpg',
+    files: ['eposta-kod-en.jpg', 'eposta-profil-en.jpg'],
+    captions: [
+      'Just type the 6-digit code sent from warsimbox@gmail.com.',
+      'Your email address, news permission, language and account deletion are all in Profile.',
+    ],
+    sections: [
+      {
+        heading: 'When you create an account',
+        bullets: [
+          'You need an email address, from any email service. It’s saved once you type the 6-digit code sent from warsimbox@gmail.com.',
+          'You need to accept the Privacy Policy and the KVKK Privacy Notice. Both are also linked from the main menu.',
+          'One email address can have one account. In Gmail, versions with dots or a “+tag” count as the same address.',
+        ],
+      },
+      {
+        heading: 'If you already have an account',
+        bullets: [
+          'You’re asked for an email address when the game opens or when you log in, but it isn’t required; your saves and scores stay where they are.',
+          'If you close the window, you won’t be asked again for 7 days. You can add an address from Profile at any time.',
+        ],
+      },
+      {
+        heading: 'News emails are optional',
+        bullets: [
+          'News emails go only to players who allow them. You can allow them when you sign up, then turn them on or off in Profile.',
+          'Your account language follows the language you pick in the game and is shown in Profile. Emails arrive in that language.',
+        ],
+      },
+      {
+        heading: 'Deleting your account',
+        bullets: [
+          'You can delete your account yourself from Profile with your password. Your saves, scores and email address are deleted too, and this can’t be undone.',
+        ],
+      },
+      {
+        heading: 'Feedback',
+        bullets: [
+          'Your thoughts and suggestions now land directly in our inbox. Sending them requires an account with an email address.',
+          'The “I would pay … $ for this game on Steam” part is open to everyone: without an account, your commander name is enough; with one, you aren’t asked for a name.',
+        ],
+      },
+    ],
+  },
+  gorunum: {
+    title: 'New look, tidier hangar, easier typing on phones',
+    summary: 'The interface is simpler and the hangar is split into generation tabs. On phones, the keyboard no longer covers the field you’re typing in. News now has an unread marker too.',
+    cover: 'gorunum-en.jpg',
+    files: ['gorunum-tel-en.jpg'],
+    captions: [
+      'The main menu on a short phone screen, with the unread count on News.',
+    ],
+    sections: [
+      {
+        heading: 'Interface',
+        bullets: [
+          'The selected item has a light background with a fading contrail under it.',
+          'In-game top bars hang from the top of the screen, and window corners are cut like a swept wing.',
+          'The market is simpler: flat rows instead of boxes inside boxes.',
+          'Side panel close buttons sit right next to the panel.',
+        ],
+      },
+      {
+        heading: 'Hangar',
+        bullets: [
+          'Aircraft are split into generation tabs, and the list no longer runs off the screen.',
+          'Future jets you couldn’t fly yet were removed from the list. Every aircraft you see in the hangar is in the game.',
+        ],
+      },
+      {
+        heading: 'Phones',
+        bullets: [
+          'The main menu and windows now fit on short screens and when the address bar is showing.',
+          'When the keyboard opens, the window moves to the top of the screen so the field you’re typing in stays visible.',
+          'The keyboard no longer opens by itself with the login window; it opens when you tap a text field.',
+          'On 90–144 Hz screens the game draws about 60 frames per second, so your phone runs cooler.',
+          'Automatic resolution drops sooner when the game starts to stutter. Graphics on phones were set to Low once; after that your choice is kept.',
+        ],
+      },
+      {
+        heading: 'Unread news',
+        bullets: [
+          'When you’re logged in, a number appears on News for new items and the list says “New”. The marker goes away when you open the item, on your other devices too.',
+        ],
+      },
+    ],
+  },
   ansiklopedi: {
     title: 'Aircraft encyclopedia, faster start, real ceilings',
     summary: 'The history and data of all 51 aircraft in the game are now in the encyclopedia. The game starts much faster on phones, and fighters climb to their real ceilings.',

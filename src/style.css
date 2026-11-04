@@ -981,6 +981,14 @@ button.danger:hover { background: #ecc7bf; }
 .news-cap small { font-size: calc(11px * var(--ui)); font-weight: 700; opacity: 0.85; }
 .news-card.small .news-cap { padding: calc(26px * var(--ui)) calc(10px * var(--ui)) calc(9px * var(--ui)); }
 .news-card.small .news-cap b { font-size: calc(15px * var(--ui)); }
+/* Okunmamış haber: haber kartında etiket, telefondaki Haberler düğmesinde köşede sayı */
+.news-count {
+  position: absolute; top: calc(-6px * var(--ui)); right: calc(-6px * var(--ui)); min-width: calc(18px * var(--ui)); padding: 0 calc(5px * var(--ui));
+  border-radius: calc(9px * var(--ui)); background: var(--red); color: #fff; font-size: calc(11px * var(--ui)); font-weight: 800; line-height: calc(18px * var(--ui));
+  text-align: center; pointer-events: none;
+}
+.news-card .news-count { top: calc(10px * var(--ui)); right: calc(10px * var(--ui)); padding: 0 calc(9px * var(--ui)); font-size: calc(12px * var(--ui)); line-height: calc(22px * var(--ui)); border-radius: calc(11px * var(--ui)); }
+.mm-news-btn { position: relative; }
 
 /* Haberler penceresi: liste ve haber sayfası */
 .news, .fb {
@@ -1391,3 +1399,11 @@ button.active, button.active:hover, .seg button.active, .mm-tabs button.active, 
 /* Araştırma: üst sıra sakin */
 .pboard { background: transparent; border-radius: var(--wing-s); }
 .pboard.idle { border-style: solid; }
+
+/* Dar telefonda hesap açıkken üst sıra tek satırda kalır (düğmeler iki satıra kırılıp menü kartına biniyordu); uzun ad kısalır */
+@media (max-width: 860px) {
+  .mm-acc { gap: calc(5px * var(--ui)); }
+  .mm-acc > * { white-space: nowrap; flex-shrink: 0; }
+  .mm-acc .mm-login:not(.mm-lang) { padding-left: calc(9px * var(--ui)); padding-right: calc(9px * var(--ui)); }
+  .mm-acc > .mm-user { flex-shrink: 1; }
+}
