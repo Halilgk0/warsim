@@ -11,7 +11,7 @@ import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, l
 import { SavesPanel } from './savesList';
 import { NEWS, newsCard } from './news';
 import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
-import { $, esc } from './dom';
+import { $, esc, focusField } from './dom';
 import { LANG, L, lower, saveLang } from '../i18n';
 import { playLangSwap } from './langSwap';
 import { socialLinks } from './social';
@@ -113,7 +113,7 @@ export class MainMenu {
     if (!acc && this.tab === 'saves') this.tab = 'new';
     this.render();
     void this.saves.refresh(acc?.key ?? null);
-    this.el.querySelector<HTMLInputElement>('input[name="cmd"]')?.focus();
+    focusField(this.el.querySelector<HTMLInputElement>('input[name="cmd"]'));
   }
 
   close(): void {
@@ -166,7 +166,7 @@ export class MainMenu {
     if (!err) return true;
     this.error = `${L('Komutan adı', 'Commander name')}: ${lower(err)}`;
     this.render();
-    this.el.querySelector<HTMLInputElement>('input[name="cmd"]')?.focus();
+    focusField(this.el.querySelector<HTMLInputElement>('input[name="cmd"]'));
     return false;
   }
 

@@ -6,7 +6,7 @@ import { type Account, NAME_MAX, cleanName, currentAccount, login, nameError, po
 import { apiMessage } from '../net/api';
 import { EMAIL_MAX, PASS_MAX, PASS_MIN, validEmail } from '../net/shared';
 import { legalUrl } from '../yasal/liste';
-import { $, esc } from './dom';
+import { $, esc, focusField } from './dom';
 import { L, LANG } from '../i18n';
 
 type Mode = 'login' | 'register' | 'recover' | 'code' | 'email' | 'verify';
@@ -131,8 +131,7 @@ export class LoginBox {
 
   private focusFirst(): void {
     const name = this.field('acc');
-    if (name && !name.value) name.focus();
-    else (this.field('pass') ?? this.field('code') ?? name)?.focus();
+    focusField(name && !name.value ? name : this.field('pass') ?? this.field('code') ?? name);
   }
 
   private switchMode(m: Mode): void {
@@ -231,7 +230,7 @@ export class LoginBox {
     this.error = '';
     this.busy = false;
     this.render('');
-    this.field('code')?.focus();
+    focusField(this.field('code'));
   }
 
   private async submitCode(): Promise<void> {

@@ -29,7 +29,8 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
     dene. Yükseklikte `100vh` yerine `var(--vh100)` kullan.
   - Klavye yatay telefonda ekranın çoğunu kaplar, üstte ~100 px kalır: yazı alanı olan pencereler `ui/keyboard.ts` `.kb`
     ile üste dayanır. Yeni açılır pencereyi `style.css`'te `.kb` kuralına ekle. Başsız tarayıcıda klavye açılmaz; gerçek
-    davranışı telefonda dene.
+    davranışı telefonda dene. Yazı alanına kodla odaklanırken `dom.ts` `focusField` kullan: telefonda klavye oyuncu alana
+    dokununca açılır.
   - Görsel bir yenilik telefonun kare hızından ödün vermesin; ağır efektler ayarlardan kapatılabilsin.
 - **Üslup:**
   - Pastel ve low-poly kalsın; arayüz War Thunder'a benzemesin.

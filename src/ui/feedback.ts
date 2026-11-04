@@ -5,7 +5,7 @@
 import { currentAccount, NAME_MAX } from '../persist';
 import { api, apiMessage } from '../net/api';
 import { FEEDBACK_MAX, PRICE_MAX, nameProblem } from '../net/shared';
-import { $, esc } from './dom';
+import { $, esc, focusField } from './dom';
 import { L, LANG } from '../i18n';
 
 /** Eski sürümde gönderilemeyen geri bildirimlerin deposu: artık kullanılmaz. */
@@ -76,8 +76,7 @@ export class FeedbackBox {
     }
     this.el.classList.remove('hidden');
     this.render();
-    // Telefonda klavye kendiliğinden açılıp pencereyi kapatmasın
-    if (!matchMedia('(pointer: coarse)').matches) this.el.querySelector<HTMLElement>('textarea, input')?.focus();
+    focusField(this.el.querySelector<HTMLElement>('textarea, input'));
   }
 
   close(): void {
@@ -107,7 +106,7 @@ export class FeedbackBox {
     }
     if (this.error) {
       this.render();
-      this.el.querySelector<HTMLElement>(this.error.includes(L('komutan', 'commander')) ? 'input[name="fbname"]' : 'textarea, input[name="fbprice"]')?.focus();
+      focusField(this.el.querySelector<HTMLElement>(this.error.includes(L('komutan', 'commander')) ? 'input[name="fbname"]' : 'textarea, input[name="fbprice"]'));
       return;
     }
     this.sending = true;

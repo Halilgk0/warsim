@@ -5,7 +5,7 @@
 import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail } from '../persist';
 import { apiMessage } from '../net/api';
 import { METRICS, PASS_MAX, PASS_MIN, cleanEmail, validEmail } from '../net/shared';
-import { $, esc } from './dom';
+import { $, esc, focusField } from './dom';
 import { HINT, LABEL, fmtValue } from './leaderboard';
 import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
 import { L, LANG, LOCALE } from '../i18n';
@@ -44,7 +44,7 @@ export class ProfileBox {
         this.pwErr = '';
         this.pwMsg = '';
         this.render();
-        this.el.querySelector<HTMLInputElement>('input[name="old"]')?.focus();
+        focusField(this.el.querySelector<HTMLInputElement>('input[name="old"]'));
       } else if (act === 'mail') {
         this.mailOpen = !this.mailOpen;
         this.mailCode = null;
@@ -53,7 +53,7 @@ export class ProfileBox {
         this.mailErr = '';
         this.pwMsg = '';
         this.render();
-        this.el.querySelector<HTMLInputElement>('input[name="email"]')?.focus();
+        focusField(this.el.querySelector<HTMLInputElement>('input[name="email"]'));
       } else if (act === 'resend') void this.resendMail();
       else if (act === 'del') {
         this.delOpen = !this.delOpen;
@@ -62,7 +62,7 @@ export class ProfileBox {
         this.mailCode = null;
         this.pwMsg = '';
         this.render();
-        this.el.querySelector<HTMLInputElement>('input[name="delpass"]')?.focus();
+        focusField(this.el.querySelector<HTMLInputElement>('input[name="delpass"]'));
       }
     });
     this.el.addEventListener('submit', (e) => {
@@ -152,7 +152,7 @@ export class ProfileBox {
         this.mailCode = { email, news };
         this.busy = false;
         this.render();
-        box('code')?.focus();
+        focusField(box('code'));
         return;
       }
       const r = await saveEmail(email, news, code);

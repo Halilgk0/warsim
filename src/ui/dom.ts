@@ -4,6 +4,11 @@ import { L, LOCALE } from '../i18n';
 
 export const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** Yazı alanına kendiliğinden odaklan; dokunmatik ekranda değil: klavye oyuncu alana dokununca açılsın. */
+export function focusField(el: HTMLElement | null | undefined): void {
+  if (!matchMedia('(pointer: coarse)').matches) el?.focus();
+}
+
 /** HTML içine güvenle metin koymak için. */
 export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
