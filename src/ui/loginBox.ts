@@ -109,7 +109,11 @@ export class LoginBox {
     this.pending = null;
     this.isOpen = false;
     this.el.classList.add('hidden');
+    this.onClosed?.();
   }
+
+  /** Pencere kapanınca (geri bildirim penceresi hesap durumunu yeniden çizer). */
+  onClosed: (() => void) | null = null;
 
   /** Eski hesaba e-posta sorusu: zorunlu değil. Telefonda klavye kendiliğinden açılmasın diye alana odaklanmaz. */
   askEmail(): void {
@@ -353,8 +357,8 @@ export class LoginBox {
       ? L('Kayıtların bulutta saklanır: başka telefondan ya da bilgisayardan da devam edersin ve skor tablosunda yer alırsın.',
         'Your saves are kept in the cloud: continue on another phone or computer, and appear on the leaderboard.')
       : m === 'recover'
-        ? L('Hesap açarken verilen kurtarma koduyla yeni şifre belirle. Kodu da kaybettiysen Geri bildirim’den ya da sosyal medya hesaplarımızdan bize yaz.',
-          'Set a new password with the recovery code you got when creating the account. If you lost the code too, write to us via Feedback or our social media.')
+        ? L('Hesap açarken verilen kurtarma koduyla yeni şifre belirle. Kodu da kaybettiysen warsimbox@gmail.com adresine ya da sosyal medya hesaplarımızdan bize yaz.',
+          'Set a new password with the recovery code you got when creating the account. If you lost the code too, write to warsimbox@gmail.com or to our social media.')
         : '';
     const newPass = m !== 'login';
     this.el.innerHTML = `

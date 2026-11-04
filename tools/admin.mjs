@@ -1,4 +1,4 @@
-// Yönetici: şifresini ve kurtarma kodunu unutan oyuncu için (Geri bildirim ya da sosyal medyadan yazdığında) ve KVKK
+// Yönetici: şifresini ve kurtarma kodunu unutan oyuncu için (warsimbox@gmail.com ya da sosyal medyadan yazdığında) ve KVKK
 // silme başvuruları için.
 //   node tools/admin.mjs bilgi "Oyuncu Adı"       e-posta adresi, onaylar, açılış tarihi, son giriş, son kayıtlar, skorları
 //   node tools/admin.mjs sifirla "Oyuncu Adı"     yeni kurtarma kodu (oyuncu "Şifremi unuttum"dan yeni şifre belirler)
@@ -15,7 +15,7 @@
 // Oyuncu hesabını Profil'den kendi silebilir; bu komut şifresini kaybedenler içindir. Silmeden önce de aynı doğrulamayı
 // yap: başvuru hesaptaki (doğrulanmış) e-posta adresinden geldiyse bu güçlü bir işarettir. Silinen veri veritabanı
 // yedeklerinde en çok 30 gün kalır, sonra kendiliğinden yok olur.
-// Geri bildirimler hesaba bağlı değildir: varsa Google Formu'nun yanıtlarından ayrıca silinir.
+// Geri bildirimler hesaba bağlı değildir: varsa warsimbox@gmail.com kutusundan ve eski Google Formu yanıtlarından ayrıca silinir.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';

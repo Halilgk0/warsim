@@ -17,7 +17,8 @@ function decode(raw) {
     const m = new RegExp(`Content-Type: text/${type};[^]*?\\r\\n\\r\\n([^-]+)`).exec(rest.join('\r\n\r\n'));
     return m ? Buffer.from(m[1].replace(/\s/g, ''), 'base64').toString() : '';
   };
-  return { to, from, subject: Buffer.from(sub, 'base64').toString(), text: part('plain'), html: part('html') };
+  const replyTo = /^Reply-To: <(.+)>$/m.exec(head)?.[1] ?? null;
+  return { to, from, replyTo, subject: Buffer.from(sub, 'base64').toString(), text: part('plain'), html: part('html') };
 }
 
 tcp((s) => {

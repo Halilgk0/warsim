@@ -20,7 +20,7 @@ Veri sorumlusu: Halil (WarSimBox). İletişim: warsimbox@gmail.com.
 - **Hesap açarsan:** kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.
 - **E-postanı doğrularken:** doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.
 - **Hesabınla oynarsan:** buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren ve öğretici tercihin.
-- **Geri bildirim gönderirsen:** yazdığın ad, ileti ve fiyat önerisi. Bunlar için hesap gerekmez; bilgiler Google Forms’a gider.
+- **Geri bildirim gönderirsen:** görüş ve önerin, fiyat önerin ve adın; hesabınla gönderdiysen e-posta adresin ve dil seçimin. Görüş ve öneri için e-postalı hesap gerekir, yalnız fiyat önerisi için gerekmez (komutan adı yazman yeterli). Bunlar warsimbox@gmail.com kutusuna e-posta olarak gelir ve orada saklanır.
 - **Siteye giren herkes için:** sayfanın sunulabilmesi için IP adresin ve tarayıcı bilgilerin barındırma ve yazı tipi hizmetlerince (aşağıda) işlenir.
 
 Reklam ya da izleme çerezi ve analitik aracı kullanmıyoruz.
@@ -47,7 +47,7 @@ Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görün�
 ### Kimlerle paylaşıyoruz
 
 - **Cloudflare, Inc. (ABD):** sitenin barındırılması, sunucu ve veritabanı. Hesap ve oyun verilerin burada saklanır.
-- **Google LLC (ABD):** e-postaların warsimbox@gmail.com hesabından gönderilmesi (Gmail; e-posta adresin ve e-postanın içeriği), yazı tipleri (Google Fonts; IP adresin) ve geri bildirim formu (Google Forms).
+- **Google LLC (ABD):** e-postaların warsimbox@gmail.com hesabından gönderilmesi ve geri bildirimlerin bu kutuda saklanması (Gmail; e-posta adresin ve e-postanın içeriği), yazı tipleri (Google Fonts; IP adresin). Önceki sürümde gönderilen geri bildirimler Google Forms’ta durur.
 
 Toplu gönderim için başka bir e-posta hizmeti kullanırsak adresin o hizmete de aktarılır ve hizmet bu listeye eklenir. Veritabanımız şu an Cloudflare’in Doğu Avrupa bölgesinde çalışıyor; bu konum kesin bir taahhüt değildir. Site Cloudflare’in dünya genelindeki ağı üzerinden sunulur. Yani verilerin Türkiye dışında işlenir. Yasal bir zorunluluk olduğunda veriler yetkili kurumlarla da paylaşılabilir.
 
@@ -57,7 +57,7 @@ Oturumun, ayarların, dil seçimin ve kayıtlarının bir kopyası tarayıcında
 
 ### Ne kadar saklıyoruz
 
-Hesap ve oyun verilerin, hesabın açık kaldığı sürece saklanır. Hesabını Profil’den kendin silebilirsin (şifren sorulur). Şifreni kaybettiysen bize yaz; başvurunu en geç 30 gün içinde sonuçlandırırız. Yasal olarak saklanması gereken veriler bunun dışındadır. Hesabın, kayıtların, skorların ve oturumların veritabanından birlikte silinir. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur. Oturumlar 90 gün sonra kapanır ve silinir. Sunucunun teknik kayıtları en çok 7 gün tutulur; Cloudflare’in kendi ağ kayıtları kendi kurallarına tabidir. Geri bildirimlerin hesaba bağlı değildir: silinmesini istiyorsan bize yazdığın adı belirt.
+Hesap ve oyun verilerin, hesabın açık kaldığı sürece saklanır. Hesabını Profil’den kendin silebilirsin (şifren sorulur). Şifreni kaybettiysen bize yaz; başvurunu en geç 30 gün içinde sonuçlandırırız. Yasal olarak saklanması gereken veriler bunun dışındadır. Hesabın, kayıtların, skorların ve oturumların veritabanından birlikte silinir. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur. Oturumlar 90 gün sonra kapanır ve silinir. Sunucunun teknik kayıtları en çok 7 gün tutulur; Cloudflare’in kendi ağ kayıtları kendi kurallarına tabidir. Geri bildirimlerin e-posta kutumuzda durur, hesabını silmek onları silmez: silinmesini istiyorsan bize yazdığın adı belirt.
 
 ### Güvenlik
 
@@ -94,7 +94,7 @@ Halil (WarSimBox). İletişim: warsimbox@gmail.com.
 | Metinlerin kabul tarihi ve sürümü, e-posta izni kaydı | Kabulün ve iznin kanıtlanması | Bir hakkın tesisi, kullanılması veya korunması (m. 5/2-e) |
 | Doğrulama kodu özeti, e-posta ve IP adresi özetleri | E-posta adresinin doğrulanması, kod gönderiminin kötüye kullanılmasının önlenmesi | Sözleşmenin kurulması (m. 5/2-c); meşru menfaat (m. 5/2-f) |
 | IP adresi ve tarayıcı bilgileri | Sitenin sunulması ve güvenliği | Meşru menfaat (m. 5/2-f) |
-| Geri bildirimde yazılan ad ve ileti | Görüşlerin değerlendirilmesi | Meşru menfaat (m. 5/2-f) |
+| Geri bildirimde yazılan ad, ileti ve fiyat önerisi; hesapla gönderildiyse e-posta adresi ve dil seçimi | Görüşlerin değerlendirilmesi | Meşru menfaat (m. 5/2-f) |
 | E-posta adresi ve dil seçimi (yalnız izin verdiysen) | Yenilik ve duyuru e-postaları | Açık rıza (m. 5/1) |
 
 ### Toplama yöntemi
@@ -103,7 +103,7 @@ Veriler, hesap ve geri bildirim formlarını doldurman ve oyunu oynaman sırası
 
 ### Aktarım
 
-Veriler, hizmetin sunulması amacıyla barındırma ve veritabanı hizmeti veren Cloudflare, Inc. ile e-posta (Gmail), yazı tipi ve form hizmeti veren Google LLC’ye aktarılır. Toplu gönderim için başka bir e-posta hizmeti kullanılırsa adres o hizmete de aktarılır ve hizmet Gizlilik Politikası’nda belirtilir. Bu şirketler ABD merkezlidir. Veritabanı şu an Cloudflare’in Doğu Avrupa bölgesinde çalışır (kesin bir taahhüt değildir) ve site Cloudflare’in dünya genelindeki ağı üzerinden sunulur; yani veriler yurt dışında işlenir. Veriler yasal zorunluluk hâlinde yetkili kamu kurumlarıyla da paylaşılabilir.
+Veriler, hizmetin sunulması amacıyla barındırma ve veritabanı hizmeti veren Cloudflare, Inc. ile e-posta (Gmail) ve yazı tipi hizmeti veren Google LLC’ye aktarılır; önceki sürümde gönderilen geri bildirimler Google Forms’ta durur. Toplu gönderim için başka bir e-posta hizmeti kullanılırsa adres o hizmete de aktarılır ve hizmet Gizlilik Politikası’nda belirtilir. Bu şirketler ABD merkezlidir. Veritabanı şu an Cloudflare’in Doğu Avrupa bölgesinde çalışır (kesin bir taahhüt değildir) ve site Cloudflare’in dünya genelindeki ağı üzerinden sunulur; yani veriler yurt dışında işlenir. Veriler yasal zorunluluk hâlinde yetkili kamu kurumlarıyla da paylaşılabilir.
 
 ### Saklama ve silme
 
@@ -143,7 +143,7 @@ Data controller: Halil (WarSimBox). Contact: warsimbox@gmail.com.
 - **If you create an account:** your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.
 - **While verifying your email:** a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.
 - **If you play with an account:** saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time and tutorial preference.
-- **If you send feedback:** the name, message and price suggestion you enter. No account is needed; this goes to Google Forms.
+- **If you send feedback:** your thoughts and suggestions, price suggestion and name; if sent with your account, also your email address and language. Feedback and suggestions need an account with an email; a price suggestion alone does not (a commander name is enough). These arrive as email in the warsimbox@gmail.com mailbox and are kept there.
 - **For every visitor:** to serve the page, your IP address and browser details are processed by the hosting and font services listed below.
 
 We use no advertising or tracking cookies and no analytics tools.
@@ -170,7 +170,7 @@ Your user name and scores are visible to every visitor on the leaderboard. Your 
 ### Who we share it with
 
 - **Cloudflare, Inc. (USA):** site hosting, server and database. Your account and game data are stored here.
-- **Google LLC (USA):** sending email from the warsimbox@gmail.com account (Gmail; your email address and the email’s content), fonts (Google Fonts; your IP address) and the feedback form (Google Forms).
+- **Google LLC (USA):** sending email from the warsimbox@gmail.com account and keeping feedback in that mailbox (Gmail; your email address and the email’s content), and fonts (Google Fonts; your IP address). Feedback sent with earlier versions remains in Google Forms.
 
 If we use another email service for bulk sending, your address is also transferred to that service and it is added to this list. Our database currently runs in Cloudflare’s Eastern Europe region; this location is not a firm commitment. The site is served through Cloudflare’s global network. Your data is therefore processed outside Türkiye. Data may also be shared with competent authorities where the law requires it.
 
@@ -180,7 +180,7 @@ Your session, settings, language and a copy of your saves are kept in your brows
 
 ### How long we keep it
 
-Account and game data are kept for as long as your account exists. You can delete your account yourself in your Profile (your password is required). If you have lost your password, write to us and we conclude your request within 30 days at the latest. Data the law requires us to keep is excepted. Your account, saves, scores and sessions are deleted from the database together. Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically. Sessions end and are deleted after 90 days. The server’s technical logs are kept for up to 7 days; Cloudflare’s own network logs follow its own rules. Feedback is not linked to accounts: to have yours deleted, tell us the name you wrote.
+Account and game data are kept for as long as your account exists. You can delete your account yourself in your Profile (your password is required). If you have lost your password, write to us and we conclude your request within 30 days at the latest. Data the law requires us to keep is excepted. Your account, saves, scores and sessions are deleted from the database together. Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically. Sessions end and are deleted after 90 days. The server’s technical logs are kept for up to 7 days; Cloudflare’s own network logs follow its own rules. Your feedback stays in our mailbox and deleting your account does not delete it: to have it deleted, tell us the name you wrote.
 
 ### Security
 
@@ -217,7 +217,7 @@ Halil (WarSimBox). Contact: warsimbox@gmail.com.
 | Date and version of accepted texts, email permission record | Proving acceptance and permission | Establishing, exercising or protecting a right (5/2-e) |
 | Verification code hash, email and IP address hashes | Verifying the email address, preventing abuse of code sending | Formation of a contract (5/2-c); legitimate interest (5/2-f) |
 | IP address and browser details | Serving and securing the site | Legitimate interest (5/2-f) |
-| Name and message entered as feedback | Reviewing feedback | Legitimate interest (5/2-f) |
+| Name, message and price suggestion entered as feedback; email address and language if sent with an account | Reviewing feedback | Legitimate interest (5/2-f) |
 | Email address and language (only if you gave permission) | News and announcement emails | Explicit consent (5/1) |
 
 ### How data is collected
@@ -226,7 +226,7 @@ Data is collected electronically and automatically when you fill in the account 
 
 ### Transfers
 
-To provide the service, data is transferred to Cloudflare, Inc. (hosting and database) and Google LLC (email through Gmail, fonts and forms). If another email service is used for bulk sending, the address is also transferred to that service, which is named in the Privacy Policy. These companies are based in the USA. The database currently runs in Cloudflare’s Eastern Europe region (not a firm commitment) and the site is served through Cloudflare’s global network, so data is processed abroad. Data may also be shared with competent public authorities where the law requires it.
+To provide the service, data is transferred to Cloudflare, Inc. (hosting and database) and Google LLC (email through Gmail and fonts); feedback sent with earlier versions remains in Google Forms. If another email service is used for bulk sending, the address is also transferred to that service, which is named in the Privacy Policy. These companies are based in the USA. The database currently runs in Cloudflare’s Eastern Europe region (not a firm commitment) and the site is served through Cloudflare’s global network, so data is processed abroad. Data may also be shared with competent public authorities where the law requires it.
 
 ### Retention and deletion
 

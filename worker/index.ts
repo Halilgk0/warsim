@@ -13,11 +13,14 @@
 // - Kayıtlar: gzip'li veri + liste için özet; otomatik kayıtlardan en yeni 3'ü, elle kayıtlardan en çok 30'u kalır.
 // - İstatistik: istemci harekâtın o anki toplamlarını yollar; sunucu harekâtın önceki en yüksek değerlerine göre artışı
 //   hesaplar, akla yatkınlık sınırlarıyla kırpar ve tüm zamanlar + bu haftanın toplamlarına ekler.
+// - Geri bildirim: warsimbox@gmail.com kutusuna e-posta olarak gelir, veritabanına yazılmaz. Görüş ve öneri için e-postalı
+//   hesap gerekir (Yanıtla düğmesi oyuncuya yazar); "Steam'de _ $ veririm" misafire de açık, misafir komutan adı yazar.
 // - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
 //   hesap silme.
 
-import { LEGAL_VERSION, METRICS, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
+import { feedbackMail } from './feedbackMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
 interface Env extends MailEnv {
@@ -60,6 +63,10 @@ const DAY_MS = 86400000;
 const LIMIT_ADDRESS = { max: 6, ms: DAY_MS };
 const LIMIT_IP = { max: 20, ms: 60 * 60 * 1000 };
 const LIMIT_ALL = { max: 400, ms: DAY_MS };
+/** Geri bildirim sınırları: hesap ve misafir (IP) başına, toplam. Kodlarla birlikte Gmail'in günlük sınırının altında kalır. */
+const LIMIT_FB_ACCOUNT = { max: 10, ms: DAY_MS };
+const LIMIT_FB_GUEST = { max: 5, ms: 60 * 60 * 1000 };
+const LIMIT_FB_ALL = { max: 50, ms: DAY_MS };
 
 // ---------------------------------------------------------------- yardımcılar
 
@@ -174,21 +181,45 @@ async function noteFail(env: Env, a: AccountRow): Promise<Response> {
 const codeHash = (email: string, code: string): Promise<string> => sha256(`${email}:${code}`);
 
 /** Sınır sayaçlarını artırır; biri aşıldıysa true. Süresi dolan pencere baştan başlar. */
-async function mailLimited(env: Env, email: string, ip: string, now: number): Promise<boolean> {
-  const hit = (key: string, l: { max: number; ms: number }) => env.DB.prepare(
+async function limited(env: Env, list: { key: string; max: number; ms: number }[], now: number): Promise<boolean> {
+  const res = await env.DB.batch<{ count: number }>(list.map((l) => env.DB.prepare(
     `INSERT INTO mail_limits (key, window_start, count) VALUES (?1, ?2, 1)
      ON CONFLICT (key) DO UPDATE SET count = CASE WHEN window_start <= ?3 THEN 1 ELSE count + 1 END,
        window_start = CASE WHEN window_start <= ?3 THEN ?2 ELSE window_start END
      RETURNING count`,
-  ).bind(key, now, now - l.ms);
-  const limits = [LIMIT_ADDRESS, LIMIT_IP, LIMIT_ALL];
-  const res = await env.DB.batch<{ count: number }>([
-    // Aynı kutuya giden yazımlar sınırı aşamasın
-    hit(`to:${await sha256(emailKey(email))}`, LIMIT_ADDRESS),
-    hit(`ip:${await sha256(ip)}`, LIMIT_IP),
-    hit('all', LIMIT_ALL),
-  ]);
-  return res.some((r, i) => r.results[0].count > limits[i].max);
+  ).bind(l.key, now, now - l.ms)));
+  return res.some((r, i) => r.results[0].count > list[i].max);
+}
+
+const clientIp = (req: Request): string => req.headers.get('cf-connecting-ip') ?? 'yerel';
+
+/** Geri bildirim: görüş için e-postalı hesap, yalnız fiyat için misafire komutan adı yeter. warsimbox@gmail.com'a e-posta olur. */
+async function sendFeedback(req: Request, env: Env): Promise<Response> {
+  const a = await authed(req, env);
+  const b = await body<{ message?: string; price?: number | null; name?: string; lang?: string }>(req);
+  const message = String(b?.message ?? '').trim().slice(0, FEEDBACK_MAX);
+  const price = b?.price === null || b?.price === undefined ? null : Number(b.price);
+  if (price !== null && (!Number.isFinite(price) || price < 0 || price > PRICE_MAX)) return fail(400, 'bad_price');
+  if (!message && price === null) return fail(400, 'feedback_empty');
+  if (message && !a) return fail(401, 'need_account');
+  if (message && !a!.email) return fail(403, 'need_email');
+  const name = a?.name ?? cleanName(String(b?.name ?? ''));
+  const problem = nameProblem(name);
+  if (problem) return fail(400, `name_${problem}`);
+  if (!mailReady(env)) return fail(503, 'mail_off');
+  const now = Date.now();
+  const who = a
+    ? { key: `fb:hesap:${a.id}`, ...LIMIT_FB_ACCOUNT }
+    : { key: `fb:ip:${await sha256(clientIp(req))}`, ...LIMIT_FB_GUEST };
+  if (await limited(env, [who, { key: 'fb:all', ...LIMIT_FB_ALL }], now)) return fail(429, 'feedback_limit');
+  try {
+    const email = a?.email ?? null;
+    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price }), email);
+  } catch (e) {
+    console.error(e);
+    return fail(502, 'mail_failed');
+  }
+  return json({ ok: true });
 }
 
 /** Doğrulama kodu gönder. Hesap açarken ad da gelir: alınmışsa kod gönderilmeden söylenir. */
@@ -206,7 +237,12 @@ async function emailCode(req: Request, env: Env): Promise<Response> {
   const prev = await env.DB.prepare('SELECT sent_at FROM email_codes WHERE email = ?').bind(email).first<{ sent_at: number }>();
   const wait = prev ? Math.ceil((prev.sent_at + CODE_GAP_MS - now) / 1000) : 0;
   if (wait > 0) return fail(429, 'mail_wait', { wait });
-  if (await mailLimited(env, email, req.headers.get('cf-connecting-ip') ?? 'yerel', now)) return fail(429, 'mail_limit');
+  if (await limited(env, [
+    // Aynı kutuya giden yazımlar sınırı aşamasın
+    { key: `to:${await sha256(emailKey(email))}`, ...LIMIT_ADDRESS },
+    { key: `ip:${await sha256(clientIp(req))}`, ...LIMIT_IP },
+    { key: 'all', ...LIMIT_ALL },
+  ], now)) return fail(429, 'mail_limit');
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
   const code = String(n).padStart(6, '0');
   await env.DB.batch([
@@ -562,6 +598,7 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname.replace(/^\/api/, '');
   const m = req.method;
   if (m === 'POST' && path === '/email/code') return emailCode(req, env);
+  if (m === 'POST' && path === '/feedback') return sendFeedback(req, env);
   if (m === 'POST' && path === '/register') return register(req, env);
   if (m === 'POST' && path === '/login') return login(req, env);
   if (m === 'POST' && path === '/recover') return recover(req, env);

@@ -22,8 +22,11 @@ function b64(s: string): string {
 
 export const mailReady = (env: MailEnv): boolean => !!env.MAIL_FROM && !!env.MAIL_PASSWORD;
 
-/** Alıcı adresi validEmail'den geçmiş olmalı (satır sonu taşıyamaz). Başarısızsa hata fırlatır; iletide adres ve şifre olmaz. */
-export async function sendMail(env: MailEnv, to: string, mail: Mail): Promise<void> {
+/**
+ * Alıcı ve replyTo validEmail'den geçmiş olmalı (satır sonu taşıyamaz). Başarısızsa hata fırlatır; iletide adres ve şifre olmaz.
+ * replyTo: e-postadaki Yanıtla düğmesi bu adrese yazar (geri bildirimde oyuncu).
+ */
+export async function sendMail(env: MailEnv, to: string, mail: Mail, replyTo: string | null = null): Promise<void> {
   const from = env.MAIL_FROM!;
   const socket = connect(
     { hostname: env.SMTP_HOST ?? 'smtp.gmail.com', port: Number(env.SMTP_PORT ?? 465) },
@@ -69,6 +72,7 @@ export async function sendMail(env: MailEnv, to: string, mail: Mail): Promise<vo
   const message = [
     `From: WarSimBox <${from}>`,
     `To: <${to}>`,
+    ...(replyTo ? [`Reply-To: <${replyTo}>`] : []),
     `Subject: =?UTF-8?B?${b64(mail.subject)}?=`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomUUID()}@warsimbox.com>`,

@@ -179,7 +179,7 @@ export class MainMenu {
   }
 
   /** Giriş ya da yeni hesap sonrası: ileti, kayıt listesi ve skorlar yenilenir. */
-  private loggedIn(a: Account, created: boolean): void {
+  loggedIn(a: Account, created: boolean): void {
     if (!cleanName(this.name)) this.name = a.name;
     this.notice = created
       ? L(`Hesap açıldı: ${a.name}. Kayıtların bulutta saklanır.`, `Account created: ${a.name}. Your saves are kept in the cloud.`)

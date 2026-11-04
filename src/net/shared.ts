@@ -50,6 +50,10 @@ export function emailKey(e: string): string {
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
 export const LEGAL_VERSION = '2026-11-04';
 
+/** Geri bildirim: görüş metninin en büyük uzunluğu ve "Steam'de _ $ veririm" üst sınırı. */
+export const FEEDBACK_MAX = 2000;
+export const PRICE_MAX = 1000000;
+
 /** Skor tablosu ölçütleri (veritabanı sütunu). */
 export const METRICS = ['kills', 'wins', 'earned', 'peak', 'play_sec'] as const;
 export type Metric = (typeof METRICS)[number];

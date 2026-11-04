@@ -1045,6 +1045,9 @@ button.danger:hover { background: #ecc7bf; }
 .fb-card textarea:focus, .fb-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .fb-price { display: flex; align-items: center; gap: calc(8px * var(--ui)); font-size: calc(15px * var(--ui)); font-weight: 800; margin: calc(8px * var(--ui)) 0 calc(10px * var(--ui)); }
 .fb-card .fb-price input { width: calc(96px * var(--ui)); text-align: center; font-weight: 800; font-size: calc(15px * var(--ui)); padding: calc(6px * var(--ui)) calc(8px * var(--ui)); }
+.fb-lock { display: flex; align-items: center; gap: calc(10px * var(--ui)); font-size: calc(13px * var(--ui)); font-weight: 700; line-height: 1.4; color: var(--accent-ink); background: var(--accent-soft); border-radius: calc(12px * var(--ui)); padding: calc(10px * var(--ui)) calc(12px * var(--ui)); }
+.fb-lock span { flex: 1; }
+.fb-lock button { flex: none; }
 .fb-req { color: #a8473c; text-transform: none; letter-spacing: 0; margin-left: calc(4px * var(--ui)); }
 .fb-err { color: #a8473c; font-size: calc(12.5px * var(--ui)); font-weight: 700; }
 

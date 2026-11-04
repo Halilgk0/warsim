@@ -518,7 +518,7 @@ export class Tutorial {
       {
         id: 'feedback', ch: 'menu', click: true,
         target: () => visible('#mainmenu [data-mm="feedback"]'),
-        text: () => L('Bir hata gördün ya da bir fikrin mi var? Buradan bize yaz; hesap gerekmez.', 'Spotted a bug or have an idea? Write to us here; no account needed.'),
+        text: () => L('Bir hata gördün ya da bir fikrin mi var? Hesabınla buradan bize yaz.', 'Spotted a bug or have an idea? Write to us here with your account.'),
         button: () => L('Oyuna geç ›', 'Start playing ›'),
       },
       // ---------------------------------------------------------- harita

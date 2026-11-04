@@ -1,74 +1,15 @@
-// Geri bildirim penceresi: görüş ve öneri, "Ben bu oyuna Steam'de _ $ veririm" ve gönderen adı (zorunlu; hesap gerekmez).
-// Gönderilen geri bildirim geliştiricinin Google Formu'na gider (oyuncu formu görmez; yanıtlar formun "Yanıtlar"
-// sekmesinde). Gönderilemezse bu cihazda saklanır (warsim.feedback.v1) ve oyun bir sonraki açılışta yeniden dener.
+// Geri bildirim penceresi: görüş ve öneri (e-postalı hesap gerekir) ve "Ben bu oyuna Steam'de _ $ veririm" (misafire de açık;
+// misafir komutan adı yazar, hesapta hesabın adı kullanılır). Gönderilen, sunucudan warsimbox@gmail.com kutusuna e-posta
+// olarak gider. Bağlantı yoksa hata gösterilir; yazılanlar pencerede kalır.
 
-import { NAME_MAX } from '../persist';
+import { currentAccount, NAME_MAX } from '../persist';
+import { api, apiMessage } from '../net/api';
+import { FEEDBACK_MAX, PRICE_MAX, nameProblem } from '../net/shared';
 import { $, esc } from './dom';
-import { L } from '../i18n';
+import { L, LANG } from '../i18n';
 
-/** Google Formu: yanıt adresi ve soruların alan kimlikleri (formun sayfasından). */
-const FORM = {
-  action: 'https://docs.google.com/forms/d/e/1FAIpQLSd0aiDv4VFn00-Qzycad3bG4pObjaSC1gV0Cyt0Cu2rW-IiBQ/formResponse',
-  name: 'entry.1906610939',
-  message: 'entry.1709181954',
-  price: 'entry.625710882',
-};
-const OUTBOX_KEY = 'warsim.feedback.v1';
-const MESSAGE_MAX = 2000;
-
-interface FeedbackEntry {
-  name: string;
-  message: string;
-  /** "Ben bu oyuna Steam'de _ $ veririm" (boş bırakılabilir). */
-  price: number | null;
-  sentAt: string;
-}
-
-/**
- * Forma gönder. Google başka siteden gelen isteğin cevabını göstermez (no-cors): ağ hatası olmadıysa ulaştı sayılır.
- */
-async function post(e: FeedbackEntry): Promise<void> {
-  const body = new URLSearchParams({
-    [FORM.name]: e.name,
-    [FORM.message]: e.message,
-    [FORM.price]: e.price === null ? '' : String(e.price),
-  });
-  await fetch(FORM.action, { method: 'POST', mode: 'no-cors', body });
-}
-
-function readOutbox(): FeedbackEntry[] {
-  try {
-    return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as FeedbackEntry[];
-  } catch {
-    return [];
-  }
-}
-
-function writeOutbox(list: FeedbackEntry[]): void {
-  try {
-    if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list.slice(-50)));
-    else localStorage.removeItem(OUTBOX_KEY);
-  } catch {
-    // Depolama kapalıysa yapacak bir şey yok
-  }
-}
-
-function keepLocally(e: FeedbackEntry): void {
-  writeOutbox([...readOutbox(), e]);
-}
-
-/** Önceden gönderilemeyip saklananları sessizce yeniden gönder (gidemeyen kalır). */
-async function flushOutbox(): Promise<void> {
-  const left: FeedbackEntry[] = [];
-  for (const e of readOutbox()) {
-    try {
-      await post(e);
-    } catch {
-      left.push(e);
-    }
-  }
-  writeOutbox(left);
-}
+/** Eski sürümde gönderilemeyen geri bildirimlerin deposu: artık kullanılmaz. */
+const OLD_OUTBOX_KEY = 'warsim.feedback.v1';
 
 export class FeedbackBox {
   isOpen = false;
@@ -80,7 +21,8 @@ export class FeedbackBox {
   private done = '';
   private sending = false;
 
-  constructor() {
+  /** login: giriş penceresini aç; addEmail: e-posta ekleme penceresini aç. İkisi kapanınca oyun refresh çağırır. */
+  constructor(private readonly actions: { login: () => void; addEmail: () => void }) {
     this.el.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
       if (t === this.el) {
@@ -90,6 +32,8 @@ export class FeedbackBox {
       const act = t.closest<HTMLElement>('[data-fb]')?.dataset.fb;
       if (act === 'close') this.close();
       else if (act === 'send') void this.send();
+      else if (act === 'login') this.actions.login();
+      else if (act === 'email') this.actions.addEmail();
       else if (act === 'again') {
         this.done = '';
         this.message = '';
@@ -112,18 +56,27 @@ export class FeedbackBox {
       else if (e.key === 'Enter' && (e.target as HTMLElement).matches('input')) void this.send();
       e.stopPropagation();
     });
-    // Önceki oturumda gönderilemeyenler
-    if (navigator.onLine !== false) void flushOutbox();
+    try {
+      localStorage.removeItem(OLD_OUTBOX_KEY);
+    } catch {
+      /* depolama kapalı */
+    }
   }
 
-  /** defaultName: hesap ya da komutan adı (boş alanı doldurmak için). */
+  /** defaultName: komutan adı (misafirde boş alanı doldurmak için). */
   open(defaultName = ''): void {
     this.isOpen = true;
     if (!this.name) this.name = defaultName;
     this.error = '';
+    // Gönderilmişse yeni geri bildirim için temiz form
+    if (this.done) {
+      this.done = '';
+      this.message = '';
+      this.price = '';
+    }
     this.el.classList.remove('hidden');
     this.render();
-    this.el.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    this.el.querySelector<HTMLElement>('textarea, input')?.focus();
   }
 
   close(): void {
@@ -131,30 +84,38 @@ export class FeedbackBox {
     this.el.classList.add('hidden');
   }
 
+  /** Giriş ya da e-posta ekleme bitince: pencere yeni hesap durumuna göre çizilsin (yazılanlar kalır). */
+  refresh(): void {
+    this.error = '';
+    this.render();
+  }
+
   private async send(): Promise<void> {
     if (this.sending || this.done) return;
+    const acc = currentAccount();
+    const canWrite = acc?.hasEmail === true;
     const name = this.name.trim();
-    const message = this.message.trim();
+    const message = canWrite ? this.message.trim() : '';
     const p = this.price.trim().replace(',', '.');
     const price = p === '' ? null : Number(p);
-    if (!name) this.error = L('Göndermeden önce gönderen adını yaz.', 'Enter your name before sending.');
-    else if (price !== null && (!Number.isFinite(price) || price < 0 || price > 1e6)) this.error = L('Fiyat 0 ile 1.000.000 arasında bir sayı olmalı.', 'The price must be a number between 0 and 1,000,000.');
-    else if (!message && price === null) this.error = L('Bir görüş yaz ya da oyuna vereceğin fiyatı gir.', 'Write some feedback or enter the price you would pay.');
+    if (price !== null && (!Number.isFinite(price) || price < 0 || price > PRICE_MAX)) this.error = apiMessage('bad_price');
+    else if (!message && price === null) this.error = canWrite ? apiMessage('feedback_empty') : L('Oyuna vereceğin fiyatı gir.', 'Enter the price you would pay.');
+    else if (!acc) {
+      const problem = nameProblem(name);
+      if (problem) this.error = L('Göndermek için komutan adını yaz (en az 2 karakter; harf, rakam, boşluk, - _ .).', 'Enter your commander name to send (at least 2 characters; letters, digits, spaces, - _ .).');
+    }
     if (this.error) {
       this.render();
-      this.el.querySelector<HTMLInputElement>(name ? 'textarea' : 'input[name="fbname"]')?.focus();
+      this.el.querySelector<HTMLElement>(this.error.includes(L('komutan', 'commander')) ? 'input[name="fbname"]' : 'textarea, input[name="fbprice"]')?.focus();
       return;
     }
-    const entry: FeedbackEntry = { name: name.slice(0, NAME_MAX * 2), message: message.slice(0, MESSAGE_MAX), price, sentAt: new Date().toISOString() };
     this.sending = true;
     this.render();
     try {
-      await post(entry);
+      await api('POST', '/feedback', { message, price, name: acc ? undefined : name, lang: LANG });
       this.done = L('Teşekkürler! Geri bildirimin bize ulaştı.', 'Thank you! Your feedback has reached us.');
-      void flushOutbox();
-    } catch {
-      keepLocally(entry);
-      this.error = L('Şu an gönderilemedi; bu cihazda saklandı. Biraz sonra yeniden dene.', 'Could not send right now; it is kept on this device. Try again a little later.');
+    } catch (e) {
+      this.error = (e as Error).message;
     }
     this.sending = false;
     this.render();
@@ -162,21 +123,31 @@ export class FeedbackBox {
 
   private render(): void {
     if (!this.isOpen) return;
+    const acc = currentAccount();
+    const canWrite = acc?.hasEmail === true;
+    const write = canWrite
+      ? `<label class="mm-label" for="fb-msg">${L('Görüşün ve önerin', 'Your thoughts and suggestions')}</label>
+         <textarea id="fb-msg" name="fbmsg" maxlength="${FEEDBACK_MAX}" rows="5" placeholder="${L('Neyi beğendin, neyi değiştirelim, nerede hata gördün?', 'What did you like, what should we change, where did you spot a bug?')}">${esc(this.message)}</textarea>`
+      : `<div class="fb-lock"><span>${acc
+        ? L('Görüş ve öneri göndermek için hesabına e-posta ekle.', 'Add an email to your account to send feedback and suggestions.')
+        : L('Görüş ve öneri göndermek için e-postalı bir hesapla giriş yap.', 'Log in with an account that has an email to send feedback and suggestions.')}</span>
+         <button type="button" data-fb="${acc ? 'email' : 'login'}">${acc ? L('E-posta ekle', 'Add email') : L('Giriş yap', 'Log in')}</button></div>`;
+    const who = acc
+      ? `<p class="muted small">${L('Gönderen', 'From')}: <b>${esc(acc.name)}</b></p>`
+      : `<label class="mm-label" for="fb-name">${L('Komutan adı', 'Commander name')} <span class="fb-req">${L('zorunlu', 'required')}</span></label>
+         <input id="fb-name" name="fbname" maxlength="${NAME_MAX}" autocomplete="nickname" placeholder="${L('Komutan adın', 'Your commander name')}" value="${esc(this.name)}">`;
     const body = this.done
       ? `<div class="fb-done">${esc(this.done)}</div>
          <div class="fb-actions"><button data-fb="again">${L('Yeni geri bildirim', 'New feedback')}</button><button class="primary" data-fb="close">${L('Kapat', 'Close')}</button></div>`
-      : `<label class="mm-label" for="fb-msg">${L('Görüşün ve önerin', 'Your thoughts and suggestions')}</label>
-         <textarea id="fb-msg" name="fbmsg" maxlength="${MESSAGE_MAX}" rows="5" placeholder="${L('Neyi beğendin, neyi değiştirelim, nerede hata gördün?', 'What did you like, what should we change, where did you spot a bug?')}">${esc(this.message)}</textarea>
+      : `${write}
          <label class="fb-price" for="fb-price">${L('Ben bu oyuna Steam’de', 'I would pay')}
            <input id="fb-price" name="fbprice" type="number" inputmode="decimal" min="0" step="1" placeholder="…" value="${esc(this.price)}">
            ${L('$ veririm', '$ for this game on Steam')}</label>
-         <label class="mm-label" for="fb-name">${L('Gönderen adı', 'Your name')} <span class="fb-req">${L('zorunlu', 'required')}</span></label>
-         <input id="fb-name" name="fbname" maxlength="${NAME_MAX * 2}" autocomplete="nickname" placeholder="${L('Adın ya da takma adın', 'Your name or nickname')}" value="${esc(this.name)}">
+         ${who}
          ${this.error ? `<div class="fb-err">${esc(this.error)}</div>` : ''}
          <div class="fb-actions"><button data-fb="close">${L('Vazgeç', 'Cancel')}</button><button class="primary" data-fb="send" ${this.sending ? 'disabled' : ''}>${this.sending ? L('Gönderiliyor…', 'Sending…') : L('Gönder', 'Send')}</button></div>`;
     this.el.innerHTML = `<div class="fb-card">
       <div class="news-head"><h2>${L('Geri bildirim', 'Feedback')}</h2><button class="icon" data-fb="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
-      <p class="muted small">${L('Hesap açman gerekmez; yalnız gönderen adını yazman yeter.', 'No account needed; just enter your name.')}</p>
       ${body}
     </div>`;
   }

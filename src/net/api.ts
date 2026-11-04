@@ -25,6 +25,11 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'name_chars': return L('Adda yalnız harf, rakam, boşluk, - _ . olabilir', 'Only letters, digits, spaces, - _ . are allowed');
     case 'taken': return L('Bu ad alınmış; başka bir ad seç', 'This name is taken; choose another one');
     case 'email_bad': return L('E-posta adresini kontrol et (ör. ad@ornek.com)', 'Check your email address (e.g. name@example.com)');
+    case 'need_account': return L('Görüş ve öneri göndermek için giriş yap', 'Log in to send feedback and suggestions');
+    case 'need_email': return L('Görüş ve öneri göndermek için hesabına e-posta ekle', 'Add an email to your account to send feedback and suggestions');
+    case 'feedback_empty': return L('Bir görüş yaz ya da oyuna vereceğin fiyatı gir', 'Write some feedback or enter the price you would pay');
+    case 'bad_price': return L('Fiyat 0 ile 1.000.000 arasında bir sayı olmalı', 'The price must be a number between 0 and 1,000,000');
+    case 'feedback_limit': return L('Çok fazla geri bildirim gönderildi; daha sonra tekrar dene', 'Too much feedback sent; try again later');
     case 'email_taken': return L('Bu e-posta başka bir hesapta kayıtlı; o hesapla giriş yap ya da başka bir adres yaz', 'This email is already on another account; log in to it or enter another address');
     case 'code_wrong': {
       const left = Number(extra.left ?? 0);

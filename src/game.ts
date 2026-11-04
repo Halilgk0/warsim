@@ -73,7 +73,13 @@ export class Game {
   readonly login = new LoginBox();
   readonly profile = new ProfileBox((notice) => this.showMainMenu(notice));
   readonly news = new NewsView();
-  readonly feedback = new FeedbackBox();
+  readonly feedback = new FeedbackBox({
+    login: () => this.login.open((a, created) => {
+      if (this.mode === 'menu') this.menu.loggedIn(a, created);
+      else if (this.pause.isOpen) this.pause.render();
+    }),
+    addEmail: () => this.login.askEmail(),
+  });
   readonly menu: MainMenu;
   readonly pause: PauseMenu;
   /** Harekât sonu (zafer / yenilgi) ve son üs geri sayımı. */
@@ -132,6 +138,9 @@ export class Game {
       document.querySelector('.fs-btn')?.classList.toggle('active', isFullscreen());
       this.menu.render();
     });
+    this.login.onClosed = () => {
+      if (this.feedback.isOpen) this.feedback.refresh();
+    };
     this.bindKeys();
     this.bindPageLifecycle();
     sound.install();
