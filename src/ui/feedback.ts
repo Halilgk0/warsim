@@ -76,7 +76,8 @@ export class FeedbackBox {
     }
     this.el.classList.remove('hidden');
     this.render();
-    this.el.querySelector<HTMLElement>('textarea, input')?.focus();
+    // Telefonda klavye kendiliğinden açılıp pencereyi kapatmasın
+    if (!matchMedia('(pointer: coarse)').matches) this.el.querySelector<HTMLElement>('textarea, input')?.focus();
   }
 
   close(): void {

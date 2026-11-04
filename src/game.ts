@@ -30,6 +30,7 @@ import { LoginBox } from './ui/loginBox';
 import { ProfileBox } from './ui/profile';
 import { NewsView } from './ui/news';
 import { FeedbackBox } from './ui/feedback';
+import { installKeyboardFit } from './ui/keyboard';
 import { isFullscreen, onFullscreenChange } from './ui/fullscreen';
 import { $, fmtTime } from './ui/dom';
 import { sound } from './audio/sound';
@@ -141,6 +142,7 @@ export class Game {
     this.login.onClosed = () => {
       if (this.feedback.isOpen) this.feedback.refresh();
     };
+    installKeyboardFit();
     this.bindKeys();
     this.bindPageLifecycle();
     sound.install();

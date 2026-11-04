@@ -25,7 +25,11 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
 - Kayıt anahtarları (`warsim.*`) ve IndexedDB adı (`warsim`) değişmez. Değişirse oyuncuların kayıtları silinir.
 - **Telefon önce gelir:**
   - Arayüz ölçülerini `calc(Npx * var(--ui))` ile yaz.
-  - Bitti demeden 800×360 ve 844×390'da bak.
+  - Bitti demeden 800×360 ve 844×390'da bak. Tarayıcıda adres çubuğu yüksekliği düşürür: menü ve pencereleri 780×300'de de
+    dene. Yükseklikte `100vh` yerine `var(--vh100)` kullan.
+  - Klavye yatay telefonda ekranın çoğunu kaplar, üstte ~100 px kalır: yazı alanı olan pencereler `ui/keyboard.ts` `.kb`
+    ile üste dayanır. Yeni açılır pencereyi `style.css`'te `.kb` kuralına ekle. Başsız tarayıcıda klavye açılmaz; gerçek
+    davranışı telefonda dene.
   - Görsel bir yenilik telefonun kare hızından ödün vermesin; ağır efektler ayarlardan kapatılabilsin.
 - **Üslup:**
   - Pastel ve low-poly kalsın; arayüz War Thunder'a benzemesin.

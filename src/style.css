@@ -14,6 +14,11 @@
   --shadow: 0 6px 24px rgba(80, 70, 60, 0.1), 0 1px 3px rgba(80, 70, 60, 0.08);
   /* Arayüz ölçeği: bütün yazı, boşluk ve kutu ölçüleri bununla çarpılır (telefonda küçülür) */
   --ui: 1;
+  /* Görünen yükseklik: telefonda 100vh adres çubuğunu saymaz, pencere ekrandan taşar */
+  --vh100: 100vh;
+}
+@supports (height: 100dvh) {
+  :root { --vh100: 100dvh; }
 }
 
 * { box-sizing: border-box; }
@@ -839,7 +844,7 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .mm-user { font-size: calc(13px * var(--ui)); background: var(--panel); box-shadow: var(--shadow); padding: calc(7px * var(--ui)) calc(14px * var(--ui)); border-radius: calc(12px * var(--ui)); font-weight: 800; display: inline-flex; align-items: center; gap: calc(7px * var(--ui)); }
 .mm-user i { width: calc(8px * var(--ui)); height: calc(8px * var(--ui)); border-radius: 50%; background: var(--accent); flex: none; }
 .mm-card {
-  position: relative; width: min(calc(560px * var(--ui)), calc(100vw - calc(32px * var(--ui)))); max-height: calc(100vh - calc(120px * var(--ui))); overflow: auto;
+  position: relative; width: min(calc(560px * var(--ui)), calc(100vw - calc(32px * var(--ui)))); max-height: calc(var(--vh100) - calc(120px * var(--ui))); overflow: auto;
   background: var(--panel); border-radius: calc(22px * var(--ui)); box-shadow: 0 18px 50px rgba(80, 70, 60, 0.18), 0 2px 6px rgba(80, 70, 60, 0.08);
   padding: calc(24px * var(--ui)) calc(26px * var(--ui)) calc(18px * var(--ui));
 }
@@ -1119,6 +1124,12 @@ button.danger:hover { background: #ecc7bf; }
 /* iOS yazı kutusuna odaklanınca sayfayı büyütür (16 px altı yazıda); yalnız orada 16 px (main.ts .ios sınıfı) */
 .ios input, .ios textarea, .ios select { font-size: 16px !important; }
 
+/* Klavye açık (ui/keyboard.ts): pencere üste dayanır ve kayar; alttaki boşluk yazı alanının en üste gelmesine yer açar.
+   Yatay telefonda klavyenin üstünde yaklaşık bir alanlık yer kalır: oyuncu klavyenin İleri tuşuyla alandan alana geçer. */
+.kb .login, .kb .fb, .kb .pm, .kb .mm { align-items: flex-start; overflow-y: auto; padding-bottom: 100vh; }
+.kb .login-card, .kb .fb-card, .kb .pm-card, .kb .mm-card { margin-top: 0; margin-bottom: 0; max-height: none; flex: none; }
+.kb input, .kb textarea { scroll-margin-top: 6px; }
+
 .login-card { width: calc(300px * var(--ui)); background: var(--panel); border-radius: calc(16px * var(--ui)); box-shadow: 0 14px 40px rgba(80, 70, 60, 0.2); padding: calc(14px * var(--ui)) calc(16px * var(--ui)) calc(16px * var(--ui)); display: flex; flex-direction: column; gap: calc(8px * var(--ui)); }
 .login-head { display: flex; justify-content: space-between; align-items: center; font-size: calc(15px * var(--ui)); }
 .login-card p { margin: 0; }
@@ -1142,7 +1153,7 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
 
 /* duraklatma menüsü */
 .pm { position: absolute; inset: 0; z-index: 9; background: rgba(228, 234, 230, 0.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
-.pm-card { width: min(calc(470px * var(--ui)), calc(100vw - calc(32px * var(--ui)))); max-height: calc(100vh - calc(60px * var(--ui))); overflow: auto; background: var(--panel); border-radius: calc(20px * var(--ui)); box-shadow: var(--shadow); padding: calc(20px * var(--ui)) calc(22px * var(--ui)); }
+.pm-card { width: min(calc(470px * var(--ui)), calc(100vw - calc(32px * var(--ui)))); max-height: calc(var(--vh100) - calc(60px * var(--ui))); overflow: auto; background: var(--panel); border-radius: calc(20px * var(--ui)); box-shadow: var(--shadow); padding: calc(20px * var(--ui)) calc(22px * var(--ui)); }
 .pm-card h2 { margin: 0 0 calc(4px * var(--ui)); font-size: calc(20px * var(--ui)); }
 .pm-head { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
 .pm-col { display: flex; flex-direction: column; gap: calc(6px * var(--ui)); margin: calc(10px * var(--ui)) 0; }
@@ -1229,14 +1240,14 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   #buildbar.placing { width: auto; }
   #buildbar.placing .bcards, .bhead .muted, .bcard small.bdesc { display: none; }
   .bcards.city { grid-template-columns: repeat(3, 1fr); }
-  .modal-card { width: calc(100vw - 12px); max-height: calc(100vh - 12px); }
-  .modal-card.research, .hangar-card { height: calc(100vh - 12px); }
+  .modal-card { width: calc(100vw - 12px); max-height: calc(var(--vh100) - 12px); }
+  .modal-card.research, .hangar-card { height: calc(var(--vh100) - 12px); }
   .modal-head .muted { display: none; }
-  .pm-card { max-height: calc(100vh - 16px); }
+  .pm-card { max-height: calc(var(--vh100) - 16px); }
   .laststand { top: calc(48px * var(--ui)); }
   .toast { bottom: calc(44px * var(--ui)); }
   .mm-top { top: 8px; left: 16px; right: 16px; }
-  .mm-card { width: min(calc(760px * var(--ui)), calc(100vw - 24px)); max-height: calc(100vh - 60px); margin-top: 40px; }
+  .mm-card { width: min(calc(760px * var(--ui)), calc(100vw - 24px)); max-height: calc(var(--vh100) - 56px); margin-top: 44px; }
   /* Yatay telefonda kart iki sütun: solda ad ve düşman sayısı, sağda harita (yükseklik kıt, kaydırma olmasın) */
   .mm-body {
     display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "name map" "enemy map" "social map" "foot foot";
@@ -1281,4 +1292,25 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   .end-stats { grid-template-columns: repeat(4, 1fr); }
   .end-card .pm-col button.big { grid-column: auto; }
   .end-card h2 { font-size: calc(22px * var(--ui)); }
+}
+
+/* Adres çubuklu yatay telefon (yaklaşık 300 px): menü kartı sıkışır, her şey kaydırmadan sığsın */
+@media (max-height: 340px) {
+  .mm-card { padding: 8px 14px; margin-top: 42px; max-height: calc(var(--vh100) - 46px); }
+  .mm-tabs { margin-bottom: 6px; }
+  .mm-tabs button { padding: 4px; }
+  .mm-label { margin-bottom: 2px; }
+  .mm-maps { gap: 5px; }
+  .mm-mapcard { padding: 3px 6px; }
+  .mm-mapcard img { width: 38px; height: 38px; }
+  .mm-mapcard small { -webkit-line-clamp: 2; }
+  .mm-enemy { margin-top: 6px; }
+  .mm-enemy .seg { margin-bottom: 4px; }
+  .mm-enemy .seg button { height: 28px; }
+  .mm-foes { margin-bottom: 0; }
+  .mm-size { margin-top: 4px; }
+  .mm-size .seg button { padding: 2px 10px; }
+  .mm-foot .social { margin-top: 2px; }
+  .soc { width: 26px; height: 26px; }
+  .mm-foot p { margin-top: 2px; line-height: 1.25; }
 }
