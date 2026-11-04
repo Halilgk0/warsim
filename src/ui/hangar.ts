@@ -1,4 +1,5 @@
-// Hangar: nesil nesil uçaklar, dönen 3B model, gerçek veriler ve irtifaya göre hız/tırmanma grafiği.
+// Hangar: nesil sekmeleri ve seçili neslin uçakları, dönen 3B model, gerçek veriler ve irtifaya göre hız/tırmanma grafiği.
+// Yalnız araştırma ağacında olan, uçurulabilen uçaklar listelenir.
 
 import * as THREE from 'three';
 import { ENGINE_NAMES, GENERATIONS, ROLE_NAMES, SPEC_LIST, generationInfo, originName, type AircraftSpec } from '../sim/aircraft/specs';
@@ -45,6 +46,12 @@ function perfChart(s: AircraftSpec): string {
   </svg>`;
 }
 
+/** Listede görünen uçaklar: araştırma ağacında olup uçurulabilenler. */
+const inTree = (s: AircraftSpec): boolean => {
+  const node = aircraftNode(s.id);
+  return !!node && !node.future;
+};
+
 export class Hangar {
   isOpen = false;
   private el = document.getElementById('hangar')!;
@@ -63,26 +70,24 @@ export class Hangar {
   research: () => Research | null = () => null;
 
   constructor() {
+    const list = SPEC_LIST.filter(inTree);
+    const gens = GENERATIONS.filter((g) => list.some((s) => s.generation === g.id));
     this.el.innerHTML = `
       <div class="modal-card hangar-card">
         <div class="modal-head">
           <div>
             <h2>${L('Hangar ve uçak nesilleri', 'Hangar and aircraft generations')}</h2>
             <p class="muted">${L(
-              'Gerçek uçaklardan alınmış kütle, kanat, motor ve silah verileri. Azami hız, tırmanış, dönüş ve menzil aynı uçuş modelinden türetilir: oyunda uçak tam olarak burada yazdığı gibi uçar. Radar ve füzeli nesiller sonraki aşamada.',
-              'Mass, wing, engine and weapon data taken from the real aircraft. Top speed, climb, turn and range all come from the same flight model: in game, each aircraft flies exactly as written here. Radar and missile generations come in a later stage.',
+              'Gerçek uçaklardan alınmış kütle, kanat, motor ve silah verileri. Azami hız, tırmanış, dönüş ve menzil aynı uçuş modelinden türetilir: oyunda uçak tam olarak burada yazdığı gibi uçar.',
+              'Mass, wing, engine and weapon data taken from the real aircraft. Top speed, climb, turn and range all come from the same flight model: in game, each aircraft flies exactly as written here.',
             )}</p>
           </div>
           <button class="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button>
         </div>
-        <div class="tree">${GENERATIONS.map((g, i) => `
-          ${i > 0 ? '<div class="tree-link"></div>' : ''}
-          <div class="node ${g.playable ? '' : 'locked'}" data-gen="${g.id}" style="flex-grow:${Math.max(1, SPEC_LIST.filter((s) => s.generation === g.id).length / 3)}">
-            <div class="node-top"><b>${g.label}</b><span>${g.era}</span></div>
-            <div class="node-name">${g.name}</div>
-            <div class="node-planes">${SPEC_LIST.filter((s) => s.generation === g.id)
-              .map((s) => `<button data-spec="${s.id}" title="${esc(s.name)}">${esc(s.abbr)}</button>`).join('')}</div>
-          </div>`).join('')}
+        <div class="gens">
+          <div class="gen-tabs">${gens.map((g) => `<button data-gen="${g.id}"><b>${g.label}</b> ${g.name}<small>${g.era}</small></button>`).join('')}</div>
+          ${gens.map((g) => `<div class="gen-planes" data-gen="${g.id}">${list.filter((s) => s.generation === g.id)
+            .map((s) => `<button data-spec="${s.id}" title="${esc(s.name)}">${esc(s.abbr)}</button>`).join('')}</div>`).join('')}
         </div>
         <div class="hangar-body">
           <div class="preview"></div>
@@ -94,6 +99,8 @@ export class Hangar {
     this.el.querySelector('.close')!.addEventListener('click', () => this.close());
     this.el.addEventListener('click', (e) => {
       if (e.target === this.el) this.close();
+      const tab = (e.target as HTMLElement).closest<HTMLButtonElement>('.gen-tabs button');
+      if (tab) this.showGen(tab.dataset.gen!);
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-spec]');
       if (b) {
         const s = SPEC_LIST.find((x) => x.id === b.dataset.spec);
@@ -149,13 +156,20 @@ export class Hangar {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Nesil sekmesi: o neslin uçakları görünür; satır sayısı değişirse önizleme yeni boyuta uyar. */
+  private showGen(gen: string): void {
+    for (const t of this.el.querySelectorAll<HTMLElement>('.gen-tabs button')) t.classList.toggle('active', t.dataset.gen === gen);
+    for (const p of this.el.querySelectorAll<HTMLElement>('.gen-planes')) p.classList.toggle('hidden', p.dataset.gen !== gen);
+    this.resize();
+  }
+
   private show(spec: AircraftSpec): void {
     this.spec = spec;
     for (const b of this.el.querySelectorAll<HTMLButtonElement>('button[data-spec]')) {
       b.classList.toggle('active', b.dataset.spec === spec.id);
       b.classList.toggle('locked', !this.hasAircraft(b.dataset.spec!));
     }
-    for (const n of this.el.querySelectorAll<HTMLElement>('.node')) n.classList.toggle('current', n.dataset.gen === spec.generation);
+    this.showGen(spec.generation);
     this.pivot.clear();
     const model = buildAircraftModel(spec.model, { gear: true });
     this.pivot.add(model.root);

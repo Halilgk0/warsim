@@ -38,6 +38,11 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
     ışık ve gölge, gökyüzü ve bulutlar, atmosfer, su ve arazi ayrıntısı gelir; uçaklar kodla zenginleşir. Blender ya da
     hazır model yok. Her adımda telefon kare hızı ölçülür.
   - Planlayıcı yalnız göreve ilişkin alanları gösterir.
+  - Arayüz dili (`style.css` sonundaki "Görünüm" bölümü): seçili öğede açık zemin ve altta sönen uçak izi (`--trail`); yeşil
+    dolgu yalnız o ekranın asıl eyleminde; oyun içi üst çubuklar tepeden sarkar (ana menünün üst düğmeleri ayrı ayrı kalır,
+    tek çubuğu kullanıcı beğenmedi); pencere köşeleri çapraz kanat (`--wing`); kutu içinde
+    kutu yerine düz satırlar; büyük harfli başlık yok. Yenilik mevcut görünümden küçük adımlarla gelir: 2026-11-04'te retro
+    temalar (harekât odası, afiş, seyir haritası) "çok eski ve kötü" diye reddedildi.
 - **Sesler:**
   - Yalnız gerçek kayıt, sentez yok.
   - Lisans yalnız CC0 ya da CC BY (Steam planı var). Lisansı kaydın kendi Freesound sayfasından doğrula; "Attribution"

@@ -538,27 +538,6 @@ input[type='checkbox'] { accent-color: var(--accent); }
 
 /* Hangar */
 .hangar-card { height: min(calc(820px * var(--ui)), 94vh); display: grid; grid-template-rows: auto auto 1fr; }
-.tree { display: flex; align-items: stretch; gap: 0; padding: calc(8px * var(--ui)) calc(22px * var(--ui)) calc(14px * var(--ui)); overflow-x: auto; max-height: calc(190px * var(--ui)); }
-.tree-link { flex: 0 0 calc(14px * var(--ui)); align-self: center; height: calc(2px * var(--ui)); background: var(--line); }
-.node {
-  flex: 1 0 calc(112px * var(--ui));
-  background: #fff;
-  border: 2px solid var(--line);
-  border-radius: calc(14px * var(--ui));
-  padding: calc(8px * var(--ui)) calc(9px * var(--ui));
-  display: flex;
-  flex-direction: column;
-  gap: calc(4px * var(--ui));
-}
-.node.current { border-color: var(--accent); }
-.node.locked { background: #faf6f0; }
-.node.locked .node-top b { color: var(--muted); }
-.node-top { display: flex; justify-content: space-between; align-items: baseline; }
-.node-top b { font-size: calc(15px * var(--ui)); }
-.node-top span { font-size: calc(10px * var(--ui)); color: var(--muted); font-weight: 700; }
-.node-name { font-size: calc(11px * var(--ui)); color: var(--muted); font-weight: 700; }
-.node-planes { display: flex; flex-wrap: wrap; gap: calc(4px * var(--ui)); margin-top: calc(2px * var(--ui)); }
-.node-planes button { padding: calc(4px * var(--ui)) calc(8px * var(--ui)); font-size: calc(12px * var(--ui)); }
 .hangar-body { display: grid; grid-template-columns: 1.3fr 1fr; min-height: 0; border-top: 1px solid var(--line); }
 .preview { position: relative; min-height: 0; overflow: hidden; }
 .preview canvas { display: block; width: 100%; height: 100%; }
@@ -730,7 +709,6 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .pchart polyline.c { stroke: #c79a52; stroke-dasharray: 4 3; }
 .pchart circle.v { fill: var(--blue); }
 .pchart .ct { fill: #b0864a; }
-.node-planes button.locked { opacity: 0.55; }
 
 /* Dizüstü genişliği: üst çubuk taşmasın (1280 px'de Araştırma, Hangar ve Görünüm ekran dışında kalıyordu) */
 @media (max-width: 1700px) {
@@ -1314,3 +1292,102 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   .soc { width: 26px; height: 26px; }
   .mm-foot p { margin-top: 2px; line-height: 1.25; }
 }
+
+/* ---- Görünüm: aynı renkler ve yazı; şablon hissi veren tekrarlar kalkar.
+   Üst çubuklar ekranın tepesinden sarkar; seçili öğe tam yeşil değil, altında sönen uçak izi taşır; yeşil dolgu yalnız o
+   ekranın asıl eylemi; pencere köşeleri kanat gibi çapraz; kutu içinde kutu yerine düz satırlar. */
+:root {
+  --wing: calc(22px * var(--ui)) calc(7px * var(--ui)) calc(22px * var(--ui)) calc(7px * var(--ui));
+  --wing-s: calc(13px * var(--ui)) calc(5px * var(--ui)) calc(13px * var(--ui)) calc(5px * var(--ui));
+  --trail: linear-gradient(90deg, var(--accent-ink), var(--accent) 55%, rgba(134, 179, 162, 0));
+}
+.panel, .mm-card, .login-card, .fb-card, .pm-card, .modal-card, .news-sheet { border-radius: var(--wing); }
+button.primary { border-radius: var(--wing-s); }
+
+/* Seçili öğe: açık zemin ve sönen iz */
+.seg button, .mm-tabs button, .timebar button, .top-actions button, .login-tabs button { background: transparent; }
+.seg button:hover, .mm-tabs button:hover, .timebar button:hover, .top-actions button:hover, .login-tabs button:hover { background: var(--chip); }
+button.active, button.active:hover, .seg button.active, .mm-tabs button.active, .timebar button.active, .login-tabs button.active, .rtabs button.active, .stage-nav button.active {
+  color: var(--accent-ink);
+  background: var(--trail) left bottom / 100% calc(3px * var(--ui)) no-repeat, var(--accent-soft);
+  border-color: transparent;
+}
+.bcard.active small, .scen.active small, .rtabs button.active small, .stage-nav button.active small { color: var(--accent-ink); opacity: 0.8; }
+.bcard.active .cost { color: var(--accent-ink); }
+.stage-nav button.active .sn { background: #fff; color: var(--accent-ink); }
+.lcard.active { border-color: transparent; background: var(--trail) left bottom / 100% calc(3px * var(--ui)) no-repeat, var(--accent-soft); }
+.rtabs button, .stage-nav button { background: transparent; border-color: transparent; }
+.rtabs button:hover, .stage-nav button:hover { background: var(--chip); }
+.timebar button.active.auto {
+  color: #8a6326;
+  background: linear-gradient(90deg, #a87c32, #c79a52 55%, rgba(199, 154, 82, 0)) left bottom / 100% calc(3px * var(--ui)) no-repeat, #fbf1dc;
+}
+
+/* Üst çubuklar tepeden sarkar */
+#topbar { top: 0; }
+.timebar, .top-actions, .money-chip, .research-chip {
+  border-radius: 0 0 calc(14px * var(--ui)) calc(14px * var(--ui));
+  box-shadow: 0 2px 10px rgba(80, 70, 60, 0.1);
+}
+.mm-brand { display: flex; align-items: center; gap: calc(8px * var(--ui)); }
+.mm-brand::before { content: ''; width: 1.1em; height: 1.1em; border-radius: 50%; background: url(/icon.svg) center / contain no-repeat; flex: none; }
+
+/* Başlıklar normal yazı; bağırmaz */
+.mm-label, .sub, .panel h3, .details h3, .modal-body h3, .pboard b, .mt-h, .mcat, .mrep-h, .mpk-h, .srow.head, .ln-h { text-transform: none; letter-spacing: 0; font-size: calc(12.5px * var(--ui)); color: #6f6c7c; }
+.tl .era-t { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+.cp-st { text-transform: none; letter-spacing: 0; font-size: 10px; }
+.ds-stamp, .news-date, .pf-stats thead th, .tut-head b { text-transform: none; letter-spacing: 0; }
+
+/* Yan panelin kapatma tuşu panele yapışık. Sağ panelin kanadı aynalı: tuşun değdiği köşe keskin kalsın. */
+:root { --edge-l: calc(12px * var(--ui)); --edge-r: calc(12px * var(--ui)); --panel-l: calc(290px * var(--ui)); --panel-r: calc(320px * var(--ui)); }
+@media (max-width: 1100px) { :root { --panel-l: calc(240px * var(--ui)); --panel-r: calc(260px * var(--ui)); } }
+@media (max-height: 520px), (max-width: 900px) {
+  :root { --edge-l: max(6px, env(safe-area-inset-left)); --edge-r: max(6px, env(safe-area-inset-right)); --panel-l: calc(240px * var(--ui)); --panel-r: calc(290px * var(--ui)); }
+}
+#left { width: var(--panel-l); }
+#right { width: var(--panel-r); border-radius: calc(7px * var(--ui)) calc(22px * var(--ui)) calc(7px * var(--ui)) calc(22px * var(--ui)); }
+.side-toggle { margin-top: calc(7px * var(--ui)); box-shadow: 0 2px 6px rgba(80, 70, 60, 0.1); }
+.side-toggle.left { left: calc(var(--edge-l) + var(--panel-l) - 1px); }
+.side-toggle.right { right: calc(var(--edge-r) + var(--panel-r) - 1px); }
+.side-toggle.left.closed { left: 0; }
+.side-toggle.right.closed { right: 0; }
+
+/* Kutu içinde kutu yok */
+.mm-mapcard { background: transparent; border-color: var(--line); }
+.mm-mapcard:hover { background: var(--chip); }
+.mm-mapcard.active { border-color: transparent; background: var(--trail) left bottom / 100% calc(3px * var(--ui)) no-repeat, var(--accent-soft); }
+.mm-size .seg button small { opacity: 0.8; }
+.aflist { gap: 0; }
+.afrow { background: transparent; border-radius: 0; border-bottom: 1px solid var(--line); padding: calc(4px * var(--ui)) 0; }
+.afrow:last-child { border-bottom: 0; }
+#log { gap: 0; }
+.log-row { background: transparent; border-radius: 0; border-bottom: 1px solid var(--line); padding: calc(5px * var(--ui)) 0 calc(5px * var(--ui)) calc(9px * var(--ui)); }
+.log-row:last-child { border-bottom: 0; }
+
+/* Pazar: özet düz bir satır, teklifler düz liste; her satırda yeşil düğme yerine sakin düğme */
+.mk-sum { gap: 0; }
+.mk-card { background: transparent; border-radius: 0; padding: calc(2px * var(--ui)) calc(14px * var(--ui)); border-left: 1px solid var(--line); }
+.mk-card:first-child { border-left: 0; padding-left: 0; }
+.mk-offer { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; margin-bottom: 0; padding: calc(6px * var(--ui)) 0; }
+.mk-offer:last-child { border-bottom: 0; }
+.mk-offer button.primary { background: var(--accent-soft); color: var(--accent-ink); }
+.mk-offer button.primary:hover { background: var(--chip-hover); }
+.mk-offer button.primary:disabled:hover { background: var(--accent-soft); }
+
+/* Hangar: üstte nesil sekmeleri, altta o neslin uçakları; liste taşmaz */
+.gens { padding: calc(2px * var(--ui)) calc(22px * var(--ui)) calc(8px * var(--ui)); display: flex; flex-direction: column; gap: calc(6px * var(--ui)); }
+.gen-tabs { display: flex; gap: calc(4px * var(--ui)); }
+.gen-tabs button { flex: 1; display: flex; align-items: baseline; gap: calc(6px * var(--ui)); background: transparent; white-space: nowrap; padding: calc(6px * var(--ui)) calc(10px * var(--ui)); font-weight: 600; }
+.gen-tabs button:hover { background: var(--chip); }
+.gen-tabs b { font-size: calc(14px * var(--ui)); font-weight: 800; }
+.gen-tabs small { margin-left: auto; font-size: calc(10.5px * var(--ui)); font-weight: 700; color: var(--muted); }
+.gen-tabs button.active small { color: var(--accent-ink); opacity: 0.8; }
+.gen-planes { display: flex; flex-wrap: wrap; gap: calc(3px * var(--ui)) calc(4px * var(--ui)); max-height: calc(92px * var(--ui)); overflow-y: auto; }
+.gen-planes button { background: transparent; padding: calc(4px * var(--ui)) calc(8px * var(--ui)); font-size: calc(12px * var(--ui)); }
+.gen-planes button:hover { background: var(--chip); }
+.gen-planes button.locked { opacity: 0.55; }
+.gen-tabs button.active, .gen-planes button.active { color: var(--accent-ink); background: var(--trail) left bottom / 100% calc(3px * var(--ui)) no-repeat, var(--accent-soft); opacity: 1; }
+
+/* Araştırma: üst sıra sakin */
+.pboard { background: transparent; border-radius: var(--wing-s); }
+.pboard.idle { border-style: solid; }
