@@ -35,7 +35,10 @@ function lit(): THREE.Scene {
  * Modeli çerçeveye oturtur. Modellerin merkezi ve kapladığı alan farklı olduğu için önce geniş çizer, dolu pikselleri ölçer,
  * kadrajı onlara göre daraltıp yeniden çizer: hiçbir model kesilmez, hepsi çerçeveyi doldurur.
  */
-function framedShot(sc: THREE.Scene, cam: THREE.PerspectiveCamera): string {
+/** Yakın kadraj (yalnız uçaklar): sağdaki burun sabit kalır, kuyruk soldan taşabilir; yükseklik hiç kesilmez. */
+interface NoseZoom { zoom: number }
+
+function framedShot(sc: THREE.Scene, cam: THREE.PerspectiveCamera, margin = 1.05, nose?: NoseZoom): string {
   const r = canvas();
   r.render(sc, cam);
   const gl = r.getContext();
@@ -57,11 +60,16 @@ function framedShot(sc: THREE.Scene, cam: THREE.PerspectiveCamera): string {
     }
   }
   if (x1 >= x0) {
-    const vh = Math.max(y1 - y0 + 1, (x1 - x0 + 1) * (H / W)) * 1.05;
-    const vw = vh * (W / H);
+    const bh = y1 - y0 + 1;
+    let vh = Math.max(bh, (x1 - x0 + 1) * (H / W)) * margin;
     // readPixels satırları alttan sayar, setViewOffset üstten.
-    const cx = (x0 + x1 + 1) / 2;
+    let cx = (x0 + x1 + 1) / 2;
     const cy = h - (y0 + y1 + 1) / 2;
+    if (nose) {
+      vh = Math.max(vh / nose.zoom, bh * margin);
+      cx = x1 + 1 + vh * (W / H) * 0.02 - (vh * (W / H)) / 2;
+    }
+    const vw = vh * (W / H);
     cam.setViewOffset(w, h, cx - vw / 2, cy - vh / 2, vw, vh);
     r.render(sc, cam);
     cam.clearViewOffset();
@@ -69,18 +77,18 @@ function framedShot(sc: THREE.Scene, cam: THREE.PerspectiveCamera): string {
   return r.domElement.toDataURL('image/webp', 0.86);
 }
 
-/** Uçak: burnu sağa bakar. */
+/** Uçak: tam yandan profil, burnu sağa bakar (sağ yanı görünür), yakın kadraj. */
 function aircraft(id: string): string {
   const scene = lit();
   const model = buildAircraftModel(SPECS[id].model);
-  model.root.rotation.set(0.24, 1.12, 0.05);
+  model.root.rotation.set(0, Math.PI / 2, 0);
   for (const p of model.props) p.rotation.z = 0.4;
   scene.add(model.root);
   const rad = model.radius;
   const cam = new THREE.PerspectiveCamera(30, W / H, 0.5, 2000);
-  cam.position.set(0, rad * 0.42, rad * 3);
+  cam.position.set(0, 0, rad * 3);
   cam.lookAt(0, 0, 0);
-  return framedShot(scene, cam);
+  return framedShot(scene, cam, 1.02, { zoom: 1.7 });
 }
 
 /** Top: 3/4 açıdan, namlu kalkık. Yapı malzemesi sis tanımı ister; bu kadar yakında sis görünmez. */

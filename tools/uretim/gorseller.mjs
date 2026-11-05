@@ -3,6 +3,7 @@
 // Geçici tarayıcı profiliyle (kullanıcının Chrome profiline dokunmaz) vite geliştirme sunucusunda çizer.
 //   node tools/uretim/gorseller.mjs                 bütün uçaklar ve toplar
 //   node tools/uretim/gorseller.mjs ac-spitfire1    yalnız bunlar (siluetleriyle birlikte)
+//   node tools/uretim/gorseller.mjs "ac-*"          bütün uçakların ana resimleri (siluetler hariç)
 // Model değişince ya da yeni uçak ve top eklenince yeniden çalıştır; kendiliğinden güncellenmez.
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -28,7 +29,8 @@ try {
   await p.goto(`http://localhost:${PORT}/ansiklopedi/`);
   const all = await p.evaluate(async () => (await import('/tools/uretim/cekim.ts')).names());
   const wanted = process.argv.slice(2);
-  const names = wanted.length ? all.filter((n) => wanted.some((w) => n === w || n.startsWith(`plan/${w}-`))) : all;
+  // "ac-*" gibi yıldızlı ad: yalnız o önekli ana resimler (siluetler hariç)
+  const names = wanted.length ? all.filter((n) => wanted.some((w) => (w.endsWith('*') ? n.startsWith(w.slice(0, -1)) : n === w || n.startsWith(`plan/${w}-`)))) : all;
   for (const name of names) {
     const url = await p.evaluate(async (n) => (await import('/tools/uretim/cekim.ts')).shot(n), name);
     if (!url.startsWith('data:image/webp')) throw new Error(`webp üretilemedi: ${name}`);

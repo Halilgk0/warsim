@@ -93,7 +93,7 @@ function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
     <div class="prd-info"><b>${esc(sp.name)}</b><div class="prd-ics">${icons}</div></div>`;
   const node = aircraftNode(sp.id);
   if (!open) {
-    return `<button class="prd-row locked" data-act="fab-res" data-id="${node?.id ?? ''}">${head}
+    return `<button class="prd-row ac locked" data-act="fab-res" data-id="${node?.id ?? ''}">${head}
       <span class="prd-lock">${ICON.lock}${L('Araştırılmalı', 'Needs research')}</span></button>`;
   }
   const service = w.airbasesOf(s.team).reduce((a, b) => a + b.inventory.filter((x) => x.specId === sp.id).length, 0);
@@ -101,7 +101,7 @@ function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
   const first = f.queue[0]?.specId === sp.id ? f.queue[0] : null;
   const factor = 0.4 + 0.6 * (s.hp / s.maxHp);
   const price = aircraftPrice(sp);
-  return `<div class="${rowClass(!!first && s.active)}" data-rowkey="${key}">${head}
+  return `<div class="${rowClass(!!first && s.active)} ac" data-rowkey="${key}">${head}
     ${cell(`${key}-svc`, 'prd-n', counter(L('Serviste', 'In service'), service))}
     ${cell(`${key}-q`, 'prd-n', lineCell(queued, 'fab-del', sp.id))}
     ${cell(`${key}-bar`, 'prd-prog', progressCell(first?.progress ?? 0, first ? ((1 - first.progress) * sp.buildTime) / factor : 0, !first && queued > 0))}
