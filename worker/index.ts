@@ -15,11 +15,14 @@
 //   hesaplar, akla yatkınlık sınırlarıyla kırpar ve tüm zamanlar + bu haftanın toplamlarına ekler.
 // - Geri bildirim: warsimbox@gmail.com kutusuna e-posta olarak gelir, veritabanına yazılmaz. Görüş ve öneri için e-postalı
 //   hesap gerekir (Yanıtla düğmesi oyuncuya yazar); "Steam'de _ $ veririm" misafire de açık, misafir komutan adı yazar.
+// - Haber e-postası: zamanlı görev dakikada bir, son haberi almamış ve izin vermiş tek hesaba gönderir (worker/newsMail.ts). Kime
+//   gittiği news_seen listesinde "mail:<haber>" olarak durur; oyuncu bu önekle yazamaz, istemciye dönmez, hesapla silinir.
 // - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
 //   hesap silme.
 
 import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
+import { LATEST_NEWS_MAIL, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { feedbackMail } from './feedbackMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
@@ -144,7 +147,7 @@ async function body<T>(req: Request): Promise<T | null> {
 function newsSeenList(a: AccountRow): string[] {
   try {
     const v: unknown = JSON.parse(a.news_seen ?? '[]');
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !x.startsWith('mail:')) : [];
   } catch {
     return [];
   }
@@ -618,6 +621,7 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
 async function api(req: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname.replace(/^\/api/, '');
   const m = req.method;
+  if (path === '/news/unsubscribe') return newsUnsubscribe(req, env, url);
   if (m === 'POST' && path === '/email/code') return emailCode(req, env);
   if (m === 'POST' && path === '/feedback') return sendFeedback(req, env);
   if (m === 'POST' && path === '/register') return register(req, env);
@@ -661,6 +665,55 @@ async function notFound(url: URL, env: Env): Promise<Response> {
   return new Response(page.body, { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
+// ---------------------------------------------------------------- haber e-postası
+
+const NEWS_MAIL_DAYS = 7;
+/** Günlük tavan: ortak sınırın (LIMIT_ALL) kalanı doğrulama kodlarına ve geri bildirime kalır. */
+const LIMIT_NEWS = { max: 250, ms: DAY_MS };
+
+/** Çıkma bağlantısının imzası: yalnız sunucu üretebilir, oturum gerekmez. */
+const newsToken = (env: Env, id: number): Promise<string> => sha256(`news-unsub:${id}:${env.ADMIN_KEY ?? ''}`);
+
+/** Sıradaki tek hesaba son haberi gönderir. Önce işaretlenir: görev yarıda kesilse de kimseye iki kez gitmez. */
+async function sendNextNewsMail(env: Env, now: number): Promise<void> {
+  const news = LATEST_NEWS_MAIL;
+  if (!mailReady(env) || !env.ADMIN_KEY || now > news.at + NEWS_MAIL_DAYS * DAY_MS) return;
+  const mark = `mail:${news.id}`;
+  const a = await env.DB.prepare(
+    `SELECT id, email, lang FROM accounts WHERE news_opt = 1 AND email IS NOT NULL AND news_at <= ?
+     AND NOT EXISTS (SELECT 1 FROM json_each(accounts.news_seen) WHERE value = ?) ORDER BY id LIMIT 1`,
+  ).bind(news.at, mark).first<{ id: number; email: string; lang: string | null }>();
+  if (!a) return;
+  // Ayrı sorulur: haber tavanı dolunca görev ortak sayacı artırmaya devam etmesin, kodlar tıkanmasın.
+  if (await limited(env, [{ key: 'news', ...LIMIT_NEWS }], now)) return;
+  if (await limited(env, [{ key: 'all', ...LIMIT_ALL }], now)) return;
+  await env.DB.prepare("UPDATE accounts SET news_seen = json_insert(news_seen, '$[#]', ?) WHERE id = ?").bind(mark, a.id).run();
+  const en = a.lang === 'en';
+  try {
+    await sendMail(env, a.email, newsMail(news, en, unsubUrl(a.id, await newsToken(env, a.id), en)));
+  } catch (e) {
+    console.error(e);
+    // Bu adrese özgü ret yeniden denenmez, sıra tıkanmasın. Bağlantı ya da oturum hatasında işaret kalkar, sonraki dakika yeniden.
+    if (!/smtp rcpt:/.test(String(e))) {
+      await env.DB.prepare('UPDATE accounts SET news_seen = (SELECT json_group_array(value) FROM json_each(accounts.news_seen) WHERE value != ?) WHERE id = ?').bind(mark, a.id).run();
+    }
+  }
+}
+
+/** Haber e-postasından çıkma: bağlantı sayfayı açar, çıkma POST ile (e-posta programının tek tıkla çıkması da POST). */
+async function newsUnsubscribe(req: Request, env: Env, url: URL): Promise<Response> {
+  const en = url.searchParams.get('l') === 'en';
+  const id = Number(url.searchParams.get('u'));
+  const page = (status: number, body: string) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  const token = await newsToken(env, id);
+  if (!env.ADMIN_KEY || !Number.isInteger(id) || !same(url.searchParams.get('t') ?? '', token)) return page(400, unsubPage(en, 'bad'));
+  if (req.method === 'POST') {
+    await env.DB.prepare('UPDATE accounts SET news_opt = 0, news_at = NULL WHERE id = ?').bind(id).run();
+    return page(200, unsubPage(en, 'done'));
+  }
+  return page(200, unsubPage(en, 'ask', `${url.pathname}?u=${id}&t=${token}&l=${en ? 'en' : 'tr'}`));
+}
+
 async function route(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   if (!url.pathname.startsWith('/api/')) return notFound(url, env);
@@ -679,5 +732,8 @@ export default {
     const res = await route(req, env);
     for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
     return res;
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(sendNextNewsMail(env, Date.now()));
   },
 } satisfies ExportedHandler<Env>;

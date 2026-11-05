@@ -5,6 +5,8 @@ export interface Mail {
   subject: string;
   text: string;
   html: string;
+  /** Ek başlıklar (haber e-postasında çıkma bağlantısı). */
+  headers?: string[];
 }
 
 const SITE = 'https://warsimbox.com';

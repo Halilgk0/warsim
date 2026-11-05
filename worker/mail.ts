@@ -73,6 +73,7 @@ export async function sendMail(env: MailEnv, to: string, mail: Mail, replyTo: st
     `From: WarSimBox <${from}>`,
     `To: <${to}>`,
     ...(replyTo ? [`Reply-To: <${replyTo}>`] : []),
+    ...(mail.headers ?? []),
     `Subject: =?UTF-8?B?${b64(mail.subject)}?=`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${crypto.randomUUID()}@warsimbox.com>`,

@@ -83,6 +83,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       ötesinde dik yükselir. Belgelenen hızı Mdd'nin üstünde olan jetin `mdd`'si tanımda verilir; F-86 ve MiG-15'inki,
       gerçekteki gibi deniz seviyesinde en hızlı olacakları biçimde seçildi.
   - `ai/`: kol, dalaş, pike, taarruz, bombardıman, taret, pist operasyonları.
+    - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
+      sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
     `scenarios.ts`, `campaign.ts`, `commander.ts` (rakip yapay zekâ).
@@ -116,7 +118,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       karşılaştırılır): `JetHull` kesit listesinden gövde, kanopi ve kanal yapar; `jetCanopy`, `jetFin`, `jetGear`,
       `sideIntake`, `glassFrames`. Yeni uçak için önce Wikimedia Commons'ta "<uçak> 3-view" ara. Sim'deki `gearHeight`
       takımla uyuşmalı.
-    - Hareketli parçalar eklemdir; şimdilik jetlerde. Modeli değiştirince ansiklopedi görsellerini de yeniden üret.
+    - Pervaneliler de çizimden kurulur: gövde `JetHull`, kanat ve yatay kuyruk çizim satırlarından `planWing` (`WingRow`),
+      düz menteşeli kuyruk `hingedFin`, ayrık flap `splitFlap` / `rowFlap`, pike freni `rowBrake`, kafesli kapak `jetCanopy`
+      `rails`, camlı burun `noseGlass`, taret `turretDome`, alt renkli parça `underPaint`, takım `propGear`, `noseWheel`,
+      `retractTailWheel`, `fixedTailWheel`. Sim'deki `turret` konumları modeldeki yerle uyuşmalı.
+    - Kuyruk tekerlekli uçağın yer açısı `flightModel.ts` `TAIL_ANGLE` (yoksa 11°), yüksekliği `gearHeight`: ana tekerin düz ve
+      kuyruk üstü duruştaki yüksekliklerinin ortası.
+    - Hareketli parçalar eklemdir. Modeli değiştirince ansiklopedi görsellerini de yeniden üret.
       - Kanat ve kuyruk `controlWing` / `controlFin` ile kurulur: ana yüzey ve kumanda yüzeyi aynı profilden kesilir
         (`airfoilPart`), aralarında yalnız menteşe çizgisi kalır.
       - Gövde (kapalı hava girişi ve egzoz) `migFuselage`, takım (içe ve öne katlanır, gövdeye girer) `migGear`.
@@ -161,6 +169,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`,
     içerik `worker/codeMail.ts`; Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
     `LIMIT_*`: başkasının kutusuna yağdırılmasın, Gmail'in günlük sınırı (~500) aşılmasın.
+  - Haber e-postası: `worker/newsMail.ts` `LATEST_NEWS_MAIL` değişip push edilince zamanlı görev dakikada bir, izin vermiş tek
+    hesaba gönderir (bir haftalık pencere). Kime gittiği `news_seen`'de `mail:<haber>`. Çıkma `/api/news/unsubscribe`. Her haber
+    e-postayla gitmek zorunda değil; yalnız duyurulmak istenen haber için değiştir.
   - Yerel deneme: `node tools/mail-dev.mjs` (sahte SMTP; kodlar http://localhost:2526), `.dev.vars` ayarları dosyasında.
   - E-postası olmayan eski hesaba oyun açılınca ve girişte sorulur (`loginBox.ts` `askEmail`), zorunlu değil. Kapatınca
     7 gün sorulmaz (`persist.ts` `shouldAskEmail`; hesap başına, tarayıcıda). Sonradan Profil'den eklenir; yenilik izni
@@ -218,6 +229,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `sosyal/biriktirilen.md`: sonraki video için biriken yenilikler. Görünür bir yenilik gelince buraya ekle.
 - `brand/`: logo dosyaları.
 - `docs/PLAN.md`: tasarım kararları ve yol haritası. Mimari bölümü kısmen eski; kod esas alınır.
+- `docs/YAPILACAKLAR.md`: sıradaki işler. Kullanıcı "sonra yapalım" dediği işi buraya yaz, biteni sil.
 
 ## Test yolları
 

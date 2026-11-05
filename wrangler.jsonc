@@ -16,5 +16,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Haber e-postası: dakikada bir, sıradaki tek hesaba (worker/index.ts scheduled)
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }
