@@ -1,7 +1,6 @@
 // Pencereler: senaryolar, araştırma ağacı, hazine ve pazar, ayarlar (ses, görünüm).
 
 import type { Game } from '../game';
-import { SCENARIOS, SCENARIO_GROUPS, type ScenarioGroup } from '../sim/scenarios';
 import {
   INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, QUALITY, RESOLUTIONS, SOUND_LEVELS, onSettingsChange, saveSettings, settings,
   type GraphicsQuality, type Resolution, type SoundLevel,
@@ -15,7 +14,7 @@ import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf } f
 import { $, esc } from './dom';
 import { L } from '../i18n';
 
-export type ModalKind = 'scenarios' | 'research' | 'settings' | 'market' | 'factory' | 'pit';
+export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit';
 
 export class Modals {
   isOpen = false;
@@ -152,10 +151,7 @@ export class Modals {
     const mainLeft = main?.scrollLeft ?? 0;
     let body = '';
     let title = '';
-    if (this.kind === 'scenarios') {
-      title = L('Senaryolar', 'Scenarios');
-      body = this.scenarios();
-    } else if (this.kind === 'research') {
+    if (this.kind === 'research') {
       title = L('Araştırma', 'Research');
       body = this.research();
     } else if (this.kind === 'settings') {
@@ -188,15 +184,6 @@ export class Modals {
       mainEl.scrollTop = mainTop;
       mainEl.scrollLeft = mainLeft;
     }
-  }
-
-  private scenarios(): string {
-    const groups = Object.keys(SCENARIO_GROUPS) as ScenarioGroup[];
-    return groups.map((gk) => `
-      <h3>${SCENARIO_GROUPS[gk]}</h3>
-      <div class="scen-grid">${SCENARIOS.filter((s) => s.group === gk).map((s) =>
-        `<button class="scen ${s.id === this.game.scenarioId ? 'active' : ''}" data-act="scenario" data-id="${s.id}">
-          <b>${esc(s.name)}</b><small>${esc(s.description)}</small></button>`).join('')}</div>`).join('');
   }
 
   private research(): string {
@@ -358,10 +345,6 @@ export class Modals {
         return;
       }
       case 'close':
-        this.close();
-        return;
-      case 'scenario':
-        g.loadScenario(b.dataset.id!);
         this.close();
         return;
       case 'mbuy': {

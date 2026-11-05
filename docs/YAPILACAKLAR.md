@@ -4,9 +4,14 @@ Biten madde listeden silinir. Yeni iş en uygun başlığın altına eklenir.
 
 ## Sırada
 
-- [ ] **Hava savunması yenileniyor.** Aşama 1, 2, 3A, 3B'nin ilk grubu (Oerlikon, 90 mm M1, Flak 41), üretim menüsü ve yuva sistemi 2026-11-05'te canlıya çıktı. M45, 61-K, QF 3.7 inç, 85 mm 52-K, 10,5 cm Flak 38 kullanıcının kararıyla sonraya kaldı; eklenince `npm run uretim:gorsel` ile resimleri de üretilir. Modeller, radar ve ansiklopedi (aşama 4–6) kullanıcıyla konuşulacak.
+- [ ] **Hava savunması yenileniyor.** Aşama 1, 2, 3A, 3B'nin ilk grubu (Oerlikon, 90 mm M1, Flak 41), üretim menüsü ve yuva sistemi 2026-11-05'te canlıya çıktı. Kalan toplar ve ansiklopedi aşağıda ayrı maddeler. Modeller ve radar (aşama 4 ve 5) kullanıcıyla konuşulacak.
   Kararlar ve aşamalar `docs/PLAN.md` "Hava savunması yenileniyor".
-- [ ] **Çelik temayı kalan menülere de taşı.** Üretim, silah yuvası, araştırma, hangar ve haberler geçti. Kalanlar (pazar, ayarlar, senaryolar, yan paneller, planlayıcı) kullanıcının kararıyla şimdilik pastel kalıyor (2026-11-05); kullanıcı isteyince. Hazır altyapı: `style.css` `.modal-card.steel`.
+- [ ] **Kalan topları ekle.** M45, 61-K, QF 3.7 inç, 85 mm 52-K, 10,5 cm Flak 38. Her top için veri (`airDefense.ts`), model (`structures.ts`), araştırma (`tech.ts`, `techEn.ts`) ve resim (`npm run uretim:gorsel gun-<top>`). Öncesi ve sonrası `npm run sim:flak` ile karşılaştırılır.
+- [ ] **Kalan menülerin tasarımını çelik yap.** Üretim, silah yuvası, araştırma, hangar ve haberler geçti. Kalanlar: pazar, ayarlar, inşa, planlayıcı, yan paneller, duraklatma, ana menü, hesap ve profil, geri bildirim, oyun sonu. Hazır altyapı: `style.css` `.modal-card.steel`. Hangisinin önce geçeceği kullanıcıyla konuşulacak.
+- [ ] **Ansiklopediyi düzenle.** Hava savunma sistemleri eklenecek (`src/ansiklopedi`: makale, `liste.ts`, görseller). İlerde yardımcı olarak arama ve filtre gibi şeyler gelecek. Ansiklopedinin teması da çelik olacak (oyundaki `.steel` renkleri; ansiklopedinin kendi stili `src/ansiklopedi/stil.css`).
+- [ ] **Öğreticiye istenen yerden başlama.** Öğreticiyi tekrar başlatma kısmı güncellenecek: eski Senaryo düğmesinin yerine oyuncunun öğreticide istediği yerden başlamasını ve öğrenmek istediği şeyi seçmesini sağlayan bir bölüm gelecek.
+  - Senaryolar oyuncu arayüzünden 2026-11-05'te kaldırıldı (düğme, pencere, stiller; henüz push edilmedi). Simülasyondaki senaryolar (`src/sim/scenarios.ts`) ve `game.loadScenario` kaldı: testler, video kayıt kipi, performans aracı ve başsız ölçümler kullanıyor.
+  - Bu bölüm yapılırken: duraklatma menüsü öğretici düğmesini senaryo grubuna göre gösteriyor (`pauseMenu.ts`); oyuncu adı yoksa kayıt başlığı ve duraklatma bilgi satırı "Senaryo" yazıyor (`game.ts`, `pauseMenu.ts`). Senaryolar oyuncuya kapalı olduğu için şimdilik zararsız.
 - [ ] **Görevlerde uçaklar daha özgür davransın.** Kullanıcı isteği: uçaklar kuyruk gibi peş peşe gitmesin, hepsi aynı anda
   robot gibi hareket etmesin. İniş için yapıldı (`src/sim/ai/ops.ts` `LandingStyle`); kol, devriye, taarruz, bombardıman ve
   diğer görevler bekliyor. Aynı yöntem kullanılabilir: değişkenlik uçak kimliğinden türesin, ortak `Math.random` akışına

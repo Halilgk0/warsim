@@ -95,7 +95,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - `airDefense.ts`: silahlar gerçek sistemlerdir (kaynaklar dosyanın başında). Silah kimlikleri (`mg`, `aa88`…) kayıtlara yazılır, değişmez.
       Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
-    `scenarios.ts`, `campaign.ts`, `commander.ts` (rakip yapay zekâ).
+    `scenarios.ts` (oyuncuya görünmez; test, video kayıt ve ölçüm için koddan `game.loadScenario`), `campaign.ts`, `commander.ts` (rakip yapay zekâ).
   - **Harita büyüklüğü:**
     - Seçenekler: Küçük 150, Orta 200 (varsayılan), Büyük 300 km.
     - Haritalar 300 km için çizildi (`MAP_BASE`). Küçükte büyük şekiller ve yerler ölçeklenir; yerel ayrıntı, pist ve

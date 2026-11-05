@@ -65,7 +65,7 @@ export class Hud {
       else if (what === 'build') game.build.toggle();
       else if (what === 'production') game.modals.toggleFactory();
       else if (what === 'pause') game.pause.open();
-      else game.modals.open(what as 'scenarios' | 'research' | 'settings' | 'market');
+      else game.modals.open(what as 'research' | 'settings' | 'market');
     });
     this.researchChip.addEventListener('click', () => game.modals.open('research'));
     this.renderSoundButton();

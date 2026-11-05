@@ -394,7 +394,10 @@ export class Game {
     return this.selectedStructureId !== null ? this.world.structureById(this.selectedStructureId) ?? null : null;
   }
 
-  /** Hazır senaryo (Senaryo penceresinden: it dalaşı, saldırı testleri, 1 düşmanlı harekât). */
+  /**
+   * Hazır senaryo: it dalaşı, saldırı denemeleri, 1 düşmanlı harekât. Oyuncu arayüzünde yok (kafa karıştırıyordu, 2026-11-05);
+   * test betikleri, video kayıt kipi ve ölçüm araçları koddan çağırır (konsoldan da: game.loadScenario('b17_raid')).
+   */
   loadScenario(id: string): void {
     const sc = SCENARIOS.find((s) => s.id === id);
     if (!sc) return;
