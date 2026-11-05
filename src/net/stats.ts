@@ -8,6 +8,8 @@ import { api } from './api';
 import type { StatsReport } from './shared';
 
 const REPORT_SEC = 60;
+/** Misafirin toplam oynama süresi (sn), bu tarayıcıda: teşekkür penceresi için. */
+const GUEST_KEY = 'warsim.oynama';
 const AFK_SEC = 180;
 /** Bildirilemeyen süre bu kadar birikir (bağlantı uzun süre yoksa). */
 const PENDING_MAX = 3600;
@@ -19,6 +21,10 @@ export class StatsTracker {
   private lastInput = performance.now();
   private sending = false;
   private wonSent = '';
+  private guestSec = -1;
+  private guestClock = 0;
+  /** Toplam oynama süresi öğrenilince (hesapta sunucudan, misafirde tarayıcıdan). */
+  onTotal: ((sec: number) => void) | null = null;
 
   constructor() {
     const touch = () => {
@@ -39,6 +45,28 @@ export class StatsTracker {
     }
   }
 
+  /** Misafir: harekâtta, sekme görünürken ve oyuncu son 3 dakikada dokunmuşsa süre bu tarayıcıda birikir. */
+  guest(real: number, w: World, visible: boolean): void {
+    if (!visible || !w.campaignId || (performance.now() - this.lastInput) / 1000 >= AFK_SEC) return;
+    if (this.guestSec < 0) {
+      try {
+        this.guestSec = Number(localStorage.getItem(GUEST_KEY)) || 0;
+      } catch {
+        this.guestSec = 0;
+      }
+    }
+    this.guestSec += real;
+    this.guestClock += real;
+    if (this.guestClock < REPORT_SEC) return;
+    this.guestClock = 0;
+    try {
+      localStorage.setItem(GUEST_KEY, String(Math.floor(this.guestSec)));
+    } catch {
+      /* yazılamıyor: bu oturumda sayılır */
+    }
+    this.onTotal?.(this.guestSec);
+  }
+
   /** Hemen bildir (sekme arka plana geçerken; keepalive: sayfa kapanırken de gider). */
   flush(w: World, team: number): void {
     if (w.campaignId) void this.send(w, team, true);
@@ -54,8 +82,9 @@ export class StatsTracker {
     };
     this.sending = true;
     try {
-      await api('POST', '/stats', report, { keepalive });
+      const res = await api<{ totalPlaySec?: number }>('POST', '/stats', report, { keepalive });
       this.pending -= playSec;
+      if (typeof res?.totalPlaySec === 'number') this.onTotal?.(res.totalPlaySec);
       if (report.won) this.wonSent = w.campaignId;
     } catch {
       /* bağlantı yok: süre birikir, sonra bildirilir */

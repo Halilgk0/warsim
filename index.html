@@ -56,7 +56,22 @@
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <link rel="preload" as="image" href="yukleme.jpg" fetchpriority="high" />
+    <script>
+      // Açılış görseli her açılışta değişir, art arda aynısı gelmez. Seçilen önden yüklenir; yükleme ekranı ve main.ts kullanır.
+      (function () {
+        var list = ['yukleme.jpg', 'acilis/1.jpg', 'acilis/2.jpg', 'acilis/3.jpg', 'acilis/4.jpg', 'acilis/5.jpg'];
+        var last = -1;
+        try { last = Number(localStorage.getItem('warsim.acilis')); } catch (e) {}
+        var i;
+        if (last >= 0 && last < list.length) { i = Math.floor(Math.random() * (list.length - 1)); if (i >= last) i++; }
+        else i = Math.floor(Math.random() * list.length);
+        try { localStorage.setItem('warsim.acilis', String(i)); } catch (e) {}
+        window.__acilis = list[i];
+        var l = document.createElement('link');
+        l.rel = 'preload'; l.as = 'image'; l.href = list[i]; l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Yazı tipi çizimi bekletmez: önce sistem yazısı, Nunito inince yerine geçer -->
@@ -153,7 +168,7 @@
       <div id="feedback" class="fb hidden"></div>
       <div id="toast" class="toast hidden"></div>
       <div id="rotate" class="rotate"><div><b data-en="Turn your phone sideways">Telefonu yan çevir</b><span data-en="WarSimBox is played in landscape.">WarSimBox yatay ekranda oynanır.</span></div></div>
-      <div id="loading" class="loading"><img src="yukleme.jpg" alt="" fetchpriority="high"><div><b>WarSimBox</b><p data-en="A Second World War air war strategy game">İkinci Dünya Savaşı hava harbi strateji oyunu</p><span data-en="Preparing the map…">Harita hazırlanıyor…</span></div></div>
+      <div id="loading" class="loading"><img alt="" fetchpriority="high"><script>document.currentScript.previousElementSibling.src = window.__acilis || 'yukleme.jpg';</script><div><b>WarSimBox</b><p data-en="A Second World War air war strategy game">İkinci Dünya Savaşı hava harbi strateji oyunu</p><span data-en="Preparing the map…">Harita hazırlanıyor…</span></div></div>
     </div>
     <script>
       // Oyun paketi inerken görünen yükleme ekranı ve yan çevir uyarısı da seçili dilde olsun (kural i18n.ts

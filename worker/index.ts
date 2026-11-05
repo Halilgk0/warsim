@@ -23,6 +23,7 @@
 import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { LATEST_NEWS_MAIL, newsMail, unsubPage, unsubUrl } from './newsMail';
+import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
 import { feedbackMail } from './feedbackMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
@@ -568,7 +569,9 @@ async function reportStats(req: Request, env: Env, a: AccountRow): Promise<Respo
      ON CONFLICT (account_id, period) DO UPDATE SET kills = kills + ?, wins = wins + ?, earned = earned + ?, peak = MAX(peak, ?), play_sec = play_sec + ?`,
   );
   await env.DB.batch(['all', isoWeek(now)].map((period) => add.bind(a.id, period, dKills, won, dEarned, peak, dPlay, dKills, won, dEarned, peak, dPlay)));
-  return json({ ok: true, counted: { kills: dKills, earned: dEarned, peak, won: !!won, playSec: dPlay } });
+  // Hesabın toplam oynama süresi: istemci 6 saatte teşekkür penceresini açar
+  const total = await env.DB.prepare("SELECT play_sec FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id).first<{ play_sec: number }>();
+  return json({ ok: true, counted: { kills: dKills, earned: dEarned, peak, won: !!won, playSec: dPlay }, totalPlaySec: total?.play_sec ?? 0 });
 }
 
 async function leaderboard(url: URL, env: Env, a: AccountRow | null): Promise<Response> {
@@ -708,6 +711,33 @@ async function sendNextNewsMail(env: Env, now: number): Promise<void> {
   }
 }
 
+const THANKS_MARK = 'mail:tesekkur-6s';
+
+/**
+ * Teşekkür e-postası: toplam oynama süresi 6 saati geçen, yenilik e-postasına izin vermiş tek hesaba, hesabın dilinde, bir kez.
+ * İzin vermeyene gitmez (gizlilik metni: duyuru e-postaları yalnız izinle). Önce işaretlenir: iki kez gitmez.
+ */
+async function sendNextThanksMail(env: Env, now: number): Promise<void> {
+  if (!mailReady(env) || !env.ADMIN_KEY) return;
+  const a = await env.DB.prepare(
+    `SELECT a.id, a.email, a.lang, a.name, s.play_sec FROM accounts a JOIN stats s ON s.account_id = a.id AND s.period = 'all'
+     WHERE s.play_sec >= ? AND a.news_opt = 1 AND a.email IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM json_each(a.news_seen) WHERE value = ?) ORDER BY a.id LIMIT 1`,
+  ).bind(THANKS_PLAY_SEC, THANKS_MARK).first<{ id: number; email: string; lang: string | null; name: string; play_sec: number }>();
+  if (!a) return;
+  if (await limited(env, [{ key: 'news', ...LIMIT_NEWS }], now)) return;
+  await env.DB.prepare("UPDATE accounts SET news_seen = json_insert(news_seen, '$[#]', ?) WHERE id = ?").bind(THANKS_MARK, a.id).run();
+  const en = a.lang === 'en';
+  try {
+    await sendMail(env, a.email, thanksMail(a.name, a.play_sec, en, unsubUrl(a.id, await newsToken(env, a.id), en)));
+  } catch (e) {
+    console.error(e);
+    if (!/smtp rcpt:/.test(String(e))) {
+      await env.DB.prepare('UPDATE accounts SET news_seen = (SELECT json_group_array(value) FROM json_each(accounts.news_seen) WHERE value != ?) WHERE id = ?').bind(THANKS_MARK, a.id).run();
+    }
+  }
+}
+
 /** Haber e-postasından çıkma: bağlantı sayfayı açar, çıkma POST ile (e-posta programının tek tıkla çıkması da POST). */
 async function newsUnsubscribe(req: Request, env: Env, url: URL): Promise<Response> {
   const en = url.searchParams.get('l') === 'en';
@@ -742,6 +772,6 @@ export default {
     return res;
   },
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(sendNextNewsMail(env, Date.now()));
+    ctx.waitUntil(sendNextNewsMail(env, Date.now()).then(() => sendNextThanksMail(env, Date.now())));
   },
 } satisfies ExportedHandler<Env>;

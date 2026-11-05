@@ -277,6 +277,30 @@ export function markNewsSeen(id: string): void {
   void api('PATCH', '/me', { newsSeen: id }).catch(() => {});
 }
 
+/** Teşekkür penceresi gösterildi mi: hesapta haber izinde (başka cihazda da), misafirde bu tarayıcıda. */
+const THANKS_KEY = 'warsim.tesekkur';
+export function thanksShown(id = 'tesekkur-6s'): boolean {
+  const acc = currentAccount();
+  if (acc) return !!acc.newsSeen?.includes(id);
+  try {
+    return localStorage.getItem(THANKS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markThanksShown(id = 'tesekkur-6s'): void {
+  if (currentAccount()) {
+    markNewsSeen(id);
+    return;
+  }
+  try {
+    localStorage.setItem(THANKS_KEY, '1');
+  } catch {
+    /* yazılamıyor */
+  }
+}
+
 /** Misafirin "Bir daha sorma" tercihi (bu tarayıcıda). */
 const TUTORIAL_OFF_KEY = 'warsim.tutorial.off';
 

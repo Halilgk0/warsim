@@ -57,7 +57,7 @@ const nextPaint = () => new Promise<void>((r) => requestAnimationFrame(() => req
 async function start(): Promise<void> {
   try {
     const bg = new Image();
-    bg.src = `${import.meta.env.BASE_URL}yukleme.jpg`;
+    bg.src = `${import.meta.env.BASE_URL}${(window as unknown as { __acilis?: string }).__acilis ?? 'yukleme.jpg'}`;
     await Promise.race([bg.decode().catch(() => {}), new Promise((r) => setTimeout(r, 1200))]);
     await nextPaint();
     // Oyuncunun seçtiği büyüklükte (varsayılan 200 km): yeni harekât haritayı yeniden üretmeden başlar

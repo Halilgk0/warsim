@@ -21,8 +21,9 @@ import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
-import { type SaveKind, currentAccount, readSave, refreshSession, shouldAskEmail, syncPending, writeSave } from './persist';
+import { type SaveKind, currentAccount, readSave, refreshSession, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
 import { StatsTracker } from './net/stats';
+import { THANKS_PLAY_SEC } from './ui/thanks';
 import { MainMenu } from './ui/mainMenu';
 import { PauseMenu } from './ui/pauseMenu';
 import { EndScreen } from './ui/endScreen';
@@ -113,6 +114,8 @@ export class Game {
   private acc = 0;
   /** Pencere açıkken seyrek çizim: bu kare çizilecek mi, çizilmeyen karelerin süresi (kamera sonraki çizimde yetişir). */
   private drawTurn = true;
+  /** Teşekkür penceresi bekliyor (toplam süre): pencere ya da öğretici açıkken açılmaz. */
+  private thanksDue = 0;
   private drawDebt = 0;
   private last = performance.now();
   private lastErrorLog = 0;
@@ -137,6 +140,9 @@ export class Game {
     this.pause = new PauseMenu(this);
     this.end = new EndScreen(this);
     this.tutorial = new Tutorial(this);
+    this.stats.onTotal = (sec) => {
+      if (sec >= THANKS_PLAY_SEC && !thanksShown()) this.thanksDue = sec;
+    };
     onSettingsChange(() => this.renderer.invalidateCoverage());
     onFullscreenChange(() => {
       document.querySelector('.fs-btn')?.classList.toggle('active', isFullscreen());
@@ -726,6 +732,15 @@ export class Game {
     }
   }
 
+  /** Teşekkür penceresi: bir kez (hesapta haber izi, misafirde tarayıcı). */
+  private showThanks(): void {
+    const sec = this.thanksDue;
+    this.thanksDue = 0;
+    if (thanksShown()) return;
+    markThanksShown();
+    this.modals.openThanks(this.world.playerName || currentAccount()?.name || '', sec);
+  }
+
   /** Oyunun önünde pencere var mı (arka plan buğulu ya da örtülü). */
   private get windowOpen(): boolean {
     return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen;
@@ -780,7 +795,10 @@ export class Game {
       this.tutorial.update();
       return;
     }
-    this.stats.update(real, this.world, this.playerTeam, !!currentAccount() && document.visibilityState === 'visible');
+    const visible = document.visibilityState === 'visible';
+    if (currentAccount()) this.stats.update(real, this.world, this.playerTeam, visible);
+    else this.stats.guest(real, this.world, visible);
+    if (this.thanksDue && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen) this.showThanks();
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
     if (!this.pause.isOpen && this.timeScale > 0) {
       this.autosaveClock += real;

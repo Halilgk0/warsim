@@ -185,6 +185,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Haber e-postası: `worker/newsMail.ts` `LATEST_NEWS_MAIL` değişip push edilince zamanlı görev dakikada bir, izin vermiş tek
     hesaba gönderir (bir haftalık pencere). Kime gittiği `news_seen`'de `mail:<haber>`. Çıkma `/api/news/unsubscribe`. Her haber
     e-postayla gitmek zorunda değil; yalnız duyurulmak istenen haber için değiştir.
+  - Teşekkür (6 saat): toplam oynama 6 saati geçen hesaba aynı zamanlı görev bir kez teşekkür e-postası atar
+    (`worker/thanksMail.ts`, işaret `mail:tesekkur-6s`). Yalnız `news_opt = 1` olanlara: izinsiz ticari ileti yasal risk,
+    kullanıcıyla böyle kararlaştırıldı. Oyunun içinde ise herkese (misafir dahil) bir kez teşekkür penceresi açılır
+    (`ui/thanks.ts`; hesapta `news_seen` `tesekkur-6s`, misafirde `warsim.tesekkur`; misafir süresi `warsim.oynama`).
   - Yerel deneme: `node tools/mail-dev.mjs` (sahte SMTP; kodlar http://localhost:2526), `.dev.vars` ayarları dosyasında.
   - E-postası olmayan eski hesaba oyun açılınca ve girişte sorulur (`loginBox.ts` `askEmail`), zorunlu değil. Kapatınca
     7 gün sorulmaz (`persist.ts` `shouldAskEmail`; hesap başına, tarayıcıda). Sonradan Profil'den eklenir; yenilik izni
@@ -199,7 +203,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     `worker/index.ts` `eraseAccount`'a da ekle; yasal metinler hesabın bütün verisinin silindiğini söylüyor.
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
 - **Açılış ve harita yükleme:**
-  - `main.ts` önce yükleme ekranını (arka görsel `public/yukleme.jpg`) çizdirir.
+  - `main.ts` önce yükleme ekranını çizdirir. Arka görsel her açılışta değişir (`yukleme.jpg` ve `public/acilis/1-5.jpg`,
+    art arda aynısı gelmez, `warsim.acilis`); seçimi `index.html` başındaki betik yapar, `404.html` de aynı listeden seçer.
+    Yeni görsel eklenince iki listeye de yaz.
   - Sonra haritayı oyuncunun seçtiği büyüklükte yükler, böylece ilk harekât yeniden üretimsiz başlar. En son oyunu
     kurar.
   - Arazi ve arazi örtüsü işçilerde paralel üretilir (`render/mapLoad.ts`, `render/mapWorker.ts`). Saf hesaplar

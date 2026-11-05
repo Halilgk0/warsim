@@ -35,5 +35,12 @@
     <a class="alt" href="/en/encyclopedia/">Aircraft encyclopedia</a>
   </nav>
 </main>
+<script>
+  // Arka plan görseli: açılış ekranındakilerden biri
+  (function () {
+    var list = ['/yukleme.jpg', '/acilis/1.jpg', '/acilis/2.jpg', '/acilis/3.jpg', '/acilis/4.jpg', '/acilis/5.jpg'];
+    document.body.style.backgroundImage = 'url(' + list[Math.floor(Math.random() * list.length)] + ')';
+  })();
+</script>
 </body>
 </html>

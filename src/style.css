@@ -870,6 +870,16 @@ button.link.prd-more { font-size: calc(11px * var(--ui)); padding: 10px 8px; mar
 .news-sheet.steel .news-lead { color: #bccac2; }
 .news-sheet.steel .news-gallery figcaption { color: #a2b1a9; }
 .news-sheet.steel .soc { background: #2c3733; color: #d3ddd7; }
+/* Teşekkür penceresi (6 saat) */
+.modal-card.thanks { width: min(calc(560px * var(--ui)), 95vw); }
+.modal-card.thanks .modal-body { font-size: calc(14px * var(--ui)); line-height: 1.55; }
+.modal-card.thanks .modal-body p { margin: calc(10px * var(--ui)) 0; }
+.thanks-lead { font-size: calc(15px * var(--ui)); color: #d3ddd7; }
+.thanks-lead b { color: #ffffff; }
+.thanks-social { display: flex; flex-wrap: wrap; gap: calc(8px * var(--ui)); }
+.thanks-soc { display: inline-flex; align-items: center; gap: calc(7px * var(--ui)); min-height: max(36px, calc(38px * var(--ui))); padding: 0 calc(14px * var(--ui)); border-radius: calc(10px * var(--ui)); background: #2c3733; box-shadow: inset 0 0 0 1px #5d6a64; color: #e8ede9; font-weight: 800; text-decoration: none; }
+.thanks-soc:hover { background: #37443f; }
+.thanks-soc svg { width: calc(18px * var(--ui)); height: calc(18px * var(--ui)); fill: currentColor; }
 /* Hangar: sahne saydam, arkada çatı makası ve kapı; yanda aynı metal yüzey */
 .steel .gens { padding-top: calc(6px * var(--ui)); }
 .steel .hg-sub { margin: calc(2px * var(--ui)) 0 0; color: #d3ddd7; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }

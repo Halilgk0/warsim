@@ -13,8 +13,9 @@ import { marketBody, sellCandidate } from './market';
 import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf } from './production';
 import { $, esc } from './dom';
 import { L } from '../i18n';
+import { thanksBody, thanksTitle } from './thanks';
 
-export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit';
+export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit' | 'thanks';
 
 export class Modals {
   isOpen = false;
@@ -41,6 +42,8 @@ export class Modals {
   private factoryTab: FactoryTab = 'ucak';
   /** Yuva penceresi: batarya ve yuva. */
   private pit: { id: number; slot: number } | null = null;
+  /** Teşekkür penceresi: ad ve toplam süre. */
+  private thanks = { name: '', sec: 0 };
 
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -98,6 +101,15 @@ export class Modals {
     else this.openFactory(this.factoryId);
   }
 
+  /** Teşekkür penceresi (6 saat). */
+  openThanks(name: string, sec: number): void {
+    this.thanks = { name, sec };
+    this.kind = 'thanks';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
   /** Bataryanın yuvası için top seçimi. */
   openPit(id: number, slot: number): void {
     this.pit = { id, slot };
@@ -151,7 +163,10 @@ export class Modals {
     const mainLeft = main?.scrollLeft ?? 0;
     let body = '';
     let title = '';
-    if (this.kind === 'research') {
+    if (this.kind === 'thanks') {
+      title = thanksTitle(this.thanks.name);
+      body = thanksBody(this.thanks.sec);
+    } else if (this.kind === 'research') {
       title = L('Araştırma', 'Research');
       body = this.research();
     } else if (this.kind === 'settings') {
@@ -169,7 +184,7 @@ export class Modals {
       body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase);
     }
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' ? ' steel' : ''}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' ? ' steel' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
@@ -243,7 +258,8 @@ export class Modals {
 
   private onClick(e: Event): void {
     if (e.target === this.el) {
-      this.close();
+      // Teşekkür penceresi bir kez gösterilir: oyuncunun haritaya devam eden dokunuşu okumadan kapatmasın, yalnız düğmeyle kapanır
+      if (this.kind !== 'thanks') this.close();
       return;
     }
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
