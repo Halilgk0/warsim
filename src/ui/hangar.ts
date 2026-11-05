@@ -1,11 +1,15 @@
 // Hangar: nesil sekmeleri ve seçili neslin uçakları, dönen 3B model, gerçek veriler ve irtifaya göre hız/tırmanma grafiği.
-// Yalnız araştırma ağacında olan, uçurulabilen uçaklar listelenir.
+// Yalnız araştırma ağacında olan, uçurulabilen uçaklar listelenir. Hava savunma bölümü aynı pencerede: sınıf sekmeleri ve silahlar,
+// namlusu kalkıp inen ve gerçek ritmiyle ateş eden model (bilgiler hangarAA.ts).
 
 import * as THREE from 'three';
 import { ENGINE_NAMES, GENERATIONS, ROLE_NAMES, SPEC_LIST, generationInfo, originName, type AircraftSpec } from '../sim/aircraft/specs';
 import { aircraftNode, TECH, TECH_BY_ID, type Research } from '../sim/tech';
 import { modAppliesTo } from '../sim/mods';
 import { buildAircraftModel } from '../render/models';
+import { buildAAGun, recoilAt } from '../render/structures';
+import { AA_CLASS_NAMES, AA_CLASS_ORDER, AA_WEAPONS, AA_WEAPON_ORDER, type AAClass, type AAWeaponId } from '../sim/structures/airDefense';
+import { aaDetails } from './hangarAA';
 import { esc, nf } from './dom';
 import { EN, L, LOCALE } from '../i18n';
 import { ENCYCLOPEDIA, encUrl } from '../ansiklopedi/liste';
@@ -46,6 +50,38 @@ function perfChart(s: AircraftSpec): string {
   </svg>`;
 }
 
+/** Hangar zemini: beton plakalar, ortada ışık havuzu, kenara doğru söner. Arka plan CSS'te (`.steel .preview`), sahne saydam. */
+function hangarFloor(): THREE.CanvasTexture {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const x = c.getContext('2d')!;
+  const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(200, 226, 210, 0.36)');
+  g.addColorStop(0.55, 'rgba(150, 182, 165, 0.17)');
+  g.addColorStop(1, 'rgba(120, 150, 135, 0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, S, S);
+  // Derzler yalnız ışığın düştüğü yerde görünür
+  x.globalCompositeOperation = 'source-atop';
+  x.strokeStyle = 'rgba(6, 10, 8, 0.4)';
+  x.lineWidth = 2;
+  for (let i = 1; i < 8; i++) {
+    const p = (S * i) / 8;
+    x.beginPath();
+    x.moveTo(p, 0);
+    x.lineTo(p, S);
+    x.moveTo(0, p);
+    x.lineTo(S, p);
+    x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
 /** Listede görünen uçaklar: araştırma ağacında olup uçurulabilenler. */
 const inTree = (s: AircraftSpec): boolean => {
   const node = aircraftNode(s.id);
@@ -68,38 +104,62 @@ export class Hangar {
   hasAircraft: (id: string) => boolean = () => true;
   /** Oyuncunun araştırması (geliştirmelerin listesi için). */
   research: () => Research | null = () => null;
+  private mode: 'ac' | 'aa' = 'ac';
+  private gunId: AAWeaponId = 'aa88';
+  private readonly guns = new Map<AAWeaponId, THREE.Group>();
+  private readonly flash = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
+  /** Vitrindeki topun ateş ritmi. */
+  private shot = { cooldown: 1, rounds: 0, recoilT: 1e9, reloading: false };
+  /** Yapı malzemesi sis tanımlarını ister (arch.ts atmoSky); bu kadar yakında sis görünmez. */
+  private readonly aaFog = new THREE.Fog(0xf6f1ea, 1e6, 2e6);
+  private stateEl!: HTMLElement;
+  private subEl!: HTMLElement;
 
   constructor() {
     const list = SPEC_LIST.filter(inTree);
     const gens = GENERATIONS.filter((g) => list.some((s) => s.generation === g.id));
     this.el.innerHTML = `
-      <div class="modal-card hangar-card">
+      <div class="modal-card hangar-card steel">
         <div class="modal-head">
           <div>
-            <h2>${L('Hangar ve uçak nesilleri', 'Hangar and aircraft generations')}</h2>
-            <p class="muted">${L(
-              'Gerçek uçaklardan alınmış kütle, kanat, motor ve silah verileri. Azami hız, tırmanış, dönüş ve menzil aynı uçuş modelinden türetilir: oyunda uçak tam olarak burada yazdığı gibi uçar.',
-              'Mass, wing, engine and weapon data taken from the real aircraft. Top speed, climb, turn and range all come from the same flight model: in game, each aircraft flies exactly as written here.',
-            )}</p>
+            <h2>${L('Hangar', 'Hangar')}</h2>
+            <p class="muted hg-sub"></p>
           </div>
+          <div class="seg hg-mode"><button data-mode="ac">${L('Uçaklar', 'Aircraft')}</button><button data-mode="aa">${L('Hava savunma', 'Air defence')}</button></div>
           <button class="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button>
         </div>
-        <div class="gens">
+        <div class="gens gens-aa hidden">
+          <div class="gen-tabs">${AA_CLASS_ORDER.map((c) => `<button data-cls="${c}"><b>${AA_CLASS_NAMES[c].name}</b><small>${AA_CLASS_NAMES[c].sub}</small></button>`).join('')}</div>
+          ${AA_CLASS_ORDER.map((c) => `<div class="gen-planes" data-cls="${c}">${AA_WEAPON_ORDER.filter((id) => AA_WEAPONS[id].cls === c)
+            .map((id) => `<button data-gun="${id}">${esc(AA_WEAPONS[id].name)}</button>`).join('')}</div>`).join('')}
+        </div>
+        <div class="gens gens-ac">
           <div class="gen-tabs">${gens.map((g) => `<button data-gen="${g.id}"><b>${g.label}</b> ${g.name}<small>${g.era}</small></button>`).join('')}</div>
           ${gens.map((g) => `<div class="gen-planes" data-gen="${g.id}">${list.filter((s) => s.generation === g.id)
             .map((s) => `<button data-spec="${s.id}" title="${esc(s.name)}">${esc(s.abbr)}</button>`).join('')}</div>`).join('')}
         </div>
         <div class="hangar-body">
-          <div class="preview"></div>
+          <div class="preview"><span class="aa-state hidden"></span></div>
           <div class="details"></div>
         </div>
       </div>`;
     this.preview = this.el.querySelector('.preview')!;
     this.details = this.el.querySelector('.details')!;
+    this.stateEl = this.el.querySelector('.aa-state')!;
+    this.subEl = this.el.querySelector('.hg-sub')!;
     this.el.querySelector('.close')!.addEventListener('click', () => this.close());
     this.el.addEventListener('click', (e) => {
       if (e.target === this.el) this.close();
-      const tab = (e.target as HTMLElement).closest<HTMLButtonElement>('.gen-tabs button');
+      const mode = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]');
+      if (mode) this.setMode(mode.dataset.mode as 'ac' | 'aa');
+      const cls = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-cls]');
+      if (cls) {
+        const first = AA_WEAPON_ORDER.find((id) => AA_WEAPONS[id].cls === cls.dataset.cls);
+        if (first) this.showGun(first);
+      }
+      const gun = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-gun]');
+      if (gun) this.showGun(gun.dataset.gun as AAWeaponId);
+      const tab = (e.target as HTMLElement).closest<HTMLButtonElement>('.gen-tabs button[data-gen]');
       if (tab) this.showGen(tab.dataset.gen!);
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-spec]');
       if (b) {
@@ -108,13 +168,13 @@ export class Hangar {
       }
     });
 
-    this.scene.background = new THREE.Color(0xf6f1ea);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd9cfbf, 1.8));
     const sun = new THREE.DirectionalLight(0xffffff, 1.7);
     sun.position.set(-3, 6, 4);
     this.scene.add(sun);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xebe3d6 }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: hangarFloor(), transparent: true, depthWrite: false }));
     floor.name = 'floor';
+    floor.renderOrder = -1;
     this.scene.add(floor);
     this.scene.add(this.pivot);
     window.addEventListener('resize', () => this.isOpen && this.resize());
@@ -125,17 +185,48 @@ export class Hangar {
     else this.open();
   }
 
+  /** Hava savunma bölümünde belirli silahı aç. */
+  openGun(id: AAWeaponId): void {
+    this.gunId = id;
+    this.mode = 'aa';
+    this.open();
+  }
+
+  private setMode(mode: 'ac' | 'aa'): void {
+    this.mode = mode;
+    if (mode === 'aa') this.showGun(this.gunId);
+    else this.show(this.spec);
+  }
+
+  /** Bölüm düğmeleri, başlık altı metni ve sekme satırları. */
+  private syncMode(): void {
+    const aa = this.mode === 'aa';
+    for (const b of this.el.querySelectorAll<HTMLElement>('button[data-mode]')) b.classList.toggle('active', b.dataset.mode === this.mode);
+    this.el.querySelector('.gens-aa')!.classList.toggle('hidden', !aa);
+    this.el.querySelector('.gens-ac')!.classList.toggle('hidden', aa);
+    this.stateEl.classList.add('hidden');
+    this.scene.fog = aa ? this.aaFog : null;
+    this.subEl.textContent = aa
+      ? L('Gerçek uçaksavar sistemlerinden alınmış kalibre, mermi ve atış verileri. Menzil, tavan ve mermi uçuş süresi oyundaki hesapla aynıdır.',
+        'Calibre, shell and rate-of-fire data taken from real anti-aircraft systems. Range, ceiling and shell flight time use the same calculation as the game.')
+      : L('Gerçek uçaklardan alınmış kütle, kanat, motor ve silah verileri. Azami hız, tırmanış, dönüş ve menzil aynı uçuş modelinden türetilir: oyunda uçak tam olarak burada yazdığı gibi uçar.',
+        'Mass, wing, engine and weapon data taken from the real aircraft. Top speed, climb, turn and range all come from the same flight model: in game, each aircraft flies exactly as written here.');
+  }
+
   open(specId?: string): void {
     this.isOpen = true;
+    if (specId) this.mode = 'ac';
     this.el.classList.remove('hidden');
     if (!this.renderer) {
-      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      this.renderer.setClearColor(0x000000, 0);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.preview.appendChild(this.renderer.domElement);
     }
     this.resize();
     const s = specId ? SPEC_LIST.find((x) => x.id === specId) : undefined;
-    this.show(s ?? this.spec);
+    if (this.mode === 'aa') this.showGun(this.gunId);
+    else this.show(s ?? this.spec);
     this.last = performance.now();
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.animate);
@@ -158,13 +249,91 @@ export class Hangar {
 
   /** Nesil sekmesi: o neslin uçakları görünür; satır sayısı değişirse önizleme yeni boyuta uyar. */
   private showGen(gen: string): void {
-    for (const t of this.el.querySelectorAll<HTMLElement>('.gen-tabs button')) t.classList.toggle('active', t.dataset.gen === gen);
-    for (const p of this.el.querySelectorAll<HTMLElement>('.gen-planes')) p.classList.toggle('hidden', p.dataset.gen !== gen);
+    for (const t of this.el.querySelectorAll<HTMLElement>('.gen-tabs button[data-gen]')) t.classList.toggle('active', t.dataset.gen === gen);
+    for (const p of this.el.querySelectorAll<HTMLElement>('.gen-planes[data-gen]')) p.classList.toggle('hidden', p.dataset.gen !== gen);
     this.resize();
+  }
+
+  private showGun(id: AAWeaponId): void {
+    this.gunId = id;
+    const w = AA_WEAPONS[id];
+    const r = this.research();
+    this.syncMode();
+    const cls: AAClass = w.cls;
+    for (const t of this.el.querySelectorAll<HTMLElement>('button[data-cls]')) t.classList.toggle('active', t.dataset.cls === cls);
+    for (const p of this.el.querySelectorAll<HTMLElement>('.gen-planes[data-cls]')) p.classList.toggle('hidden', p.dataset.cls !== cls);
+    for (const b of this.el.querySelectorAll<HTMLButtonElement>('button[data-gun]')) {
+      const g = AA_WEAPONS[b.dataset.gun as AAWeaponId];
+      b.classList.toggle('active', g.id === id);
+      b.classList.toggle('locked', !!r && !r.has(g.requires ?? undefined));
+    }
+    this.resize();
+    this.pivot.clear();
+    this.pivot.userData.props = [];
+    this.pivot.rotation.z = 0;
+    let gun = this.guns.get(id);
+    if (!gun) {
+      gun = buildAAGun(id);
+      this.guns.set(id, gun);
+    }
+    const u = gun.userData;
+    this.pivot.rotation.y = 0.5;
+    this.pivot.add(gun);
+    // Çerçeve: topun boyuna göre; namlu ucuna ateş işareti
+    // Çerçeve namlu en dik açıdayken ölçülür: top yukarı bakınca da sığsın
+    (u.pitch as THREE.Object3D).rotation.x = -1.25;
+    gun.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(gun).getSize(new THREE.Vector3());
+    (u.pitch as THREE.Object3D).rotation.x = -0.6;
+    // Yerdeki uzun kollar (90 mm) çerçeveyi büyütüp topu küçültmesin: yükseklik ölçü, kollar taşabilir
+    const rad = Math.min(Math.max(size.x, size.y, size.z), size.y * 1.15);
+    (u.muzzle as THREE.Object3D).add(this.flash);
+    this.flash.scale.setScalar(Math.max(0.05, w.bore / 900));
+    this.flash.visible = false;
+    const floor = this.scene.getObjectByName('floor')!;
+    floor.scale.setScalar(rad * 1.7);
+    floor.position.y = 0;
+    this.camera.position.set(rad * 1.2, rad * 0.82, rad * 1.42);
+    this.camera.lookAt(0, size.y * 0.26, 0);
+    this.shot = { cooldown: 0.8, rounds: w.mag, recoilT: 1e9, reloading: false };
+    this.details.innerHTML = aaDetails(w, r);
+    this.details.scrollTop = 0;
+  }
+
+  /** Vitrindeki topun hareketi: namlu yavaşça kalkıp iner, simülasyonla aynı seri ve şarjör ritmiyle ateş eder. */
+  private animateGun(now: number, dt: number): void {
+    const w = AA_WEAPONS[this.gunId];
+    const gun = this.guns.get(this.gunId);
+    if (!gun) return;
+    const u = gun.userData;
+    const pitch = u.pitch as THREE.Object3D;
+    pitch.rotation.x = -(0.8 + Math.sin(now / 3200) * 0.45);
+    const s = this.shot;
+    s.cooldown -= dt;
+    s.recoilT += dt;
+    if (s.cooldown <= 0) {
+      s.reloading = false;
+      s.recoilT = 0;
+      // Dörtlü topta parlama sırayla namlu uçlarında (modeldeki namlu aralığı)
+      if (w.barrels === 4) this.flash.position.set(s.rounds % 2 ? 0.25 : -0.25, s.rounds % 4 < 2 ? 0.2 : -0.18, 0);
+      else this.flash.position.set(0, 0, 0);
+      s.cooldown += 1 / w.rate;
+      if (w.mag > 0 && --s.rounds <= 0) {
+        s.rounds = w.mag;
+        s.cooldown += w.reload;
+        s.reloading = true;
+      }
+    }
+    (u.recoil as THREE.Object3D).position.z = -recoilAt(s.recoilT, u.recoilLen as number, u.recoilBack as number);
+    this.flash.visible = s.recoilT < 0.045;
+    const busy = s.reloading && s.recoilT > 0.15;
+    this.stateEl.classList.toggle('hidden', !busy);
+    if (busy) this.stateEl.textContent = w.drum ? L('Tambur değişiyor', 'Changing drum') : w.clip ? L('Tarak değişiyor', 'Changing clip') : L('Şarjör değişiyor', 'Changing magazine');
   }
 
   private show(spec: AircraftSpec): void {
     this.spec = spec;
+    this.syncMode();
     for (const b of this.el.querySelectorAll<HTMLButtonElement>('button[data-spec]')) {
       b.classList.toggle('active', b.dataset.spec === spec.id);
       b.classList.toggle('locked', !this.hasAircraft(b.dataset.spec!));
@@ -176,10 +345,11 @@ export class Hangar {
     this.pivot.userData.props = model.props;
     const r = model.radius;
     const floor = this.scene.getObjectByName('floor')!;
-    floor.scale.setScalar(r * 1.5);
+    floor.scale.setScalar(r * 2);
     floor.position.y = -r * 0.35;
     this.camera.position.set(r * 2.3, r * 1.25, r * 2.6);
     this.camera.lookAt(0, -r * 0.08, 0);
+    this.details.scrollTop = 0;
 
     const gen = generationInfo(spec.generation);
     const e = spec.engine;
@@ -250,8 +420,9 @@ export class Hangar {
     if (!this.isOpen || !this.renderer) return;
     const dt = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
-    this.pivot.rotation.y += dt * 0.45;
-    this.pivot.rotation.z = Math.sin(now / 1800) * 0.12;
+    this.pivot.rotation.y += dt * (this.mode === 'aa' ? 0.3 : 0.45);
+    if (this.mode === 'aa') this.animateGun(now, dt);
+    else this.pivot.rotation.z = Math.sin(now / 1800) * 0.12;
     const props = (this.pivot.userData.props ?? []) as THREE.Object3D[];
     for (const p of props) p.rotation.z += dt * 30;
     this.renderer.render(this.scene, this.camera);

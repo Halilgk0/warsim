@@ -14,6 +14,8 @@ export const ORIGIN_EN: Record<string, string> = {
   Fransa: 'France',
   Japonya: 'Japan',
   'Sovyetler Birliği': 'Soviet Union',
+  İsveç: 'Sweden',
+  İsviçre: 'Switzerland',
 };
 
 export const DESC_EN: Record<string, string> = {

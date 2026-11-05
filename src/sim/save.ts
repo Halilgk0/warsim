@@ -9,11 +9,12 @@ import { Vector3 } from 'three';
 import { World, type LogEntry } from './world';
 import { Structure, STRUCTURE_DEFS, type StructureKind } from './structures/structure';
 import { reserveAirframeIds, type Airframe, type BaseUpgrade } from './structures/airbase';
-import type { AASensorId, AAWeaponId } from './structures/airDefense';
+import { AA_WEAPONS, type AASensorId, type AAWeaponId } from './structures/airDefense';
+import type { GunItem } from './structures/factory';
 import { Commander, type CommanderOptions, type CommanderState } from './commander';
 import type { LedgerEntry, MarketOffer } from './economy';
 import type { MissionReport } from './missionResult';
-import type { Slot } from './tech';
+import { SLOT_ORDER, type Slot } from './tech';
 import { flattenFootprint, loadMap } from './terrain';
 import { MAP_BASE } from './mapData';
 import { L } from '../i18n';
@@ -34,7 +35,10 @@ interface TeamSave {
   color: string;
   ai: boolean;
   flightCounter: number;
-  research: { done: string[]; slots: Record<Slot, SlotSave>; points: number; totalPoints: number };
+  /** Depodaki toplar (eski kayıtlarda yok). */
+  gunStock?: Partial<Record<AAWeaponId, number>>;
+  /** Eski kayıtlarda `defense` hattı yok. */
+  research: { done: string[]; slots: Record<'tech' | 'vehicle', SlotSave> & Partial<Record<Slot, SlotSave>>; points: number; totalPoints: number };
   people: number;
   capacity: number;
   recruit: number;
@@ -76,13 +80,15 @@ interface StructureSave {
   aa?: {
     level: number;
     weapons: AAWeaponId[];
+    /** Takılmakta olan yuvalara kalan süre (eski kayıtlarda yok). */
+    installs?: number[];
     sensors: AASensorId[];
     job: { key: string; label: string; left: number; total: number } | null;
     crew: number;
     shotsFired: number;
   };
   radar?: { level: 1 | 2 };
-  factory?: { queue: { specId: string; progress: number; paid: number }[]; repeat: boolean };
+  factory?: { queue: { specId: string; progress: number; paid: number }[]; repeat: boolean; guns?: GunItem[] };
 }
 
 export interface SaveData {
@@ -92,6 +98,8 @@ export interface SaveData {
   /** Harita büyüklüğü (m); önceki kayıtlarda yok (300 km). */
   mapSize?: number;
   time: number;
+  /** Gerçek oynanma süresi (sn). Eski kayıtlarda yok: orada sayaç oyun zamanından sürer. */
+  playTime?: number;
   playerTeam: number;
   playerName: string;
   setup: { enemies: number } | null;
@@ -117,12 +125,13 @@ export interface SaveData {
 export function serializeWorld(w: World, scenarioId: string): SaveData {
   // Havadaki uçakların mürettebatı eve dönmüş sayılır
   const teams: TeamSave[] = w.teams.map((t) => ({
-    name: t.name, color: t.color, ai: t.ai, flightCounter: t.flightCounter,
+    name: t.name, color: t.color, ai: t.ai, flightCounter: t.flightCounter, gunStock: { ...t.gunStock },
     research: {
       done: [...t.research.done],
       slots: {
         tech: { current: t.research.slots.tech.current ? { ...t.research.slots.tech.current } : null, queue: [...t.research.slots.tech.queue] },
         vehicle: { current: t.research.slots.vehicle.current ? { ...t.research.slots.vehicle.current } : null, queue: [...t.research.slots.vehicle.queue] },
+        defense: { current: t.research.slots.defense.current ? { ...t.research.slots.defense.current } : null, queue: [...t.research.slots.defense.queue] },
       },
       points: t.research.points, totalPoints: t.research.totalPoints,
     },
@@ -157,12 +166,12 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     }
     if (s.aa) {
       o.aa = {
-        level: s.aa.level, weapons: s.aa.mounts.map((m) => m.weapon), sensors: [...s.aa.sensors],
+        level: s.aa.level, weapons: s.aa.mounts.map((m) => m.weapon), installs: s.aa.mounts.map((m) => m.install), sensors: [...s.aa.sensors],
         job: s.aa.job ? { ...s.aa.job } : null, crew: s.aa.crew, shotsFired: s.aa.shotsFired,
       };
     }
     if (s.radar) o.radar = { level: s.radar.level };
-    if (s.factory) o.factory = { queue: s.factory.queue.map((q) => ({ ...q })), repeat: s.factory.repeat };
+    if (s.factory) o.factory = { queue: s.factory.queue.map((q) => ({ ...q })), repeat: s.factory.repeat, guns: s.factory.gunQueue.map((q) => ({ ...q })) };
     return o;
   });
   return {
@@ -171,6 +180,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     mapId: w.mapId,
     mapSize: w.mapSize,
     time: w.time,
+    playTime: w.playTime,
     playerTeam: w.playerTeam,
     playerName: w.playerName,
     setup: w.setup ? { ...w.setup } : null,
@@ -198,6 +208,7 @@ export function deserializeWorld(d: SaveData): World {
   w.mapId = d.mapId;
   w.mapSize = d.mapSize ?? MAP_BASE;
   w.time = d.time;
+  w.playTime = d.playTime ?? d.time;
   w.playerTeam = d.playerTeam;
   w.playerName = d.playerName;
   w.setup = d.setup ? { ...d.setup } : null;
@@ -211,12 +222,14 @@ export function deserializeWorld(d: SaveData): World {
     const r = t.research;
     r.done.clear();
     for (const id of ts.research.done) r.done.add(id);
-    for (const k of ['tech', 'vehicle'] as const) {
+    for (const k of SLOT_ORDER) {
       const sl = ts.research.slots[k];
+      if (!sl) continue;
       r.slots[k].current = sl.current ? { ...sl.current } : null;
       r.slots[k].queue.length = 0;
       r.slots[k].queue.push(...sl.queue);
     }
+    r.moveOldDefenseJobs();
     r.points = ts.research.points;
     r.totalPoints = ts.research.totalPoints;
     r.version++;
@@ -225,6 +238,7 @@ export function deserializeWorld(d: SaveData): World {
     t.personnel.recruit = ts.recruit;
     t.personnel.reserved = 0;
     t.money = ts.money;
+    t.gunStock = ts.gunStock ? { ...ts.gunStock } : {};
     t.ledger.push(...ts.ledger);
     t.earned = ts.earned;
     t.spent = ts.spent;
@@ -266,7 +280,12 @@ export function deserializeWorld(d: SaveData): World {
       const aa = s.aa;
       aa.level = o.aa.level;
       aa.mounts.length = 0;
-      for (const wpn of o.aa.weapons) aa.addMount(wpn);
+      o.aa.weapons.forEach((wpn, i) => {
+        aa.addMount(wpn);
+        const left = o.aa?.installs?.[i] ?? 0;
+        aa.mounts[i].install = left;
+        aa.mounts[i].installTotal = left > 0 ? AA_WEAPONS[wpn].installTime : 0;
+      });
       aa.sensors.clear();
       for (const sn of o.aa.sensors) aa.sensors.add(sn);
       aa.job = o.aa.job ? { ...o.aa.job } : null;
@@ -277,6 +296,7 @@ export function deserializeWorld(d: SaveData): World {
     if (s.factory && o.factory) {
       s.factory.queue.push(...o.factory.queue.map((q) => ({ ...q })));
       s.factory.repeat = o.factory.repeat;
+      s.factory.gunQueue.push(...(o.factory.guns ?? []).map((q) => ({ ...q })));
     }
     w.structures.push(s);
   }

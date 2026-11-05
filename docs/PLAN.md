@@ -76,7 +76,7 @@ src/
 
 ## Araştırma
 
-- İki hat aynı anda: **teknoloji** (modifikasyon, hava savunma, radar) ve **araç** (uçak). Süre oyun zamanında akar.
+- Üç hat aynı anda: **teknoloji** (modifikasyon), **araç** (uçak) ve **hava savunma** (top, nişan, tahkimat, radar). Süre oyun zamanında akar.
 - Süreler dönemle büyür: erken pervaneli geliştirmeler 3–5 dk, gelişmiş pervaneli 5–11 dk, jet teknolojileri 10–20 dk;
   uçaklar rütbeyle (Spitfire I ≈ 8 dk, Spitfire IX ≈ 15 dk, F-86 ≈ 30 dk).
 - **Savaş puanı:** düşürme, yapı isabeti ve dönen görevlerden kazanılır; havuzdan harcanarak araştırmayı 2 kata kadar hızlandırır.
@@ -343,6 +343,124 @@ src/
   kaybı He 111'i geçmiyor (eski nişancı modelinde 8'e 6). Önceki açıklar (önlemede eskorta takılma, B-17 baskınında geç
   kalan devriye) kapandı.
 
+## Hava savunması yenileniyor (2026-11-05 kararları)
+
+Hedef: uçaklar gibi gerçek sistemler, kendi araştırma ağacı ve showroom.
+
+Kullanıcı kararları:
+- Füze yok. Oyun 1953 civarında bitiyor; füzeler radarlı jetlerle "sonraki aşama"ya kalır.
+- Hava savunması için ayrı, üçüncü araştırma hattı. Toplam araştırma botlar için de hızlanır, dengelenmeli.
+- Batarya ve üretim (2026-11-05, kullanıcının son kararı; önceki "tek tip" kararının yerine): batarya 2 yuvayla ve M2 ile başlar; top araştırılır, fabrikada istenen sayıda üretilir (takım deposu), batarya panelinde yuvaya dokunulup takılır, çıkan top depoya döner. Yuva en çok 4, kombinasyon serbest. Eski kayıtlardaki fazla yuvalı bataryalar kalır. Tahkimat II ve III yuva yerine dayanıklılık verir (bomba ve roket hasarı −%15, −%30). Botlar depo kullanmaz: `options` işleriyle aynı parayı öder, tek tip kurar.
+- Üretim menüsü (kullanıcı isteği): uzun metal satırlar, soldan sağa koyu yeşilden siyaha, arkada silik atölye çizimi; üretilen satırda sağdan sola yavaş akış (yalnız `transform`; Ayarlar'da efektler kapalıysa ve azaltılmış harekette yok); üret düğmesinin yanında adet seçimi (bant en çok 30). Üst çubukta "Üretim" düğmesi ve U tuşu. Süsün kaydırmaya maliyeti ölçülemeyecek kadar az: 4× yavaş işlemcide süslü ve süssüz p95 aynı (~105 ms); yük arkadaki oyun çizimiydi. Bu yüzden pencere açıkken oyun iki karede bir çizilir: aynı sayfada dönüşümlü ölçümde p95 ~108 ms'den ~20 ms'ye indi. Pencerenin geri kalanı da çelik temaya geçti (`.modal-card.steel`), başlık tek satıra indi.
+- Azar azar: önce 12–15 sistem (mevcut 7 + 6–8 yeni), 25 sistemin hepsi birden değil.
+- Ağaç uçaklardaki gibi ortak; ülke kısıtı yok.
+
+Aşamalar (her biri tek başına yayınlanabilir):
+1. **Veri ve simülasyon (yapıldı):** 7 silah gerçek kimliğinde, yavaşlayan mermi, şarjör, `npm run sim:flak`.
+2. **Showroom (yapıldı):** Hangarda Uçaklar / Hava savunma seçimi (`hangar.ts`, `hangarAA.ts`), sınıf sekmeleri, oyundaki modelin
+   döndüğü, namlu kaldırdığı ve gerçek ritmiyle ateş ettiği vitrin, menzil-tavan zarfı ve uçuş süresi yayları. Batarya panelinde "İncele".
+   Hasar ve parçacık yarıçapı gösterilmez: oyun dengesi, gerçek değer değil.
+3. **Ağaç ve yeni silahlar.** Eski kimlikler (`mg`, `aa20`, `aa88`, `hd_*`) değişmez: kayıtlar buna bağlı.
+   - **3A (yapıldı):** Üçüncü hat (`Slot` `defense`: top, nişan, tahkimat, gözcü, radar). Eski kayıtta mühendislik hattındaki hava savunma
+     işi ilerlemesi ve ödenen parasıyla yeni hatta geçer (`moveOldDefenseJobs`). Pano: sınıf şeritleri, sütun önkoşul derinliği, yıl kartta;
+     yıl ekseni seçilmedi çünkü açılış sırası tarih sırası değil (8,8 cm 1936, Flak 38 1939). Radar sekmesi panoya katıldı. Tek tip batarya:
+     ayrı alan yok, kayıttaki yuvalardan okunur (`uniformGun`); `all:<top>` işi bütün yuvaları çevirir, değişen toplar bu sırada ateş edemez.
+     Karışık kurmak panelde "Farklı top ekle". Botlar `BOT_GUNS`: batarya kimliğine göre hafif, orta ya da ağır, karıştırmaz.
+   - **3B:** Yeni silahlar küçük gruplarla. İlk grup (yapıldı): Oerlikon 20 mm, 90 mm M1, 8,8 cm Flak 41. Sırada: M45, 61-K, QF 3.7 inç, 85 mm 52-K, 10,5 cm Flak 38.
+     Oerlikon'un kaynaktaki etkili menzili ~900 m; oyundaki menzil izli mermi ölçütünde, Flak 38 ile aynı oranda (~1.900 m). 90 mm'nin etkili tavanı tapa kuralıyla ~11.500 m.
+     Yeni ağır toplarda dönüş hızı, hasar ve parçacık yarıçapı oyun dengesi. 8 toplu ölçüm (60 koşu, 8 He 111): 90 mm ~12.000, Flak 41 ~5.900 mermi/düşürme; B-17'ye 7.200–7.800 (az düşürme, sapma büyük).
+4. **Modeller:** Her sistem çizim ve fotoğraftan; telefon kare hızı ölçülür. Mevcut 7 top 2026-11-05'te fotoğraflara bakılarak elden geçirildi: düz
+   kalkanlar kalktı, namlular daraldı, kaide ve yanaklar görünür oldu (top başına ~900–1.270 üçgen, M2 356). Tam çizimden yapım kullanıcıya bağlı.
+5. **Radar ve atış kontrol:** Gerçek adlarla (Kommandogerät 36, Kerrison, M9, Würzburg, SCR-584, VT tapası; Chain Home, Freya,
+   SCR-270, Würzburg-Riese). Yapı ve modeller güncellenir.
+6. **Ansiklopedi ve duyuru:** Sayfalar, haber, e-posta. Sesler gerekirse lisanslı kayıtla.
+
+Aday sistemler (yıllar eklenirken kaynaktan doğrulanır):
+- Hafif: M45 dörtlü 12,7 mm, Flak 38, Flakvierling 38, Oerlikon 20 mm, Type 96 25 mm.
+- Orta: Flak 36, Flak 43, 61-K 37 mm, Bofors L/60, S-60 57 mm.
+- Ağır: Flak 36, Flak 41, QF 3.7 inç, 85 mm 52-K, 90 mm M1, Type 88 75 mm.
+- Çok ağır: 10,5 cm Flak 38, 12,8 cm Flak 40, 120 mm M1, KS-19 100 mm.
+
+**1. aşamanın verisi** (`airDefense.ts`). Kaynak: Tactical and Technical Trends "Employment of German AAA" (savaş dönemi ABD
+istihbaratı) ve Wikipedia silah sayfaları.
+- `mg` = M2 Browning (tek namlu, model de öyle), `aa20` = Flak 38, `aa20q` = Flakvierling 38, `aa37` = Flak 36, `aa40` = Bofors L/60,
+  `aa88` = 8,8 cm Flak 36, `aa128` = 12,8 cm Flak 40.
+- Mermi yavaşlaması v' = -k·v², k = C·A/m. Tek C (0,26) kaynaktaki üç noktayı tutuyor: 20 mm 6 sn'de 2,2 km, 37 mm 14 sn'de 4,2 km,
+  88 mm 30 sn'de 9,9 km. 88 mm'nin 8 km'ye uçuşu 11 sn'den ~21 sn'ye çıktı. Uçak silahlarının mermisi yavaşlamaz (denge ayrı).
+- Şarjör: seri hızıyla boşalır, değiştirme süresi pratik atış hızını tutturur (Flak 38: 450 seri, ~200 pratik). 37 mm'nin pratik
+  hızında kaynaklar 60–120 diyor; ~90 seçildi.
+- Etkili tavan: tapa tavanının ~1.800 m altı (kaynaktaki kural; 88 mm 9,9 → 8 km, 128 mm 14,8 → 13 km).
+- Hasar ve parçacık yarıçapı değişmedi: mermi kütlesiyle zaten orantılı. 88 mm'nin kaynaktaki öldürücü yarıçapı ~9 m, oyunda 22 m
+  (azalan hasarla). Küçültülmedi, çünkü düşürme başına mermi tarihî büyüklükte.
+
+`npm run sim:flak -- 16` (6 top, avcısız, görev yapay zekâsı), mermi/düşürme, önce → sonra. Bu kadar az düşürmede sapma büyük; eğilime bak.
+
+| Durum | Önce | Sonra |
+|---|---|---|
+| 6 × 88 mm, 8 He 111 | 4.430 | 4.521 |
+| 6 × 128 mm + radar, 12 B-17 | 1.660 | 1.928 |
+| 6 × 37 mm, 8 Ju 87 | 1.160 | 1.967 |
+| 6 × Bofors, 8 Ju 87 | 480 | 945 |
+| 6 × Flak 38, 8 Il-2 | 3.586 | 8.551 |
+| 6 × Flakvierling, 8 Il-2 | 3.420 | 4.216 |
+
+Karşılaştırma için zayıf bir kaynak (Westermann'dan aktaran forum yorumu): ağır flak düşürme iddiası başına ~3.300 mermi, hafif
+flak ~4.900, 1944'te ağır flak 16.000. 6 × 88 mm tek geçişte 12 B-17'den neredeyse hiç düşüremiyor (önce de öyleydi): mermi başına
+gerçekçi, ama oyundaki top sayısı azken ağır flak daha çok caydırıcı. 2. aşamadan sonra oyunda bakılacak.
+
+**Denge (2026-11-05, kullanıcının isteğiyle, 3B'den önce).** İkisi birlikte yapıldı: yalnız isabeti artırmak yalnız oyuncunun savunmasını güçlendirirdi.
+- **8,8 cm `aim` 0,87** (oyun dengesi, gerçek değer değil). `npm run sim:flak -- 200 agir88,he88 8`, mermi/düşürme: B-17 11.986 → 4.788, He 111 7.546 → 4.190.
+  Yukarıdaki tablonun 16 koşusu seyrek düşürmede gürültülü; karşılaştırmada en az 200 koşu ve isabet sayısına bak. Tarihî ~3.300 (zayıf kaynak).
+- **Bot savunma fonu:** gelirin %15'i (`DEFENSE_SHARE`), yatırım payından (0,35 → 0,20): toplam ayrılan para aynı. Ayrı rezerv yapılınca uçak araştırması gerilemişti.
+  İkinci üs kurulana kadar %5 ve yatırım payı tam: payı her zaman kısınca üsler azaldı, son üsünü kaybeden bot kasasında 18.900 kr bulamayıp 170–230. dakikalarda elendi
+  (240 dakikada 0/16 → 7/16). 150 dakikalık ölçüm bunu göstermedi: bot dengesini en az 240 dakikayla dene.
+  Fon top çevirmeyi ve sıradaki hava savunma araştırmasını öder; araştırma para beklerken de harcanabilir. Açık topa çevrilecek batarya varsa önce ona birikir.
+  Sıra `DEFENSE_PRIORITY`: radar toplardan önce. Radarsız yüksek akın ancak ~20 km kala görülür, avcılar 6,5 km'ye tırmanamaz.
+- Ölçüm, 150 dakikalık bot harekâtı (8 koşu, harekât başına top sayısı; 150. dakikada oyuncu baskını: 12 B-17 90 km'den 6,5 km'de, 8 Il-2 18 km'den alçaktan):
+
+| | Önce | Sonra |
+|---|---|---|
+| Top | 12,7 mm 17,0; 20 mm 1,0 | 12,7 mm 6,8; 20 mm 7,3; 37 mm 2,3 |
+| Uçak / mühendislik araştırması | 5,9 / 8,8 | 5,8 / 8,8 |
+| Hava savunma / radar araştırması | 4,3 / 3,0 | 3,1 / 2,9 |
+| Filo, kazanç | 6,7, 90.500 | 7,4, 90.400 |
+| 8 Il-2 alçak baskın kaybı (aşağıya bak: bu satır güvenilir değil) | %28 | %47 |
+| 12 B-17 yüksek baskın kaybı | 0/96 | 0/96 |
+| B-17'ye avcı isabeti, baskın başına | 1,4 | 3,6 |
+
+240 dakika (8 koşu), hayatta kalan bot başına: elenen 0/16 → 0/16, filo 8,2 → 8,6, batarya 4,8 → 5,5, üs 1,9 → 1,6, maden 2,5 → 2,1, kazanç ~158.000.
+
+Çarpışma modeli denendi: 8 avcı, önleme görevinde, 5 dakikada 12 B-17'den ~1 düşürür, 1–3 uçak kaybeder; B-17 ~19 adet 20 mm isabetiyle düşer.
+**Alçak baskın, ayrıntılı ölçüm** (150. dakika, 8 Il-2, 10 koşu, 25 dakika: dönüş dahil). Yukarıdaki %28 → %47 farkı sapmaydı, topların sonucu değil:
+
+| | Kayıp | Düşüren |
+|---|---|---|
+| Eski kod, yalın | 38/80 (%48) | avcı 34, top 4 |
+| Yeni kod, yalın | 30/80 (%38; 8'i tek koşuda, isabetsiz, gidişte) | top 12, avcı 10 |
+| Yeni kod, eskortla (4 P-51) | 10/80 (%13) | top 7, avcı 3 |
+| Yeni kod, 4 Il-2 bastırma koluyla | 8/80 (%10; bastırma kolu 10/40) | top 5, avcı 3 |
+
+Ayar yapılmadı: önlem alan oyuncunun kaybı üçte bire iniyor, kaybın büyük kısmı yine avcıdan. Yalnız ilk 7 dakikayı saymak yarıya yakınını gizliyor; görev kayıplarını dönüşle ölç.
+
+**Bot önlemesi (2026-11-05, kullanıcının isteği: mantıklı, oyuncuyu zorlamadan, her seferinde aynı sayı ve tip değil, bazen hazırlıksız).** `commander.ts` `raidResponse`; oyuncunun alarm ayarı aynı kaldı.
+- Akın başına bir karar: bombardıman akınına büyüklüğün %35–80'i (en çok 8), avcı süpürmesine %25–60'ı (en çok 4). Hazır avcıların ~%60'ı; tehdit yapıların 15 km yakınındaysa yedek de kalkar.
+- Hazırlıksız yakalanma %25: radarsız +%10, yer kontrolüyle −%10, son 15 dakikada akın yediyse −%15, alçak akında +%20. Olunca kalkış 2–5 dakika gecikir, sayı yarıya iner. Yoksa 0–45 sn.
+- Alçak akına (800 m altı) %40 daha az avcı. Tip: o irtifaya çıkabilenlerden, çabuk tırmananı öne alan rastgele seçim. En çok dörtlü kalkar; büyük tepki dalgalara ve tiplere bölünür. Üsten uzakta çift, dibinde tek de kalkar.
+- Kovalama: kendi yapılarından 25 km (`BOT_LEASH`; oyuncunun alarmında 55 km). Akın yiyen bot 15 dakika boyunca bombardıman uçağından önce avcı üretir.
+
+Ölçüm, 150. dakika, dönüş dahil (B-17 7–8 koşu, Il-2 8–10 koşu):
+
+| | Önce | Sonra |
+|---|---|---|
+| 12 B-17, 90 km'den | 1/96 (%1) | 3/84 (%4) |
+| B-17'ye avcı isabeti, baskın başına | 11,5 | 18,3 |
+| 8 Il-2, önlemsiz | 30/80 (%38) | 28/80 (%35) |
+| 8 Il-2, eskortla | 10/80 (%13) | 18/80 (%23) |
+| 8 Il-2, bastırma koluyla | 8/80 (%10) | 13/80 (%16) |
+
+240 dakikada elenen bot 1/12 ve 1/16 (önce 0/16), ikisi de 227–238. dakikada, son üs yıkılınca. Kalanlar: filo ~8, batarya ~6, üs 2,0–2,3.
+Açık: 150 dakikada bataryalarda 8,8 cm yok, 240 dakikada nadir. Ölçümlerde sapma büyük.
+
 ## Uçaksavar ve uçaksavardan kaçınma
 
 - **Yerleşim:** batarya hava üssünün tel örgüsünün hemen dışına kurulabilir (pistin 120 m bir yanından 560 m öbür yanına
@@ -352,7 +470,7 @@ src/
 - **Görüş**: optik nişan menzili hedefin boyutu, kol hâlinde uçuşu ve yoğuşma izine göre (`visibility`, avcı algısıyla
   aynı): tek avcı 5,5 km, 7 km'deki B-17 kutusu ~15 km. Eski sabit 5,5–7,4 km'de 88 mm yüksekteki B-17'yi ancak tepeden
   geçerken görüyordu. Atış kontrol radarı tam menzilde izler.
-- **Namlu dönüş hızı** (`slew`): 12,7 mm 60°/sn, 20 mm 45, dörtlü 20 mm 40, 37/40 mm 30, 88 mm 12, 128 mm 8. Namlu hedefe
+- **Namlu dönüş hızı** (`slew`): 12,7 mm 60°/sn, 20 mm 45, dörtlü 20 mm 40, 37 mm 30, Bofors 50 (kaynaktan), 88 mm 12, 128 mm 8. Namlu hedefe
   yetişmeden ateş edilmez; izleyemeyeceği kadar hızlı kayan hedef seçilmez. Takip gecikmesi ~0,1 sn × açısal hız. Hızla
   yakından geçen alçak uçak hafif topu da atlatır; topun üstüne dalan Stuka/Il-2 ise kolay hedef (açısal hızı sıfır).
 - **Ağır flak isabeti**: patlama noktası atış anındaki rotaya göre kestirilir (8 km'de ~120–180 m hata, 22 m öldürücü

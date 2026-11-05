@@ -24,7 +24,7 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
     kayıtları taşınana kadar açık kalır, sonra silinir.
 - Kayıt anahtarları (`warsim.*`) ve IndexedDB adı (`warsim`) değişmez. Değişirse oyuncuların kayıtları silinir.
 - **Telefon önce gelir:**
-  - Arayüz ölçülerini `calc(Npx * var(--ui))` ile yaz.
+  - Arayüz ölçülerini `calc(Npx * var(--ui))` ile yaz. Çelik pencerelerde dokunma hedefi en az 32 px: `max(32px, calc(Npx * var(--ui)))`.
   - Bitti demeden 800×360 ve 844×390'da bak. Tarayıcıda adres çubuğu yüksekliği düşürür: menü ve pencereleri 780×300'de de
     dene. Yükseklikte `100vh` yerine `var(--vh100)` kullan.
   - Klavye yatay telefonda ekranın çoğunu kaplar, üstte ~100 px kalır: yazı alanı olan pencereler `ui/keyboard.ts` `.kb`
@@ -43,6 +43,10 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
     tek çubuğu kullanıcı beğenmedi); pencere köşeleri çapraz kanat (`--wing`); kutu içinde
     kutu yerine düz satırlar; büyük harfli başlık yok. Yenilik mevcut görünümden küçük adımlarla gelir: 2026-11-04'te retro
     temalar (harekât odası, afiş, seyir haritası) "çok eski ve kötü" diye reddedildi.
+  - Çelik tema (2026-11-05, kullanıcı beğendi; `style.css` `.modal-card.steel`): ağır metal fabrikası. Satırlar soldan sağa
+    koyu yeşilden siyaha, baklavalı sac başlık, ince ikaz şeridi. Üretim, Silah yuvası, Araştırma, Hangar ve Haberler'de (haber e-postası da aynı renklerde); kartta
+    `steel` sınıfı ve değişkenler (`--ink`, `--chip`, `--trail`…) başka menüye de taşır. Yayılması kullanıcının kararıyla.
+    Araştırmada siluet rengi durumu söyler (`research.ts` `INK`, renk başına hazır dosya); hangar sahnesi saydam, arka planı `.steel .preview`.
 - **Sesler:**
   - Yalnız gerçek kayıt, sentez yok.
   - Lisans yalnız CC0 ya da CC BY (Steam planı var). Lisansı kaydın kendi Freesound sayfasından doğrula; "Attribution"
@@ -62,6 +66,7 @@ npm run typecheck
 npm run sim:bench    # başsız simülasyon ölçümü (tools/sim)
 npm run sim:hits     # isabet/düşürme istatistikleri
 npm run sim:ceiling  # servis tavanı ayarı: specs.ts CEILINGS üslerini bulur ve denetler
+npm run sim:flak     # uçaksavar karnesi: mermi ve düşürme; silah verisi değişince öncesini ve sonrasını karşılaştır
 npm run db:local     # yerel D1 veritabanı (tablolar)
 npm run serve        # yerel Cloudflare sunucusu: dist/ + /api (http://localhost:8787; önce npm run build)
 npm run deploy       # Cloudflare'e elle yayın (normalde GitHub bağlantısıyla kendiliğinden)
@@ -83,9 +88,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       ötesinde dik yükselir. Belgelenen hızı Mdd'nin üstünde olan jetin `mdd`'si tanımda verilir; F-86 ve MiG-15'inki,
       gerçekteki gibi deniz seviyesinde en hızlı olacakları biçimde seçildi.
   - `ai/`: kol, dalaş, pike, taarruz, bombardıman, taret, pist operasyonları.
+    - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
+    - `airDefense.ts`: silahlar gerçek sistemlerdir (kaynaklar dosyanın başında). Silah kimlikleri (`mg`, `aa88`…) kayıtlara yazılır, değişmez.
+      Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
     `scenarios.ts`, `campaign.ts`, `commander.ts` (rakip yapay zekâ).
   - **Harita büyüklüğü:**
@@ -97,7 +105,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       büyüklükten bağımsız kalsın.
     - Senaryolar ve video kayıt kipi 300 km'dir.
   - **Olaylar:** `w.events` her kare önce ses (`audio/battle.ts`), sonra render tarafından tüketilir; render listeyi
-    siler.
+    siler. Pencere açıkken (`game.ts` `windowOpen`) ikisi de iki karede bir çalışır, olaylar sonraki kareye kalır: birini
+    tek başına atlama, olay ya iki kez işlenir ya kaybolur. Bu karelerde otomatik çözünürlük durur.
+  - **Zaman:** `world.time` simülasyon saati: hızlanır; günün saati, üretim süreleri, skor ona bağlı. `world.playTime` gerçek oynanma süresi: ekrandaki sayaç, kayıt başlığı, günlük satırları (`fmtStamp`). Hızlandırma etkilemez, duraklatınca durur; `Game.tick` sayar, simülasyon adımı dokunmaz. Eski kayıtta `time`'dan sürer.
   - **Kimlikler:** Kimlik sayaçları modül düzeyinde. Kayıt kipi için sıfırlama işlevleri var.
 - **`src/render/`: Three.js.**
   - `gameRenderer.ts`: sahne ve senkron.
@@ -124,7 +134,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       `retractTailWheel`, `fixedTailWheel`. Sim'deki `turret` konumları modeldeki yerle uyuşmalı.
     - Kuyruk tekerlekli uçağın yer açısı `flightModel.ts` `TAIL_ANGLE` (yoksa 11°), yüksekliği `gearHeight`: ana tekerin düz ve
       kuyruk üstü duruştaki yüksekliklerinin ortası.
-    - Hareketli parçalar eklemdir. Modeli değiştirince ansiklopedi görsellerini de yeniden üret.
+    - Hareketli parçalar eklemdir. Modeli değiştirince ansiklopedi görsellerini ve üretim listesi resimlerini de yeniden üret.
       - Kanat ve kuyruk `controlWing` / `controlFin` ile kurulur: ana yüzey ve kumanda yüzeyi aynı profilden kesilir
         (`airfoilPart`), aralarında yalnız menteşe çizgisi kalır.
       - Gövde (kapalı hava girişi ve egzoz) `migFuselage`, takım (içe ve öne katlanır, gövdeye girer) `migGear`.
@@ -133,6 +143,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Eklem menteşe ekseniyle döner. `gameRenderer.ts` `animateParts` kumandalara bağlar.
     - Işıklar model tanımında (`lights`): seyir lambaları ve iniş farı. Ek çözünürlük `HIRES`.
     - Yeni uçağa eklerken bu dört parçayı ve ışıkları tanıma ekle.
+  - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
+    malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
   - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `palette.ts`.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
 - **`src/audio/`:**
@@ -147,6 +159,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `news.ts`: haberler. Yeni haber listenin en üstüne yazılır (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
     İngilizce görseli `cover` ve `files` ile verilir). Okunmamış işareti kendiliğinden çıkar: açılan haberin kimliği hesaba
     yazılır (`accounts.news_seen`), misafirde işaret yok. `MARK_DAYS`'ten eski haber işaretlenmez.
+  - `production.ts`: üretim menüsü (fabrika; uçak ve top satırları) ve yuva penceresi (bataryada top takma). Pencere açıkken yalnız `data-cell` hücreleri güncellenir; tam çizim düğmeyi kaçırıyordu. Resimler hazır dosya (`public/uretim`; araştırma dosyası ve `plan/` altındaki siluetler de): telefon bu pencereler için model kurmaz, liste metni kısa kalır. Yeni uçak ya da top eklenince, model değişince `npm run uretim:gorsel [ac-<uçak> gun-<top>]`.
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
     Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
     güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.
@@ -225,6 +238,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - `tools/rec/`: tanıtım videoları (`record.mjs`, `probe.mjs`, `ui.mjs`, `edit.mjs`) ve grafik önce/sonra denetimi
   (`audit/stills.mjs`, `audit/perf.mjs`; taban `audit/taban-2026-10-23.json`). Bkz. README.
 - `tools/sim/`: başsız simülasyon betikleri.
+- `tools/uretim/`: üretim listesi resimleri (`public/uretim/ac-*.webp`, `gun-*.webp`) ve araştırma siluetleri (`plan/`), oyunun modellerinden.
 - `release/` (git dışı):
   - itch.io paketi;
   - `sosyal/` videolar ve gönderi metinleri;
@@ -239,6 +253,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **Tarayıcı:** Kendi Playwright betiğin, ayrı port (5291 ve üstü) ve temiz profille. `window.game` konsoldan
   erişilebilir. Başsız tarayıcı rAF'yi yavaşlatır; dünyayı `evaluate` içinde elle adımla.
 - **Performans:** `chrome-devtools` MCP ile işlemciyi 4 kat yavaşlatarak telefonu taklit et.
+  - Telefon benzetimi derlenmiş sürümde (`dist`), 3× piksel yoğunluğu ve gerçek dokunuş dizisiyle (`Input.dispatchTouchEvent`) yapılır; canlı sürümle aynı koşuda karşılaştır.
+  - Model önbelleği (`models.ts` `geoCache`) pencereler arasında ortak: ilk açılış süresini temiz sayfada ölç, yoksa önce açılan pencere maliyeti gizler.
 - **Görsel önce/sonra:** Kayıt kipi aynı sahneyi her seferinde aynı oynatır.
 
 ## Windows ortam tuzakları

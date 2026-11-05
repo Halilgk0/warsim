@@ -367,7 +367,7 @@ export class BattleSound {
       s.aa.mounts.forEach((m, i) => {
         const wd = AA_WEAPONS[m.weapon];
         const fresh = m.lastFire > since && m.lastFire <= w.time;
-        if (m.weapon === 'aa88' || m.weapon === 'aa128') {
+        if (wd.kind === 'flak') {
           if (fresh) sound.play('aa_heavy', 'world', { gain: h.gain * (m.weapon === 'aa128' ? 1 : 0.85), rate: m.weapon === 'aa128' ? 0.85 : 0.95 + Math.random() * 0.1, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb, when: now + h.delay * 0.5, important: true });
         } else if (wd.medium) {
           if (fresh) sound.play('aa_pom', 'world', { gain: h.gain, rate: m.weapon === 'aa40' ? 1 : 1.06, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb });

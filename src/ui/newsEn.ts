@@ -15,6 +15,106 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'hava-savunmasi': {
+    title: 'Air defence renewed: real guns and a new research line',
+    summary: 'Anti-aircraft guns are now real systems: 10 guns from the M2 to the 12.8 cm Flak 40, their own research line, factory production, gun pits at each battery and their own section in the hangar.',
+    files: ['hava-yuva-en.jpg', 'hava-pano-en.jpg', 'hava-hangar-en.jpg'],
+    captions: [
+      'Gun pit: the gun fitted now and the guns in stock.',
+      'The air defence board in research: light, medium and heavy guns, fire control, fortification and warning.',
+      'Air defence in the hangar: the gun turns and fires at its real rhythm, with a range and ceiling chart beside it.',
+    ],
+    sections: [
+      {
+        heading: 'Real guns',
+        bullets: [
+          'Batteries now use 10 real systems: M2 Browning, 2 cm Flak 38, Oerlikon 20 mm, 2 cm Flakvierling 38, 3.7 cm Flak 36, Bofors 40 mm L/60, 8.8 cm Flak 36, 90 mm M1, 8.8 cm Flak 41 and 12.8 cm Flak 40.',
+          'The Oerlikon, 90 mm M1 and Flak 41 are new. The older guns’ models were also rebuilt from photographs.',
+          'Shells now slow down in flight; magazines, clips and practical rate of fire come from real data. An 8.8 cm shell takes about 20 seconds to reach 8 km, so it can miss an aircraft that changes course.',
+        ],
+      },
+      {
+        heading: 'New battery system',
+        bullets: [
+          'A new battery starts with 2 gun pits and 12.7 mm M2s.',
+          'Research a gun and build as many as you like at a factory; finished guns go into stock.',
+          'Tap a battery, pick a pit and fit a gun from stock. The removed gun returns to stock; the pit cannot fire while fitting.',
+          'Upgrading raises the battery to 4 pits. Mix guns however you like.',
+          'Fortification II and III no longer add pits; they reduce bomb and rocket damage by 15% and 30%.',
+        ],
+      },
+      {
+        heading: 'Research and hangar',
+        bullets: [
+          'Air defence is now a separate third line, progressing at the same time as aircraft programmes and engineering. Radars are on this board too.',
+          'The hangar has a new Air defence section: the gun turns, raises its barrel and fires at its real rhythm. Calibre, shell, range and ceiling data are there.',
+        ],
+      },
+      {
+        heading: 'Opponents',
+        bullets: [
+          'Bots also fit better guns to their batteries.',
+          'They do not answer every raid with the same fighters in the same numbers, and they can be caught unprepared.',
+        ],
+      },
+      {
+        heading: 'Old saves',
+        bullets: [
+          'Guns and extra pits in your saves are kept. Air defence research in progress moves to the new line.',
+        ],
+      },
+    ],
+  },
+  'uretim-celik': {
+    title: 'Production menu, steel look and a real-time counter',
+    summary: 'All aircraft and guns are in one production list. Production, Research, Hangar and News have a new steel look. The game counter no longer speeds up, and menus are easier on phones.',
+    cover: 'uretim-en.jpg',
+    files: ['celik-arastirma-en.jpg', 'celik-hangar-en.jpg'],
+    captions: [
+      'The research board: the colour of the silhouette and card shows the state.',
+      'The hangar: the aircraft now stands under roof trusses on a concrete floor.',
+    ],
+    sections: [
+      {
+        heading: 'Production menu',
+        bullets: [
+          'All aircraft and anti-aircraft guns are in one list of long rows: model, data, how many are in service and on the line, time left.',
+          'Batch production: choose the number with − and +, then tap "Build". The line holds up to 30 orders.',
+          'A slow flow runs across the row in production. It is hidden when visual effects are off.',
+          'Types not yet researched are grey and locked; tapping one takes you to its research.',
+          'The top bar has a Factory button and the U key. Tapping a factory beside a base is also easy now.',
+        ],
+      },
+      {
+        heading: 'Steel look',
+        bullets: [
+          'Production, Gun pit, Research, Hangar and News have moved to a heavy metal look: dark green to black from left to right, with tread plate headers.',
+          'On the research board, green cards are done, bright ones can start, amber ones are in progress and grey ones are waiting for prerequisites.',
+        ],
+      },
+      {
+        heading: 'Real-time counter',
+        bullets: [
+          'The game time beside the clock is no longer affected by speed-ups and stops when you pause. The event log and save names show this time too.',
+          'The time of day and build times still follow game speed. In old saves the counter carries on from where it was.',
+        ],
+      },
+      {
+        heading: 'Easier on phones',
+        bullets: [
+          'Buttons in the new windows are larger, with more room between "+" and "Build".',
+          'Research no longer freezes on first opening, and the production list opens right away.',
+          'While a window is open, the game behind it is drawn less often, so lists scroll smoothly.',
+        ],
+      },
+      {
+        heading: 'Tutorial',
+        bullets: [
+          'The tutorial now also covers the production menu, fitting guns, the three research lines and the hangar.',
+        ],
+      },
+    ],
+  },
   pervaneliler: {
     title: 'All propeller aircraft renewed',
     summary: 'All 40 propeller aircraft in the research tree were rebuilt from drawings: from the Hurricane to the B-29, each has its own fuselage, wing and landing gear. Control surfaces move and the gear folds.',

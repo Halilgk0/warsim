@@ -7,6 +7,7 @@
 // Planlayıcıdaki ihtimal ise bilinen etkenlerden bir tahmindir (en fazla %92).
 
 import type { World } from './world';
+import { AA_WEAPONS } from './structures/airDefense';
 import type { FlightGroup } from './ai/flightGroup';
 import type { MissionPlan, MissionType } from './ai/missions';
 import { SPECS, type Loadout, type Role } from './aircraft/specs';
@@ -60,6 +61,8 @@ export interface MissionReport {
   reason: string;
   reward: number;
   time: number;
+  /** Ekranda gösterilen an: gerçek oynanma süresi. Eski kayıtlarda yok. */
+  played?: number;
   aircraft: string;
 }
 
@@ -319,7 +322,7 @@ export function missionOdds(
       const d = Math.hypot(s.pos.x - tp.x, s.pos.z - tp.z);
       if (s.aa && d < 4500) {
         aa++;
-        if (s.aa.mounts.some((m) => m.weapon === 'aa88' || m.weapon === 'aa128' || m.weapon === 'aa40')) heavy = true;
+        if (s.aa.mounts.some((m) => m.weapon === 'aa40' || AA_WEAPONS[m.weapon].kind === 'flak')) heavy = true;
       }
       if (s.airbase && d < 40000) bases++;
       if (s.radar && d < 60000) radar = true;

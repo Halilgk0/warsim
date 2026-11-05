@@ -83,7 +83,7 @@ export class EndScreen {
     this.el.innerHTML = `<div class="pm-card end-card ${kind}">
       ${head}
       <div class="end-stats">
-        <div><b>${fmtTime(w.time)}</b><span>${L('oyun süresi', 'game time')}</span></div>
+        <div><b>${fmtTime(w.playTime)}</b><span>${L('oyun süresi', 'game time')}</span></div>
         <div><b>${out}/${foes.length}</b><span>${L('elenen düşman', 'enemies eliminated')}</span></div>
         <div><b>${ok} / ${fail}</b><span>${L('başarılı / başarısız görev', 'missions won / lost')}</span></div>
         <div><b>${me.research.done.size}</b><span>${L('araştırma', 'research')}</span></div>

@@ -16,7 +16,7 @@ import { dayHour, sunAt } from '../render/atmosphere';
 import { onSettingsChange, settings, type InfoField } from './settings';
 import { fullscreenSupported, toggleFullscreen } from './fullscreen';
 import { sound } from '../audio/sound';
-import { $, bar, esc, fmtTime, hpColor, nf, pct } from './dom';
+import { $, bar, esc, fmtStamp, fmtTime, hpColor, nf, pct } from './dom';
 import { L, lower } from '../i18n';
 
 export function skillName(skill: number): string {
@@ -63,6 +63,7 @@ export class Hud {
       else if (what === 'fullscreen') toggleFullscreen();
       else if (what === 'sound') sound.toggleMute();
       else if (what === 'build') game.build.toggle();
+      else if (what === 'production') game.modals.toggleFactory();
       else if (what === 'pause') game.pause.open();
       else game.modals.open(what as 'scenarios' | 'research' | 'settings' | 'market');
     });
@@ -138,7 +139,7 @@ export class Hud {
 
   update(): void {
     const g = this.game;
-    this.clock.textContent = fmtTime(g.world.time);
+    this.clock.textContent = fmtTime(g.world.playTime);
     // Günün saati: güneş ufkun üstündeyse güneş, değilse ay
     this.dayclock.classList.toggle('hidden', !settings.graphics.dayCycle);
     if (settings.graphics.dayCycle) {
@@ -188,7 +189,7 @@ export class Hud {
   private renderResearch(): void {
     const r = this.game.world.teams[this.game.playerTeam]?.research;
     if (!r) return;
-    const line = (k: 'tech' | 'vehicle', label: string) => {
+    const line = (k: 'tech' | 'vehicle' | 'defense', label: string) => {
       const c = r.slots[k].current;
       const wt = r.waiting[k];
       if (!c && wt) return `<div class="rc-line" title="${L('Sıradaki araştırmanın parası birikince başlar', 'The next project starts once its cost is saved up')}"><span class="muted-ink">${label}</span><span class="warn-ink">${L('para bekleniyor', 'awaiting funds')} · ${esc(techName(TECH_BY_ID[wt]))}</span></div>`;
@@ -202,7 +203,7 @@ export class Hud {
     const crew = w.personnelEnabled
       ? `<div class="rc-line" title="${L('Evler personel barındırır (1 ev = 4 kişi). Uçaklar mürettebatı kadar kişiyle kalkar.', 'Houses hold personnel (1 house = 4 people). An aircraft takes off only with its full crew.')}"><span class="muted-ink">${L('Personel', 'Personnel')}</span><span class="${w.crewFree(this.game.playerTeam) <= 0 ? 'bad' : ''}">${w.crewFree(this.game.playerTeam)} ${L('boşta', 'free')} · ${p.people}/${p.capacity}</span></div>`
       : '';
-    this.researchChip.innerHTML = `${line('tech', L('Teknoloji', 'Technology'))}${line('vehicle', L('Araç', 'Aircraft'))}
+    this.researchChip.innerHTML = `${line('tech', L('Teknoloji', 'Technology'))}${line('vehicle', L('Araç', 'Aircraft'))}${line('defense', L('Savunma', 'Defence'))}
       <div class="rc-line"><span class="muted-ink">${L('Savaş puanı', 'War points')}</span><span class="${r.boosting ? 'rc-boost' : ''}">${nf.format(r.points)}${r.boosting ? ' · ×2' : ''}</span></div>${crew}`;
   }
 
@@ -329,7 +330,7 @@ export class Hud {
       const cls = r.outcome === 'success' ? 'ok' : r.outcome === 'fail' ? 'bad' : 'none';
       const icon = r.outcome === 'success' ? '✓' : r.outcome === 'fail' ? '✗' : '–';
       return `<div class="mrep ${cls}"><span class="mrep-i">${icon}</span><div><div class="mrep-t"><b>${esc(r.flight)}</b> ${MISSION_NAMES[r.type]}${r.reward > 0 ? ` <b class="pos">+${fmtMoney(r.reward)}</b>` : ''}</div>
-        <small>${esc(r.reason)} · ${esc(r.aircraft)} · ${fmtTime(r.time)}</small></div></div>`;
+        <small>${esc(r.reason)} · ${esc(r.aircraft)} · ${fmtStamp(r)}</small></div></div>`;
     }).join('')}` : '';
     if (!flights.length) {
       this.missions.innerHTML = `<p class="muted small">${L('Havada görev yok. Bir hava üssünü seçip görev planla', 'No missions in the air. Select an airbase and plan one')}<span class="kbd"> (P)</span>.</p>` + done;
@@ -377,7 +378,7 @@ export class Hud {
     this.lastLogKey = key;
     const rows = logs.slice(-40).reverse();
     this.log.innerHTML = rows
-      .map((l) => `<div class="log-row ${l.team !== null ? `b${l.team}` : ''} c-${l.cat}"><span class="t">${fmtTime(l.time)}</span>${esc(l.text)}</div>`)
+      .map((l) => `<div class="log-row ${l.team !== null ? `b${l.team}` : ''} c-${l.cat}"><span class="t">${fmtStamp(l)}</span>${esc(l.text)}</div>`)
       .join('');
   }
 

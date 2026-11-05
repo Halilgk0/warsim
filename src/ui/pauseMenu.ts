@@ -174,7 +174,7 @@ export class PauseMenu {
           </div>`
         : `<div class="pm-guest"><span>${L('Misafir oyun kaydedilmez.', 'Guest games are not saved.')}</span><button data-pm="login">${L('Giriş yap ve kaydet', 'Log in and save')}</button></div>`;
       body = `<h2>${L('Duraklatıldı', 'Paused')}</h2>
-        <p class="muted small">${who} · ${esc(mapById(w.mapId).name)} ${w.mapSize / 1000} km · ${L('oyun süresi', 'game time')} ${fmtTime(w.time)}${foes > 0 ? ` · ${foes} ${L('düşman', foes === 1 ? 'enemy' : 'enemies')}` : ''}${acc ? ` · ${L('hesap', 'account')} ${esc(acc.name)}` : ''}</p>
+        <p class="muted small">${who} · ${esc(mapById(w.mapId).name)} ${w.mapSize / 1000} km · ${L('oyun süresi', 'game time')} ${fmtTime(w.playTime)}${foes > 0 ? ` · ${foes} ${L('düşman', foes === 1 ? 'enemy' : 'enemies')}` : ''}${acc ? ` · ${L('hesap', 'account')} ${esc(acc.name)}` : ''}</p>
         ${this.msg ? `<div class="mm-note">${esc(this.msg)}</div>` : ''}
         <div class="pm-col">
           <button class="primary big" data-pm="resume">${L('Devam et', 'Resume')} <small class="kbd">Esc</small></button>

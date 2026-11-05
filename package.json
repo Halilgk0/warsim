@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit && tsc -p worker --noEmit",
     "sim:bench": "esbuild tools/sim/bench.ts --bundle --platform=node --format=esm --outfile=tools/sim/.out/bench.mjs --log-level=error && node tools/sim/.out/bench.mjs",
     "sim:hits": "esbuild tools/sim/hitkill.ts --bundle --platform=node --format=esm --outfile=tools/sim/.out/hitkill.mjs --log-level=error && node tools/sim/.out/hitkill.mjs",
+    "sim:flak": "esbuild tools/sim/flak.ts --bundle --platform=node --format=esm --outfile=tools/sim/.out/flak.mjs --log-level=error && node tools/sim/.out/flak.mjs",
     "sim:ceiling": "esbuild tools/sim/tavan.ts --bundle --platform=node --format=esm --outfile=tools/sim/.out/tavan.mjs --log-level=error && node tools/sim/.out/tavan.mjs",
+    "uretim:gorsel": "node tools/uretim/gorseller.mjs",
     "db:local": "wrangler d1 migrations apply warsimbox --local",
     "serve": "wrangler dev",
     "deploy": "npm run build && wrangler d1 migrations apply warsimbox --remote && wrangler deploy"

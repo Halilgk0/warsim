@@ -1,4 +1,6 @@
 import { Vector3 } from 'three';
+import { QUEUE_MAX } from './structures/factory';
+import { AA_WEAPONS, type AAWeaponId } from './structures/airDefense';
 import { Aircraft, type AircraftOptions } from './aircraft/aircraft';
 import { CONVERGENCE, SPECS, SPEC_LIST, type AircraftSpec, type Caliber, type GunSpec, type Loadout } from './aircraft/specs';
 import { hitBoxOf, segmentHitsAircraft, type HitZone } from './aircraft/hitbox';
@@ -80,6 +82,8 @@ export interface Team {
   eliminated: boolean;
   /** Deftere yazılmamış onarım gideri. */
   repairAcc: number;
+  /** Üretilmiş, bataryaya takılmamış uçaksavar topları. */
+  gunStock: Partial<Record<AAWeaponId, number>>;
   /** Hava üssü kalmadıysa elenmeye kadar kalan süre (s); null = üssü var. */
   lastStand: number | null;
   /** Gelir ölçümü: bu saniyenin geliri, son 60 saniyelik kovalar ve deftere yazılmamış maden geliri. */
@@ -119,6 +123,8 @@ export interface Bullet {
   caliber: Caliber;
   /** > 0: ömrü bitince patlar (kendini imha) — parçacık yarıçapı. */
   burstRadius: number;
+  /** Yavaşlama sabiti k (1/m), uçaksavar mermisi; yoksa yavaşlamaz. */
+  drag?: number;
   /** Yakınlık tapası: hedefin yanından geçerken patlar. */
   proximity: boolean;
   tracer: boolean;
@@ -188,6 +194,8 @@ export type SimEvent =
 
 export interface LogEntry {
   time: number;
+  /** Ekranda gösterilen an: gerçek oynanma süresi. Eski kayıtlarda yok. */
+  played?: number;
   text: string;
   team: number | null;
   cat: LogCategory;
@@ -248,6 +256,8 @@ export class World {
   }
 
   time = 0;
+  /** Oyunun gerçek oynanma süresi (sn). Hızlandırmadan etkilenmez, duraklatınca durur; simülasyon adımı dokunmaz, Game sayar. */
+  playTime = 0;
   readonly teams: Team[] = [];
   readonly aircraft: Aircraft[] = [];
   readonly flights: FlightGroup[] = [];
@@ -295,7 +305,7 @@ export class World {
       id: this.teams.length, name, color, research: new Research(initialTech), intel: new TeamIntel(), flightCounter: 0, ai,
       personnel: { people: 0, reserved: 0, capacity: 0, recruit: 0 },
       money: 0, ledger: [], earned: 0, spent: 0, reserve: 0, eliminated: false, repairAcc: 0, lastStand: null, incomeAcc: 0, incomeHist: [], mineAcc: 0,
-      kills: 0, peakFleet: 0,
+      kills: 0, peakFleet: 0, gunStock: {},
     };
     this.teams.push(t);
     // Araştırma başlarken ödenir; iptalde kısmi iade
@@ -343,7 +353,7 @@ export class World {
   }
 
   private record(t: Team, amount: number, reason: string): void {
-    t.ledger.push({ time: this.time, amount, reason });
+    t.ledger.push({ time: this.time, played: this.playTime, amount, reason });
     if (t.ledger.length > 60) t.ledger.shift();
   }
 
@@ -417,7 +427,10 @@ export class World {
     for (const s of this.structures) {
       if (s.team !== t.id || s.destroyed) continue;
       s.hp = 0;
-      if (s.factory) s.factory.queue.length = 0;
+      if (s.factory) {
+        s.factory.queue.length = 0;
+        s.factory.gunQueue.length = 0;
+      }
     }
     let interned = 0;
     for (const ac of this.aircraft) {
@@ -461,10 +474,45 @@ export class World {
   orderAircraft(s: Structure, specId: string): boolean {
     const f = s.factory;
     const spec = SPECS[specId];
-    if (!f || !spec || f.queue.length >= 8) return false;
+    if (!f || !spec || f.queue.length >= QUEUE_MAX) return false;
     const price = aircraftPrice(spec);
     if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${spec.abbr}`)) return false;
     f.enqueue(specId, this.economyEnabled ? price : 0);
+    return true;
+  }
+
+  /** Fabrikaya top siparişi: fiyatı peşin ödenir, top ayrı bantta üretilip depoya girer. */
+  orderGun(s: Structure, gun: AAWeaponId): boolean {
+    const f = s.factory;
+    if (!f || f.gunQueue.length >= QUEUE_MAX || !this.teams[s.team].research.has(AA_WEAPONS[gun].requires ?? undefined)) return false;
+    const price = AA_WEAPONS[gun].cost;
+    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${AA_WEAPONS[gun].name}`)) return false;
+    f.gunQueue.push({ gun, progress: 0, paid: this.economyEnabled ? price : 0 });
+    return true;
+  }
+
+  /** Bu topun en son siparişini iptal et; kalan kısmı iade edilir. */
+  cancelGun(s: Structure, gun: AAWeaponId): void {
+    const f = s.factory;
+    if (!f) return;
+    for (let i = f.gunQueue.length - 1; i >= 0; i--) {
+      if (f.gunQueue[i].gun !== gun) continue;
+      const it = f.gunQueue[i];
+      f.gunQueue.splice(i, 1);
+      if (it.paid > 0) this.earn(s.team, Math.round(it.paid * (1 - it.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${AA_WEAPONS[gun].name}`);
+      return;
+    }
+  }
+
+  /** Depodaki topu bataryanın yuvasına tak; çıkan top depoya döner. */
+  installGun(s: Structure, slot: number, gun: AAWeaponId): boolean {
+    const aa = s.aa;
+    const stock = this.teams[s.team].gunStock;
+    if (!aa || !s.active || (stock[gun] ?? 0) <= 0 || slot < 0 || slot >= aa.maxMounts || slot > aa.mounts.length) return false;
+    if (aa.mounts[slot]?.weapon === gun) return false;
+    stock[gun] = (stock[gun] ?? 0) - 1;
+    const old = aa.placeGun(slot, gun);
+    if (old) stock[old] = (stock[old] ?? 0) + 1;
     return true;
   }
 
@@ -624,7 +672,7 @@ export class World {
     const types = [...new Set(fl.members.map((m) => m.spec.abbr))].join(', ');
     this.missionReports.push({
       id: (this.missionReports[this.missionReports.length - 1]?.id ?? 0) + 1, team: fl.team, flight: fl.name, type: fl.plan.type, outcome: r.outcome, reason: r.reason,
-      reward: this.economyEnabled ? r.reward : 0, time: this.time, aircraft: `${fl.expected} × ${types}`,
+      reward: this.economyEnabled ? r.reward : 0, time: this.time, played: this.playTime, aircraft: `${fl.expected} × ${types}`,
     });
     if (this.missionReports.length > 60) this.missionReports.shift();
   }
@@ -719,7 +767,7 @@ export class World {
   // ------------------------------------------------------------------ günlük
 
   log(text: string, team: number | null = null, cat: LogCategory = 'info'): void {
-    this.logs.push({ time: this.time, text, team, cat });
+    this.logs.push({ time: this.time, played: this.playTime, text, team, cat });
     if (this.logs.length > 300) this.logs.shift();
   }
 
@@ -1797,6 +1845,7 @@ export class World {
       const b = list[i];
       b.prev.copy(b.pos);
       b.vel.y -= G * dt;
+      if (b.drag) b.vel.multiplyScalar(1 / (1 + b.drag * b.vel.length() * dt));
       b.pos.addScaledVector(b.vel, dt);
       b.life -= dt;
       let alive = true;
@@ -1938,6 +1987,8 @@ export class World {
     s.lastHit = this.time;
     // Kamuflaj ve sahte mevziler: uçaksavar bataryaları daha az isabet alır
     if (s.aa && this.teams[s.team]?.research.has('hd_camo')) dmg *= 0.75;
+    // Mevzi tahkimatı: seviye 3 ve 4 başına hasar −%15
+    if (s.aa && s.aa.level > 2) dmg *= 1 - 0.15 * (s.aa.level - 2);
     const before = s.hp;
     s.hp = Math.max(0, s.hp - dmg);
     // Görev sonucu: saldıran kolun hanesine; savunan tarafın bu bölgedeki devriyesinin hanesine
@@ -1958,7 +2009,10 @@ export class World {
       this.events.push({ kind: 'structureDestroyed', id: s.id });
       s.repairing = false;
       this.log(L(`${source}: ${s.name} imha edildi!`, `${source}: ${s.name} destroyed!`), team, 'strike');
-      if (s.factory) s.factory.queue.length = 0;
+      if (s.factory) {
+        s.factory.queue.length = 0;
+        s.factory.gunQueue.length = 0;
+      }
       return;
     }
     const last = this.hitLogTimes.get(s.id) ?? -1e9;

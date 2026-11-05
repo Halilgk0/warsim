@@ -4,19 +4,20 @@
 import type { Game } from '../game';
 import type { Structure } from '../sim/structures/structure';
 import { STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
-import { AA_WEAPONS, AA_WEAPON_ORDER, AA_SENSORS, type AASensorId, type UpgradeOption } from '../sim/structures/airDefense';
+import { AA_WEAPONS, AA_SENSORS, type AASensorId, type AAWeaponId, type UpgradeOption } from '../sim/structures/airDefense';
 import { BASE_UPGRADES, type BaseUpgrade } from '../sim/structures/airbase';
 import { RADAR_LEVELS } from '../sim/structures/radar';
-import { ROLE_NAMES, SPECS, SPEC_LIST, type Role } from '../sim/aircraft/specs';
-import { TECH_BY_ID, aircraftNode, type Research } from '../sim/tech';
+import { SPECS } from '../sim/aircraft/specs';
+import { TECH_BY_ID, type Research } from '../sim/tech';
 import { PALETTE } from '../render/palette';
 import { aircraftThumb } from '../render/thumbs';
-import { BASE_UPGRADE_COST, STRUCTURE_COST, aircraftPrice, fmtMoney, richnessName, richnessTier } from '../sim/economy';
+import { BASE_UPGRADE_COST, STRUCTURE_COST, fmtMoney, richnessName, richnessTier } from '../sim/economy';
 import { skillName } from './hud';
 import { settings, saveSettings } from './settings';
 import { $, bar, esc, fmtDur, hpColor, nf, pct } from './dom';
-import { L, count, lower } from '../i18n';
+import { L, LOCALE, count, lower } from '../i18n';
 
+const nf1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 const KIND_ICON: Record<string, string> = STRUCT_GLYPH;
 const SENSOR_ORDER: AASensorId[] = ['rangefinder', 'predictor', 'gunRadar', 'proximity'];
 
@@ -299,17 +300,8 @@ export class LeftPanel {
     const aa = s.aa!;
     const w = this.game.world;
     const research = w.teams[s.team].research;
-    const mounts = aa.mounts.map((m, i) => {
-      const wd = AA_WEAPONS[m.weapon];
-      const tgt = m.targetId !== null ? w.aircraftById(m.targetId) : undefined;
-      const st = tgt ? (m.acquire > 0 ? `${L('hedef alıyor', 'acquiring')}: ${tgt.callsign}` : `<b>${L('ateş', 'firing')}: ${tgt.callsign}</b>`) : L('boşta', 'idle');
-      return `<div class="mount"><span class="slot">${i + 1}</span><span><b>${wd.short}</b> <span class="muted small">${wd.name}</span><br><small>${Math.round(wd.range / 100) / 10} km · ${L('tavan', 'ceiling')} ${nf.format(wd.ceiling)} m · ${st}</small></span></div>`;
-    }).join('');
-    const empty = aa.maxMounts - aa.mounts.length;
-    const job = aa.job ? `<div class="job"><b>${esc(aa.job.label)}</b> — ${L(`${fmtDur(aa.job.left)} kaldı`, `${fmtDur(aa.job.left)} left`)} ${bar((1 - aa.job.left / aa.job.total) * 100, 'var(--warn)')}</div>` : '';
     const opts = aa.options(research);
     const byKey = new Map(opts.map((o) => [o.key, o]));
-    const resBtn = (id: string | null) => this.researchButton(research, id);
     const econ = w.economyEnabled;
     const act = (o: UpgradeOption | undefined, label: string) => {
       if (!o) return '';
@@ -317,44 +309,48 @@ export class LeftPanel {
       const why = !o.enabled ? o.reason ?? o.detail : ok ? o.detail : `${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(o.cost)})`;
       return `<button class="mini ${ok ? 'primary' : ''}" data-act="aa-up" data-key="${o.key}" ${ok ? '' : 'disabled'} title="${esc(why)}">${label} · ${econ && o.cost > 0 ? `${fmtMoney(o.cost)} · ` : ''}${fmtDur(o.time)}</button>`;
     };
-    const weaponRows = AA_WEAPON_ORDER.map((id) => {
-      const wd = AA_WEAPONS[id];
-      const unlocked = research.has(wd.requires ?? undefined);
-      const n = aa.mounts.filter((m) => m.weapon === id).length;
-      const rep = opts.find((o) => o.key.startsWith('rep:') && o.key.endsWith(`:${id}`));
-      return `<div class="aarow ${unlocked ? 'ok' : ''}"><span><b>${wd.short}</b> <small>${esc(wd.name)} · ${wd.range / 1000} km</small>${n ? `<small class="inst">${L(`bu bataryada ${n} adet`, `${n} at this battery`)}</small>` : ''}</span>
-        <span class="aact">${unlocked ? `${act(byKey.get(`add:${id}`), L('Ekle', 'Add'))}${act(rep, L('Yükselt', 'Upgrade'))}` : resBtn(wd.requires)}</span></div>`;
-    }).join('');
-    const sensorRows = SENSOR_ORDER.map((id) => {
+    // Silah yuvaları: dokununca seçim penceresi açılır
+    let pits = '';
+    for (let i = 0; i < aa.maxMounts; i++) {
+      const m = aa.mounts[i];
+      if (!m) {
+        pits += `<button class="gun-pit empty" data-act="pit" data-i="${i}"><span class="slot">${i + 1}</span><span class="pit-t"><b>${L('Boş yuva', 'Empty pit')}</b><small>${L('Top takmak için dokun', 'Tap to fit a gun')}</small></span><span class="pit-go">›</span></button>`;
+        continue;
+      }
+      const wd = AA_WEAPONS[m.weapon];
+      const tgt = m.targetId !== null ? w.aircraftById(m.targetId) : undefined;
+      const st = m.install > 0
+        ? L(`takılıyor, ${fmtDur(m.install)}`, `fitting, ${fmtDur(m.install)}`)
+        : tgt ? (m.acquire > 0 ? `${L('hedef alıyor', 'acquiring')}: ${tgt.callsign}` : `${L('ateş', 'firing')}: ${tgt.callsign}`) : L('boşta', 'idle');
+      pits += `<button class="gun-pit" data-act="pit" data-i="${i}"><span class="slot">${i + 1}</span><span class="pit-t"><b>${esc(wd.name)}</b><small>${nf1.format(wd.range / 1000)} km · ${L('tavan', 'ceiling')} ${nf1.format(wd.ceiling / 1000)} km · ${esc(st)}</small>${m.install > 0 ? bar((1 - m.install / Math.max(m.installTotal, 1)) * 100, 'var(--warn)', true) : ''}</span><span class="pit-go">›</span></button>`;
+    }
+    const job = aa.job ? `<div class="job"><b>${esc(aa.job.label)}</b> — ${L(`${fmtDur(aa.job.left)} kaldı`, `${fmtDur(aa.job.left)} left`)} ${bar((1 - aa.job.left / aa.job.total) * 100, 'var(--warn)')}</div>` : '';
+    // Yuva ekleme yalnız araştırma açıksa, araştırılmamışsa ağaca yönlendirilir; aletler ve tahkimat yalnız kurulabilir olduklarında görünür
+    const grow = aa.level === 1 && !research.has('hd_fort1')
+      ? `<div class="aarow"><span><b>${L('Yuva sayısını 4 yap', 'Raise to 4 gun pits')}</b><small>${esc(TECH_BY_ID.hd_fort1.name)} ${L('gerekli', 'required')}</small></span><span class="aact">${this.researchButton(research, 'hd_fort1')}</span></div>`
+      : '';
+    const lvlOpt = byKey.get('lvl');
+    const lvlRow = lvlOpt && (aa.level === 1 || research.has(aa.level === 2 ? 'hd_fort2' : 'hd_fort3'))
+      ? `<div class="aarow ok"><span><b>${esc(lvlOpt.label)}</b><small>${esc(lvlOpt.detail)}</small></span><span class="aact">${act(lvlOpt, aa.level === 1 ? L('Genişlet', 'Expand') : L('Tahkim et', 'Fortify'))}</span></div>`
+      : '';
+    const sensors = SENSOR_ORDER.filter((id) => aa.sensors.has(id) || research.has(AA_SENSORS[id].requires)).map((id) => {
       const sd = AA_SENSORS[id];
-      const unlocked = research.has(sd.requires);
       const has = aa.sensors.has(id);
-      return `<div class="aarow ${unlocked ? 'ok' : ''}"><span><b>${has ? '✓ ' : ''}${esc(sd.name)}</b><small>${esc(sd.desc)}</small></span>
-        <span class="aact">${has ? `<small class="inst">${L('kurulu', 'installed')}</small>` : unlocked ? act(byKey.get(`sen:${id}`), L('Kur', 'Install')) : resBtn(sd.requires)}</span></div>`;
+      return `<div class="aarow ok"><span><b>${has ? '✓ ' : ''}${esc(sd.name)}</b><small>${esc(sd.desc)}</small></span><span class="aact">${has ? `<small class="inst">${L('kurulu', 'installed')}</small>` : act(byKey.get(`sen:${id}`), L('Kur', 'Install'))}</span></div>`;
     }).join('');
-    const lvlRows = [2, 3, 4].map((lv) => {
-      const req = lv === 2 ? 'hd_fort1' : lv === 3 ? 'hd_fort2' : 'hd_fort3';
-      const unlocked = research.has(req);
-      const done = aa.level >= lv;
-      const what = lv === 2 ? L('beton çukurlar', 'concrete pits') : lv === 3 ? L('derin çukur ve cephane nişleri', 'deep pits and ammunition niches') : L('dış halkada iki ağır top kaidesi (toplam 8)', 'two heavy gun mounts on the outer ring (8 in all)');
-      return `<div class="aarow ${unlocked ? 'ok' : ''}"><span><b>${done ? '✓ ' : ''}${L('Seviye', 'Level')} ${lv}</b><small>${L('+2 silah yuvası', '+2 gun slots')}, ${what}</small></span>
-        <span class="aact">${done ? `<small class="inst">${L('tamam', 'done')}</small>` : unlocked ? (aa.level === lv - 1 ? act(byKey.get('lvl'), L('Yükselt', 'Upgrade')) : `<small>${L(`önce seviye ${lv - 1}`, `level ${lv - 1} first`)}</small>`) : resBtn(req)}</span></div>`;
-    }).join('');
+    const extra = `${grow}${lvlRow}${sensors}`;
     return `
       ${this.head(s)}
       <div class="kv">
-        <span>${L('Seviye', 'Level')}</span><span>${aa.level} · ${L('yuva', 'slots')} ${aa.mounts.length}/${aa.maxMounts}</span>
+        <span>${L('Tahkimat', 'Fortification')}</span><span>${L(`seviye ${aa.level}`, `level ${aa.level}`)}</span>
         <span>${L('Mürettebat', 'Crew')}</span><span>${aa.crew > 1.1 ? L('deneyimli', 'veteran') : aa.crew > 0.95 ? L('eğitimli', 'trained') : L('yeni', 'green')}</span>
         <span>${L('Atılan', 'Rounds fired')}</span><span>${nf.format(aa.shotsFired)}</span>
       </div>
-      <h3>${L('Silah çukurları', 'Gun pits')}</h3>${mounts}${empty > 0 ? `<p class="muted small">${L(`${empty} boş çukur`, `${count(empty, 'empty pit')}`)}</p>` : ''}
+      <h3>${L('Silah yuvaları', 'Gun pits')}</h3>
+      <div class="pits">${pits}</div>
       ${job}
-      <h3>${L('Bataryanın ağacı', 'Battery tree')}</h3>
-      <p class="muted small">${L('Araştırma yeni silahı yalnız kullanılabilir yapar; bu bataryaya ayrıca kurulur. Aynı anda bir iş.', 'Research only makes a new gun available; it is then installed at this battery. One job at a time.')}
-        <button class="link" data-act="research-hd">${L('Tüm hava savunma ağacı ›', 'Full air defence tree ›')}</button></p>
-      <div class="aatree"><div class="aagroup"><div class="mcat">${L('Silahlar', 'Guns')}</div>${weaponRows}</div>
-        <div class="aagroup"><div class="mcat">${L('Nişan ve atış kontrolü', 'Sighting and fire control')}</div>${sensorRows}</div>
-        <div class="aagroup"><div class="mcat">${L('Tahkimat', 'Fortification')}</div>${lvlRows}</div></div>`;
+      ${extra ? `<h3>${L('Mevzi', 'Position')}</h3><div class="aatree">${extra}</div>` : ''}
+      <p class="muted small"><button class="link" data-act="research-hd">${L('Hava savunma araştırması ›', 'Air defence research ›')}</button></p>`;
   }
 
   /** Henüz araştırılmamış düğüm için: durum ya da "araştır" düğmesi. */
@@ -362,7 +358,7 @@ export class LeftPanel {
     if (!id) return '';
     const t = TECH_BY_ID[id];
     if (!t) return '';
-    if (r.isActive(id)) return `<small class="inst">${L('araştırılıyor', 'researching')} ${pct(r.slots.tech.current?.progress ?? 0)}</small>`;
+    if (r.isActive(id)) return `<small class="inst">${L('araştırılıyor', 'researching')} ${pct(r.slots[r.slotOf(t)].current?.progress ?? 0)}</small>`;
     if (r.isQueued(id)) return `<small class="inst">${L('sırada', 'queued')}</small>`;
     return `<button class="mini" data-act="enqueue" data-id="${id}" title="${esc(t.desc)}">${L('Araştır', 'Research')} · ${fmtDur(t.time)}</button>`;
   }
@@ -400,38 +396,21 @@ export class LeftPanel {
   private factory(s: Structure): string {
     const f = s.factory!;
     const w = this.game.world;
-    const research = w.teams[s.team].research;
-    const econ = w.economyEnabled;
-    const q = f.queue.map((it, i) =>
-      `<div class="qrow"><span>${i + 1}. <b>${esc(SPECS[it.specId].name)}</b>${econ && it.paid > 0 ? ` <small class="muted-ink">${fmtMoney(it.paid)}</small>` : ''}</span>
-        <button class="mini icon-x" data-act="fac-del" data-i="${i}" title="${L('Siparişi iptal et', 'Cancel order')}${econ ? L(' (ödenen paranın kalan kısmı iade edilir)', ' (the unspent part is refunded)') : ''}">✕</button>
-        ${i === 0 ? bar(it.progress * 100, 'var(--accent)', true) : ''}</div>`,
-    ).join('') || `<p class="muted">${L('Kuyruk boş.', 'The queue is empty.')}</p>`;
-    const roles: Role[] = ['fighter', 'attacker', 'diveBomber', 'bomber'];
-    const groups = roles.map((role) => {
-      const open = SPEC_LIST.filter((sp) => sp.role === role && sp.playable && research.hasAircraft(sp.id));
-      if (!open.length) return '';
-      return `<div class="mcat">${ROLE_NAMES[role]}</div>${open.map((sp) => {
-        const price = aircraftPrice(sp);
-        const ok = f.queue.length < 8 && this.afford(price);
-        return `<button class="prow" data-act="fac-add" data-spec="${sp.id}" ${ok ? '' : 'disabled'}>
-        <img src="${aircraftThumb(sp.id)}" alt=""><span><b>${esc(sp.name)}</b><small>${nf.format(sp.vMax * 3.6)} km/${L('sa', 'h')} · ${fmtDur(sp.buildTime)}${econ ? ` · ${this.cost(price)}` : ''}</small></span><b class="plus">+</b></button>`;
-      }).join('')}`;
-    }).join('');
-    const locked = SPEC_LIST.filter((sp) => sp.playable && !research.hasAircraft(sp.id) && aircraftNode(sp.id));
     const own = s.attachedTo !== null ? w.airbaseById(s.attachedTo) : undefined;
     const target = own && own.s.active && own.freeSlots > 0 ? own : w.nearestAirbase(s.team, s.pos, (b) => b.s.active && b.freeSlots > 0);
+    const line = (label: string, name: string | null, progress: number, n: number) => `<div class="qrow"><span>${label}: ${name ? `<b>${esc(name)}</b>${n > 1 ? ` <small class="muted-ink">+${n - 1}</small>` : ''}` : `<span class="muted">${L('boş', 'idle')}</span>`}</span>${name ? bar(progress * 100, 'var(--accent)', true) : ''}</div>`;
+    const stock = Object.values(w.teams[s.team].gunStock).reduce((a, b) => a + (b ?? 0), 0);
     return `
       ${this.head(s)}
       <div class="kv">
         <span>${L('Üretim hızı', 'Production rate')}</span><span>${pct(0.4 + 0.6 * (s.hp / s.maxHp))}</span>
-        <span>${L('Teslim', 'Delivers to')}</span><span>${target ? esc(target.s.name) : `<b class="bad">${L('boş hangar yok', 'no free hangar')}</b>`}</span>
+        <span>${L('Uçak teslimi', 'Aircraft go to')}</span><span>${target ? esc(target.s.name) : `<b class="bad">${L('boş hangar yok', 'no free hangar')}</b>`}</span>
+        <span>${L('Depodaki top', 'Guns in stock')}</span><span>${nf.format(stock)}</span>
       </div>
-      <h3>${L('Üretim sırası', 'Production queue')}</h3>${q}
-      <label class="check"><input type="checkbox" data-act="fac-repeat" ${f.repeat ? 'checked' : ''}> ${L('Bitince tekrarla', 'Repeat when done')}${econ ? ` <span class="muted small">${L('(her tekrar yeniden ödenir)', '(each repeat is paid again)')}</span>` : ''}</label>
-      ${f.queue.length ? `<button class="wide" data-act="fac-clear">${L('Kuyruğu temizle', 'Clear queue')}${econ ? L(' (iade)', ' (refund)') : ''}</button>` : ''}
-      <h3>${L('Üret', 'Build')}</h3><div class="plist">${groups}</div>
-      ${locked.length ? `<p class="muted small">${L(`Araç ağacında açılacak ${locked.length} uçak daha var.`, `${locked.length} more aircraft to unlock in the aircraft tree.`)} <button class="link" data-act="research">${L('Araç ağacı ›', 'Aircraft tree ›')}</button></p>` : ''}`;
+      <button class="primary wide" data-act="fac-open">${L('Üretim menüsü', 'Production menu')}</button>
+      <h3>${L('Bantlar', 'Production lines')}</h3>
+      ${line(L('Uçak', 'Aircraft'), f.queue[0] ? SPECS[f.queue[0].specId].name : null, f.queue[0]?.progress ?? 0, f.queue.length)}
+      ${line(L('Top', 'Gun'), f.gunQueue[0] ? AA_WEAPONS[f.gunQueue[0].gun].name : null, f.gunQueue[0]?.progress ?? 0, f.gunQueue.length)}`;
   }
 
   // ------------------------------------------------------------------ düşman yapısı
@@ -495,6 +474,15 @@ export class LeftPanel {
       }
       case 'aa-up':
         if (s?.aa) g.world.startAAJob(s, b.dataset.key!);
+        break;
+      case 'aa-info':
+        g.hangar.openGun(b.dataset.w as AAWeaponId);
+        break;
+      case 'pit':
+        if (s?.aa) g.modals.openPit(s.id, Number(b.dataset.i));
+        break;
+      case 'fac-open':
+        if (s?.factory) g.modals.openFactory(s.id);
         break;
       case 'repair':
         if (s) g.world.setRepair(s, true);

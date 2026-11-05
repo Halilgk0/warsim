@@ -32,6 +32,109 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'hava-savunmasi',
+    date: '2026-11-05',
+    title: 'Hava savunması yenilendi: gerçek toplar ve yeni araştırma hattı',
+    summary: 'Uçaksavarlar artık gerçek sistemler: M2’den 12,8 cm Flak 40’a 10 top, kendi araştırma hattı, fabrikada üretim, bataryada silah yuvaları ve hangarda kendi vitrini.',
+    cover: img('hava.jpg'),
+    images: [
+      { src: img('hava-yuva.jpg'), caption: 'Silah yuvası: o an takılı top ve depodaki toplar.' },
+      { src: img('hava-pano.jpg'), caption: 'Araştırmada hava savunma panosu: hafif, orta ve ağır toplar, atış kontrol, tahkimat ve ihbar.' },
+      { src: img('hava-hangar.jpg'), caption: 'Hangarda hava savunma: top döner, gerçek ritmiyle ateş eder; menzil ve tavan grafiği yanında.' },
+    ],
+    sections: [
+      {
+        heading: 'Gerçek toplar',
+        bullets: [
+          'Bataryalarda 10 gerçek sistem var: M2 Browning, 2 cm Flak 38, Oerlikon 20 mm, 2 cm Flakvierling 38, 3,7 cm Flak 36, Bofors 40 mm L/60, 8,8 cm Flak 36, 90 mm M1, 8,8 cm Flak 41 ve 12,8 cm Flak 40.',
+          'Oerlikon, 90 mm M1 ve Flak 41 yeni. Eski topların modelleri de fotoğraflara bakılarak yenilendi.',
+          'Mermi artık havada yavaşlar; şarjör, tarak ve pratik atış hızı gerçek verilerden gelir. 8,8 cm’nin mermisi 8 km’ye yaklaşık 20 saniyede çıkar, bu yüzden rota değiştiren uçağı kaçırabilir.',
+        ],
+      },
+      {
+        heading: 'Yeni batarya sistemi',
+        bullets: [
+          'Yeni batarya 2 silah yuvası ve 12,7 mm M2 ile başlar.',
+          'Topu araştır, fabrikada istediğin kadar üret; biten top depoya girer.',
+          'Bataryaya dokun, yuvayı seç, depodaki topu tak. Çıkan top depoya döner; takılırken o yuva ateş edemez.',
+          'Yükseltmeyle yuva sayısı 4’e çıkar. Topları istediğin gibi karıştırabilirsin.',
+          'Tahkimat II ve III artık yuva eklemez, bomba ve roket hasarını %15 ve %30 azaltır.',
+        ],
+      },
+      {
+        heading: 'Araştırma ve hangar',
+        bullets: [
+          'Hava savunma artık ayrı, üçüncü bir hat: uçak programları ve mühendislikle aynı anda ilerler. Radarlar da bu panoda.',
+          'Hangar’da yeni bir Hava savunma bölümü var: top döner, namlusunu kaldırır, gerçek ritmiyle ateş eder. Kalibre, mermi, menzil ve tavan bilgileri orada.',
+        ],
+      },
+      {
+        heading: 'Rakipler',
+        bullets: [
+          'Botlar da bataryalarına daha iyi toplar kurar.',
+          'Baskına her seferinde aynı avcılarla ve aynı sayıda karşılık vermezler; bazen hazırlıksız yakalanırlar.',
+        ],
+      },
+      {
+        heading: 'Eski kayıtlar',
+        bullets: [
+          'Kayıtlardaki toplar ve fazla yuvalar korunur. Yarım kalan hava savunma araştırmaları yeni hatta geçer.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'uretim-celik',
+    date: '2026-11-05',
+    title: 'Üretim menüsü, çelik görünüm ve gerçek zamanlı sayaç',
+    summary: 'Bütün uçaklar ve toplar tek üretim listesinde. Üretim, Araştırma, Hangar ve Haberler yeni çelik görünümde. Oyun sayacı artık hızlanmıyor, telefonda menüler daha rahat.',
+    cover: img('uretim.jpg'),
+    images: [
+      { src: img('celik-arastirma.jpg'), caption: 'Araştırma panosu: siluetin ve kartın rengi durumu söyler.' },
+      { src: img('celik-hangar.jpg'), caption: 'Hangar: uçak artık çatı makasları altında, beton zeminde duruyor.' },
+    ],
+    sections: [
+      {
+        heading: 'Üretim menüsü',
+        bullets: [
+          'Bütün uçaklar ve uçaksavar topları uzun satırlar hâlinde tek listede: model, bilgiler, serviste ve bantta kaç tane olduğu, kalan süre.',
+          'Toplu üretim: adedi − ve + ile seç, "Üret"e dokun. Bantta en çok 30 sipariş durur.',
+          'Üretilen satırda yavaş bir akış döner. Görsel efektler kapalıysa görünmez.',
+          'Araştırılmamışlar gri ve kilitli; dokununca araştırmasına gider.',
+          'Üst çubukta Üretim düğmesi ve U tuşu var. Üssün yanındaki fabrikaya dokunmak da artık kolay.',
+        ],
+      },
+      {
+        heading: 'Çelik görünüm',
+        bullets: [
+          'Üretim, Silah yuvası, Araştırma, Hangar ve Haberler ağır metal bir görünüme geçti: soldan sağa koyu yeşilden siyaha, baklavalı sac başlıklar.',
+          'Araştırma panosunda yeşil kart bitmiş, parlak kart başlatılabilir, kehribar kart sürüyor, gri kart önkoşul bekliyor.',
+        ],
+      },
+      {
+        heading: 'Gerçek zamanlı sayaç',
+        bullets: [
+          'Saatin yanındaki oyun süresi artık hızlandırmadan etkilenmez, duraklatınca durur. Olay günlüğü ve kayıt adları da bu süreyi gösterir.',
+          'Günün saati ve üretim süreleri oyun hızıyla akmaya devam eder. Eski kayıtlarda sayaç kaldığı yerden sürer.',
+        ],
+      },
+      {
+        heading: 'Telefonda daha rahat',
+        bullets: [
+          'Yeni pencerelerde düğmeler büyüdü; "+" ile "Üret" arası açıldı.',
+          'Araştırma ilk açılışta artık donmuyor, üretim listesi hemen açılıyor.',
+          'Pencere açıkken arkadaki oyun daha seyrek çizilir, liste akıcı kayar.',
+        ],
+      },
+      {
+        heading: 'Öğretici',
+        bullets: [
+          'Öğretici üretim menüsünü, top takmayı, araştırmanın üç hattını ve hangarı da anlatıyor.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'pervaneliler',
     date: '2026-11-05',
     title: 'Pervaneli uçakların hepsi yenilendi',
@@ -867,7 +970,7 @@ export class NewsView {
       markNewsSeen(n.id);
       syncNewsMarks();
     }
-    this.el.innerHTML = `<div class="news-sheet" tabindex="-1">${n ? this.article(n) : this.list()}</div>`;
+    this.el.innerHTML = `<div class="news-sheet steel" tabindex="-1">${n ? this.article(n) : this.list()}</div>`;
     const sheet = this.el.querySelector<HTMLElement>('.news-sheet');
     sheet?.focus();
     if (sheet) sheet.scrollTop = 0;

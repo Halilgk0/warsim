@@ -1,7 +1,8 @@
-// Araştırma: iki ağaç ve iki eşzamanlı araştırma hattı.
+// Araştırma: üç ağaç ve üç eşzamanlı araştırma hattı.
 //
 //  - Teknoloji (modifikasyonlar): dönem dönem motor, gövde, silah, nişan ve yakıt geliştirmeleri. Araştıran tarafın
-//    uygun uçaklarına etki eder (mods.ts). Hava savunma ve radar dalları da buradadır.
+//    uygun uçaklarına etki eder (mods.ts).
+//  - Hava savunma: toplar, nişan aletleri, tahkimat, gözcü ve radar. Kendi hattında ilerler, uçak geliştirmelerini bekletmez.
 //  - Araç ağacı: gerçek uçaklar, hat hat (dönüş avcısı, enerji avcısı, ağır avcı, taarruz, pike, bombardıman).
 //    Bir uçağı açmak için yalnız temel şeyler gerekir: hattaki önceki uçak ve uçağı mümkün kılan motor/kanat
 //    teknolojisi. Donanım (nişangâh, hidrolik kumanda, kabarcık kokpit, acil güç, silah geliştirmeleri…) uçağı açmaz,
@@ -20,7 +21,8 @@ export type ModCategory = 'motor' | 'govde' | 'silah' | 'nisan' | 'menzil';
 export type AircraftLine = 'hafif' | 'enerji' | 'agir' | 'taarruz' | 'pike' | 'bombardiman';
 export type AAGroup = 'silah' | 'nisan' | 'tahkimat';
 export type Era = 1 | 2 | 3 | 4;
-export type Slot = 'tech' | 'vehicle';
+export type Slot = 'tech' | 'vehicle' | 'defense';
+export const SLOT_ORDER: Slot[] = ['tech', 'vehicle', 'defense'];
 
 export interface TechNode {
   id: string;
@@ -245,17 +247,23 @@ export const TECH: TechNode[] = [
   ac('f4e', 'agir', 7, 0, ['future'], { future: true }),
 
   // ================================================================ Hava savunma
-  { id: 'hd_20', name: '20 mm hafif uçaksavar', kind: 'aa', era: 1, group: 'silah', tier: 1, time: 80, requires: [],
-    desc: 'Patlayıcı mermili hızlı top. 2 km menzil, alçak irtifaya karşı etkili.', effect: 'Mevzilere 20 mm takılabilir' },
-  { id: 'hd_20q', name: 'Dörtlü 20 mm (Flakvierling)', kind: 'aa', era: 2, group: 'silah', tier: 2, time: 120, requires: ['hd_20', 'hd_fort1'],
+  { id: 'hd_20', name: '2 cm Flak 38', kind: 'aa', era: 1, group: 'silah', tier: 1, time: 80, requires: [],
+    desc: 'Alman hafif uçaksavar topu: dakikada 200 mermi, 20’lik şarjörle seri atar. İzli mermi 6 sn’de, yaklaşık 2,2 km’de kendini imha eder.', effect: 'Mevzilere 20 mm takılabilir' },
+  { id: 'hd_oerlikon', name: 'Oerlikon 20 mm', kind: 'aa', era: 1, group: 'silah', tier: 2, time: 90, requires: ['hd_20'],
+    desc: 'İsviçre tasarımı hafif top: 60’lık tamburla uzun seri atar, elle çabuk döner. Menzili Flak 38’den kısa.', effect: 'Mevzilere Oerlikon takılabilir' },
+  { id: 'hd_20q', name: '2 cm Flakvierling 38', kind: 'aa', era: 2, group: 'silah', tier: 2, time: 120, requires: ['hd_20', 'hd_fort1'],
     desc: 'Tek lafet üstünde dört 20 mm top: dakikada 800 mermi. Alçaktan gelen taarruz uçaklarına karşı ölümcül, ama menzili kısa.', effect: 'Mevzilere 4×20 mm takılabilir' },
-  { id: 'hd_37', name: '37 mm orta uçaksavar', kind: 'aa', era: 1, group: 'silah', tier: 2, time: 120, requires: ['hd_20'],
-    desc: '3,5 km menzil, kendini imha eden izli mermiler.', effect: 'Mevzilere 37 mm takılabilir' },
-  { id: 'hd_40', name: '40 mm Bofors', kind: 'aa', era: 2, group: 'silah', tier: 3, time: 150, requires: ['hd_37', 'hd_rangefinder'],
-    desc: 'Dünyanın en yaygın orta uçaksavarı: 4 km menzil, ağır izli mermi, hızlı atış. Hesaplayıcı ve yakınlık tapasıyla çok etkili.', effect: 'Mevzilere 40 mm takılabilir' },
-  { id: 'hd_88', name: '88 mm ağır uçaksavar', kind: 'aa', era: 2, group: 'silah', tier: 3, time: 180, requires: ['hd_37', 'hd_rangefinder'],
-    desc: 'Zaman tapalı ağır flak. 9 km menzil; yüksekten gelen bombardıman uçaklarına karşı.', effect: 'Mevzilere 88 mm takılabilir' },
-  { id: 'hd_128', name: '128 mm çok ağır flak', kind: 'aa', era: 3, group: 'silah', tier: 5, time: 220, requires: ['hd_88', 'hd_predictor', 'hd_fort2'],
+  { id: 'hd_37', name: '3,7 cm Flak 36', kind: 'aa', era: 1, group: 'silah', tier: 2, time: 120, requires: ['hd_20'],
+    desc: 'Alman orta uçaksavar topu: 6’lık taraklarla atar, izli mermi 4,2 km’de kendini imha eder.', effect: 'Mevzilere 37 mm takılabilir' },
+  { id: 'hd_40', name: 'Bofors 40 mm L/60', kind: 'aa', era: 2, group: 'silah', tier: 3, time: 150, requires: ['hd_37', 'hd_rangefinder'],
+    desc: 'İsveç tasarımı, savaşın en yaygın orta uçaksavarı: 3,8 km pratik tavan, 0,9 kg izli mermi, 4’lük taraklar. Namlusu hızlı döner, alçak uçağı izler. Hesaplayıcı ve yakınlık tapasıyla çok etkili.', effect: 'Mevzilere 40 mm takılabilir' },
+  { id: 'hd_88', name: '8,8 cm Flak 36', kind: 'aa', era: 2, group: 'silah', tier: 3, time: 180, requires: ['hd_37', 'hd_rangefinder'],
+    desc: 'Zaman tapalı ağır flak: etkili tavan 8 km. Mermi 8 km’ye yaklaşık 20 sn’de gider; o sırada rota değiştiren uçak kurtulur.', effect: 'Mevzilere 88 mm takılabilir' },
+  { id: 'hd_90', name: '90 mm M1', kind: 'aa', era: 2, group: 'silah', tier: 4, time: 190, requires: ['hd_88', 'hd_predictor'],
+    desc: 'ABD ağır topu: etkili tavan ~11,5 km, dakikada 20 atış. Atış kontrol aletleriyle çok verimli.', effect: 'Mevzilere 90 mm takılabilir' },
+  { id: 'hd_flak41', name: '8,8 cm Flak 41', kind: 'aa', era: 3, group: 'silah', tier: 5, time: 210, requires: ['hd_90', 'hd_fort2'],
+    desc: 'Yeni nesil 8,8 cm: 1.000 m/sn namlu hızı, etkili tavan 11,3 km. Mermi aynı yüksekliğe çok daha çabuk varır; pahalıdır.', effect: 'Mevzilere Flak 41 takılabilir' },
+  { id: 'hd_128', name: '12,8 cm Flak 40', kind: 'aa', era: 3, group: 'silah', tier: 5, time: 220, requires: ['hd_88', 'hd_predictor', 'hd_fort2'],
     desc: '13 km tavan, 26 kg mermi, geniş parça yarıçapı. B-29 gibi çok yüksekten gelen bombardıman uçaklarının tek ilacı; yavaş ateş eder ve pahalıdır.', effect: 'Mevzilere 128 mm takılabilir' },
   { id: 'hd_ammo', name: 'Gelişmiş uçaksavar mühimmatı', kind: 'aa', era: 2, group: 'silah', tier: 4, time: 140, requires: ['hd_37', 'w_hispano'],
     desc: 'Daha güçlü patlayıcı ve iyileştirilmiş tapalar. Tüm bataryalarda geçerli; ayrıca kurulum gerekmez.', effect: 'Tüm uçaksavar hasarı +%15' },
@@ -270,13 +278,13 @@ export const TECH: TechNode[] = [
   { id: 'hd_crew', name: 'Uçaksavar topçu okulu', kind: 'aa', era: 1, group: 'nisan', tier: 2, time: 110, requires: ['hd_rangefinder', 'observer'],
     desc: 'Eğitimli nişancılar hedefi daha çabuk alır, daha az ıskalar. Tüm bataryalarda geçerli; kurulum gerekmez.', effect: 'Mürettebat becerisi +%22' },
   { id: 'hd_fort1', name: 'Mevzi tahkimatı I', kind: 'aa', era: 1, group: 'tahkimat', tier: 1, time: 60, requires: [],
-    desc: 'Kum torbası yerine beton çukurlar ve cephane sığınakları: mevziler seviye 2’ye yükseltilebilir (+2 silah yuvası).', effect: 'Seviye 2 yükseltmesi' },
+    desc: 'Kum torbası yerine beton çukurlar ve cephane sığınakları: mevziler seviye 2’ye yükseltilebilir, silah yuvası 2’den 4’e çıkar.', effect: 'Seviye 2 yükseltmesi' },
   { id: 'hd_fort2', name: 'Mevzi tahkimatı II', kind: 'aa', era: 2, group: 'tahkimat', tier: 2, time: 90, requires: ['hd_fort1', 'hd_37'],
-    desc: 'Büyük batarya düzeni ve komuta sığınağı: mevziler seviye 3’e yükseltilebilir (+2 silah yuvası).', effect: 'Seviye 3 yükseltmesi' },
+    desc: 'Derin beton çukurlar ve komuta sığınağı: mevziler seviye 3’e yükseltilebilir, bataryaya gelen bomba ve roket hasarı %15 azalır.', effect: 'Seviye 3 yükseltmesi' },
   { id: 'hd_camo', name: 'Kamuflaj ve sahte mevziler', kind: 'aa', era: 2, group: 'tahkimat', tier: 3, time: 120, requires: ['hd_fort2'],
     desc: 'Ağlar, boyalar ve tahta sahte toplar: saldıranlar gerçek yuvaları ayırt etmekte zorlanır. Tüm bataryalarda geçerli.', effect: 'Bataryalara bomba/roket hasarı −%25' },
   { id: 'hd_fort3', name: 'Mevzi tahkimatı III (flak kalesi)', kind: 'aa', era: 3, group: 'tahkimat', tier: 4, time: 160, requires: ['hd_fort2', 'hd_88', 'hd_camo'],
-    desc: 'Beton flak kalesi: dış halkada iki ağır top yuvası daha. Mevziler seviye 4’e yükseltilebilir (en fazla 8 silah).', effect: 'Seviye 4 yükseltmesi' },
+    desc: 'Beton flak kalesi: mevziler seviye 4’e yükseltilebilir, bataryaya gelen bomba ve roket hasarı toplam %30 azalır.', effect: 'Seviye 4 yükseltmesi' },
 
   // ================================================================ Radar ve komuta
   { id: 'observer', name: 'Hava gözetleme ağı', kind: 'radar', era: 1, tier: 1, time: 60, requires: [],
@@ -319,6 +327,7 @@ export class Research {
   readonly slots: Record<Slot, SlotState> = {
     tech: { current: null, queue: [] },
     vehicle: { current: null, queue: [] },
+    defense: { current: null, queue: [] },
   };
   /** Savaş puanı havuzu (araştırma saniyesi cinsinden). */
   points = 0;
@@ -329,7 +338,7 @@ export class Research {
   payer: ((t: TechNode) => number | null) | null = null;
   refunder: ((amount: number) => void) | null = null;
   /** Parası beklenen düğüm (hat başına). */
-  readonly waiting: Record<Slot, string | null> = { tech: null, vehicle: null };
+  readonly waiting: Record<Slot, string | null> = { tech: null, vehicle: null, defense: null };
   private modsCache: { version: number; mods: ModEffects } | null = null;
   private specMods = new Map<string, { version: number; mods: ModEffects }>();
 
@@ -347,7 +356,7 @@ export class Research {
   }
 
   slotOf(t: TechNode): Slot {
-    return t.kind === 'aircraft' ? 'vehicle' : 'tech';
+    return t.kind === 'aircraft' ? 'vehicle' : t.kind === 'mod' ? 'tech' : 'defense';
   }
 
   available(t: TechNode): boolean {
@@ -355,11 +364,11 @@ export class Research {
   }
 
   isActive(id: string): boolean {
-    return this.slots.tech.current?.id === id || this.slots.vehicle.current?.id === id;
+    return SLOT_ORDER.some((k) => this.slots[k].current?.id === id);
   }
 
   isQueued(id: string): boolean {
-    return this.slots.tech.queue.includes(id) || this.slots.vehicle.queue.includes(id);
+    return SLOT_ORDER.some((k) => this.slots[k].queue.includes(id));
   }
 
   /** Araştırmayı başlat ya da kuyruğa ekle. Önkoşulları eksikse onları da kendi hatlarına koyar. */
@@ -372,7 +381,7 @@ export class Research {
   }
 
   cancel(id: string): void {
-    for (const k of ['tech', 'vehicle'] as Slot[]) {
+    for (const k of SLOT_ORDER) {
       const sl = this.slots[k];
       const i = sl.queue.indexOf(id);
       if (i >= 0) sl.queue.splice(i, 1);
@@ -395,7 +404,7 @@ export class Research {
 
   /** Şu an puan havuzu araştırmayı hızlandırıyor mu. */
   get boosting(): boolean {
-    return this.points > 0 && (!!this.slots.tech.current || !!this.slots.vehicle.current);
+    return this.points > 0 && SLOT_ORDER.some((k) => !!this.slots[k].current);
   }
 
   get mods(): ModEffects {
@@ -434,10 +443,29 @@ export class Research {
     sl.current = { id, progress: 0, paid };
   }
 
+  /**
+   * Eski kayıt: hava savunma ve radar işleri mühendislik hattındaydı. Sürmekte olan iş ilerlemesi ve ödenen parasıyla, sıradakiler
+   * sırasıyla yeni hatta geçer.
+   */
+  moveOldDefenseJobs(): void {
+    const old = this.slots.tech;
+    const def = this.slots.defense;
+    const isDef = (id: string) => TECH_BY_ID[id] && this.slotOf(TECH_BY_ID[id]) === 'defense';
+    if (old.current && isDef(old.current.id) && !def.current) {
+      def.current = old.current;
+      old.current = null;
+    }
+    const moved = old.queue.filter(isDef);
+    if (moved.length) {
+      def.queue.push(...moved);
+      old.queue.splice(0, old.queue.length, ...old.queue.filter((id) => !isDef(id)));
+    }
+  }
+
   /** Tamamlanan araştırmaların kimlikleri. */
   update(dt: number): string[] {
     const out: string[] = [];
-    for (const k of ['tech', 'vehicle'] as Slot[]) {
+    for (const k of SLOT_ORDER) {
       const sl = this.slots[k];
       if (!sl.current) {
         this.startNext(k);
@@ -452,8 +480,7 @@ export class Research {
         this.version++;
         sl.current = null;
         out.push(t.id);
-        this.startNext('tech');
-        this.startNext('vehicle');
+        for (const n of SLOT_ORDER) this.startNext(n);
       }
     }
     return out;

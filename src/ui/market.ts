@@ -5,7 +5,7 @@ import { SPECS, ROLE_NAMES } from '../sim/aircraft/specs';
 import { SELL_RATE, aircraftPrice, fmtMoney, richnessName, richnessTier } from '../sim/economy';
 import type { Airbase, Airframe } from '../sim/structures/airbase';
 import { aircraftThumb } from '../render/thumbs';
-import { bar, esc, fmtTime, hpColor, nf, pct } from './dom';
+import { bar, esc, fmtStamp, fmtTime, hpColor, nf, pct } from './dom';
 import { L } from '../i18n';
 
 /** Bir uçağın pazardaki satış fiyatı (yıpranma düşürür). */
@@ -110,7 +110,7 @@ export function marketBody(w: World, team: number, baseId: number | null): strin
 
   // ---------------------------------------------------------------- defter
   const ledger = t.ledger.slice(-18).reverse().map((e) =>
-    `<tr><td>${fmtTime(e.time)}</td><td style="text-align:left">${esc(e.reason)}</td><td class="${e.amount >= 0 ? 'pos' : 'neg'}">${e.amount >= 0 ? '+' : '−'}${nf.format(Math.abs(e.amount))}</td></tr>`).join('');
+    `<tr><td>${fmtStamp(e)}</td><td style="text-align:left">${esc(e.reason)}</td><td class="${e.amount >= 0 ? 'pos' : 'neg'}">${e.amount >= 0 ? '+' : '−'}${nf.format(Math.abs(e.amount))}</td></tr>`).join('');
   const ledgerHtml = `<h3>${L('Son hareketler', 'Recent transactions')}</h3>${ledger ? `<table class="tbl mk-ledger">${ledger}</table>` : `<p class="muted">${L('Henüz hareket yok.', 'No transactions yet.')}</p>`}`;
 
   return `${summary}

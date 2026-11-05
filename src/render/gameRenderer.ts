@@ -357,13 +357,14 @@ export class GameRenderer {
     this.scenery.rebuild();
   }
 
-  frame(realDt: number, alpha = 1): void {
+  /** thinned: pencere açıkken kareler seyrek çizilir; otomatik çözünürlük bunu yavaşlama sanmasın. */
+  frame(realDt: number, alpha = 1, thinned = false): void {
     const w = this.world;
     if (!w) return;
     this.alpha = alpha;
     const simDt = Math.max(0, w.time - this.lastTime);
     this.lastTime = w.time;
-    this.autoResolution(realDt);
+    if (!thinned) this.autoResolution(realDt);
     this.rig.update(realDt);
     this.updateClearings(w);
     // Harita değiştiyse önce arazi örtüsü, sonra arazi ve süs yeniden kurulur
@@ -473,7 +474,8 @@ export class GameRenderer {
       if (g) {
         const reach = s.kind === 'airbase' ? RUNWAY_HALF : s.def.radius * 2.2;
         const gd = Math.hypot(g.x - s.pos.x, g.z - s.pos.z);
-        if (gd < reach) d = Math.min(d, 10);
+        // Pistin alanındaki yapı öne geçer: skor eşitken listede önce gelen üs kazanıyor, bitişikteki fabrika hiç seçilemiyordu
+        if (gd < reach) d = Math.min(d, s.kind === 'airbase' ? 10 : 9 * (gd / reach));
       }
       if (d < 30 && d < bestD) {
         bestD = d;

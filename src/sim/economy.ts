@@ -124,6 +124,8 @@ const MONEY_NF = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 
 export interface LedgerEntry {
   time: number;
+  /** Ekranda gösterilen an: gerçek oynanma süresi. Eski kayıtlarda yok. */
+  played?: number;
   amount: number;
   reason: string;
 }

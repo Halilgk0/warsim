@@ -111,6 +111,9 @@ export class Game {
   interaction: Interaction = { mode: 'none' };
   private lastScale = 1;
   private acc = 0;
+  /** Pencere açıkken seyrek çizim: bu kare çizilecek mi, çizilmeyen karelerin süresi (kamera sonraki çizimde yetişir). */
+  private drawTurn = true;
+  private drawDebt = 0;
   private last = performance.now();
   private lastErrorLog = 0;
   /** withMap haritayı işçilerde yüklerken (döngü bekler). */
@@ -266,7 +269,7 @@ export class Game {
       rig.yaw = cam.yaw;
       rig.pitch = cam.pitch;
     } else this.focusHome();
-    this.toast(`${L('Kayıt yüklendi', 'Save loaded')} · ${mapById(d.mapId).name} · ${L('oyun', 'game')} ${fmtTime(w.time)}`);
+    this.toast(`${L('Kayıt yüklendi', 'Save loaded')} · ${mapById(d.mapId).name} · ${L('oyun', 'game')} ${fmtTime(w.playTime)}`);
   }
 
   exitToMenu(): void {
@@ -330,7 +333,7 @@ export class Game {
 
   defaultSaveTitle(): string {
     const who = this.world.playerName || L('Senaryo', 'Scenario');
-    return `${who} · ${fmtTime(this.world.time)}`;
+    return `${who} · ${fmtTime(this.world.playTime)}`;
   }
 
   /** Son kayıttan sonra oyun ilerledi mi. */
@@ -639,6 +642,7 @@ export class Game {
         case 'KeyF': this.toggleFollow(); break;
         case 'KeyH': this.hangar.toggle(); break;
         case 'KeyB': this.build.toggle(); break;
+        case 'KeyU': this.modals.toggleFactory(); break;
         case 'KeyT': this.modals.open('research'); break;
         case 'KeyV': this.modals.open('settings'); break;
         case 'KeyM': this.modals.open('market'); break;
@@ -719,8 +723,14 @@ export class Game {
     }
   }
 
+  /** Oyunun önünde pencere var mı (arka plan buğulu ya da örtülü). */
+  private get windowOpen(): boolean {
+    return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen;
+  }
+
   private tick(now: number): void {
-    const real = Math.min((now - this.last) / 1000, 0.1);
+    const raw = (now - this.last) / 1000;
+    const real = Math.min(raw, 0.1);
     this.last = now;
     // Oyunun bu karedeki hızı: seçilen hız, 1× seçiliyken boş yolda 2×
     const scale = this.mode === 'play'
@@ -731,6 +741,16 @@ export class Game {
       this.toast(L('Boş yol: kolların yoldayken oyun 2× akar; çatışma ve görevde 1×\'e döner.', 'Open road: while your flights travel the game runs at 2×; it drops to 1× for combat and missions.'));
     }
     this.acc += real * scale;
+    // Oyun süresi sayacı gerçek zamanlı: hızlandırma etkilemez, duraklatınca durur. Yavaş karede de geri kalmasın diye kırpılmamış süre;
+    // üst sınır sekmeye dönüş için (arka planda kare çizilmez).
+    if (this.mode === 'play' && scale > 0) this.world.playTime += Math.min(raw, 1);
+    // Pencere açıkken arkadaki oyun iki karede bir çizilir: pencerenin kaydırması akıcı kalır (4× yavaş işlemcide en yavaş kareler
+    // ~110 ms'den ~20 ms'ye iner), buğulu arka planda fark edilmez. Ses de yalnız çizilen karede çalışır: olayları çizim siler,
+    // atlanan karenin olayları sonraki karede ikisine birden gider; ne iki kez çalar ne kaybolur.
+    const covered = this.mode === 'play' && this.windowOpen;
+    this.drawTurn = covered ? !this.drawTurn : true;
+    const draw = this.drawTurn;
+    this.drawDebt += real;
     let steps = 0;
     const maxSteps = 80;
     while (this.acc >= STEP && steps < maxSteps) {
@@ -744,7 +764,7 @@ export class Game {
     try {
       const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
       const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
-      this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, scale, listener, (ac) => this.renderer.isVisible(ac));
+      if (draw) this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, scale, listener, (ac) => this.renderer.isVisible(ac));
       if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
     } catch (e) {
       this.reportError(e);
@@ -752,6 +772,7 @@ export class Game {
     if (this.mode === 'menu') {
       // Arka plan: harita yavaşça döner; oyun arayüzü gizli
       rig.yaw += real * 0.025;
+      this.drawDebt = 0;
       this.renderer.frame(real, Math.min(this.acc / STEP, 1));
       this.tutorial.update();
       return;
@@ -767,7 +788,10 @@ export class Game {
     }
     // Seçili uçak indi/düştüyse seçim kalksın
     if (this.selectedAircraftId !== null && !this.world.aircraftById(this.selectedAircraftId)) this.selectAircraft(null);
-    this.renderer.frame(real, Math.min(this.acc / STEP, 1));
+    if (draw) {
+      this.renderer.frame(this.drawDebt, Math.min(this.acc / STEP, 1), covered);
+      this.drawDebt = 0;
+    }
     this.hud.update();
     this.end.update();
     this.left.update();

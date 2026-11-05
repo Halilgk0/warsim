@@ -14,6 +14,9 @@ export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
+/** Günlük satırının anı: gerçek oynanma süresi (eski kayıtlarda oyun zamanı). */
+export const fmtStamp = (e: { time: number; played?: number }): string => fmtTime(e.played ?? e.time);
+
 export function fmtTime(t: number): string {
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);

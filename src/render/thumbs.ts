@@ -49,36 +49,3 @@ export function aircraftThumb(specId: string, color = 0x6f86b8): string {
   cache.set(key, url);
   return url;
 }
-
-const planCache = new Map<string, string>();
-let planRenderer: THREE.WebGLRenderer | null = null;
-const PLAN = 160;
-
-/** Uçağın üstten (plan) siluet çizimi, tek renk — araştırma tasarım panosu için. */
-export function aircraftPlan(specId: string, ink = 0x56607a): string {
-  const key = `${specId}:${ink}`;
-  const hit = planCache.get(key);
-  if (hit) return hit;
-  const spec = SPECS[specId];
-  if (!spec) return '';
-  if (!planRenderer) {
-    planRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    planRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    planRenderer.setSize(PLAN, PLAN, false);
-    planRenderer.setClearColor(0x000000, 0);
-  }
-  const sc = new THREE.Scene();
-  sc.overrideMaterial = new THREE.MeshBasicMaterial({ color: ink, side: THREE.DoubleSide });
-  const model = buildAircraftModel(spec.model, { detail: 0 });
-  for (const p of model.props) p.visible = false;
-  sc.add(model.root);
-  const r = model.radius * 1.02;
-  const cam = new THREE.OrthographicCamera(-r, r, r, -r, 0.1, 200);
-  cam.position.set(0, 80, 0);
-  cam.up.set(0, 0, 1);
-  cam.lookAt(0, 0, 0);
-  planRenderer.render(sc, cam);
-  const url = planRenderer.domElement.toDataURL('image/png');
-  planCache.set(key, url);
-  return url;
-}

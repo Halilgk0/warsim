@@ -440,7 +440,7 @@ export async function writeSave(account: string, title: string, kind: SaveKind, 
   const me = data.teams[data.playerTeam];
   const meta: SaveMeta = {
     id: newSaveId(),
-    account, title, kind, created: Date.now(), gameTime: data.time, playerName: data.playerName,
+    account, title, kind, created: Date.now(), gameTime: data.playTime ?? data.time, playerName: data.playerName,
     enemies: data.setup?.enemies ?? Math.max(0, data.teams.length - 1), money: Math.round(me?.money ?? 0),
     structures: data.structures.filter((s) => s.team === data.playerTeam && s.hp > 0).length,
     mapId: data.mapId, mapSize: data.mapSize, v: data.v,

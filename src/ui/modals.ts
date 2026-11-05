@@ -9,15 +9,21 @@ import {
 import { sound } from '../audio/sound';
 import { defaultSelection, researchBody, stageOf, type ResearchStage, type ResearchTab } from './research';
 import { TECH_BY_ID } from '../sim/tech';
+import type { AAWeaponId } from '../sim/structures/airDefense';
 import { marketBody, sellCandidate } from './market';
+import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf } from './production';
 import { $, esc } from './dom';
 import { L } from '../i18n';
 
-export type ModalKind = 'scenarios' | 'research' | 'settings' | 'market';
+export type ModalKind = 'scenarios' | 'research' | 'settings' | 'market' | 'factory' | 'pit';
 
 export class Modals {
   isOpen = false;
   private kind: ModalKind | null = null;
+  /** Açık pencerenin türü (öğretici bekler). */
+  get openKind(): ModalKind | null {
+    return this.isOpen ? this.kind : null;
+  }
   private el = $('modal');
   private next = 0;
   private tab: ResearchTab = 'arac';
@@ -31,6 +37,11 @@ export class Modals {
   private marketBase: number | null = null;
   /** Pazarda son işlem uyarısı. */
   private marketMsg = '';
+  /** Üretim menüsünün fabrikası ve sekmesi. */
+  private factoryId: number | null = null;
+  private factoryTab: FactoryTab = 'ucak';
+  /** Yuva penceresi: batarya ve yuva. */
+  private pit: { id: number; slot: number } | null = null;
 
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -66,6 +77,47 @@ export class Modals {
     this.render();
   }
 
+  /** Üretim menüsü: bu fabrikanın (yoksa takımın ilk fabrikasının) listesi. */
+  openFactory(id: number | null, tab: FactoryTab = this.factoryTab): void {
+    const g = this.game;
+    const own = g.world.structures.filter((x) => x.team === g.playerTeam && x.factory && !x.destroyed);
+    this.factoryId = own.find((x) => x.id === id)?.id ?? own[0]?.id ?? null;
+    this.factoryTab = tab;
+    if (this.factoryId === null) {
+      g.toast(L('Önce bir fabrika kur: İnşa menüsünden ya da hava üssünün panelinden.', 'Build a factory first: from the Build menu or the airbase panel.'), true);
+      return;
+    }
+    this.kind = 'factory';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
+  /** Üst çubuk ve U tuşu: açıksa kapat, yoksa takımın fabrikası. */
+  toggleFactory(): void {
+    if (this.isOpen && this.kind === 'factory') this.close();
+    else this.openFactory(this.factoryId);
+  }
+
+  /** Bataryanın yuvası için top seçimi. */
+  openPit(id: number, slot: number): void {
+    this.pit = { id, slot };
+    this.kind = 'pit';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
+  private factoryHtml(): string {
+    const s = this.game.world.structures.find((x) => x.id === this.factoryId);
+    return s?.factory ? factoryBody(this.game, s, this.factoryTab) : `<p class="muted">${L('Fabrika kalmadı.', 'No factory left.')}</p>`;
+  }
+
+  private pitHtml(): string {
+    const s = this.pit ? this.game.world.structures.find((x) => x.id === this.pit!.id) : undefined;
+    return s?.aa && !s.destroyed ? pitBody(this.game, s, this.pit!.slot) : `<p class="muted">${L('Batarya kalmadı.', 'The battery is gone.')}</p>`;
+  }
+
   close(): void {
     this.isOpen = false;
     this.kind = null;
@@ -73,7 +125,17 @@ export class Modals {
   }
 
   update(): void {
-    if (!this.isOpen || (this.kind !== 'research' && this.kind !== 'market')) return;
+    if (!this.isOpen) return;
+    if (this.kind === 'factory' || this.kind === 'pit') {
+      // Yalnız değişen hücreler: düğme basılırken yenilenmesin
+      const t = performance.now();
+      if (t < this.next) return;
+      this.next = t + 400;
+      const body = this.el.querySelector<HTMLElement>('.modal-body');
+      if (!body || !patchCells(body, this.kind === 'factory' ? this.factoryHtml() : this.pitHtml())) this.render();
+      return;
+    }
+    if (this.kind !== 'research' && this.kind !== 'market') return;
     const now = performance.now();
     if (now < this.next || now - this.lastScroll < 900) return;
     this.next = now + 500;
@@ -99,12 +161,19 @@ export class Modals {
     } else if (this.kind === 'settings') {
       title = L('Ayarlar', 'Settings');
       body = this.settingsBody();
+    } else if (this.kind === 'factory') {
+      title = L('Üretim', 'Production');
+      body = this.factoryHtml();
+    } else if (this.kind === 'pit') {
+      const s = this.game.world.structures.find((x) => x.id === this.pit?.id);
+      title = L(`Silah yuvası ${(this.pit?.slot ?? 0) + 1}`, `Gun pit ${(this.pit?.slot ?? 0) + 1}`) + (s ? ` · ${s.name}` : '');
+      body = this.pitHtml();
     } else if (this.kind === 'market') {
       title = L('Hazine ve pazar', 'Treasury and market');
       body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase);
     }
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' ? ' steel' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
@@ -218,7 +287,7 @@ export class Modals {
         // Başka aşamadaki düğüm seçildiyse o aşamaya geç (önceki aşamadan gösterilen öncüller hariç)
         if ((t.kind === 'aircraft' || t.kind === 'mod') && !b.closest('.prevstage')) this.stage = stageOf(t);
         // Önkoşul başka sekmedeyse oraya geç
-        const tab: ResearchTab = t.kind === 'aircraft' ? 'arac' : t.kind === 'mod' ? 'mod' : t.kind === 'aa' ? 'hd' : 'radar';
+        const tab: ResearchTab = t.kind === 'aircraft' ? 'arac' : t.kind === 'mod' ? 'mod' : 'hd';
         if (tab !== this.tab) this.tab = tab;
         this.render();
         return;
@@ -226,6 +295,68 @@ export class Modals {
       case 'spec-info':
         g.hangar.open(b.dataset.spec);
         return;
+      case 'aa-info':
+        g.hangar.openGun(b.dataset.w as AAWeaponId);
+        return;
+      case 'fab-qty':
+        changeQty(b.dataset.id!, Number(b.dataset.d));
+        this.next = 0;
+        this.update();
+        return;
+      case 'fab-tab':
+        this.factoryTab = b.dataset.v as FactoryTab;
+        this.render();
+        return;
+      case 'fab-pick':
+        this.factoryId = Number(b.dataset.id);
+        this.render();
+        return;
+      case 'fab-add':
+      case 'fab-del':
+      case 'fab-add-gun':
+      case 'fab-del-gun': {
+        const s = g.world.structures.find((x) => x.id === this.factoryId);
+        if (!s?.factory) return;
+        const act = b.dataset.act;
+        // Toplu üretim: seçili adet kadar sipariş; düğme yetmediğinde zaten kapalı
+        if (act === 'fab-add') for (let i = qtyOf(b.dataset.id!); i > 0 && g.world.orderAircraft(s, b.dataset.id!); i--);
+        else if (act === 'fab-add-gun') for (let i = qtyOf(b.dataset.id!); i > 0 && g.world.orderGun(s, b.dataset.id as AAWeaponId); i--);
+        else if (act === 'fab-del-gun') g.world.cancelGun(s, b.dataset.id as AAWeaponId);
+        else {
+          for (let i = s.factory.queue.length - 1; i >= 0; i--) {
+            if (s.factory.queue[i].specId !== b.dataset.id) continue;
+            g.world.cancelOrder(s, i);
+            break;
+          }
+        }
+        this.next = 0;
+        this.update();
+        return;
+      }
+      case 'fab-res': {
+        // Kilitli satır: araştırma panosunda o düğüm
+        const t = TECH_BY_ID[b.dataset.id ?? ''];
+        this.kind = 'research';
+        this.tab = t?.kind === 'aircraft' ? 'arac' : 'hd';
+        this.sel = t?.id ?? null;
+        if (t?.kind === 'aircraft') this.stage = stageOf(t);
+        this.render();
+        return;
+      }
+      case 'fab-open-hd':
+        this.kind = 'research';
+        this.tab = 'hd';
+        this.sel = null;
+        this.render();
+        return;
+      case 'pit-fab':
+        this.openFactory(null, 'top');
+        return;
+      case 'pit-put': {
+        const s = g.world.structures.find((x) => x.id === this.pit?.id);
+        if (s && this.pit && g.world.installGun(s, this.pit.slot, b.dataset.id as AAWeaponId)) this.close();
+        return;
+      }
       case 'close':
         this.close();
         return;
@@ -264,6 +395,12 @@ export class Modals {
   }
 
   private onChange(e: Event): void {
+    const rep = e.target as HTMLInputElement;
+    if (rep.dataset.act === 'fab-repeat') {
+      const fac = this.game.world.structures.find((x) => x.id === this.factoryId);
+      if (fac?.factory) fac.factory.repeat = rep.checked;
+      return;
+    }
     const el = e.target as HTMLInputElement | HTMLSelectElement;
     if (el.dataset.mk === 'base') {
       this.marketBase = Number(el.value);

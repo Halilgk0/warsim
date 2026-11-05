@@ -544,8 +544,8 @@ export class Tutorial {
         id: 'time', ch: 'map',
         target: () => visible('#timebar'),
         text: () => L(
-          'Savaş gerçek zamanlı akar. Buradan duraklatır ya da 32 katına kadar hızlandırırsın. Sen okurken öğretici zamanı durdurur.',
-          'The war runs in real time. Pause it or speed it up to 32× here. While you read, the tutorial stops the clock.',
+          'Savaş gerçek zamanlı akar. Buradan duraklatır ya da 32 katına kadar hızlandırırsın; yanındaki sayaç gerçek oynama süreni gösterir, hızlanmaz. Sen okurken öğretici zamanı durdurur.',
+          'The war runs in real time. Pause it or speed it up to 32× here; the counter beside it shows your real play time and does not speed up. While you read, the tutorial stops the clock.',
         ),
       },
       // ---------------------------------------------------------- ilk görev
@@ -681,17 +681,80 @@ export class Tutorial {
         ),
       },
       {
-        id: 'research', ch: 'grow',
-        target: () => visible('.top-actions [data-open="research"]'),
+        id: 'prod', ch: 'grow',
+        target: () => visible('.top-actions [data-open="production"]'),
+        done: () => g.modals.openKind === 'factory',
         text: () => L(
-          `Fabrikan yeni uçak üretir; ona ${tapThen()} sıraya uçak ekle. Araştırma daha iyi motorlar, silahlar ve yeni uçaklar açar.`,
-          `Your factory builds new aircraft; ${tap()} it to queue some. Research unlocks better engines, weapons and new aircraft.`,
+          `Uçakları ve uçaksavar toplarını fabrikan üretir. "Üretim"e ${tap()}.`,
+          `Your factory builds aircraft and anti-aircraft guns. ${Tap()} "Factory".`,
+        ),
+      },
+      {
+        id: 'prodRow', ch: 'grow',
+        enter: () => g.modals.openFactory(null, 'ucak'),
+        target: () => visible('.prd-row:not(.locked)'),
+        text: () => L(
+          `Her satırda serviste ve bantta kaç tane olduğu görünür. Adedi − ve + ile seç, "Üret"e ${tap()}; biten uçak üssüne gelir. Gri satırlar önce araştırma ister.`,
+          `Each row shows how many are in service and on the line. Choose the number with − and +, then ${tap()} "Build"; finished aircraft go to your base. Grey rows need research first.`,
+        ),
+      },
+      {
+        id: 'prodGuns', ch: 'grow',
+        enter: () => {
+          if (g.modals.openKind !== 'factory') g.modals.openFactory(null, 'ucak');
+        },
+        target: () => visible('[data-act="fab-tab"][data-v="top"]'),
+        done: () => !!visible('[data-rowkey="gun-mg"]'),
+        text: () => L(
+          `Uçaksavar topları da burada: "Hava savunma"ya ${tap()}.`,
+          `Anti-aircraft guns are here too: ${tap()} "Air defence".`,
+        ),
+      },
+      {
+        id: 'prodStock', ch: 'grow',
+        enter: () => g.modals.openFactory(null, 'top'),
+        target: () => visible('[data-rowkey="gun-mg"]'),
+        text: () => L(
+          `Biten top depoya girer. Bataryayı İnşa'dan kurarsın: 2 yuva ve 12,7 mm M2 ile başlar. Bataryaya ${tapThen()} bir yuva seç, depodaki topu tak. Yükseltince yuva 4'e çıkar.`,
+          `A finished gun goes into stock. You build batteries from Build: they start with 2 gun pits and 12.7 mm M2s. ${Tap()} a battery, pick a pit and fit a gun from stock. Upgrading gives up to 4 pits.`,
+        ),
+      },
+      {
+        id: 'research', ch: 'grow',
+        enter: () => g.modals.close(),
+        target: () => visible('.top-actions [data-open="research"]'),
+        done: () => g.modals.openKind === 'research',
+        text: () => L(
+          `Araştırma yeni uçaklar, daha iyi motorlar, silahlar ve toplar açar. "Araştırma"ya ${tap()}.`,
+          `Research unlocks new aircraft, better engines, weapons and guns. ${Tap()} "Research".`,
+        ),
+      },
+      {
+        id: 'researchLines', ch: 'grow',
+        enter: () => {
+          if (g.modals.openKind !== 'research') g.modals.open('research', 'arac');
+        },
+        target: () => [...document.querySelectorAll('.rtabs button')],
+        text: () => L(
+          `Üç hat aynı anda ilerler: uçak programları, mühendislik ve hava savunma. Bir karta ${tapThen()} sağdaki dosyadan başlat. Yeşil kart bitmiş, parlak kart başlatılabilir, gri kart önce önkoşul ister.`,
+          `Three lines progress at the same time: aircraft programmes, engineering and air defence. ${Tap()} a card and start it from the dossier on the right. Green cards are done, bright ones can start, grey ones need prerequisites first.`,
+        ),
+      },
+      {
+        id: 'showroom', ch: 'grow',
+        enter: () => g.modals.close(),
+        target: () => visible('.top-actions [data-open="hangar"]'),
+        text: () => L(
+          'Hangar\'da uçakların ve uçaksavar toplarının gerçek verileri ve dönen modelleri var. İstediğin zaman bak.',
+          'The Hangar shows the real data and rotating models of every aircraft and anti-aircraft gun. Look in whenever you like.',
         ),
       },
       // ---------------------------------------------------------- savaş
       {
         id: 'enemy', ch: 'war',
         enter: () => {
+          // "Sonraki bölüm" pencere açıkken de gelebilir
+          g.modals.close();
           g.planner.close();
           g.selectAircraft(null);
           g.selectStructure(null);
