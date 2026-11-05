@@ -48,7 +48,7 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-04';
+export const LEGAL_VERSION = '2026-11-05';
 
 /** Geri bildirim: görüş metninin en büyük uzunluğu ve "Steam'de _ $ veririm" üst sınırı. */
 export const FEEDBACK_MAX = 2000;
@@ -78,4 +78,6 @@ export interface LeaderRow {
   rank: number;
   name: string;
   value: number;
+  /** Yalnız oyuncunun kendi satırında: skoru gizli, tabloda sırası yok (rank 0). */
+  hidden?: boolean;
 }

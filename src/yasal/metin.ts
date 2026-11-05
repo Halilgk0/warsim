@@ -30,7 +30,7 @@ const privacyTr: LegalText = {
 <ul>
   <li><b>Hesap açarsan:</b> kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.</li>
   <li><b>E-postanı doğrularken:</b> doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.</li>
-  <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici tercihin ve okuduğun haberler.</li>
+  <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici ve skor tablosu tercihlerin ve okuduğun haberler.</li>
   <li><b>Geri bildirim gönderirsen:</b> görüş ve önerin, fiyat önerin ve adın; hesabınla gönderdiysen e-posta adresin ve dil seçimin. Görüş ve öneri için e-postalı hesap gerekir, yalnız fiyat önerisi için gerekmez (komutan adı yazman yeterli). Bunlar ${OWNER.email} kutusuna e-posta olarak gelir ve orada saklanır.</li>
   <li><b>Siteye giren herkes için:</b> sayfanın sunulabilmesi için IP adresin ve tarayıcı bilgilerin barındırma ve yazı tipi hizmetlerince (aşağıda) işlenir.</li>
 </ul>
@@ -51,7 +51,7 @@ const privacyTr: LegalText = {
 <p>Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen, hesabında seçili dilde gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.</p>
 
 <h2>Herkese görünenler</h2>
-<p>Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.</p>
+<p>Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Bunu Profil’den kapatabilirsin; kapalıyken adın ve skorların tabloda görünmez. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.</p>
 
 <h2>Kimlerle paylaşıyoruz</h2>
 <ul>
@@ -91,7 +91,7 @@ const privacyEn: LegalText = {
 <ul>
   <li><b>If you create an account:</b> your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.</li>
   <li><b>While verifying your email:</b> a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.</li>
-  <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial preference and the news items you have read.</li>
+  <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial and leaderboard preferences and the news items you have read.</li>
   <li><b>If you send feedback:</b> your thoughts and suggestions, price suggestion and name; if sent with your account, also your email address and language. Feedback and suggestions need an account with an email; a price suggestion alone does not (a commander name is enough). These arrive as email in the ${OWNER.email} mailbox and are kept there.</li>
   <li><b>For every visitor:</b> to serve the page, your IP address and browser details are processed by the hosting and font services listed below.</li>
 </ul>
@@ -112,7 +112,7 @@ const privacyEn: LegalText = {
 <p>News and announcement emails are sent only if you ticked the separate box, in the language selected on your account. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.</p>
 
 <h2>What is public</h2>
-<p>Your user name and scores are visible to every visitor on the leaderboard. Your user name does not have to be your real name or contain personal details.</p>
+<p>Your user name and scores are visible to every visitor on the leaderboard. You can turn this off in your Profile; while it is off, your name and scores do not appear there. Your user name does not have to be your real name or contain personal details.</p>
 
 <h2>Who we share it with</h2>
 <ul>

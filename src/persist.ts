@@ -158,6 +158,8 @@ export interface Profile {
   news: boolean;
   /** Gizlilik ve KVKK metinleri kabul edildi mi. */
   accepted: boolean;
+  /** Skorlar herkese açık tabloda görünür mü. */
+  scorePublic: boolean;
 }
 
 export async function fetchProfile(): Promise<Profile> {
@@ -168,6 +170,11 @@ export async function fetchProfile(): Promise<Profile> {
 }
 
 /** E-posta ekle ya da değiştir (yeni adres için kod gerekir), yenilik iznini ayarla (metin onayı arayüzde alınır). */
+/** Skorların herkese açık tabloda görünüp görünmeyeceği. */
+export async function saveScorePublic(on: boolean): Promise<void> {
+  await api('PATCH', '/me', { scorePublic: on });
+}
+
 export async function saveEmail(email: string, news: boolean, code?: string): Promise<{ email: string; news: boolean }> {
   const r = await api<{ account: Account; email: string; news: boolean }>('POST', '/email', { email, code, accepted: true, news });
   session = r.account;

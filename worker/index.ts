@@ -52,6 +52,8 @@ interface AccountRow {
   lang: string | null;
   /** Okunan haberlerin kimlikleri (JSON dizisi). */
   news_seen?: string;
+  /** 1: skorlar herkese açık tabloda görünür (varsayılan), 0: gizli. */
+  score_public: number;
 }
 
 const NEWS_SEEN_MAX = 200;
@@ -392,7 +394,7 @@ async function logout(req: Request, env: Env): Promise<Response> {
 }
 
 async function updateMe(req: Request, env: Env, a: AccountRow): Promise<Response> {
-  const b = await body<{ noTutorial?: boolean; lang?: string; newsSeen?: string }>(req);
+  const b = await body<{ noTutorial?: boolean; lang?: string; newsSeen?: string; scorePublic?: boolean }>(req);
   const seen = b?.newsSeen;
   if (typeof seen === 'string' && /^[a-z0-9-]{1,40}$/.test(seen)) {
     // Tek komutta: art arda açılan iki haberden biri kaybolmaz
@@ -405,6 +407,10 @@ async function updateMe(req: Request, env: Env, a: AccountRow): Promise<Response
   if (typeof b?.noTutorial === 'boolean') {
     await env.DB.prepare('UPDATE accounts SET no_tutorial = ? WHERE id = ?').bind(b.noTutorial ? 1 : 0, a.id).run();
     a.no_tutorial = b.noTutorial ? 1 : 0;
+  }
+  if (typeof b?.scorePublic === 'boolean') {
+    await env.DB.prepare('UPDATE accounts SET score_public = ? WHERE id = ?').bind(b.scorePublic ? 1 : 0, a.id).run();
+    a.score_public = b.scorePublic ? 1 : 0;
   }
   const lang = langCode(b?.lang);
   if (lang && lang !== a.lang) {
@@ -434,10 +440,10 @@ async function setEmail(req: Request, env: Env, a: AccountRow): Promise<Response
   return json({ account: publicAccount(a), email, news });
 }
 
-/** Profil: hesap bilgisi, skorlar (tüm zamanlar + bu hafta), her ölçütte tüm zamanlar sırası, kayıt sayısı. */
+/** Profil: hesap bilgisi, skorlar (tüm zamanlar + bu hafta), her ölçütte tüm zamanlar sırası (gizli hesaplar sayılmaz), kayıt sayısı. */
 async function profile(env: Env, a: AccountRow): Promise<Response> {
   const week = isoWeek(Date.now());
-  const ranks = METRICS.map((m) => `(SELECT COUNT(*) FROM stats WHERE period = 'all' AND ${m} > s.${m}) + 1 AS ${m}`).join(', ');
+  const ranks = METRICS.map((m) => `(SELECT COUNT(*) FROM stats x JOIN accounts b ON b.id = x.account_id WHERE x.period = 'all' AND b.score_public = 1 AND x.${m} > s.${m}) + 1 AS ${m}`).join(', ');
   const [all, wk, rank, saves] = await env.DB.batch([
     env.DB.prepare("SELECT kills, wins, earned, peak, play_sec FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id),
     env.DB.prepare('SELECT kills, wins, earned, peak, play_sec FROM stats WHERE account_id = ? AND period = ?').bind(a.id, week),
@@ -447,7 +453,7 @@ async function profile(env: Env, a: AccountRow): Promise<Response> {
   return json({
     account: publicAccount(a), all: all.results[0] ?? null, week: wk.results[0] ?? null, ranks: rank.results[0] ?? null,
     saves: (saves.results[0] as { n: number } | undefined)?.n ?? 0,
-    email: a.email, news: !!a.news_opt, accepted: !!a.legal_version,
+    email: a.email, news: !!a.news_opt, accepted: !!a.legal_version, scorePublic: !!a.score_public,
   });
 }
 
@@ -572,15 +578,17 @@ async function leaderboard(url: URL, env: Env, a: AccountRow | null): Promise<Re
   // Sütun adı yalnız beyaz listeden (METRICS): sorguya kullanıcı girdisi girmez
   const { results } = await env.DB.prepare(
     `SELECT a.name AS name, s.${metric} AS value FROM stats s JOIN accounts a ON a.id = s.account_id
-     WHERE s.period = ? AND s.${metric} > 0 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 50`,
+     WHERE s.period = ? AND s.${metric} > 0 AND a.score_public = 1 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 50`,
   ).bind(period).all<{ name: string; value: number }>();
   const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value }));
   let me: LeaderRow | null = null;
   if (a) {
     const mine = await env.DB.prepare(`SELECT ${metric} AS value FROM stats WHERE account_id = ? AND period = ?`).bind(a.id, period).first<{ value: number }>();
     if (mine && mine.value > 0) {
-      const above = await env.DB.prepare(`SELECT COUNT(*) AS n FROM stats WHERE period = ? AND ${metric} > ?`).bind(period, mine.value).first<{ n: number }>();
-      me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value };
+      if (a.score_public) {
+        const above = await env.DB.prepare(`SELECT COUNT(*) AS n FROM stats s JOIN accounts b ON b.id = s.account_id WHERE s.period = ? AND b.score_public = 1 AND s.${metric} > ?`).bind(period, mine.value).first<{ n: number }>();
+        me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value };
+      } else me = { rank: 0, name: a.name, value: mine.value, hidden: true };
     }
   }
   return json({ metric, period, rows, me });

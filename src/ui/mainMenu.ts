@@ -189,6 +189,12 @@ export class MainMenu {
     void this.board.refresh(true);
   }
 
+  /** Skor görünürlüğü değişti: tablo eski kalmasın. */
+  scoresChanged(): void {
+    this.board.invalidate();
+    if (this.isOpen && this.tab === 'scores') void this.board.refresh(true);
+  }
+
   private onClick(e: Event): void {
     const t = e.target as HTMLElement;
     const acc = currentAccount();

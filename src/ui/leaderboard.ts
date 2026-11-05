@@ -56,6 +56,11 @@ export class LeaderboardPanel {
 
   constructor(private readonly rerender: () => void) {}
 
+  /** Skor görünürlüğü değişti: önbellekteki tablolar eskidi. */
+  invalidate(): void {
+    this.boards.clear();
+  }
+
   private get key(): string {
     return `${this.metric}:${this.period}:${currentAccount()?.key ?? ''}`;
   }
@@ -88,17 +93,18 @@ export class LeaderboardPanel {
     let list: string;
     if (this.loading) list = `<p class="muted">${L('Skorlar yükleniyor…', 'Loading scores…')}</p>`;
     else if (this.error && !board) list = `<p class="login-err">${esc(this.error)}</p>`;
-    else if (!board || !board.rows.length) {
+    else if (!board || (!board.rows.length && !board.me)) {
       list = `<p class="muted">${this.period === 'week'
         ? L('Bu hafta henüz kimse yok. İlk sen ol!', 'Nobody yet this week. Be the first!')
         : L('Henüz kimse yok. İlk sen ol!', 'Nobody yet. Be the first!')}</p>`;
     } else {
-      const row = (r: LeaderRow, me: boolean) => `<div class="lb-row ${me ? 'me' : ''} ${r.rank <= 3 ? `top top${r.rank}` : ''}">
-        <span class="lb-rank">${r.rank}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
+      const row = (r: LeaderRow, me: boolean) => `<div class="lb-row ${me ? 'me' : ''} ${!r.hidden && r.rank <= 3 ? `top top${r.rank}` : ''}">
+        <span class="lb-rank">${r.hidden ? '–' : r.rank}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
       const mine = board.me;
       const inTop = !!mine && board.rows.some((r) => r.rank === mine.rank && r.name === mine.name);
       list = `<div class="lb-list">${board.rows.map((r) => row(r, !!acc && r.name === acc.name)).join('')}
-        ${mine && !inTop ? `<div class="lb-gap">…</div>${row(mine, true)}` : ''}</div>`;
+        ${mine && !inTop ? `${board.rows.length ? '<div class="lb-gap">…</div>' : ''}${row(mine, true)}` : ''}</div>
+        ${mine?.hidden ? `<p class="muted small">${L('Skorların gizli: bu satırı yalnız sen görüyorsun. Profil’den açabilirsin.', 'Your scores are hidden: only you can see this row. You can turn them on in your Profile.')}</p>` : ''}`;
     }
     const foot = acc
       ? ''

@@ -179,6 +179,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Yeni migration canlı veritabanına push'tan önce uygulanır (`wrangler d1 migrations apply warsimbox --remote`);
     Workers Builds'in bunu yaptığını varsayma. Yalnız eklemeli değişiklik: eski worker yeni tabloyla çalışabilsin.
   - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.
+    Oyuncu Profil'den tabloda görünmemeyi seçebilir (`accounts.score_public`, varsayılan açık): gizli hesap tabloya ve sıra
+    sayımına girmez, skoru yine işlenir.
   - Şifresini ve kurtarma kodunu unutan oyuncu ve yazılı silme başvurusu: `tools/admin.mjs` (önce kimlik sorusu sor; bkz.
     dosyanın başı). Oyuncu hesabını Profil'den şifresiyle kendi siler. Hesaba bağlı yeni tablo eklenirse
     `worker/index.ts` `eraseAccount`'a da ekle; yasal metinler hesabın bütün verisinin silindiğini söylüyor.

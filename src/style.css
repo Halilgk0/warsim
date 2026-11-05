@@ -924,6 +924,7 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .pf-stats tbody tr { border-top: 1px solid var(--line); }
 .pf-stats td { font-weight: 700; font-variant-numeric: tabular-nums; }
 .pf-rank { color: var(--accent-ink); font-weight: 900; }
+.pf-public-hint { margin: calc(-4px * var(--ui)) 0 0; }
 .pf-pw { display: flex; flex-direction: column; gap: calc(8px * var(--ui)); }
 .pf-email { display: flex; align-items: center; justify-content: space-between; gap: calc(8px * var(--ui)); }
 .pf-email span { min-width: 0; overflow-wrap: anywhere; }

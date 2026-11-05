@@ -1,10 +1,10 @@
 // Profil penceresi (ana menüde ad etiketine ya da oyunda Menü → Profil'e dokununca): hesap bilgisi, hesabın dili, e-posta
 // (yeni adres kodla doğrulanır) ve yenilik izni, skorlar (tüm zamanlar, sıra, bu hafta), buluttaki kayıt sayısı, şifre
-// değiştirme ve hesabı silme.
+// değiştirme, hesabı silme ve skorların herkese açık tabloda görünüp görünmeyeceği.
 
-import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail } from '../persist';
+import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail, saveScorePublic } from '../persist';
 import { apiMessage } from '../net/api';
-import { METRICS, PASS_MAX, PASS_MIN, cleanEmail, validEmail } from '../net/shared';
+import { METRICS, PASS_MAX, PASS_MIN, type Metric, cleanEmail, validEmail } from '../net/shared';
 import { $, esc, focusField } from './dom';
 import { HINT, LABEL, fmtValue } from './leaderboard';
 import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
@@ -27,8 +27,8 @@ export class ProfileBox {
   private delOpen = false;
   private busy = false;
 
-  /** onDeleted: hesap silinince (ana menüye dönülür, ileti gösterilir). */
-  constructor(private readonly onDeleted: (notice: string) => void) {
+  /** onDeleted: hesap silinince (ana menüye dönülür, ileti gösterilir). onScoresChanged: skor görünürlüğü değişince. */
+  constructor(private readonly onDeleted: (notice: string) => void, private readonly onScoresChanged: () => void) {
     this.el = document.createElement('div');
     this.el.className = 'login profile hidden';
     $('app').append(this.el);
@@ -64,6 +64,10 @@ export class ProfileBox {
         this.render();
         focusField(this.el.querySelector<HTMLInputElement>('input[name="delpass"]'));
       }
+    });
+    this.el.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.name === 'public') void this.savePublic(t);
     });
     this.el.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -101,6 +105,33 @@ export class ProfileBox {
   close(): void {
     this.isOpen = false;
     this.el.classList.add('hidden');
+  }
+
+  /** Yerinde güncellenir: açık formlarda yazılanlar silinmesin. */
+  private async savePublic(box: HTMLInputElement): Promise<void> {
+    const p = this.profile;
+    if (!p) return;
+    const err = this.el.querySelector<HTMLElement>('.pf-public-err');
+    const on = box.checked;
+    box.disabled = true;
+    err?.classList.add('hidden');
+    try {
+      await saveScorePublic(on);
+      p.scorePublic = on;
+      this.el.querySelectorAll<HTMLElement>('.pf-rank[data-m]').forEach((c) => { c.textContent = this.rankText(p, c.dataset.m as Metric); });
+      this.onScoresChanged();
+    } catch (e) {
+      box.checked = !on;
+      if (err) {
+        err.textContent = (e as Error).message;
+        err.classList.remove('hidden');
+      }
+    }
+    box.disabled = false;
+  }
+
+  private rankText(p: Profile, m: Metric): string {
+    return p.scorePublic && (p.all?.[m] ?? 0) > 0 && p.ranks ? `#${p.ranks[m]}` : '–';
   }
 
   private async submit(): Promise<void> {
@@ -271,8 +302,7 @@ export class ProfileBox {
     const rows = METRICS.map((m) => {
       const all = p.all?.[m] ?? 0;
       const week = p.week?.[m] ?? 0;
-      const rank = all > 0 && p.ranks ? `#${p.ranks[m]}` : '–';
-      return `<tr title="${esc(HINT[m]())}"><th>${LABEL[m]()}</th><td>${fmtValue(m, all)}</td><td class="pf-rank">${rank}</td><td>${fmtValue(m, week)}</td></tr>`;
+      return `<tr title="${esc(HINT[m]())}"><th>${LABEL[m]()}</th><td>${fmtValue(m, all)}</td><td class="pf-rank" data-m="${m}">${this.rankText(p, m)}</td><td>${fmtValue(m, week)}</td></tr>`;
     }).join('');
     const pw = this.pwOpen
       ? `<form class="pf-pw" novalidate>
@@ -322,7 +352,10 @@ export class ProfileBox {
         <thead><tr><th></th><th>${L('Tüm zamanlar', 'All time')}</th><th>${L('Sıra', 'Rank')}</th><th>${L('Bu hafta', 'This week')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      ${p.all ? '' : `<p class="muted small">${L('Henüz skorun yok: hesabınla bir harekât oyna, skorların burada ve Skorlar tablosunda görünür.', 'No scores yet: play a campaign with your account and your scores appear here and in the Scores table.')}</p>`}
+      ${p.all ? '' : `<p class="muted small">${L('Henüz skorun yok: hesabınla bir harekât oyna, skorların burada görünür.', 'No scores yet: play a campaign with your account and your scores appear here.')}</p>`}
+      <label class="login-check"><input type="checkbox" name="public" ${p.scorePublic ? 'checked' : ''}><span>${L('Skorlarım skor tablosunda herkese açık olsun', 'Show my scores on the public leaderboard')}</span></label>
+      <p class="muted small pf-public-hint">${L('Kapalıyken adın ve skorların tabloda görünmez; skorların kaydedilmeye devam eder.', 'When off, your name and scores stay off the leaderboard; your scores keep counting.')}</p>
+      <div class="login-err hidden pf-public-err"></div>
       ${this.pwMsg ? `<div class="mm-note">${esc(this.pwMsg)}</div>` : ''}
       <button type="button" class="${this.pwOpen ? '' : 'link'} pf-pw-toggle" data-pf="pw">${this.pwOpen ? L('Vazgeç', 'Cancel') : L('Şifre değiştir', 'Change password')}</button>
       ${pw}

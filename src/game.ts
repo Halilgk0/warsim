@@ -72,7 +72,7 @@ export class Game {
   readonly build: BuildBar;
   readonly layout = new Layout();
   readonly login = new LoginBox();
-  readonly profile = new ProfileBox((notice) => this.showMainMenu(notice));
+  readonly profile = new ProfileBox((notice) => this.showMainMenu(notice), () => this.menu.scoresChanged());
   readonly news = new NewsView();
   readonly feedback = new FeedbackBox({
     login: () => this.login.open((a, created) => {

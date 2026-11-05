@@ -7,7 +7,7 @@ Gizlilik Politikası ve KVKK Aydınlatma Metni'nin okunmak için kopyası. Sited
 
 Sitedeki adresi: `/gizlilik/`
 
-*Yürürlük tarihi: 4 Kasım 2026*
+*Yürürlük tarihi: 5 Kasım 2026*
 
 Bu metin, WarSimBox oynarken hangi verilerinin işlendiğini, neden işlendiğini ve bu veriler üzerindeki haklarını anlatır. Oyunu hesap açmadan, misafir olarak da oynayabilirsin. Kişisel verilerin işlenmesine ilişkin yasal bilgilendirme [KVKK Aydınlatma Metni](https://warsimbox.com/kvkk/)’ndedir.
 
@@ -19,7 +19,7 @@ Veri sorumlusu: Halil (WarSimBox). İletişim: warsimbox@gmail.com.
 
 - **Hesap açarsan:** kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, hesabın açılış ve son giriş tarihleri, oturum belirtecinin özeti, bu metinleri kabul ettiğin tarih ve sürüm, dil seçimin, e-posta tercihin. Şifren sunucuya gönderilmeden önce tarayıcında özetlenir; şifrenin ve kurtarma kodunun kendisi saklanmaz.
 - **E-postanı doğrularken:** doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.
-- **Hesabınla oynarsan:** buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici tercihin ve okuduğun haberler.
+- **Hesabınla oynarsan:** buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici ve skor tablosu tercihlerin ve okuduğun haberler.
 - **Geri bildirim gönderirsen:** görüş ve önerin, fiyat önerin ve adın; hesabınla gönderdiysen e-posta adresin ve dil seçimin. Görüş ve öneri için e-postalı hesap gerekir, yalnız fiyat önerisi için gerekmez (komutan adı yazman yeterli). Bunlar warsimbox@gmail.com kutusuna e-posta olarak gelir ve orada saklanır.
 - **Siteye giren herkes için:** sayfanın sunulabilmesi için IP adresin ve tarayıcı bilgilerin barındırma ve yazı tipi hizmetlerince (aşağıda) işlenir.
 
@@ -42,7 +42,7 @@ Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen, hesabında 
 
 ### Herkese görünenler
 
-Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.
+Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Bunu Profil’den kapatabilirsin; kapalıyken adın ve skorların tabloda görünmez. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.
 
 ### Kimlerle paylaşıyoruz
 
@@ -77,7 +77,7 @@ Bu metin değişirse yürürlük tarihi güncellenir. Önemli değişiklikleri o
 
 Sitedeki adresi: `/kvkk/`
 
-*Yürürlük tarihi: 4 Kasım 2026*
+*Yürürlük tarihi: 5 Kasım 2026*
 
 Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu’nun (KVKK) 10. maddesi uyarınca hazırlanmıştır. Ayrıntılar [Gizlilik Politikası](https://warsimbox.com/gizlilik/)’ndadır.
 
@@ -130,7 +130,7 @@ Haklarını kullanmak için, kullanıcı adını belirterek warsimbox@gmail.com 
 
 Sitedeki adresi: `/en/privacy/`
 
-*Effective date: 4 November 2026. This is a translation; the Turkish text prevails.*
+*Effective date: 5 November 2026. This is a translation; the Turkish text prevails.*
 
 This policy explains what data is processed when you play WarSimBox, why, and your rights over it. You can also play as a guest without an account. The statutory notice on personal data is in the [KVKK Privacy Notice](https://warsimbox.com/en/kvkk/).
 
@@ -142,7 +142,7 @@ Data controller: Halil (WarSimBox). Contact: warsimbox@gmail.com.
 
 - **If you create an account:** your user name, email address, hashes of your password and recovery code, account creation and last login dates, a hash of your session token, the date and version of these texts you accepted, your language, and your email preference. Your password is hashed in your browser before it is sent; neither the password nor the recovery code itself is stored.
 - **While verifying your email:** a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.
-- **If you play with an account:** saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial preference and the news items you have read.
+- **If you play with an account:** saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial and leaderboard preferences and the news items you have read.
 - **If you send feedback:** your thoughts and suggestions, price suggestion and name; if sent with your account, also your email address and language. Feedback and suggestions need an account with an email; a price suggestion alone does not (a commander name is enough). These arrive as email in the warsimbox@gmail.com mailbox and are kept there.
 - **For every visitor:** to serve the page, your IP address and browser details are processed by the hosting and font services listed below.
 
@@ -165,7 +165,7 @@ News and announcement emails are sent only if you ticked the separate box, in th
 
 ### What is public
 
-Your user name and scores are visible to every visitor on the leaderboard. Your user name does not have to be your real name or contain personal details.
+Your user name and scores are visible to every visitor on the leaderboard. You can turn this off in your Profile; while it is off, your name and scores do not appear there. Your user name does not have to be your real name or contain personal details.
 
 ### Who we share it with
 
@@ -200,7 +200,7 @@ If this policy changes, the effective date is updated. We announce important cha
 
 Sitedeki adresi: `/en/kvkk/`
 
-*Effective date: 4 November 2026. This is a translation; the Turkish text prevails.*
+*Effective date: 5 November 2026. This is a translation; the Turkish text prevails.*
 
 This notice is given under Article 10 of Turkish Personal Data Protection Law No. 6698 (KVKK). See the [Privacy Policy](https://warsimbox.com/en/privacy/) for details.
 

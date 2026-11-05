@@ -18,7 +18,3 @@ Biten madde listeden silinir. Yeni iş en uygun başlığın altına eklenir.
 - [ ] Yeni modelleri kalabalık bir savaşta gerçek telefonda dene. Şimdiye kadar yalnız işlemci yavaşlatılarak ölçüldü.
 - [ ] Hasarlı uçakların inişini ve yoğun savaş sırasında inişi dene.
 - [ ] Pas geçen A-26'nın dönüşte yaklaşık 60 m alçalmasına bak.
-
-## Sorulacaklar
-
-- [ ] Haber e-postası ticari elektronik ileti sayılır mı, İYS kaydı gerekir mi: avukata sor.
