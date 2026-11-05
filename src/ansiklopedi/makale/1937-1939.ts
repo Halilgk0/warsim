@@ -23,7 +23,7 @@ export const A1937_1939: Article[] = [
       { k: t('Azami hız', 'Top speed'), v: t('Yaklaşık 520 km/sa, 5.300 m’de (pervaneye göre değişir)', 'About 520 km/h at 5,300 m (varies with the propeller)') },
       { k: t('Silahlar', 'Armament'), v: t('8 × 7,7 mm Browning makineli tüfek, namlu başına 334 mermi', '8 × .303 in (7.7 mm) Browning machine guns, 334 rounds per gun') },
       { k: t('Mürettebat', 'Crew'), v: t('1', '1') },
-      { k: t('Kanat açıklığı / uzunluk', 'Span / length'), v: t('12,19 m / 9,84 m', '12.19 m / 9.84 m') },
+      { k: t('Kanat açıklığı / uzunluk', 'Span / length'), v: t('12,19 m / 9,58 m', '12.19 m / 9.58 m') },
     ],
     sections: [
       {

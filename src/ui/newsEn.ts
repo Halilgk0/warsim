@@ -15,6 +15,41 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  pervaneliler: {
+    title: 'All propeller aircraft renewed',
+    summary: 'All 40 propeller aircraft in the research tree were rebuilt from drawings: from the Hurricane to the B-29, each has its own fuselage, wing and landing gear. Control surfaces move and the gear folds.',
+    captions: [
+      'Fighters and attack aircraft: each one’s shape comes from its own drawing.',
+      'Bombers: glazed noses, turrets and engine nacelles.',
+    ],
+    sections: [
+      {
+        heading: 'New models',
+        bullets: [
+          'All propeller aircraft were rebuilt from three-view drawings, with dimensions taken from the drawings and the aircraft’s known measurements.',
+          'Each has its own details: the Stuka’s inverted gull wing and wheel spats, the Corsair’s bent wing, the P-38’s twin booms, the I-16’s open cockpit, the Zero’s long canopy, the Sea Fury’s five-blade propeller.',
+          'On bombers, turrets now sit in their real places on the model, and that’s where the bullets come from.',
+          'The details show best at Medium and High graphics quality. On Low the shape is the same but drawn more simply.',
+        ],
+      },
+      {
+        heading: 'Moving parts',
+        bullets: [
+          'Ailerons, elevators and rudders move with the aircraft’s manoeuvres, and flaps come down.',
+          'The landing gear retracts after takeoff in each aircraft’s real direction: inward, outward, backward or forward. The Stuka’s gear is fixed, as it was on the real aircraft.',
+          'Dive bombers open their dive brakes.',
+          'Navigation lights glow red on the left wing and green on the right.',
+        ],
+      },
+      {
+        heading: 'On the ground',
+        bullets: [
+          'Tailwheel aircraft sit on their tails on the runway and when parked, each at an angle from its own measurements.',
+          'The Hurricane Mk I’s length was corrected to 9.58 m. The encyclopedia pictures were also made from the new models.',
+        ],
+      },
+    ],
+  },
   jetler: {
     title: 'Jets rebuilt from real drawings, air bases renewed',
     summary: 'All 11 jets in the research tree were rebuilt from three-view drawings: control surfaces move and the landing gear folds into the airframe. Air bases now have open hangars and night lights.',

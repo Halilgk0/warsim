@@ -23,6 +23,8 @@ export interface Controls {
   nCmd: number;
   throttle: number;
   diveBrake: boolean;
+  /** Yan kayış: inişte fazla hızı atmak için (sürüklemeyi artırır). */
+  sideslip: boolean;
   /** Yerde tekerlek freni. */
   brake: boolean;
   /** İniş konfigürasyonu: flap + iniş takımı (sürükleme artar, tutunma hızı düşer). */
@@ -114,7 +116,7 @@ export class Aircraft {
   n = 1;
   rollRate = 0;
   readonly controls: Controls = {
-    rollRate: 0, nCmd: 1, throttle: 0.8, diveBrake: false, brake: false, flaps: false, wep: false, afterburner: false,
+    rollRate: 0, nCmd: 1, throttle: 0.8, diveBrake: false, sideslip: false, brake: false, flaps: false, wep: false, afterburner: false,
   };
   readonly engine: ThrustState = { throttle: 0.8, spool: 0.8, wep: false, afterburner: false };
   /** Şamandıralı karbüratörde eksi G sonrası motorun sustuğu kalan süre (s). */

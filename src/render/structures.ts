@@ -9,7 +9,7 @@ import type { Structure } from '../sim/structures/structure';
 import { AASite, type AAWeaponId } from '../sim/structures/airDefense';
 import { RUNWAY_HALF } from '../sim/structures/airbase';
 import { SPECS } from '../sim/aircraft/specs';
-import { gearHeight } from '../sim/aircraft/flightModel';
+import { gearHeight, groundAngle } from '../sim/aircraft/flightModel';
 import { quality } from '../ui/settings';
 import { buildCityModel } from './cityModels';
 import { PALETTE } from './palette';
@@ -1347,8 +1347,10 @@ export class StructureView {
       const back = geo.boundingBox!.max.z - bay.out;
       const dx = Math.sin(bay.yaw);
       const dz = Math.cos(bay.yaw);
-      const m = new THREE.Matrix4().makeRotationY(bay.yaw).setPosition(
-        bay.x - dx * back + dz * lat, bay.y + gearHeight(sp), bay.z - dz * back - dx * lat);
+      // Kuyruk tekerlekli uçak kuyruğu üstünde durur (flightModel.ts stepGround ile aynı açı)
+      const m = new THREE.Matrix4().makeRotationY(bay.yaw);
+      if (sp.tailDragger) m.multiply(new THREE.Matrix4().makeRotationX(-groundAngle(sp) * Math.PI / 180));
+      m.setPosition(bay.x - dx * back + dz * lat, bay.y + gearHeight(sp), bay.z - dz * back - dx * lat);
       let list = byKind.get(sp.model);
       if (!list) byKind.set(sp.model, (list = []));
       list.push(m);

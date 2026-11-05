@@ -20,6 +20,8 @@ import { DEG, G, clamp, moveToward, rotateByAngularVelocity } from '../../core/m
 
 /** Flap + iniş takımı açıkken parazit sürükleme çarpanı (takım ≈ +0,02, tam flap ≈ +0,03 Cd0). */
 export const FLAP_DRAG = 3.2;
+/** Yan kayışın sürükleme çarpanı: gövde yana dönük uçar, temiz uçak fazla hızını böyle atar. */
+export const SIDESLIP_DRAG = 1.6;
 /** Pike freni sürükleme çarpanı. */
 export const DIVE_BRAKE_DRAG = 4;
 /** Acil güç azami süresi (s). */
@@ -70,9 +72,57 @@ export function approachSpeed(ac: Aircraft): number {
 }
 
 /** Model merkezinin tekerleklere yüksekliği. */
+/** Kuyruk üstü yer açısı (derece): çizimde ana teker ile kuyruk tekerinin altından geçen doğru. Yoksa 11. */
+const TAIL_ANGLE: Record<string, number> = { lancaster: 9.7, b17g: 5.3, ju88a4: 12, he111: 9.4, blenheim: 13.4, pe2: 11.4, mosquito: 12.9, bf110c: 11.7, ad4: 13.8, sb2c: 13.3, sbd3: 11.4, ju87d: 12.6, ju87b: 12.6, il10: 9.8, il2m3: 10.6, il2: 10.6, seafury: 14.6, a6m2: 11.5, i16: 17.3, f8f: 13.3, f4u4: 12.7, f6f5: 11.6, p40e: 12.5, la7: 13.8, yak3: 10, p47d: 12.5, typhoon: 12.8, fw190a5: 14.5, p51d: 12, bf109g: 14.5, bf109f: 14.5, bf109e: 14.5, };
+
+/** Kuyruk tekerlekli uçağın yerde durduğu burun açısı (derece). */
+export function groundAngle(spec: AircraftSpec): number {
+  return TAIL_ANGLE[spec.id] ?? 11;
+}
+
 export function gearHeight(spec: AircraftSpec): number {
   // MiG-15 alçak durur (kısa takım; gövde ekseni yerden ~1,55 m)
   if (spec.id === 'mig15') return 1.55;
+  // Hurricane çizimden: ana teker pervane ekseninin 2,15 m altında; 11° kuyruk üstü duruşta 1,97 (ikisinin ortası)
+  if (spec.id === 'bf109e') return 1.61;
+  if (spec.id === 'bf109f') return 1.61;
+  if (spec.id === 'bf109g') return 1.61;
+  if (spec.id === 'p51d') return 1.95;
+  if (spec.id === 'fw190a5') return 2;
+  if (spec.id === 'typhoon') return 2.31;
+  if (spec.id === 'p47d') return 2.17;
+  if (spec.id === 'yak3') return 1.68;
+  if (spec.id === 'la7') return 1.75;
+  if (spec.id === 'p40e') return 2.11;
+  if (spec.id === 'f6f5') return 2.29;
+  if (spec.id === 'f4u4') return 2.28;
+  if (spec.id === 'f8f') return 1.99;
+  if (spec.id === 'i16') return 1.46;
+  if (spec.id === 'a6m2') return 1.69;
+  if (spec.id === 'seafury') return 2.15;
+  if (spec.id === 'il2') return 2.03;
+  if (spec.id === 'il2m3') return 2.03;
+  if (spec.id === 'il10') return 1.95;
+  if (spec.id === 'ju87b') return 2.27;
+  if (spec.id === 'ju87d') return 2.27;
+  if (spec.id === 'sbd3') return 1.83;
+  if (spec.id === 'sb2c') return 2.2;
+  if (spec.id === 'ad4') return 2.33;
+  if (spec.id === 'bf110c') return 2.37;
+  if (spec.id === 'mosquito') return 2.05;
+  if (spec.id === 'p38j') return 1.87;
+  if (spec.id === 'pe2') return 2.38;
+  if (spec.id === 'blenheim') return 2.3;
+  if (spec.id === 'he111') return 2.37;
+  if (spec.id === 'ju88a4') return 2.6;
+  if (spec.id === 'b25j') return 2.26;
+  if (spec.id === 'b17g') return 2.37;
+  if (spec.id === 'lancaster') return 3.19;
+  if (spec.id === 'a26b') return 2.16;
+  if (spec.id === 'b29') return 2.95;
+  if (spec.id === 'hurricane1') return 2.06;
+  // Spitfire: ana teker pervane ekseninin 1,89 m altında, 11° duruşta 1,65
+  if (spec.id === 'spitfire1' || spec.id === 'spitfire5' || spec.id === 'spitfire9') return 1.77;
   // Çizimden: F-86 ve F-84 de kısa takımlı (karın yerden ~0,85 m)
   if (spec.id === 'f86f') return 1.72;
   if (spec.id === 'f84g') return 1.62;
@@ -178,6 +228,7 @@ export function stepFlight(ac: Aircraft, dt: number): void {
   let cd0Mul = (1 + storesDrag(ac)) * fx.dragMul;
   if (ctl.diveBrake && s.diveBrakes) cd0Mul *= DIVE_BRAKE_DRAG;
   if (ctl.flaps) cd0Mul *= FLAP_DRAG;
+  if (ctl.sideslip) cd0Mul *= SIDESLIP_DRAG;
   // Motoru duran ya da rölantideki pervane yel değirmeni gibi frenler
   if (s.engine.kind !== 'jet') {
     if (fx.thrustMul < 0.05 || !engineRunning(ac)) cd0Mul *= 1.35;
@@ -206,7 +257,7 @@ export function stepGround(ac: Aircraft, dt: number, rotating: boolean): void {
   ac.pos.z -= Math.cos(hd) * ac.speed * dt;
   ac.pos.y = groundLevel(ac.pos.x, ac.pos.z) + gearHeight(s);
   let pitch = 0;
-  if (s.tailDragger) pitch = 11 * (1 - clamp(ac.speed / (stallSpeed(ac) * 0.75), 0, 1));
+  if (s.tailDragger) pitch = groundAngle(s) * (1 - clamp(ac.speed / (stallSpeed(ac) * 0.75), 0, 1));
   if (rotating) pitch = 7;
   ac.setAttitude(hd / DEG, pitch);
   ac.n = 1;

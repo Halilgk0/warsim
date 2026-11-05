@@ -32,6 +32,8 @@ export interface FlyCommand {
   /** Hedef hız (m/s). throttle null ise geçerli. */
   speed: number | null;
   diveBrake: boolean;
+  /** Yan kayış (inişte hız atma). */
+  sideslip: boolean;
   /** Küçük aşağı düzeltmelerde negatif G ile itmeye izin ver. */
   allowPush: boolean;
   /** Araziden güvenli yükseklik (AGL, m). */
@@ -60,6 +62,7 @@ export function newCommand(): FlyCommand {
     throttle: null,
     speed: null,
     diveBrake: false,
+    sideslip: false,
     allowPush: true,
     minAlt: 150,
     terrainAvoid: true,
@@ -80,6 +83,7 @@ export function resetCommand(c: FlyCommand, ac: Aircraft): void {
   c.throttle = null;
   c.speed = ac.spec.cruiseSpeed;
   c.diveBrake = false;
+  c.sideslip = false;
   c.allowPush = true;
   c.minAlt = 150;
   c.terrainAvoid = true;
@@ -398,6 +402,7 @@ export function fly(ac: Aircraft, cmd: FlyCommand, dt: number): void {
   c.diveBrake = (cmd.diveBrake && !ac.groundAvoid) || ((compress || (ac.groundAvoid && fastDive)) && s.diveBrakes);
   c.brake = false;
   c.flaps = cmd.flaps && !ac.groundAvoid;
+  c.sideslip = cmd.sideslip && !ac.groundAvoid;
   c.wep = cmd.wep && c.throttle > 0.95;
   c.afterburner = cmd.afterburner && c.throttle > 0.95;
 }

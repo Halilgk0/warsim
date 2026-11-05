@@ -32,6 +32,44 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'pervaneliler',
+    date: '2026-11-05',
+    title: 'Pervaneli uçakların hepsi yenilendi',
+    summary: 'Araştırma ağacındaki 40 pervaneli uçağın hepsi çizimlerden yeniden kuruldu: Hurricane’den B-29’a her uçağın kendi gövdesi, kanadı ve takımı var. Kumanda yüzeyleri oynuyor, takımlar katlanıyor.',
+    cover: img('pervane.jpg'),
+    images: [
+      { src: img('pervane-avci.jpg'), caption: 'Avcılar ve taarruz uçakları: her birinin biçimi kendi çiziminden.' },
+      { src: img('pervane-bomba.jpg'), caption: 'Bombardıman uçakları: camlı burunlar, taretler ve motor naselleri.' },
+    ],
+    sections: [
+      {
+        heading: 'Yeni modeller',
+        bullets: [
+          'Bütün pervaneliler üç görünüş çizimlerinden yeniden yapıldı; ölçüleri çizimlerden ve uçakların bilinen boyutlarından alındı.',
+          'Her uçağın kendine özgü ayrıntıları var: Stuka’nın ters martı kanadı ve teker tulumları, Corsair’in kırık kanadı, P-38’in çift kirişi, I-16’nın açık kokpiti, Zero’nun uzun kapağı, Sea Fury’nin beş palalı pervanesi.',
+          'Bombardıman uçaklarında taretler artık modelde gerçek yerinde ve mermiler oradan çıkıyor.',
+          'Ayrıntılar en çok Orta ve Yüksek grafik kalitesinde görünür. Düşük’te biçim aynıdır, çizim sadedir.',
+        ],
+      },
+      {
+        heading: 'Hareketli parçalar',
+        bullets: [
+          'Kanatçık, irtifa ve istikamet dümeni uçağın manevrasına göre oynar, flaplar iner.',
+          'İniş takımı kalkıştan sonra toplanır; her uçakta gerçekteki yöne: içe, dışa, arkaya ya da öne. Stuka’nın takımı gerçekte olduğu gibi sabittir.',
+          'Pike uçaklarında pike frenleri açılır.',
+          'Seyir lambaları sol kanatta kırmızı, sağ kanatta yeşil yanar.',
+        ],
+      },
+      {
+        heading: 'Yerde',
+        bullets: [
+          'Kuyruk tekerlekli uçaklar pistte ve park yerinde kuyrukları üstünde durur; her uçağın duruş açısı kendi ölçülerinden.',
+          'Hurricane Mk I’in boyu 9,58 m olarak düzeltildi. Ansiklopedideki görseller de yeni modellerden üretildi.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'jetler',
     date: '2026-11-04',
     title: 'Jetler gerçek çizimlerden yeniden yapıldı, hava üsleri yenilendi',

@@ -96,8 +96,9 @@ const gloss = (c: number): Livery => ({ top: [c], under: c, finish: 'gloss' });
 /** Model anahtarına göre boya. */
 export const LIVERIES: Record<string, Livery> = {
   // İngiliz: 1940 Dark Earth / Dark Green, 1941 sonrası Ocean Grey / Dark Green
-  hurricane: two(DARK_EARTH, DARK_GREEN, SKY, { aft: { z: -0.7, skin: 'fabric' } }),
+  hurricane: two(DARK_EARTH, DARK_GREEN, SKY, { aft: { z: -1.5, skin: 'fabric' } }),
   spitfire: two(DARK_EARTH, DARK_GREEN, SKY),
+  spitfire5: two(OCEAN_GREY, DARK_GREEN, MED_SEA_GREY),
   spitfire9: two(OCEAN_GREY, DARK_GREEN, MED_SEA_GREY),
   typhoon: two(OCEAN_GREY, DARK_GREEN, MED_SEA_GREY),
   meteor: two(OCEAN_GREY, DARK_GREEN, MED_SEA_GREY),

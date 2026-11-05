@@ -116,6 +116,7 @@ export class Brain {
     ops.queue = 99;
     ops.requestTimer = 0;
     ops.goArounds = 0;
+    ops.style = null;
   }
 
   detach(ac: Aircraft, world: World, reason: string): void {
