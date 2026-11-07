@@ -32,6 +32,56 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'ansiklopedi-hava',
+    date: '2026-11-06',
+    title: 'Ansiklopedi yenilendi: hava savunması, arama ve çelik görünüm',
+    summary: 'Ansiklopedide artık 10 uçaksavar topunun da sayfası var. Liste sayfalarında arama ve sıralama, yeni çelik görünüm; uçakların boyaları oyunda da daha gerçekçi.',
+    cover: img('ansiklopedi2.jpg'),
+    images: [
+      { src: img('ansiklopedi2-liste.jpg'), caption: 'Hava savunması: hafif, orta ve ağır uçaksavar topları.' },
+      { src: img('ansiklopedi2-arama.jpg'), caption: 'Arama ve sıralama: ad, kısaltma, ülke ya da yıl yaz; yıla, ada ya da hıza göre sırala.' },
+    ],
+    sections: [
+      {
+        text: [
+          'warsimbox.com/ansiklopedi yenilendi: uçakların yanında artık uçaksavar topları da var.',
+        ],
+      },
+      {
+        heading: 'Hava savunması bölümü',
+        bullets: [
+          'M2 Browning’den 12,8 cm Flak 40’a, oyundaki 10 uçaksavar silahının her birinin sayfası var: tarihçe, künye ve oyundaki modelin görseli.',
+          'WarSimBox’ta bölümü: topun oyundaki menzili, etkili tavanı, pratik atış hızı, merminin tavana varma süresi ve araştırmada nasıl açıldığı.',
+          'Hangarın Hava savunma bölümünde her topun altında “Tarihçesini ansiklopedide oku” bağlantısı.',
+        ],
+      },
+      {
+        heading: 'Arama ve sıralama',
+        bullets: [
+          'Liste sayfalarında arama kutusu: ad, kısaltma (bf109, p51), ülke, rol ya da yıl yaz.',
+          'Uçakları yıla, ada ya da azami hıza; topları yıla, ada ya da kalibreye göre sırala.',
+        ],
+      },
+      {
+        heading: 'Yeni görünüm',
+        bullets: [
+          'Ansiklopedi oyundaki çelik görünüme geçti: baklavalı sac üst çubuk, metal kartlar, uçakların arkasında hangar.',
+          'Kartlarda uçaklar artık yakından ve sağa bakıyor.',
+          'Sağda temaya uygun yeni bir kaydırma çubuğu.',
+        ],
+      },
+      {
+        heading: 'Uçak boyaları (oyunda da)',
+        bullets: [
+          'Boyasız uçaklar (P-51D, B-17G, MiG-15…) beyaz değil, gerçekteki gibi gümüş: daha keskin parlama, ayrı tonlu levhalar.',
+          'Boyalı uçaklarda levhalar farklı solmuş, hava akışı yönünde silik kir izleri var; mat boyanın plastik gibi parlaması kalktı.',
+          'Vampire FB.5 artık 1950’lerin RAF kamuflajında: üstte koyu yeşil ve koyu deniz grisi, altta PRU mavisi.',
+          'İniş takımları düzeltildi: P-51 ve P-47 gibi avcılarda kapaklar artık bacaktan ayrı durmuyor; B-17 ve Lancaster gibi bombardıman uçaklarında bacak lastiğin içinden geçmiyor, iki yanından iniyor.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'hava-savunmasi',
     date: '2026-11-05',
     title: 'Hava savunması yenilendi: gerçek toplar ve yeni araştırma hattı',

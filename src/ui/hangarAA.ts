@@ -7,7 +7,8 @@ import { fmtMoney } from '../sim/economy';
 import { AA_CLASS_NAMES, AA_SENSORS, type AAClass, type AASensorId, type AAWeaponDef, flightTime, gunBuildTime, practicalPerMin, shellDrag } from '../sim/structures/airDefense';
 import { TECH_BY_ID, type Research } from '../sim/tech';
 import { esc, nf } from './dom';
-import { L, LOCALE } from '../i18n';
+import { EN, L, LOCALE } from '../i18n';
+import { AA_ENCYCLOPEDIA, encAAUrl } from '../ansiklopedi/liste';
 
 const nf1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 
@@ -135,5 +136,6 @@ export function aaDetails(w: AAWeaponDef, research: Research | null): string {
     <p class="muted small">${L('Dolu alan: topun ateş edebildiği bölge. Yaylar: merminin oraya varma süresi. Yatay çizgiler: uçakların seyir irtifası.', 'Filled area: where the gun can fire. Arcs: shell flight time. Horizontal lines: aircraft cruising altitudes.')}</p>
     <div class="kv">${rows.map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join('')}</div>
     ${upgrades(w, research)}
-    <p class="muted small">${L('Namlu dönüşü Bofors dışında oyun için tahmindir. Pratik atış hızı eğitimli mürettebatla; deneyim şarjör değiştirmeyi hızlandırır.', 'Traverse is a game estimate except for the Bofors. Practical rate is for a trained crew; experience speeds up reloading.')}</p>`;
+    <p class="muted small">${L('Namlu dönüşü Bofors dışında oyun için tahmindir. Pratik atış hızı eğitimli mürettebatla; deneyim şarjör değiştirmeyi hızlandırır.', 'Traverse is a game estimate except for the Bofors. Practical rate is for a trained crew; experience speeds up reloading.')}</p>
+    ${AA_ENCYCLOPEDIA[w.id] ? `<p><a class="enc-link" href="${encAAUrl(EN, w.id)}" target="_blank" rel="noopener">${L('Tarihçesini ansiklopedide oku', 'Read its history in the encyclopedia')} ↗</a></p>` : ''}`;
 }

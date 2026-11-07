@@ -1,5 +1,5 @@
-// Ansiklopedide sayfası olan uçaklar (uçak kimliği → adres parçası) ve adresler. Oyun da bunu okur (ana menü ve
-// hangardan bağlantı); makalelerin metni makaleler.ts'te, oyun paketine girmez. Yeni makale yazılınca buraya da ekle.
+// Ansiklopedide sayfası olan uçaklar ve hava savunma silahları (kimlik → adres parçası) ve adresler. Oyun da bunu okur (ana menü ve
+// hangardan bağlantı); makalelerin metni makaleler.ts ve makale/hava-savunmasi.ts'te, oyun paketine girmez. Yeni makale yazılınca buraya da ekle.
 
 export const ENCYCLOPEDIA: Record<string, string> = {
   hurricane1: 'hawker-hurricane-mk-i',
@@ -58,6 +58,23 @@ export const ENCYCLOPEDIA: Record<string, string> = {
 export const ENC_TR = '/ansiklopedi/';
 export const ENC_EN = '/en/encyclopedia/';
 
+/** Hava savunması bölümü: silah kimliği (airDefense) → adres parçası. Makaleler makale/hava-savunmasi.ts'te. */
+export const AA_ENCYCLOPEDIA: Record<string, string> = {
+  mg: 'm2-browning-12-7-mm',
+  aa20: '2-cm-flak-38',
+  oerlikon: 'oerlikon-20-mm',
+  aa20q: '2-cm-flakvierling-38',
+  aa37: '3-7-cm-flak-36',
+  aa40: 'bofors-40-mm-l60',
+  aa88: '8-8-cm-flak-36',
+  aa90: '90-mm-m1',
+  aa41: '8-8-cm-flak-41',
+  aa128: '12-8-cm-flak-40',
+};
+
+export const ENC_AA_TR = '/ansiklopedi/hava-savunmasi/';
+export const ENC_AA_EN = '/en/encyclopedia/air-defence/';
+
 /** Oyun warsimbox.com dışında (eski adres, itch.io) açıldıysa sayfalar ana adreste. */
 const ORIGIN = typeof location !== 'undefined' && !/(^|\.)warsimbox\.com$|^localhost$|^127\./.test(location.hostname)
   ? 'https://warsimbox.com' : '';
@@ -66,4 +83,10 @@ const ORIGIN = typeof location !== 'undefined' && !/(^|\.)warsimbox\.com$|^local
 export function encUrl(en: boolean, id?: string): string {
   const slug = id ? ENCYCLOPEDIA[id] : undefined;
   return `${ORIGIN}${en ? ENC_EN : ENC_TR}${slug ? `${slug}/` : ''}`;
+}
+
+/** Hava savunması bölümü ya da bir silahın sayfası. */
+export function encAAUrl(en: boolean, id?: string): string {
+  const slug = id ? AA_ENCYCLOPEDIA[id] : undefined;
+  return `${ORIGIN}${en ? ENC_AA_EN : ENC_AA_TR}${slug ? `${slug}/` : ''}`;
 }

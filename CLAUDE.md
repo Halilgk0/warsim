@@ -44,7 +44,8 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
     kutu yerine düz satırlar; büyük harfli başlık yok. Yenilik mevcut görünümden küçük adımlarla gelir: 2026-11-04'te retro
     temalar (harekât odası, afiş, seyir haritası) "çok eski ve kötü" diye reddedildi.
   - Çelik tema (2026-11-05, kullanıcı beğendi; `style.css` `.modal-card.steel`): ağır metal fabrikası. Satırlar soldan sağa
-    koyu yeşilden siyaha, baklavalı sac başlık, ince ikaz şeridi. Üretim, Silah yuvası, Araştırma, Hangar ve Haberler'de (haber e-postası da aynı renklerde); kartta
+    koyu yeşilden siyaha, baklavalı sac başlık, ince ikaz şeridi. Üretim, Silah yuvası, Araştırma, Hangar ve Haberler'de (haber e-postası da aynı renklerde; ansiklopedi ve yasal
+    sayfalar `ansiklopedi/stil.css`'te aynı renk ve desenlerin kopyasıyla); kartta
     `steel` sınıfı ve değişkenler (`--ink`, `--chip`, `--trail`…) başka menüye de taşır. Yayılması kullanıcının kararıyla.
     Araştırmada siluet rengi durumu söyler (`research.ts` `INK`, renk başına hazır dosya); hangar sahnesi saydam, arka planı `.steel .preview`.
 - **Sesler:**
@@ -132,6 +133,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       düz menteşeli kuyruk `hingedFin`, ayrık flap `splitFlap` / `rowFlap`, pike freni `rowBrake`, kafesli kapak `jetCanopy`
       `rails`, camlı burun `noseGlass`, taret `turretDome`, alt renkli parça `underPaint`, takım `propGear`, `noseWheel`,
       `retractTailWheel`, `fixedTailWheel`. Sim'deki `turret` konumları modeldeki yerle uyuşmalı.
+    - Ana takım `propGear`: bacak kapağının yalnız çokgeni verilir, yeri ve eğimi bacaktan hesaplanır (`gearDoorOn`, tekerin
+      karşı yüzünde). Teker bacağın tam altındaysa (`dx: 0`, tek teker) bacak çatal olur (`forkOf`), lastiğin içinden geçmez.
     - Kuyruk tekerlekli uçağın yer açısı `flightModel.ts` `TAIL_ANGLE` (yoksa 11°), yüksekliği `gearHeight`: ana tekerin düz ve
       kuyruk üstü duruştaki yüksekliklerinin ortası.
     - Hareketli parçalar eklemdir. Modeli değiştirince ansiklopedi görsellerini ve üretim listesi resimlerini de yeniden üret.
@@ -203,9 +206,11 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     `worker/index.ts` `eraseAccount`'a da ekle; yasal metinler hesabın bütün verisinin silindiğini söylüyor.
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
 - **Açılış ve harita yükleme:**
-  - `main.ts` önce yükleme ekranını çizdirir. Arka görsel her açılışta değişir (`yukleme.jpg` ve `public/acilis/1-5.jpg`,
+  - `main.ts` önce yükleme ekranını çizdirir. Arka görsel her açılışta değişir (`public/acilis/1-7.webp`, 2400×1350,
     art arda aynısı gelmez, `warsim.acilis`); seçimi `index.html` başındaki betik yapar, `404.html` de aynı listeden seçer.
-    Yeni görsel eklenince iki listeye de yaz.
+    Yeni görsel eklenince iki listeye de yaz. Görseller kayıt kipinin `a_*` sahnelerinden (`src/rec/klipTakes.ts`), yatay
+    3200×1800 çizilip küçültülür; uçak kartın üstünde, kadrajın üst yarısında kalmalı (ortada yükleme kartı durur).
+    `yukleme.jpg` yedek ve teşekkür e-postasının görseli, sıraya girmez.
   - Sonra haritayı oyuncunun seçtiği büyüklükte yükler, böylece ilk harekât yeniden üretimsiz başlar. En son oyunu
     kurar.
   - Arazi ve arazi örtüsü işçilerde paralel üretilir (`render/mapLoad.ts`, `render/mapWorker.ts`). Saf hesaplar
@@ -223,7 +228,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron
   ses. Yayın derlemesine girmez.
-- **`src/ansiklopedi/`:** Uçak ansiklopedisi. Arama motorları için düz HTML: `/ansiklopedi/…` ve `/en/encyclopedia/…`.
+- **`src/ansiklopedi/`:** Uçak ve hava savunması ansiklopedisi. Arama motorları için düz HTML: `/ansiklopedi/…` ve `/en/encyclopedia/…`.
   - Metin döneme göre `makale/*.ts`'te (TR/EN; biçim `tur.ts`, toplayan `makaleler.ts`). Sıra, ad, yıl ve "Oyunda"
     sayıları katalogdan (`specs.ts`) gelir. "Oyunda" metni yalnız oyunda gerçekten modellenmiş davranışı anlatır;
     araştırma yolunu sayfa kendisi ekler, metinde tekrarlama. Yalnız araştırma ağacındaki uçakların sayfası olur;
@@ -232,11 +237,19 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     paketine girmez.
   - Sayfaları `sayfalar.ts` üretir. Vite eklentisi `tools/ansiklopedi/vite.ts` derlemede dist/'e yazar, geliştirmede
     anında sunar. Site haritası da oradan üretilir.
-  - Görseller oyunun modellerinden: `node tools/ansiklopedi/gorseller.mjs [uçak]` → `public/ansiklopedi/gorsel`.
+  - Liste sayfalarında arama ve sıralama (`tools()` ve sayfa sonundaki betik): kartlar düz HTML kalır, betik `data-*`
+    değerleriyle süzer ve sıralar. Arama önce başlıkta (ad, kısaltma, yıl, ülke, rol), sonuç yoksa kısa açıklamada.
+  - Görseller oyunun modellerinden: `node tools/ansiklopedi/gorseller.mjs [uçak] [--34 --yan --og --kart]` → `public/ansiklopedi/gorsel`.
+    Liste kartı `-kart` (burun sağda, alçak açı, kadraj dolu piksellere göre), sayfa başı `-34`.
     Uçağın modeli değişince görselleri de yeniden üret; kendiliğinden güncellenmez.
   - Arka plan ana menünün haritası: `node tools/ansiklopedi/arkaplan.mjs` → `public/ansiklopedi/arka.webp`.
   - Yeni uçak: makale + `liste.ts` + görseller. Tarih ve sayılar yaygın kaynaklarla uyuşmalı; emin olunmayan bilgi
     yazılmaz.
+  - Hava savunması bölümü (`/ansiklopedi/hava-savunmasi/…`, `/en/encyclopedia/air-defence/…`): makaleler
+    `makale/hava-savunmasi.ts`, adresler `liste.ts` `AA_ENCYCLOPEDIA` (hangarın top bilgisi de bağlanır), görseller
+    `gorseller.mjs gun-<silah>`. Sayılar silah tablosundan: `sim/structures/aaWeapons.ts` (saf veri; `airDefense.ts` onu aynen
+    dışa aktarır). Ansiklopedi `airDefense.ts`'i içe aktarmasın: arazi modülü Node'da yüklenirken harita üretilir.
+    Yeni top eklenince makalesi, adresi ve görseli de eklenir.
 
 ## Araçlar ve klasörler
 

@@ -207,12 +207,22 @@ const COLOR = /* glsl */ `
         skPanel = skHash3( cell );
         #ifdef SKIN_METAL
           // Çıplak alüminyum: levhalar farklı ton ve hafif renk sapmasında
-          c *= ( 1.0 + ( skPanel - 0.5 ) * 0.07 ) * vec3( 1.0 + ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02, 1.0, 1.0 - ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02 );
+          c *= ( 1.0 + ( skPanel - 0.5 ) * 0.12 ) * vec3( 1.0 + ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02, 1.0, 1.0 - ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02 );
         #else
-          c *= 1.0 + ( skPanel - 0.5 ) * 0.025;
+          // Boya: levhalar farklı solmuş ve rötuşlanmış; tek tonlu yüzey plastik gibi duruyordu
+          c *= 1.0 + ( skPanel - 0.5 ) * 0.1;
+          // Kir ve yağ izi: hava akışı yönünde (z) uzayan silik koyu çizgiler; alt yüzde ve arka gövdede daha çok
+          // Uzakta (desen pikselden küçülünce) söner: kıpırdamasın
+          float grime = smoothstep( 0.45, 0.85, skNoise( vec3( skP.x * 3.4, skP.y * 3.4, skP.z * 0.32 ) ) )
+            * ( 1.0 - smoothstep( 0.3, 0.8, length( fwidth( skP ) ) * 3.4 ) );
+          c *= 1.0 - grime * ( 0.08 + 0.08 * smoothstep( 0.2, -0.5, skN.y ) + 0.04 * smoothstep( 0.0, -4.0, skP.z ) );
         #endif
-        // Panel çizgisi gerçekte ince bir gölge: birkaç metreden belli belirsiz
-        c *= 1.0 - line * 0.16;
+        // Panel çizgisi gerçekte ince bir gölge: birkaç metreden belli belirsiz (boyada biraz daha koyu: dolgu ve kir)
+        #ifdef SKIN_METAL
+          c *= 1.0 - line * 0.16;
+        #else
+          c *= 1.0 - line * 0.22;
+        #endif
       } else if ( mat < 1.5 ) {
         // Ahşap: pürüzsüz, yalnız büyük birleşim çizgileri ve dolgu dalgası
         c *= 0.985 + 0.03 * skNoise( skP * 0.7 );
@@ -224,8 +234,12 @@ const COLOR = /* glsl */ `
         c *= ( 0.955 + 0.045 * sag ) * ( 1.0 + 0.05 * rib );
         c *= 1.0 - skLine( skP.y, 0.16, 0.005 ) * abs( skN.x ) * 0.15;
       }
-      // Boyada püskürtme dalgası
-      c *= 0.975 + 0.05 * skNoise( skP * 1.3 + 7.0 );
+      // Boyada püskürtme dalgası (boyada daha belirgin: el ile püskürtülmüş, yer yer kalın yer yer ince)
+      #ifdef SKIN_METAL
+        c *= 0.975 + 0.05 * skNoise( skP * 1.3 + 7.0 );
+      #else
+        c *= 0.95 + 0.1 * skNoise( skP * 1.3 + 7.0 );
+      #endif
     #endif
     #ifndef SKIN_METAL
       // Servis boyası: güneşte solmuş, tozlu (fabrika rengi kadar doygun değil); üst yüzler biraz daha soluk
@@ -287,9 +301,12 @@ export function skinMaterial(info: SkinInfo, detail: number): THREE.MeshPhongMat
   const lv = info.livery;
   const f = lv.finish;
   // Mat boya da tam mat değil (saten): geniş, yumuşak parlama ve sıyırarak bakınca gök yansıması
-  const o = f === 'metal' ? { specular: 0x9a9a9a, shininess: 56, env: 0.42, base: 0.22 }
-    : f === 'gloss' ? { specular: 0x6a6a6a, shininess: 70, env: 0.28, base: 0.07 }
-      : { specular: 0x333333, shininess: 14, env: 0.16, base: 0.03 };
+  // Çıplak metal: keskin parlama ve güçlü yansıma (gümüş, beyaz boya gibi değil)
+  const o = f === 'metal' ? { specular: 0xb4b4b4, shininess: 90, env: 0.5, base: 0.26 }
+    // Parlak boya (donanma laciverti): daha küçük ve keskin parlama. Mat boya: geniş yumuşak parlama plastik gibi
+    // duruyordu, kısıldı; sıyırarak bakınca gök yansıması kalır.
+    : f === 'gloss' ? { specular: 0x7a7a7a, shininess: 110, env: 0.28, base: 0.07 }
+      : { specular: 0x1e1e1e, shininess: 10, env: 0.15, base: 0.03 };
   const m = new THREE.MeshPhongMaterial({
     color: 0xffffff, flatShading: !detail, side: THREE.DoubleSide, specular: o.specular, shininess: o.shininess,
   });

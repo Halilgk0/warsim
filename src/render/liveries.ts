@@ -21,6 +21,8 @@ const MED_SEA_GREY = 0x9da3a6;
 const NIGHT = 0x232427;
 const XD_SEA_GREY = 0x434b50;
 const SLATE_GREY = 0x5c6468;
+const DARK_SEA_GREY = 0x525c60;
+const PRU_BLUE = 0x5a7389;
 // Luftwaffe (RLM)
 const RLM70 = 0x3b4737;
 const RLM71 = 0x505c42;
@@ -62,8 +64,8 @@ const AMT12 = 0x4c565d;
 const AII_GREEN = 0x4d5e35;
 // Japonya
 const AMEIRO = 0xb5b096;
-/** Çıplak alüminyum. */
-const ALUMINIUM = 0xd0d5d9;
+/** Çıplak alüminyum: gümüş gri. Daha açığı güneşte beyaz boya gibi görünüyordu; parlaklığı yansıma ve parlama verir. */
+const ALUMINIUM = 0xadb3b8;
 
 export type Finish = 'matte' | 'gloss' | 'metal';
 export type Camo = 'wavy' | 'splinter' | 'soft';
@@ -107,7 +109,8 @@ export const LIVERIES: Record<string, Livery> = {
   lancaster: two(DARK_EARTH, DARK_GREEN, NIGHT),
   canberra: two(SLATE_GREY, DARK_GREEN, NIGHT),
   seafury: { top: [XD_SEA_GREY], under: SKY, finish: 'matte' },
-  vampire: metal(),
+  // Vampire FB.5: 1950'lerin RAF avcı-bombardıman düzeni, Dark Green / Dark Sea Grey üstte, PRU Blue altta
+  vampire: two(DARK_GREEN, DARK_SEA_GREY, PRU_BLUE),
   // Alman: erken dönem köşeli kıymık deseni, 1941 sonrası avcılarda yumuşak benekli griler
   bf109e: two(RLM71, RLM02, RLM65, { camo: 'splinter', nose: { color: RLM04, len: 0.9 } }),
   bf109f: two(RLM74, RLM75, RLM76, { camo: 'soft', highSides: true }),

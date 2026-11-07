@@ -720,8 +720,8 @@ function slantX(g: Geo, k: number, y0: number): Geo {
 interface PropGearOpts {
   /** Üst menteşe (x, y, z), aks (x, y, z), tekerlek yarıçapı ve genişliği, tekerleğin bacağa göre kayması (+ içe). */
   top: V3; axle: V3; rw: number; tw: number; dx: number;
-  /** Bacağın dışına bağlı kapak: [z, y] çokgeni, x'i, bacak eğimi. */
-  door?: { x: number; pts: [number, number][]; slant?: number };
+  /** Bacağa bağlı kapak: [z, y] çokgeni; yeri ve eğimi bacaktan (gearDoorOn). */
+  door?: { pts: [number, number][] };
   /** Destekler: bacak üstünde oran k'dan gövdeye nokta (x hep +yan için). */
   stays?: { k: number; to: V3 }[];
   /** Dışa toplanır (Spitfire, Bf 109). */
@@ -732,6 +732,35 @@ interface PropGearOpts {
   fore?: boolean;
   /** Yan başına çift tekerlek aralığı. */
   twin?: number;
+}
+
+/**
+ * Teker bacağın tam altındaysa (kayma yok, tek teker) bacak lastiğin içinden geçmesin: çatal. h iki bacağın eksenden
+ * uzaklığı, k boyunduruğun bacak üstündeki oranı (lastiğin hemen üstü).
+ */
+function forkOf(o: PropGearOpts, r: number): { h: number; k: number } | null {
+  if (o.dx || o.twin) return null;
+  const len = o.top[1] - o.axle[1];
+  const k = Math.max(0, Math.min(0.7, (o.top[1] - (o.axle[1] + o.rw + 0.05)) / len));
+  return { h: o.tw / 2 + r * 0.62 + 0.02, k };
+}
+
+/**
+ * Bacak kapağı bacağın üstüne yaslanır: tekerleğin karşı yüzünde (teker içteyse dışta), bacağın eğimiyle iner. Kapak
+ * tekerleğin hizasına iniyorsa lastiğe değmeyecek kadar açılır. Elle verilen x eski çizimlerde bacaktan 15 cm kopuktu.
+ */
+function gearDoorOn(o: PropGearOpts, s: number, r: number): Geo {
+  const pts = o.door!.pts;
+  const y0 = pts[0][1];
+  const k = (o.axle[0] - o.top[0]) / (o.top[1] - o.axle[1]);
+  const side = o.dx < 0 ? -1 : 1;
+  const yb = Math.min(...pts.map((p) => p[1]));
+  const wheelTop = o.axle[1] + o.rw;
+  const fork = forkOf(o, r);
+  let off = (fork ? fork.h + r * 0.62 : r) + 0.011 + 0.006;
+  if (yb < wheelTop) off = Math.max(off, o.tw / 2 + 0.025 - side * o.dx);
+  const x = o.top[0] + k * (o.top[1] - y0) + side * off;
+  return underPaint(slantX(legFairing(s * x, pts), s * k, y0));
 }
 
 /**
@@ -747,14 +776,25 @@ function propGear(o: PropGearOpts): Geo[] {
     const at = (k: number) => top.clone().lerp(axle, k);
     const wx = axle.x - s * o.dx;
     const r = Math.min(0.09, o.rw * 0.2);
+    const legs = forkOf(o, r);
+    let strut: Geo[];
+    if (legs) {
+      // Çatal: üst bacak lastiğin üstündeki boyunduruğa, oradan lastiğin iki yanında iki bacak aksa
+      const y = at(legs.k);
+      const side = (p: THREE.Vector3, k: number) => p.clone().setX(p.x + k * legs.h);
+      strut = [
+        ...(legs.k > 0.02 ? [rod(top, y, r, 8)] : []),
+        rod(side(y, 1), side(y, -1), r * 0.7, 6),
+        ...[1, -1].map((k) => rod(side(y, k), side(axle, k), r * 0.62, 8)),
+        rod(side(axle, 1), side(axle, -1), r * 0.5, 6),
+      ];
+    } else strut = [rod(top, at(0.62), r, 8), rod(at(0.56), axle, r * 0.66, 8), rod(axle, v(wx, axle.y, axle.z), r * 0.6, 6)];
     const parts = [
-      rod(top, at(0.62), r, 8),
-      rod(at(0.56), axle, r * 0.66, 8),
-      rod(axle, v(wx, axle.y, axle.z), r * 0.6, 6),
+      ...strut,
       ...(o.twin ? [1, -1].flatMap((k) => wheelParts(o.rw, o.tw, wx + k * o.twin!, axle.y, axle.z)) : wheelParts(o.rw, o.tw, wx, axle.y, axle.z)),
       ...(o.stays ?? []).map((q) => rod(at(q.k), v(s * q.to[0], q.to[1], q.to[2]), r * 0.42, 5)),
     ];
-    const door = o.door ? [underPaint(slantX(legFairing(s * o.door.x, o.door.pts), s * (o.door.slant ?? 0), o.door.pts[0][1]))] : [];
+    const door = o.door ? [gearDoorOn(o, s, r)] : [];
     const axis: V3 = o.fore ? [s, 0, 0] : o.back ? [-s, 0, 0] : [0, 0, o.out ? -1 : 1];
     out.push(...joint(s > 0 ? 'takimL' : 'takimR', [top.x, top.y, top.z], [...parts.map((g) => tag(g, 'dark')), ...door], false, axis));
   }
@@ -4337,78 +4377,78 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (!spec || kind === 'ju87b' || kind === 'ju87d') return [];
   if (kind === 'bf109e' || kind === 'bf109f' || kind === 'bf109g') return propGear({
     top: [0.52, -0.4, 0.75], axle: [1.02, -1.42, 0.92], rw: 0.33, tw: 0.15, dx: 0.08, out: true,
-    door: { x: 0.74, pts: [[0.92, -0.5], [0.62, -0.5], [0.72, -1.2], [1.16, -1.2]], slant: 0.42 },
+    door: { pts: [[0.92, -0.5], [0.62, -0.5], [0.72, -1.2], [1.16, -1.2]] },
     stays: [{ k: 0.45, to: [0.5, -0.42, 0.25] }],
   });
   if (kind === 'p51d') return propGear({
     top: [1.72, -0.72, 0.28], axle: [1.82, -1.64, 0.29], rw: 0.36, tw: 0.17, dx: 0.1,
-    door: { x: 1.93, pts: [[0.62, -0.76], [-0.04, -0.76], [0.0, -1.42], [0.6, -1.42]], slant: 0.1 },
+    door: { pts: [[0.62, -0.76], [-0.04, -0.76], [0.0, -1.42], [0.6, -1.42]] },
     stays: [{ k: 0.45, to: [1.25, -0.72, 0.1] }],
   });
   if (kind === 'fw190') return propGear({
     top: [2.25, -0.62, 0.55], axle: [1.85, -1.8, 0.7], rw: 0.33, tw: 0.2, dx: 0.1,
-    door: { x: 2.2, pts: [[0.95, -0.72], [0.28, -0.72], [0.34, -1.38], [0.98, -1.5]], slant: -0.33 },
+    door: { pts: [[0.95, -0.72], [0.28, -0.72], [0.34, -1.38], [0.98, -1.5]] },
     stays: [{ k: 0.42, to: [1.65, -0.68, 0.45] }],
   });
   if (kind === 'typhoon') return propGear({
     top: [2.08, -0.72, 1.05], axle: [2.1, -2.035, 1.2], rw: 0.44, tw: 0.22, dx: 0.12,
-    door: { x: 2.25, pts: [[1.7999999999999998, -0.78], [0.8999999999999999, -0.78], [0.8799999999999999, -1.8350000000000002], [1.8199999999999998, -1.935]] },
+    door: { pts: [[1.7999999999999998, -0.78], [0.8999999999999999, -0.78], [0.8799999999999999, -1.8350000000000002], [1.8199999999999998, -1.935]] },
     stays: [{ k: 0.45, to: [1.55, -0.78, 0.95] }],
   });
   if (kind === 'yak3') return propGear({
     top: [1.05, -0.5, 0.75], axle: [1.2, -1.47, 0.95], rw: 0.31, tw: 0.15, dx: 0.1,
-    door: { x: 1.3, pts: [[1.15, -0.56], [0.55, -0.56], [0.68, -1.3], [1.18, -1.32]], slant: 0.12 },
+    door: { pts: [[1.15, -0.56], [0.55, -0.56], [0.68, -1.3], [1.18, -1.32]] },
     stays: [{ k: 0.45, to: [0.85, -0.52, 0.3] }],
   });
   if (kind === 'p47') return propGear({
     top: [2.32, -0.72, 0.303], axle: [2.38, -1.794, 0.353], rw: 0.44, tw: 0.22, dx: 0.13,
-    door: { x: 2.52, pts: [[0.7729999999999999, -0.78], [-0.067, -0.78], [-0.04700000000000004, -1.544], [0.7729999999999999, -1.544]] },
+    door: { pts: [[0.7729999999999999, -0.78], [-0.067, -0.78], [-0.04700000000000004, -1.544], [0.7729999999999999, -1.544]] },
     stays: [{ k: 0.42, to: [1.72, -0.8, 0.15299999999999997] }],
   });
   if (kind === 'la7') return propGear({
-    top: [1.42, -0.55, 0.633], axle: [1.42, -1.53, 0.533], rw: 0.31, tw: 0.15, dx: 0.08, door: { x: 1.52, pts: [[0.983, -0.62], [0.283, -0.62], [0.333, -1.3], [0.983, -1.3]] }, stays: [{ k: 0.45, to: [0.95, -0.62, 0.433] }] 
+    top: [1.42, -0.55, 0.633], axle: [1.42, -1.53, 0.533], rw: 0.31, tw: 0.15, dx: 0.08, door: { pts: [[0.983, -0.62], [0.283, -0.62], [0.333, -1.3], [0.983, -1.3]] }, stays: [{ k: 0.45, to: [0.95, -0.62, 0.433] }] 
   });
   if (kind === 'p40') return propGear({
-    top: [1.07, -0.75, -0.25], axle: [1.07, -1.707, -0.287], rw: 0.4, tw: 0.17, dx: -0.24, back: true, door: { x: 1.0, pts: [[0.02, -0.82], [-0.5, -0.82], [-0.52, -1.3], [0.0, -1.3]] }, stays: [{ k: 0.42, to: [1.07, -0.8, -0.85] }] 
+    top: [1.07, -0.75, -0.25], axle: [1.07, -1.707, -0.287], rw: 0.4, tw: 0.17, dx: -0.24, back: true, door: { pts: [[0.02, -0.82], [-0.5, -0.82], [-0.52, -1.3], [0.0, -1.3]] }, stays: [{ k: 0.42, to: [1.07, -0.8, -0.85] }] 
   });
   if (kind === 'f6f') return propGear({
-    top: [1.65, -0.85, 0.55], axle: [1.65, -1.975, 0.517], rw: 0.4, tw: 0.18, dx: 0.05, back: true, door: { x: 1.8, pts: [[0.95, -0.92], [0.2, -0.92], [0.22, -1.5], [0.92, -1.5]] }, stays: [{ k: 0.45, to: [1.65, -0.85, -0.1] }] 
+    top: [1.65, -0.85, 0.55], axle: [1.65, -1.975, 0.517], rw: 0.4, tw: 0.18, dx: 0.05, back: true, door: { pts: [[0.95, -0.92], [0.2, -0.92], [0.22, -1.5], [0.92, -1.5]] }, stays: [{ k: 0.45, to: [1.65, -0.85, -0.1] }] 
   });
   if (kind === 'f4u') return propGear({
-    top: [2.2, -1.0, 0.48], axle: [2.2, -1.965, 0.594], rw: 0.41, tw: 0.19, dx: 0, back: true, door: { x: 2.36, pts: [[0.98, -1.05], [0.15, -1.05], [0.2, -1.62], [0.95, -1.62]] }, stays: [{ k: 0.42, to: [2.2, -1.05, -0.1] }] 
+    top: [2.2, -1.0, 0.48], axle: [2.2, -1.965, 0.594], rw: 0.41, tw: 0.19, dx: 0, back: true, door: { pts: [[0.98, -1.05], [0.15, -1.05], [0.2, -1.62], [0.95, -1.62]] }, stays: [{ k: 0.42, to: [2.2, -1.05, -0.1] }] 
   });
   if (kind === 'f8f') return propGear({
-    top: [1.82, -0.75, 0.621], axle: [1.85, -1.679, 0.671], rw: 0.42, tw: 0.2, dx: 0.1, door: { x: 2, pts: [[1.171, -0.82], [0.371, -0.82], [0.421, -1.45], [1.121, -1.4]] }, stays: [{ k: 0.42, to: [1.3, -0.82, 0.471] }] 
+    top: [1.82, -0.75, 0.621], axle: [1.85, -1.679, 0.671], rw: 0.42, tw: 0.2, dx: 0.1, door: { pts: [[1.171, -0.82], [0.371, -0.82], [0.421, -1.45], [1.121, -1.4]] }, stays: [{ k: 0.42, to: [1.3, -0.82, 0.471] }] 
   });
   if (kind === 'i16') return propGear({
-    top: [1.25, -0.55, 0.943], axle: [1.35, -1.315, 1.043], rw: 0.33, tw: 0.15, dx: 0.1, door: { x: 1.45, pts: [[1.363, -0.62], [0.743, -0.62], [0.763, -1.18], [1.343, -1.18]], slant: 0.1 }, stays: [{ k: 0.45, to: [0.8, -0.6, 0.943] }] 
+    top: [1.25, -0.55, 0.943], axle: [1.35, -1.315, 1.043], rw: 0.33, tw: 0.15, dx: 0.1, door: { pts: [[1.363, -0.62], [0.743, -0.62], [0.763, -1.18], [1.343, -1.18]] }, stays: [{ k: 0.45, to: [0.8, -0.6, 0.943] }] 
   });
   if (kind === 'a6m') return propGear({
-    top: [1.79, -0.58, 0.681], axle: [1.79, -1.482, 0.631], rw: 0.29, tw: 0.14, dx: 0.08, door: { x: 1.88, pts: [[0.951, -0.65], [0.351, -0.65], [0.391, -1.3], [0.931, -1.3]] }, stays: [{ k: 0.45, to: [1.3, -0.65, 0.531] }] 
+    top: [1.79, -0.58, 0.681], axle: [1.79, -1.482, 0.631], rw: 0.29, tw: 0.14, dx: 0.08, door: { pts: [[0.951, -0.65], [0.351, -0.65], [0.391, -1.3], [0.931, -1.3]] }, stays: [{ k: 0.45, to: [1.3, -0.65, 0.531] }] 
   });
   if (kind === 'seafury') return propGear({
-    top: [2.5, -0.78, 0.68], axle: [2.46, -1.9, 0.6], rw: 0.36, tw: 0.18, dx: 0.1, door: { x: 2.62, pts: [[1.05, -0.85], [0.2, -0.85], [0.22, -1.6], [1.0, -1.6]] }, stays: [{ k: 0.42, to: [1.9, -0.82, 0.45] }] 
+    top: [2.5, -0.78, 0.68], axle: [2.46, -1.9, 0.6], rw: 0.36, tw: 0.18, dx: 0.1, door: { pts: [[1.05, -0.85], [0.2, -0.85], [0.22, -1.6], [1.0, -1.6]] }, stays: [{ k: 0.42, to: [1.9, -0.82, 0.45] }] 
   });
   if (kind === 'il2') return propGear({
-    top: [1.75, -0.85, 0.341], axle: [1.75, -1.696, 0.441], rw: 0.39, tw: 0.19, dx: 0, back: true, door: { x: 1.93, pts: [[0.761, -1.0], [0.141, -1.0], [0.161, -1.5], [0.741, -1.5]] }, stays: [{ k: 0.42, to: [1.75, -0.9, -0.259] }] 
+    top: [1.75, -0.85, 0.341], axle: [1.75, -1.696, 0.441], rw: 0.39, tw: 0.19, dx: 0, back: true, door: { pts: [[0.761, -1.0], [0.141, -1.0], [0.161, -1.5], [0.741, -1.5]] }, stays: [{ k: 0.42, to: [1.75, -0.9, -0.259] }] 
   });
   if (kind === 'il2m3') return propGear({
-    top: [1.75, -0.85, 0.341], axle: [1.75, -1.696, 0.441], rw: 0.39, tw: 0.19, dx: 0, back: true, door: { x: 1.93, pts: [[0.761, -1.0], [0.141, -1.0], [0.161, -1.5], [0.741, -1.5]] }, stays: [{ k: 0.42, to: [1.75, -0.9, -0.259] }] 
+    top: [1.75, -0.85, 0.341], axle: [1.75, -1.696, 0.441], rw: 0.39, tw: 0.19, dx: 0, back: true, door: { pts: [[0.761, -1.0], [0.141, -1.0], [0.161, -1.5], [0.741, -1.5]] }, stays: [{ k: 0.42, to: [1.75, -0.9, -0.259] }] 
   });
   if (kind === 'il10') return propGear({
-    top: [1.85, -0.72, 0.5], axle: [1.85, -1.62, 0.4], rw: 0.38, tw: 0.18, dx: 0.02, back: true, door: { x: 2.02, pts: [[0.88, -0.78], [0.0, -0.78], [0.02, -1.35], [0.85, -1.35]] }, stays: [{ k: 0.42, to: [1.85, -0.75, -0.2] }] 
+    top: [1.85, -0.72, 0.5], axle: [1.85, -1.62, 0.4], rw: 0.38, tw: 0.18, dx: 0.02, back: true, door: { pts: [[0.88, -0.78], [0.0, -0.78], [0.02, -1.35], [0.85, -1.35]] }, stays: [{ k: 0.42, to: [1.85, -0.75, -0.2] }] 
   });
   if (kind === 'sbd') return propGear({
-    top: [1.55, -0.8, 0.374], axle: [1.6, -1.538, 0.474], rw: 0.355, tw: 0.17, dx: 0.1, door: { x: 1.7, pts: [[0.854, -0.85], [0.194, -0.85], [0.224, -1.3], [0.824, -1.3]] }, stays: [{ k: 0.42, to: [1.05, -0.85, 0.274] }] 
+    top: [1.55, -0.8, 0.374], axle: [1.6, -1.538, 0.474], rw: 0.355, tw: 0.17, dx: 0.1, door: { pts: [[0.854, -0.85], [0.194, -0.85], [0.224, -1.3], [0.824, -1.3]] }, stays: [{ k: 0.42, to: [1.05, -0.85, 0.274] }] 
   });
   if (kind === 'sb2c') return propGear({
-    top: [2.0, -0.85, -0.5], axle: [2.02, -1.786, -0.4], rw: 0.4, tw: 0.2, dx: 0.1, door: { x: 2.16, pts: [[0.02, -0.9], [-0.72, -0.9], [-0.7, -1.5], [0, -1.5]] }, stays: [{ k: 0.42, to: [1.45, -0.9, -0.6] }] 
+    top: [2.0, -0.85, -0.5], axle: [2.02, -1.786, -0.4], rw: 0.4, tw: 0.2, dx: 0.1, door: { pts: [[0.02, -0.9], [-0.72, -0.9], [-0.7, -1.5], [0, -1.5]] }, stays: [{ k: 0.42, to: [1.45, -0.9, -0.6] }] 
   });
   if (kind === 'ad4') return propGear({
-    top: [1.95, -0.95, 0.75], axle: [1.97, -2.05, 0.85], rw: 0.42, tw: 0.2, dx: 0.02, back: true, door: { x: 2.13, pts: [[1.3, -1.0], [0.4, -1.0], [0.42, -1.7], [1.28, -1.7]] }, stays: [{ k: 0.42, to: [1.95, -0.95, 0.1] }] 
+    top: [1.95, -0.95, 0.75], axle: [1.97, -2.05, 0.85], rw: 0.42, tw: 0.2, dx: 0.02, back: true, door: { pts: [[1.3, -1.0], [0.4, -1.0], [0.42, -1.7], [1.28, -1.7]] }, stays: [{ k: 0.42, to: [1.95, -0.95, 0.1] }] 
   });
   if (kind === 'bf110') return propGear({
-    top: [2.34, -0.9, 1.477], axle: [2.34, -2.114, 1.557], rw: 0.44, tw: 0.22, dx: 0, back: true, door: { x: 2.55, pts: [[1.857, -1.0], [1.257, -1.0], [1.277, -1.5], [1.857, -1.5]] }, stays: [{ k: 0.42, to: [2.34, -0.95, 0.807] }] 
+    top: [2.34, -0.9, 1.477], axle: [2.34, -2.114, 1.557], rw: 0.44, tw: 0.22, dx: 0, back: true, door: { pts: [[1.857, -1.0], [1.257, -1.0], [1.277, -1.5], [1.857, -1.5]] }, stays: [{ k: 0.42, to: [2.34, -0.95, 0.807] }] 
   });
   if (kind === 'mosquito') return propGear({
     top: [2.45, -0.75, 1.872], axle: [2.45, -1.766, 1.972], rw: 0.53, tw: 0.22, dx: 0, back: true, stays: [{ k: 0.42, to: [2.45, -0.85, 1.172] }] 
@@ -4446,7 +4486,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'hurricane') return hurricaneGear();
   if (kind === 'spitfire' || kind === 'spitfire5' || kind === 'spitfire9') return propGear({
     top: [0.62, -0.72, 0.8], axle: [0.87, -1.56, 1.05], rw: 0.33, tw: 0.16, dx: 0.1, out: true,
-    door: { x: 0.74, pts: [[1.0, -0.82], [0.62, -0.82], [0.72, -1.5], [1.28, -1.5]], slant: 0.25 },
+    door: { pts: [[1.0, -0.82], [0.62, -0.82], [0.72, -1.5], [1.28, -1.5]] },
     stays: [{ k: 0.5, to: [0.66, -0.75, 0.3] }],
   });
   if (kind === 'mig15') return migGear(gearHeight(spec));

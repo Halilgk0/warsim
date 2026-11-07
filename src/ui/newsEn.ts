@@ -15,6 +15,55 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'ansiklopedi-hava': {
+    title: 'Encyclopedia renewed: air defence, search and a steel look',
+    summary: 'The encyclopedia now has pages for 10 anti-aircraft guns too. Search and sorting on the list pages, a new steel look, and more realistic aircraft finishes in the game as well.',
+    cover: 'ansiklopedi2-en.jpg',
+    files: ['ansiklopedi2-liste-en.jpg', 'ansiklopedi2-arama-en.jpg'],
+    captions: [
+      'Air defence: light, medium and heavy anti-aircraft guns.',
+      'Search and sorting: type a name, short name, country or year; sort by year, name or speed.',
+    ],
+    sections: [
+      {
+        text: [
+          'warsimbox.com/en/encyclopedia has been renewed: alongside the aircraft, it now covers the anti-aircraft guns too.',
+        ],
+      },
+      {
+        heading: 'Air defence section',
+        bullets: [
+          'From the M2 Browning to the 12.8 cm Flak 40, each of the game’s 10 anti-aircraft weapons has its own page: history, key facts and an image of the in-game model.',
+          'In WarSimBox section: the gun’s in-game range, effective ceiling, practical rate of fire, the shell’s time to ceiling and how it is unlocked in research.',
+          'In the hangar’s Air defence section, each gun now has a “Read its history in the encyclopedia” link.',
+        ],
+      },
+      {
+        heading: 'Search and sorting',
+        bullets: [
+          'A search box on the list pages: type a name, short name (bf109, p51), country, role or year.',
+          'Sort aircraft by year, name or top speed, and guns by year, name or calibre.',
+        ],
+      },
+      {
+        heading: 'New look',
+        bullets: [
+          'The encyclopedia now has the game’s steel look: a diamond-plate top bar, metal cards and a hangar behind the aircraft.',
+          'On the cards the aircraft are now closer and face right.',
+          'A new scrollbar on the right that matches the theme.',
+        ],
+      },
+      {
+        heading: 'Aircraft finishes (in the game too)',
+        bullets: [
+          'Unpainted aircraft (P-51D, B-17G, MiG-15…) are no longer white but silver, as in reality: a sharper shine and panels in different tones.',
+          'On painted aircraft the panels have faded differently and there are faint dirt streaks along the airflow; the plastic-like sheen of matte paint is gone.',
+          'The Vampire FB.5 now wears the RAF camouflage of the 1950s: Dark Green and Dark Sea Grey on top, PRU Blue underneath.',
+          'Landing gear fixed: on fighters like the P-51 and P-47 the gear doors no longer hang away from the leg, and on bombers such as the B-17 and Lancaster the leg now forks around the tyre instead of passing through it.',
+        ],
+      },
+    ],
+  },
   'hava-savunmasi': {
     title: 'Air defence renewed: real guns and a new research line',
     summary: 'Anti-aircraft guns are now real systems: 10 guns from the M2 to the 12.8 cm Flak 40, their own research line, factory production, gun pits at each battery and their own section in the hangar.',

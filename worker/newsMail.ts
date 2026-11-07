@@ -12,6 +12,8 @@ interface NewsText {
   lead: string;
   bullets: string[];
   button: string;
+  /** Düğmenin gittiği yol (yoksa ana sayfa). */
+  link?: string;
 }
 
 export interface NewsMail {
@@ -20,35 +22,40 @@ export interface NewsMail {
   /** Duyuru zamanı. Bundan sonra izin veren eski haberi almaz; gönderim bir hafta sonra kendiliğinden durur. */
   at: number;
   image: string;
+  /** Görselde yazı varsa İngilizcesi (yoksa image). */
+  imageEn?: string;
   tr: NewsText;
   en: NewsText;
 }
 
 export const LATEST_NEWS_MAIL: NewsMail = {
-  id: 'hava-savunmasi',
-  at: Date.UTC(2026, 10, 5, 23, 59),
-  image: 'news/hava.jpg',
+  id: 'ansiklopedi-hava',
+  at: Date.UTC(2026, 10, 7, 23, 59),
+  image: 'news/ansiklopedi2.jpg',
+  imageEn: 'news/ansiklopedi2-en.jpg',
   tr: {
-    subject: 'WarSimBox: Hava savunması yenilendi',
-    title: 'Hava savunması yenilendi',
-    lead: 'Uçaksavarlar artık gerçek sistemler: M2’den 12,8 cm Flak 40’a 10 top, kendi araştırma hattı, fabrikada üretim ve hangarda kendi vitrini.',
+    subject: 'WarSimBox: Ansiklopedi yenilendi, boyalar gerçeğe yaklaştı',
+    title: 'Ansiklopedi yenilendi',
+    lead: 'Ansiklopedide artık 10 uçaksavar topunun da sayfası var; arama, sıralama ve oyundaki çelik görünüm geldi. Uçakların boyaları oyunda da daha gerçekçi.',
     bullets: [
-      'Oerlikon, 90 mm M1 ve 8,8 cm Flak 41 yeni. Mermi havada yavaşlar; şarjör ve atış hızı gerçek verilerden gelir.',
-      'Topu araştır, fabrikada üret, bataryanın yuvasına tak. Yuva sayısı 4’e çıkar, toplar karıştırılabilir.',
-      'Yeni üretim menüsü, çelik görünüm ve artık hızlanmayan oyun sayacı da bu güncellemede.',
+      'Hava savunması bölümü: M2 Browning’den 12,8 cm Flak 40’a her topun tarihçesi, künyesi ve oyundaki değerleri.',
+      'Liste sayfalarında arama kutusu (bf109, p51, ülke, yıl) ve yıla, ada ya da hıza göre sıralama.',
+      'Boyasız uçaklar (P-51D, B-17G, MiG-15…) beyaz değil gümüş; boyalı uçaklarda solmuş levhalar ve kir izleri. İniş takımları da düzeltildi.',
     ],
-    button: 'Oyunu aç',
+    button: 'Ansiklopediyi aç',
+    link: '/ansiklopedi/',
   },
   en: {
-    subject: 'WarSimBox: Air defence renewed',
-    title: 'Air defence renewed',
-    lead: 'Anti-aircraft guns are now real systems: 10 guns from the M2 to the 12.8 cm Flak 40, their own research line, factory production and their own section in the hangar.',
+    subject: 'WarSimBox: The encyclopedia renewed, more realistic paint',
+    title: 'The encyclopedia renewed',
+    lead: 'The encyclopedia now has a page for each of the 10 anti-aircraft guns, plus search, sorting and the game’s steel look. Aircraft paint is more realistic in the game too.',
     bullets: [
-      'The Oerlikon, 90 mm M1 and 8.8 cm Flak 41 are new. Shells slow down in flight; magazines and rate of fire come from real data.',
-      'Research a gun, build it at a factory and fit it into a battery’s gun pit. Batteries go up to 4 pits, and guns can be mixed.',
-      'This update also brings a new production menu, a steel look and a game counter that no longer speeds up.',
+      'Air defence section: history, specs and in-game stats for every gun from the M2 Browning to the 12.8 cm Flak 40.',
+      'A search box on the list pages (bf109, p51, country, year) and sorting by year, name or speed.',
+      'Unpainted aircraft (P-51D, B-17G, MiG-15…) are silver instead of white; painted ones have faded panels and grime streaks. Landing gear has been fixed too.',
     ],
-    button: 'Open the game',
+    button: 'Open the encyclopedia',
+    link: '/en/encyclopedia/',
   },
 };
 
@@ -66,7 +73,7 @@ export function newsMail(m: NewsMail, en: boolean, unsub: string): Mail {
   return {
     subject: t.subject,
     headers: [`List-Unsubscribe: <${unsub}>`, 'List-Unsubscribe-Post: List-Unsubscribe=One-Click'],
-    text: `${t.title}\n\n${t.lead}\n\n${t.bullets.map((b) => `- ${b}`).join('\n')}\n\n${t.button}: ${SITE}\n\n${why}\n${leave}: ${unsub}\n\nWarSimBox · ${SITE}`,
+    text: `${t.title}\n\n${t.lead}\n\n${t.bullets.map((b) => `- ${b}`).join('\n')}\n\n${t.button}: ${SITE}${t.link ?? ''}\n\n${why}\n${leave}: ${unsub}\n\nWarSimBox · ${SITE}`,
     html: `<!doctype html>
 <html lang="${en ? 'en' : 'tr'}">
 <head>
@@ -87,13 +94,13 @@ export function newsMail(m: NewsMail, en: boolean, unsub: string): Mail {
       </tr></table>
     </td></tr>
     <tr><td height="3" bgcolor="#c49e58" style="background:#c49e58;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
-    <tr><td bgcolor="#171e1b" style="background:#171e1b;line-height:0;"><img src="${SITE}/${m.image}" width="520" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>
+    <tr><td bgcolor="#171e1b" style="background:#171e1b;line-height:0;"><img src="${SITE}/${en && m.imageEn ? m.imageEn : m.image}" width="520" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>
     <tr><td bgcolor="#171e1b" style="background:#171e1b;border-radius:0 0 18px 7px;padding:22px 24px 24px;color:#f0f4f1;">
       <div style="font-size:22px;font-weight:800;line-height:1.25;margin:0 0 8px;">${t.title}</div>
       <div style="font-size:15px;line-height:1.5;color:#d3ddd7;margin:0 0 12px;">${t.lead}</div>
       ${t.bullets.map((b) => `<div style="font-size:14px;line-height:1.5;color:#bccac2;margin:0 0 6px;padding-left:14px;text-indent:-14px;">•&nbsp;&nbsp;${b}</div>`).join('\n      ')}
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 0;"><tr>
-        <td bgcolor="#467a62" style="background:#467a62;border-radius:12px;"><a href="${SITE}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${t.button}</a></td>
+        <td bgcolor="#467a62" style="background:#467a62;border-radius:12px;"><a href="${SITE}${t.link ?? ''}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${t.button}</a></td>
       </tr></table>
       <div style="font-size:12px;line-height:1.5;color:#93a39a;margin:18px 0 0;padding-top:14px;border-top:1px solid #39453f;">${why}<br><a href="${unsub}" style="color:#a6dcc0;font-weight:700;">${leave}</a></div>
     </td></tr>
