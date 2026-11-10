@@ -4,7 +4,7 @@
 import type { World } from './world';
 import { Commander } from './commander';
 import { START_MONEY, fmtMoney, oreRichness } from './economy';
-import { MAP_ID, MAP_SIZE, TEAM_SITES } from './mapData';
+import { MAP_ID, MAP_SIZE, TEAM_SITES, type SiteDef } from './mapData';
 import { newAirframe, type Airbase } from './structures/airbase';
 import { clamp } from '../core/math';
 import { L, count } from '../i18n';
@@ -16,6 +16,11 @@ export interface CampaignOptions {
   playerName: string;
   /** Ana menü arka planı: oyuncu tarafını da yapay zekâ yönetir. */
   demo?: boolean;
+  /**
+   * Ana üs yerleri (oyuncu ilk; yüklü haritanın ölçeğinde, startSites.ts rollStartSites). Yoksa haritanın sabit yerleri
+   * (ana menü arka planı, senaryolar ve ölçümler).
+   */
+  sites?: SiteDef[];
 }
 
 /** Başlangıç madeni: aday yerler arasından ortalama verime en yakın olanı (her taraf eşit şansla başlasın). */
@@ -61,10 +66,11 @@ export function setupCampaign(w: World, o: CampaignOptions): void {
   w.economyEnabled = true;
   for (let i = 0; i <= n; i++) {
     const ts = TEAM_SITES[i];
+    const site = o.sites?.[i] ?? ts.site;
     const ai = i > 0 || !!o.demo;
     const t = w.addTeam(ts.name, ts.color, [], ai);
     t.money = START_MONEY;
-    const base = w.addStructure(i, 'airbase', L(`${ts.name} ana üs`, `${ts.name} main base`), ts.site.x, ts.site.z, ts.site.heading).airbase!;
+    const base = w.addStructure(i, 'airbase', L(`${ts.name} ana üs`, `${ts.name} main base`), site.x, site.z, site.heading).airbase!;
     startingFactory(w, base);
     startingMine(w, base);
     for (let k = 0; k < 2; k++) {

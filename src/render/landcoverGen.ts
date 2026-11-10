@@ -44,6 +44,7 @@ const fbmForest = makeFbm(5151, 4);
 const fbmForest2 = makeFbm(6262, 3);
 const fbmField = makeFbm(7373, 3);
 const fbmAngle = makeFbm(8484, 2);
+const fbmGrove = makeFbm(9595, 3);
 
 /**
  * j0 ≤ j < j1 satırlarının arazi örtüsü. heights satır hRow0'dan başlar ve komşu satırları (j − 1, j + 1; kenarda
@@ -87,12 +88,12 @@ export function fillLandcover(heights: Float32Array, hRow0: number, j0: number, 
       const treeLine = 1 - smoothstep(1650, 2050, h);
       const steep = 1 - smoothstep(0.75, 1.15, slope);
       const f = smoothstep(-0.02, 0.2, n) * hill * treeLine * steep * cityClear * site * (1 - cityNear * 0.55);
-      out.forest[k] = Math.round(clamp(f, 0, 1) * 255);
+      let fv = 0;
       // Tarla: düz ovalarda, ormansız yerde, şehir çevresinde yoğun
       if (h < 560 && slope < 0.14) {
         const region = smoothstep(-0.12, 0.22, fbmField(x / 15000, z / 15000));
         const fl = clamp(region * 0.85 + cityNear * 0.6, 0, 1) * (1 - smoothstep(0.1, 0.35, f)) * (1 - smoothstep(0.08, 0.14, slope)) * site * (1 - urban);
-        let fv = fl * smoothstep(18, 40, h) * (1 - smoothstep(420, 560, h));
+        fv = fl * smoothstep(18, 40, h) * (1 - smoothstep(420, 560, h));
         // Parseller: köşe ızgarasına hizalı dikdörtgenler (bölgeye göre 3-5 × 2-4 köşe, 300 km hücresinde), hücre başına
         // renk. Küçük haritada hücre küçük: köşe sayısı artar, parsel gerçek boyunda kalır
         const region2 = Math.floor((fbmAngle(x / 30000, z / 30000) + 1) * 3);
@@ -105,6 +106,11 @@ export function fillLandcover(heights: Float32Array, hRow0: number, j0: number, 
         if (hash(cv + 91, cu - 17) < 0.18) fv *= 0.3;
         out.field[k] = Math.round(clamp(fv, 0, 1) * 255);
       }
+      // Boş kalan açık arazi ağaçlanır (2026-11-10): her yerde seyrek ağaç, yer yer koru ve ağaç öbeği. Tarlalar (parsel deseni)
+      // aynı kalır; şehir, ana üs yerleri, ağaç sınırı üstü ve uçurumlar boş. Uzakta arazi rengi, yakında ağaç olarak görünür.
+      const grove = smoothstep(0, 0.4, fbmGrove(x / 1600, z / 1600));
+      const open = (0.12 + 0.5 * grove) * treeLine * steep * cityClear * site * (1 - urban) * (1 - smoothstep(0.15, 0.35, fv));
+      out.forest[k] = Math.round(clamp(Math.max(f, open), 0, 1) * 255);
     }
   }
 }

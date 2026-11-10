@@ -97,6 +97,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
     `scenarios.ts` (oyuncuya görünmez; test, video kayıt ve ölçüm için koddan `game.loadScenario`), `campaign.ts`, `commander.ts` (rakip yapay zekâ).
+  - **Rastgele başlangıç yerleri** (2026-11-10, `startSites.ts`): harekâtta ana üsler haritanın sabit yerlerinde değil,
+    yüklü haritada uygun rastgele noktalarda (karada, pist sığar, koridor açık, şehir ve kenardan uzak; arazi değişmez).
+    Her tarafın en yakın rakibi sabit yerlerdeki ortalamanın 0,6–1,5 katı, ortalama ±%15. Harita `startZones` verirse
+    (Takımadalar: altı büyük ada) her taraf ayrı bölgede. Ana menü dizilişi önizlemede gösterir ("Yeni yerler"), oyun
+    aynısıyla başlar (`game.newCampaign` `layout`). Uygun nokta havuzu harita başına bir kez, menüde dilimlerle kurulur.
+    Ana menü arka planı, senaryolar ve ölçümler sabit yerlerde kalır. Haritanın sabit yerleri (`sites`) araziyi de
+    biçimlendirir (ova, yol); değiştirmek eski kayıtları bozar.
   - **Harita büyüklüğü:**
     - Seçenekler: Küçük 150, Orta 200 (varsayılan), Büyük 300 km.
     - Haritalar 300 km için çizildi (`MAP_BASE`). Küçükte büyük şekiller ve yerler ölçeklenir; yerel ayrıntı, pist ve
@@ -149,6 +156,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
     malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
   - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `palette.ts`.
+  - **Boş arazi ağaçlı** (2026-11-10): `landcoverGen.ts` ormanın dışındaki açık araziye de seyrek ağaç ve koru yazar
+    (`open`, tarla, şehir, üs yeri, ağaç sınırı ve uçurum hariç). Yakın ağaçlar `scenery.ts`'te yol, köy, çiftlik ve şehir
+    çevresine dikilmez (`keepOut`, 40 m hücre; `buildSettlements` doldurur). Yalnız görüntü: sim arazisi değişmez.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
 - **`src/audio/`:**
   - `sound.ts`: Web Audio, kanallar, örnek bankası.

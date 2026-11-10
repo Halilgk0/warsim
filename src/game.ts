@@ -23,6 +23,11 @@ import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
 import { type SaveKind, currentAccount, listSaves, readSave, refreshSession, savesCleanupBy, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
 import { autoSlotFor } from './saveSlots';
+import { rollStartSites } from './sim/startSites';
+import type { SiteDef } from './sim/mapData';
+
+/** Ana menünün gösterdiği başlangıç dizilişi: hangi harita (terrainMap.key) için atıldığıyla. */
+export interface StartLayout { key: string; sites: SiteDef[] }
 import { StatsTracker } from './net/stats';
 import { THANKS_PLAY_SEC } from './ui/thanks';
 import { MainMenu } from './ui/mainMenu';
@@ -236,14 +241,22 @@ export class Game {
   /** Ana menüde seçilen harita (ve büyüklüğü) arka plana gelir. */
   previewMap(mapId: string, size: number): void {
     if (this.mode !== 'menu') return;
-    this.withMap(mapId, size, () => this.buildBackdrop());
+    this.withMap(mapId, size, () => {
+      this.buildBackdrop();
+      // Harita yüklendi: menü önizlemesinde rastgele başlangıç yerleri atılabilir
+      this.menu.refreshLayout();
+    });
   }
 
-  /** Yeni harekât: oyuncu + düşmanlar, herkes aynı varlıklarla başlar. */
-  newCampaign(playerName: string, enemies: number, mapId = terrainMap.id, size = terrainMap.size): void {
+  /**
+   * Yeni harekât: oyuncu + düşmanlar, herkes aynı varlıklarla başlar. Ana üsler rastgele yerlerde (ana menünün gösterdiği
+   * diziliş; uymuyorsa yeniden atılır, bulunamazsa haritanın sabit yerleri).
+   */
+  newCampaign(playerName: string, enemies: number, mapId = terrainMap.id, size = terrainMap.size, layout?: StartLayout): void {
     this.withMap(mapId, size, () => {
       const w = new World();
-      setupCampaign(w, { enemies, playerName });
+      const sites = layout && layout.key === terrainMap.key && layout.sites.length === enemies + 1 ? layout.sites : rollStartSites(enemies + 1) ?? undefined;
+      setupCampaign(w, { enemies, playerName, sites });
       w.campaignId = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
       this.enterPlay(w, 'kampanya');
       this.lastSave = null;

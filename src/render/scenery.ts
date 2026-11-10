@@ -7,7 +7,14 @@ import { CITIES, MAP_HALF as HALF, MAP_SIZE, TEAM_SITES } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, groundLevel, terrainHeight, terrainMap } from '../sim/terrain';
 import { chunkCells } from './terrain';
 import { clamp, mulberry32, smoothstep } from '../core/math';
-import { cleared, clearingsVersion, fieldGrid, forestGrid, sampleGrid, sampleSmooth, slopeGrid } from './landcover';
+import { cleared, clearingsVersion, fieldGrid, forestGrid, sampleGrid, sampleSmooth, slopeGrid, urbanGrid } from './landcover';
+import { makeFbm } from '../core/noise';
+
+/** Açık arazideki ağaç kümeleri (koru, ağaç öbeği): eşit serpiştirme yerine öbek öbek. */
+const fbmGrove = makeFbm(6151, 3);
+
+/** Ağaç konmayacak yerler ızgarası: yollar, köyler, çiftlikler, şehirler (KEEP_CELL m'lik hücreler). */
+const KEEP_CELL = 40;
 import { BOX, CYL, GABLE, broadleafFarGeo, broadleafGeo, coniferFarGeo, coniferGeo, freeze, rockGeo } from './props';
 import { linkAtmosphere } from './atmosphere';
 import { linkCloudShadow } from './clouds';
@@ -192,6 +199,24 @@ export class Scenery {
   private settleBlocks: SettleBlock[] = [];
   private roads: THREE.Vector3[][] = [];
   private settleVersion = 0;
+  /** Ağaç konmayacak hücreler (yol, köy, çiftlik, şehir); yerleşimlerle birlikte kurulur. */
+  private keepOut = new Set<number>();
+
+  private keepKey(x: number, z: number): number {
+    const n = Math.ceil(MAP_SIZE / KEEP_CELL) + 1;
+    return Math.floor((z + HALF) / KEEP_CELL) * n + Math.floor((x + HALF) / KEEP_CELL);
+  }
+
+  private keepCircle(x: number, z: number, r: number): void {
+    for (let dz = -r; dz <= r; dz += KEEP_CELL) {
+      for (let dx = -r; dx <= r; dx += KEEP_CELL) if (dx * dx + dz * dz <= r * r) this.keepOut.add(this.keepKey(x + dx, z + dz));
+    }
+  }
+
+  /** Bu noktaya ağaç konmaz mı (yol, köy, çiftlik, şehir). */
+  private keptOut(x: number, z: number): boolean {
+    return this.keepOut.has(this.keepKey(x, z));
+  }
   private settleDirtyAt = -1;
   /** Hangi harita için kuruldu. */
   private mapVersion = -1;
@@ -448,11 +473,18 @@ export class Scenery {
           const pz = z + (rng() - 0.5) * step * 0.5;
           const r = rng();
           const forest = sampleSmooth(forestGrid, px, pz);
-          // Ormanda sık; açık arazide tek tük (tarlada çok seyrek)
-          const p = forest > 0.06 ? Math.min(1, forest * 1.15) : sampleGrid(fieldGrid, px, pz) > 0.3 ? 0.003 : 0.012;
+          // Ormanda sık. Açık arazi boş kalmasın (2026-11-10): öbek öbek ağaçlık ve koru; tarlada seyrek ağaç öbekleri
+          // (parsel deseni görünür kalır). Yol, köy, çiftlik ve şehirde ağaç yok.
+          // Açık arazinin ağaçlığı arazi örtüsünde (landcoverGen open); burada tarlalara seyrek ağaç öbekleri eklenir
+          let p: number;
+          if (forest > 0.06) p = Math.min(1, forest * 1.15);
+          else if (sampleGrid(fieldGrid, px, pz) > 0.3) p = 0.005 + smoothstep(-0.35, 0.45, fbmGrove(px / 900, pz / 900)) * 0.04;
+          else p = 0.012;
           if (r > p) continue;
           const h = terrainHeight(px, pz);
-          if (h < 6 || cleared(px, pz, 60)) continue;
+          if (h < 6 || cleared(px, pz, 60) || this.keptOut(px, pz) || sampleGrid(urbanGrid, px, pz) > 0.05) continue;
+          // Açık arazinin ağaçları ağaç sınırının (≈1,7 km) üstüne ve uçurumlara çıkmaz
+          if (forest <= 0.06 && (h > 1700 || sampleGrid(slopeGrid, px, pz) > 0.7)) continue;
           const conifer = rng() < 0.1 + 0.8 * smoothstep(500, 1250, h);
           const size = (conifer ? 17 : 15) + rng() * 10;
           const y = groundLevel(px, pz) - 0.8;
@@ -534,6 +566,17 @@ export class Scenery {
       const size = (9 + rng() * 6) * s;
       trees.push(x, groundLevel(x, z) - 0.4, z, size, size, size, rng() * 6.28, TREES_B[Math.floor(rng() * TREES_B.length)]);
     };
+    // Ağaç konmayacak yerler: yollar (iki yana 30 m) ve şehirler; köyler ve çiftlikler aşağıda kurulurken eklenir
+    this.keepOut.clear();
+    for (const road of roads) {
+      for (let i = 1; i < road.length; i++) {
+        const a = road[i - 1];
+        const b = road[i];
+        const n = Math.max(1, Math.ceil(a.distanceTo(b) / 20));
+        for (let k = 0; k <= n; k++) this.keepCircle(a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n, 30);
+      }
+    }
+    for (const c of CITIES) this.keepCircle(c.x, c.z, c.r * 1.25);
 
     // Dekor şehirleri: sokak ızgarası, merkezde apartman/ofis, çevrede evler, parklar
     for (const c of CITIES) {
@@ -615,6 +658,7 @@ export class Scenery {
         const cx = p.x - (dz / l) * side * 160;
         const cz = p.z + (dx / l) * side * 160;
         const yaw = Math.atan2(dx, dz);
+        this.keepCircle(cx, cz, 230);
         const n = 6 + Math.floor(rng() * 10);
         for (let k = 0; k < n; k++) {
           const a = rng() * Math.PI * 2;
@@ -642,6 +686,7 @@ export class Scenery {
       if (CITIES.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.3) || cleared(x, z, 300)) continue;
       const yaw = rng() * Math.PI;
       const y = groundLevel(x, z) - 0.5;
+      this.keepCircle(x, z, 50);
       walls.push(x, y, z, 14, 7.5, 26, yaw, 0x8e3e2e);
       roofs.push(x, y + 7.5, z, 15, 5, 27, yaw, 0x5a5e66);
       house(x + 28 * Math.cos(yaw), z - 28 * Math.sin(yaw), yaw);

@@ -5,7 +5,10 @@ import type { Game } from '../game';
 import { MAX_ENEMIES } from '../sim/campaign';
 import { MAP_BASE, MAP_SIZES, MAP_SIZE_DEFAULT, TEAM_SITES, mapSizeName } from '../sim/mapData';
 import { MAPS, mapById } from '../sim/maps';
-import { terrainMap } from '../sim/terrain';
+import { mapKey, terrainMap } from '../sim/terrain';
+import { buildStartSitePool, rollStartSites, startSitesReady } from '../sim/startSites';
+import type { StartLayout } from '../game';
+import type { SiteDef } from '../sim/mapData';
 import { mapPreview } from './mapPreview';
 import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError } from '../persist';
 import { SavesPanel } from './savesList';
@@ -42,21 +45,30 @@ export function savedSize(): number {
   return MAP_SIZE_DEFAULT;
 }
 
-/** Oyuncu üssünden en yakın düşman üssü (km), seçilen büyüklükte. */
-function nearestEnemyKm(mapId: string, enemies: number, size: number): number {
-  const s = mapById(mapId).sites;
-  const k = size / MAP_BASE;
-  const d = s.slice(1, enemies + 1).map((o) => Math.hypot(o.x - s[0].x, o.z - s[0].z) * k);
+/** Oyuncu üssünden en yakın düşman üssü (km): atılan dizilişte (yüklü haritanın ölçeğinde). */
+function nearestEnemyKm(sites: SiteDef[]): number {
+  const d = sites.slice(1).map((o) => Math.hypot(o.x - sites[0].x, o.z - sites[0].z));
   return Math.round(Math.min(...d) / 5000) * 5;
 }
 
-/** Küçük harita: seçili haritanın önizlemesi üstünde tarafların ana üs yerleri (seçilen düşman sayısına göre). */
-function siteMap(mapId: string, enemies: number): string {
+/** Diziliş henüz atılmadıysa: haritanın sabit yerlerinde en yakın rakip uzaklıklarının ortalaması (km; rastgele yerler buna yakın). */
+function meanNearestKm(mapId: string, enemies: number, size: number): number {
+  const k = size / MAP_BASE;
+  const s = mapById(mapId).sites.slice(0, enemies + 1);
+  const near = s.map((a, i) => Math.min(...s.filter((_, j) => j !== i).map((b) => Math.hypot(a.x - b.x, a.z - b.z) * k)));
+  return Math.round(near.reduce((p, q) => p + q, 0) / near.length / 5000) * 5;
+}
+
+/**
+ * Küçük harita: seçili haritanın önizlemesi üstünde tarafların ana üs yerleri (atılan rastgele diziliş; size: dizilişin
+ * atıldığı büyüklük). Diziliş yoksa yalnız harita.
+ */
+function siteMap(mapId: string, sites: SiteDef[] | null, size: number): string {
   const S = 150;
   // Yerler her büyüklükte aynı oranda: taban ölçekte çizilir
-  const k = S / MAP_BASE;
+  const k = (S / MAP_BASE) * (MAP_BASE / size);
   const def = mapById(mapId);
-  const dots = def.sites.slice(0, enemies + 1).map((site, i) => {
+  const dots = (sites ?? []).map((site, i) => {
     const t = TEAM_SITES[i];
     const x = S / 2 + site.x * k;
     const y = S / 2 + site.z * k;
@@ -77,6 +89,9 @@ export class MainMenu {
   private tab: Tab = 'new';
   private error = '';
   private notice = '';
+  /** Önizlemedeki rastgele başlangıç dizilişi (oyun başlarken aynısı kullanılır). */
+  private layout: (StartLayout & { enemies: number }) | null = null;
+  private slicing = false;
   readonly saves: SavesPanel;
   readonly board: LeaderboardPanel;
 
@@ -189,7 +204,10 @@ export class MainMenu {
       return false;
     }
     enterFullscreen();
-    this.game.newCampaign(name, this.enemies, this.mapId, this.size);
+    // Önizlemede gösterilen diziliş; uymuyorsa (harita başka büyüklükte yüklü) oyun başlarken atılır
+    const lay = this.currentLayout();
+    this.game.newCampaign(name, this.enemies, this.mapId, this.size, lay ?? undefined);
+    this.layout = null;
     return true;
   }
 
@@ -214,6 +232,53 @@ export class MainMenu {
         { label: goLabel, run: go },
       ],
     );
+  }
+
+  /**
+   * Gösterilen başlangıç dizilişi (rastgele ana üs yerleri). Seçili harita bu büyüklükte yüklü değilse null (oyun
+   * başlarken atılır). Uygun nokta havuzu henüz kurulmadıysa dilimler hâlinde kurulur, bitince önizleme yenilenir.
+   */
+  private currentLayout(): (StartLayout & { enemies: number }) | null {
+    const key = mapKey(this.mapId, this.size);
+    if (terrainMap.key !== key) return null;
+    if (this.layout?.key === key && this.layout.enemies === this.enemies) return this.layout;
+    if (startSitesReady()) {
+      const sites = rollStartSites(this.enemies + 1);
+      this.layout = sites ? { key, enemies: this.enemies, sites } : null;
+      return this.layout;
+    }
+    if (!this.slicing) {
+      this.slicing = true;
+      const step = () => {
+        if (terrainMap.key !== key || buildStartSitePool(8)) {
+          this.slicing = false;
+          this.refreshLayout();
+          return;
+        }
+        setTimeout(step, 0);
+      };
+      setTimeout(step, 0);
+    }
+    return null;
+  }
+
+  /** "En yakın düşman üssü" satırı ve "Yeni yerler" düğmesi. */
+  private nearHtml(): string {
+    const lay = this.currentLayout();
+    if (!lay) {
+      return `<span class="muted small mm-near">${L('Başlangıç yerleri rastgele; en yakın düşman ortalama', 'Random start positions; nearest enemy on average')} ≈ ${meanNearestKm(this.mapId, this.enemies, this.size)} km</span>`;
+    }
+    return `<span class="muted small mm-near">${L('En yakın düşman üssü', 'Nearest enemy base')} ≈ ${nearestEnemyKm(lay.sites)} km
+      <button class="mini" data-mm="reroll" title="${L('Üslerin başlangıç yerlerini yeniden seç', 'Pick new start positions for the bases')}">↻ ${L('Yeni yerler', 'New positions')}</button></span>`;
+  }
+
+  /** Yalnız harita önizlemesi ve uzaklık satırı yenilenir (yazılan komutan adı ve odak bozulmasın). */
+  refreshLayout(): void {
+    if (!this.isOpen) return;
+    const map = this.el.querySelector('.mm-map');
+    if (map) map.outerHTML = siteMap(this.mapId, this.currentLayout()?.sites ?? null, this.size);
+    const near = this.el.querySelector('.mm-near');
+    if (near) near.outerHTML = this.nearHtml();
   }
 
   /** Kayıtlar sekmesi (fazla kayıt ve yer uyarılarından). */
@@ -258,6 +323,10 @@ export class MainMenu {
       case 'enemies':
         this.enemies = Number(b.dataset.v);
         this.render();
+        return;
+      case 'reroll':
+        this.layout = null;
+        this.refreshLayout();
         return;
       case 'map':
         if (b.dataset.v === this.mapId) return;
@@ -391,7 +460,7 @@ export class MainMenu {
         <div class="mm-maps">${maps}</div>
         <div class="mm-size">
           <div class="seg">${MAP_SIZES.map((s) => `<button class="${s === this.size ? 'active' : ''}" data-mm="size" data-v="${s}">${mapSizeName(s)}<small>${s / 1000} km</small></button>`).join('')}</div>
-          <span class="muted small">${L('En yakın düşman üssü', 'Nearest enemy base')} ≈ ${nearestEnemyKm(this.mapId, this.enemies, this.size)} km</span>
+          ${this.nearHtml()}
         </div>
         </div>
         <div class="mm-enemy">
@@ -401,7 +470,7 @@ export class MainMenu {
             <div class="mm-foes">${foes}</div>
             <p class="muted small">${L('Herkes herkese karşı. Her ülke ana hava üssü, uçak fabrikası, 1 maden ocağı ve 2 evle başlar.', 'Free for all. Every country starts with a main airbase, an aircraft factory, 1 mine and 2 houses.')}</p>
           </div>
-          ${siteMap(this.mapId, this.enemies)}
+          ${siteMap(this.mapId, this.currentLayout()?.sites ?? null, this.size)}
         </div>
         <div class="mm-foot"><p>${acc
           ? L(`Oyun <b>${esc(acc.name)}</b> hesabına kaydedilir; her 5 dakikada otomatik kayıt alınır.`, `The game is saved to the <b>${esc(acc.name)}</b> account and autosaved every 5 minutes.`)

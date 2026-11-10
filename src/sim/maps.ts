@@ -19,6 +19,11 @@ export interface MapDef {
   cities: CityDef[];
   /** Ayrıca düzleştirilecek noktalar (test senaryolarının tesisleri vb.). */
   extraLand: LandPoint[];
+  /**
+   * Rastgele başlangıç bölgeleri (taban ölçekte daireler): varsa her taraf ayrı bir bölgede başlar (Takımadalar: her ülke
+   * kendi adasında, ortadaki tarafsız ada ve adacıklar dışında). Yoksa harita her yerinde serbest.
+   */
+  startZones?: LandPoint[];
   /** Düzleştirme öncesi doğal yükseklik (m). k: harita büyüklüğü / 300 km (x, z gerçek konum). */
   natural(x: number, z: number, k?: number): number;
 }
@@ -197,6 +202,7 @@ const TAKIMADA: MapDef = {
   sites: [islandSite(0, 90), islandSite(1, 90), islandSite(2, 150), islandSite(3, 150), islandSite(4, 30), islandSite(5, 30)],
   cities: islandCities(),
   extraLand: [],
+  startZones: ISLANDS.slice(0, 6).map(({ x, z, r }) => ({ x, z, r })),
   natural: takimada,
 };
 

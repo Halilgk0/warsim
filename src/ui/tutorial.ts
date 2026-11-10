@@ -482,8 +482,8 @@ export class Tutorial {
         id: 'mapsize', ch: 'menu', click: true,
         target: () => visible('#mainmenu .mm-s-map'),
         text: () => L(
-          'Harita ve büyüklüğü: küçük haritada üsler birbirine yakın, savaş çabuk başlar; büyük haritada uçuşlar uzun sürer. İstersen burada değiştir.',
-          'Map and size: on a small map the bases are close together and the fighting starts quickly; on a large map flights take longer. Change them here if you like.',
+          'Harita ve büyüklüğü: küçük haritada üsler birbirine yakın, savaş çabuk başlar; büyük haritada uçuşlar uzun sürer. Herkes her harekâtta rastgele bir yerde başlar; “Yeni yerler” ile yeniden seçebilirsin. İstersen burada değiştir.',
+          'Map and size: on a small map the bases are close together and the fighting starts quickly; on a large map flights take longer. Everyone starts somewhere random in each campaign; “New positions” picks again. Change them here if you like.',
         ),
       },
       {
