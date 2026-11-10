@@ -9,6 +9,8 @@ import { terrainMap } from '../sim/terrain';
 import { mapPreview } from './mapPreview';
 import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError } from '../persist';
 import { SavesPanel } from './savesList';
+import { autoSlotFor } from '../saveSlots';
+import { SAVE_SLOTS } from '../net/shared';
 import { NEWS, newsCard, syncNewsMarks } from './news';
 import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
 import { $, esc, focusField } from './dom';
@@ -81,8 +83,13 @@ export class MainMenu {
   constructor(private readonly game: Game) {
     // Oyuna girerken tam ekran (tıklama anında istenmeli)
     this.saves = new SavesPanel((id) => {
-      enterFullscreen();
-      void this.game.loadSave(id);
+      const m = this.saves.list.find((x) => x.id === id);
+      const go = () => {
+        enterFullscreen();
+        void this.game.loadSave(id);
+      };
+      if (m && this.noAutoSlot(m.playerName)) this.warnNoAutoSlot(m.playerName, L('Otomatik kayıtsız devam et', 'Continue without autosave'), go);
+      else go();
     }, () => this.render());
     this.board = new LeaderboardPanel(() => this.render());
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -170,12 +177,52 @@ export class MainMenu {
     return false;
   }
 
-  /** Harekâtı başlat (öğretici penceresi ya da ana menü bölümü bitince). Ad geçersizse false. */
-  launch(): boolean {
+  /**
+   * Harekâtı başlat (öğretici penceresi ya da ana menü bölümü bitince). Ad geçersizse false. Otomatik kayıt için boş yer
+   * yoksa önce söylenir (force: oyuncu yine de başlattı).
+   */
+  launch(force = false): boolean {
     if (!this.validName()) return false;
+    const name = cleanName(this.name);
+    if (!force && this.noAutoSlot(name)) {
+      this.warnNoAutoSlot(name, L('Otomatik kayıtsız başla', 'Start without autosave'), () => this.launch(true));
+      return false;
+    }
     enterFullscreen();
-    this.game.newCampaign(cleanName(this.name), this.enemies, this.mapId, this.size);
+    this.game.newCampaign(name, this.enemies, this.mapId, this.size);
     return true;
+  }
+
+  /** Hesapta bu adlı oyunun otomatik kaydı için yer yok mu (liste henüz gelmediyse sorulmaz; oyunda ayrıca bakılır). */
+  private noAutoSlot(playerName: string): boolean {
+    return !!currentAccount() && !this.saves.loading && autoSlotFor(this.saves.list, playerName) === null;
+  }
+
+  private warnNoAutoSlot(playerName: string, goLabel: string, go: () => void): void {
+    this.game.modals.openNotice(
+      L('Otomatik kayıt için boş yer yok', 'No free slot for autosave'),
+      `<p>${L(
+        `${SAVE_SLOTS} kayıt yerinin hepsi dolu ve hiçbiri <b>${esc(playerName)}</b> oyununun otomatik kaydı değil. Böyle başlarsan oyun otomatik kaydedilmez.`,
+        `All ${SAVE_SLOTS} save slots are full and none of them holds the autosave of <b>${esc(playerName)}</b>. If you start like this, the game will not autosave.`,
+      )}</p>
+      <p>${L(
+        'Kayıtlar\'dan birini silersen otomatik kayıt kendiliğinden başlar; oyunun içinden de silebilirsin (Menü → Kayıtlar).',
+        'Delete one in Saves and autosave starts by itself; you can also do that during the game (Menu → Saves).',
+      )}</p>`,
+      [
+        { label: L('Kayıtları aç', 'Open saves'), primary: true, run: () => this.openSaves() },
+        { label: goLabel, run: go },
+      ],
+    );
+  }
+
+  /** Kayıtlar sekmesi (fazla kayıt ve yer uyarılarından). */
+  openSaves(): void {
+    const acc = currentAccount();
+    if (!acc) return;
+    this.tab = 'saves';
+    this.render();
+    void this.saves.refresh(acc.key);
   }
 
   /** Giriş ya da yeni hesap sonrası: ileti, kayıt listesi ve skorlar yenilenir. */
@@ -187,6 +234,8 @@ export class MainMenu {
     this.render();
     void this.saves.refresh(a.key);
     void this.board.refresh(true);
+    // Fazla kayıt uyarısı her girişte
+    void this.game.checkSaveCleanup();
   }
 
   /** Skor görünürlüğü değişti: tablo eski kalmasın. */

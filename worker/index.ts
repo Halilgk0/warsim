@@ -20,7 +20,7 @@
 // - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
 //   hesap silme.
 
-import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, SAVE_AUTO_HOME, SAVE_CLEANUP_DAYS, SAVE_SLOTS, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { LATEST_NEWS_MAIL, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
@@ -55,12 +55,15 @@ interface AccountRow {
   news_seen?: string;
   /** 1: skorlar herkese açık tabloda görünür (varsayılan), 0: gizli. */
   score_public: number;
+  /** Fazla kayıt uyarısının ilk gösterildiği an (ms; migration 0008). Kayıt sayısı yerlere sığınca boşalır. */
+  saves_warned?: number | null;
 }
 
 const NEWS_SEEN_MAX = 200;
 const SESSION_DAYS = 90;
 const MAX_FAILS = 8;
 const LOCK_MS = 15 * 60 * 1000;
+/** Yersiz kayıt sınırları: yalnız kayıt yerlerinden (2026-11-10) önceki istemciler için. */
 const AUTO_KEEP = 3;
 const MANUAL_MAX = 30;
 const SAVE_MAX_BYTES = 1_500_000;
@@ -488,9 +491,58 @@ function bytesToB64(b: Uint8Array): string {
   return btoa(s);
 }
 
+interface SaveRow { id: string; created: number; meta: Record<string, unknown> }
+
+/**
+ * Yeri olmayan (kayıt yerlerinden önceki) kayıtları boş yerlere yerleştirir: otomatikler önce 4. yere doğru, elle olanlar
+ * 1. yerden başlayarak; en yenisi önce. Yer kalmazsa yersiz kalır.
+ */
+async function placeLegacySaves(env: Env, a: AccountRow, rows: SaveRow[]): Promise<void> {
+  const free = new Set(Array.from({ length: SAVE_SLOTS }, (_, i) => i + 1));
+  for (const r of rows) if (validSlot(r.meta.slot)) free.delete(r.meta.slot);
+  const legacy = rows.filter((r) => !validSlot(r.meta.slot)).sort((x, y) => y.created - x.created);
+  const ups: D1PreparedStatement[] = [];
+  for (const r of legacy) {
+    const order = r.meta.kind === 'auto' ? [SAVE_AUTO_HOME, 3, 2, 1] : [1, 2, 3, 4];
+    const slot = order.find((s) => free.has(s));
+    if (slot === undefined) break;
+    free.delete(slot);
+    r.meta = { ...r.meta, slot };
+    ups.push(env.DB.prepare('UPDATE saves SET meta = ? WHERE id = ? AND account_id = ?').bind(JSON.stringify(r.meta), r.id, a.id));
+  }
+  if (ups.length) await env.DB.batch(ups);
+}
+
+/**
+ * Kayıt listesi, en yenisi önce. Toplam SAVE_SLOTS'u aşıyorsa (düzenden önceki fazla kayıtlar): ilk listede uyarı zamanı
+ * yazılır ve cleanupBy döner; SAVE_CLEANUP_DAYS sonra yerdeki kayıtlar ve en yeni yersiz kayıtlar kalır, gerisi silinir.
+ * Sığıyorsa yersizler boş yerlere yerleşir.
+ */
 async function listSaves(env: Env, a: AccountRow): Promise<Response> {
-  const { results } = await env.DB.prepare('SELECT meta FROM saves WHERE account_id = ? ORDER BY created DESC').bind(a.id).all<{ meta: string }>();
-  return json({ saves: results.map((r) => JSON.parse(r.meta)) });
+  const now = Date.now();
+  const { results } = await env.DB.prepare('SELECT id, created, meta FROM saves WHERE account_id = ?').bind(a.id).all<{ id: string; created: number; meta: string }>();
+  let rows: SaveRow[] = results.map((r) => ({ id: r.id, created: r.created, meta: JSON.parse(r.meta) as Record<string, unknown> }));
+  let cleanupBy: number | null = null;
+  if (rows.length > SAVE_SLOTS) {
+    const warned = a.saves_warned ?? now;
+    if (a.saves_warned == null) await env.DB.prepare('UPDATE accounts SET saves_warned = ? WHERE id = ?').bind(now, a.id).run();
+    cleanupBy = warned + SAVE_CLEANUP_DAYS * DAY_MS;
+    if (now >= cleanupBy) {
+      const slotted = rows.filter((r) => validSlot(r.meta.slot));
+      const legacy = rows.filter((r) => !validSlot(r.meta.slot)).sort((x, y) => y.created - x.created);
+      const keep = new Set([...slotted, ...legacy.slice(0, Math.max(0, SAVE_SLOTS - slotted.length))].map((r) => r.id));
+      const gone = rows.filter((r) => !keep.has(r.id));
+      if (gone.length) await env.DB.batch(gone.map((r) => env.DB.prepare('DELETE FROM saves WHERE id = ? AND account_id = ?').bind(r.id, a.id)));
+      rows = rows.filter((r) => keep.has(r.id));
+      cleanupBy = null;
+    }
+  }
+  if (rows.length <= SAVE_SLOTS) {
+    if (a.saves_warned != null) await env.DB.prepare('UPDATE accounts SET saves_warned = NULL WHERE id = ?').bind(a.id).run();
+    await placeLegacySaves(env, a, rows);
+  }
+  rows.sort((x, y) => y.created - x.created);
+  return json({ saves: rows.map((r) => r.meta), cleanupBy });
 }
 
 async function putSave(req: Request, env: Env, a: AccountRow, id: string): Promise<Response> {
@@ -507,13 +559,24 @@ async function putSave(req: Request, env: Env, a: AccountRow, id: string): Promi
   if (owner && owner.account_id !== a.id) return fail(403, 'forbidden');
   const kind = b.meta.kind === 'auto' ? 'auto' : 'manual';
   const created = typeof b.meta.created === 'number' ? b.meta.created : Date.now();
-  if (!owner && kind === 'manual') {
+  const slot = validSlot(b.meta.slot) ? b.meta.slot : null;
+  if (!owner && kind === 'manual' && slot === null) {
+    // Yersiz elle kayıt: yalnız kayıt yerlerinden önceki istemciler (eski sınır)
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM saves WHERE account_id = ? AND kind = 'manual'").bind(a.id).first<{ n: number }>();
     if ((n?.n ?? 0) >= MANUAL_MAX) return fail(409, 'too_many');
   }
-  const meta = JSON.stringify({ ...b.meta, id, account: a.name_key, kind });
-  await env.DB.prepare('INSERT OR REPLACE INTO saves (id, account_id, kind, created, meta, data) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(id, a.id, kind, created, meta, data).run();
+  const meta = JSON.stringify({ ...b.meta, id, account: a.name_key, kind, ...(slot ? { slot } : {}) });
+  const put = env.DB.prepare('INSERT OR REPLACE INTO saves (id, account_id, kind, created, meta, data) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(id, a.id, kind, created, meta, data);
+  if (slot !== null) {
+    // Kayıt yeri: o yerdeki önceki kayıt (elle ya da otomatik) yerini bırakır
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM saves WHERE account_id = ? AND id != ? AND json_extract(meta, '$.slot') = ?").bind(a.id, id, slot),
+      put,
+    ]);
+    return json({ ok: true, meta: JSON.parse(meta) });
+  }
+  await put.run();
   if (kind === 'auto') {
     // Otomatik kayıtlardan en yeni AUTO_KEEP tanesi kalır
     await env.DB.prepare(

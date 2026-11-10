@@ -15,7 +15,14 @@ import { $, esc } from './dom';
 import { L } from '../i18n';
 import { thanksBody, thanksTitle } from './thanks';
 
-export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit' | 'thanks';
+export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit' | 'thanks' | 'notice';
+
+/** Bildirim penceresinin düğmesi: tıklanınca pencere kapanır, sonra run çalışır. */
+export interface NoticeButton {
+  label: string;
+  primary?: boolean;
+  run: () => void;
+}
 
 export class Modals {
   isOpen = false;
@@ -44,6 +51,8 @@ export class Modals {
   private pit: { id: number; slot: number } | null = null;
   /** Teşekkür penceresi: ad ve toplam süre. */
   private thanks = { name: '', sec: 0 };
+  /** Bildirim penceresi (kayıt yeri uyarıları gibi): başlık, gövde (HTML), düğmeler. */
+  private notice: { title: string; body: string; buttons: NoticeButton[] } = { title: '', body: '', buttons: [] };
 
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -110,6 +119,15 @@ export class Modals {
     this.render();
   }
 
+  /** Bildirim penceresi: çelik görünüm, düğmeler altta (ilki asıl eylem). Dışarı dokunmak ya da ✕ yalnız kapatır. */
+  openNotice(title: string, body: string, buttons: NoticeButton[]): void {
+    this.notice = { title, body, buttons };
+    this.kind = 'notice';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
   /** Bataryanın yuvası için top seçimi. */
   openPit(id: number, slot: number): void {
     this.pit = { id, slot };
@@ -166,6 +184,10 @@ export class Modals {
     if (this.kind === 'thanks') {
       title = thanksTitle(this.thanks.name);
       body = thanksBody(this.thanks.sec);
+    } else if (this.kind === 'notice') {
+      title = this.notice.title;
+      body = `<div class="notice-body">${this.notice.body}</div><div class="btn-row">${this.notice.buttons.map((b, i) =>
+        `<button class="${b.primary ? 'primary' : ''}" data-act="nb" data-i="${i}">${b.label}</button>`).join('')}</div>`;
     } else if (this.kind === 'research') {
       title = L('Araştırma', 'Research');
       body = this.research();
@@ -183,8 +205,10 @@ export class Modals {
       title = L('Hazine ve pazar', 'Treasury and market');
       body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase);
     }
+    // Bildirim ana menünün ve hesap penceresinin de üstünde açılır
+    this.el.classList.toggle('over', this.kind === 'notice');
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' ? ' steel' : ''}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' ? ' steel' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
@@ -266,6 +290,12 @@ export class Modals {
     if (!b) return;
     const g = this.game;
     switch (b.dataset.act) {
+      case 'nb': {
+        const btn = this.notice.buttons[Number(b.dataset.i)];
+        this.close();
+        btn?.run();
+        return;
+      }
       case 'rtab':
         this.tab = b.dataset.tab as ResearchTab;
         this.sel = null;

@@ -872,6 +872,13 @@ button.link.prd-more { font-size: calc(11px * var(--ui)); padding: 10px 8px; mar
 .news-sheet.steel .soc { background: #2c3733; color: #d3ddd7; }
 /* Teşekkür penceresi (6 saat) */
 .modal-card.thanks { width: min(calc(560px * var(--ui)), 95vw); }
+/* Bildirim penceresi (kayıt yeri uyarıları): teşekkür penceresiyle aynı ölçüler; ana menü (20) ve hesap penceresi (45) üstünde */
+.modal.over { position: fixed; z-index: 46; }
+.modal-card.notice { width: min(calc(520px * var(--ui)), 95vw); }
+.modal-card.notice .modal-body { font-size: calc(14px * var(--ui)); line-height: 1.55; }
+.notice-body p { margin: calc(8px * var(--ui)) 0; color: #d3ddd7; }
+.notice-body b { color: #ffffff; }
+.modal-card.notice .btn-row button { min-height: max(32px, calc(36px * var(--ui))); }
 .modal-card.thanks .modal-body { font-size: calc(14px * var(--ui)); line-height: 1.55; }
 .modal-card.thanks .modal-body p { margin: calc(10px * var(--ui)) 0; }
 .thanks-lead { font-size: calc(15px * var(--ui)); color: #d3ddd7; }
@@ -1243,6 +1250,14 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .sv-main small { font-size: calc(11px * var(--ui)); color: var(--muted); font-weight: 700; }
 .sv-act { display: flex; gap: calc(4px * var(--ui)); align-items: center; flex: none; }
 .sv-confirm { font-size: calc(11.5px * var(--ui)); font-weight: 700; color: #a8473c; display: inline-flex; gap: calc(4px * var(--ui)); align-items: center; }
+/* Kayıt yerleri: numara, boş yer, otomatik işareti, uyarı şeridi, eski kayıtlar bölümü */
+.sv-slot { width: calc(28px * var(--ui)); height: calc(28px * var(--ui)); border-radius: calc(9px * var(--ui)); display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; flex: none; }
+.sv-row.empty { background: transparent; border-style: dashed; }
+.sv-row.empty .sv-slot { background: var(--chip); color: var(--muted); }
+.sv-auto { color: var(--muted); }
+.sv-warn { font-size: calc(12px * var(--ui)); line-height: 1.45; font-weight: 700; color: #7d5a1e; background: #f8eed6; border-radius: calc(10px * var(--ui)); padding: calc(8px * var(--ui)) calc(11px * var(--ui)); margin: 0 0 calc(8px * var(--ui)); }
+.sv-legacy-h { font-size: calc(13px * var(--ui)); margin: calc(12px * var(--ui)) 0 calc(6px * var(--ui)); }
+.sv-legacy-h small { font-weight: 700; }
 button.danger { background: #f3d9d3; color: #a8473c; }
 button.danger:hover { background: #ecc7bf; }
 

@@ -21,7 +21,8 @@ import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
 import { setupCampaign } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
-import { type SaveKind, currentAccount, readSave, refreshSession, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
+import { type SaveKind, currentAccount, listSaves, readSave, refreshSession, savesCleanupBy, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
+import { autoSlotFor } from './saveSlots';
 import { StatsTracker } from './net/stats';
 import { THANKS_PLAY_SEC } from './ui/thanks';
 import { MainMenu } from './ui/mainMenu';
@@ -38,7 +39,8 @@ import { sound } from './audio/sound';
 import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
-import { L } from './i18n';
+import { L, LOCALE } from './i18n';
+import { SAVE_SLOTS } from './net/shared';
 import { Tutorial } from './ui/tutorial';
 import { MAP_BASE, MAP_SCALE } from './sim/mapData';
 import { AutoFast } from './autoFast';
@@ -106,6 +108,10 @@ export class Game {
   /** Son kayıt (gerçek zaman, oyun zamanı, tür). */
   lastSave: { real: number; gameTime: number; kind: SaveKind } | null = null;
   private autosaveClock = 0;
+  /** Otomatik kayıt için yer olmadığı söylendi (yer açılınca sıfırlanır). */
+  private autoNoSlotTold = false;
+  /** Gösterilecek fazla kayıt uyarısı (silme tarihi, kayıt sayısı). */
+  private cleanupDue: { by: number; count: number } | null = null;
   private toastTimer = 0;
   timeScale = 1;
   scenarioId = SCENARIOS[0].id;
@@ -167,6 +173,7 @@ export class Game {
       if (acc) void syncPending(acc.key).catch(() => {});
       // E-postası olmayan eski hesaba her açılışta sorulur (adres bağlanana kadar; pencere kapatılabilir)
       if (shouldAskEmail() && this.mode === 'menu' && !this.login.isOpen) this.login.askEmail();
+      void this.checkSaveCleanup();
     });
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');
@@ -361,15 +368,64 @@ export class Game {
     return m < 60 ? L(`${m} dk önce`, `${m} min ago`) : L(`${Math.floor(m / 60)} sa ${m % 60} dk önce`, `${Math.floor(m / 60)} h ${m % 60} min ago`);
   }
 
-  /** Hesaba kaydet (giriş yoksa false). */
-  async saveNow(kind: SaveKind, title?: string): Promise<boolean> {
+  /**
+   * Kayıt yerlerinden önceki fazla kayıtlar: sunucu silme tarihini verdiyse (savesCleanupBy) uyarı her girişte (oyun açılınca
+   * ve hesaba girince) gösterilir, ana menüde başka pencere yokken.
+   */
+  async checkSaveCleanup(): Promise<void> {
+    const acc = currentAccount();
+    if (!acc) return;
+    const list = await listSaves(acc.key).catch(() => null);
+    if (!list || !savesCleanupBy()) return;
+    this.cleanupDue = { by: savesCleanupBy()!, count: list.length };
+  }
+
+  private showCleanup(): void {
+    const c = this.cleanupDue!;
+    this.cleanupDue = null;
+    const left = Math.max(0, Math.ceil((c.by - Date.now()) / 86400000));
+    const when = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' }).format(c.by);
+    this.modals.openNotice(
+      L('Kayıtlarını temizle', 'Clean up your saves'),
+      `<p>${L(
+        `Artık her hesapta en çok <b>${SAVE_SLOTS} kayıt</b> var. Senin <b>${c.count} kaydın</b> var.`,
+        `Each account now has at most <b>${SAVE_SLOTS} saves</b>. You have <b>${c.count} saves</b>.`,
+      )}</p>
+      <p>${L(
+        `Kayıtlar sekmesinden istemediklerini sil. <b>${when}</b> tarihine kadar (${left} gün) ${SAVE_SLOTS}'e inmezse en yeni ${SAVE_SLOTS} kayıt dışındakiler kendiliğinden silinir.`,
+        `Delete the ones you don't need in the Saves tab. If you still have more than ${SAVE_SLOTS} by <b>${when}</b> (${left} ${left === 1 ? 'day' : 'days'}), all but your newest ${SAVE_SLOTS} are deleted automatically.`,
+      )}</p>`,
+      [
+        { label: L('Kayıtları aç', 'Open saves'), primary: true, run: () => this.menu.openSaves() },
+        { label: L('Sonra', 'Later'), run: () => {} },
+      ],
+    );
+  }
+
+  /**
+   * Hesaba kaydet (giriş yoksa false). Elle kayıtta yer verilir; otomatikte yer kayıt listesinden seçilir (saveSlots.ts
+   * autoSlotFor). Otomatik kayıt için boş yer yoksa kaydedilmez, oyuncuya bir kez söylenir.
+   */
+  async saveNow(kind: SaveKind, title?: string, slot?: number): Promise<boolean> {
     const acc = currentAccount();
     if (!acc || this.mode !== 'play') return false;
     try {
+      if (kind === 'auto') {
+        const s = autoSlotFor(await listSaves(acc.key), this.world.playerName);
+        if (s === null) {
+          if (!this.autoNoSlotTold) this.toast(L('Otomatik kayıt alınamadı: boş kayıt yeri yok. Menü → Kayıtlar\'dan birini silebilirsin.', 'Could not autosave: no free save slot. You can delete one in Menu → Saves.'), true);
+          this.autoNoSlotTold = true;
+          this.autosaveClock = 0;
+          return false;
+        }
+        slot = s;
+        this.autoNoSlotTold = false;
+      }
+      if (slot === undefined) return false;
       const d = serializeWorld(this.world, this.scenarioId);
       const rig = this.renderer.rig;
       d.camera = { x: rig.target.x, z: rig.target.z, distance: rig.distance, yaw: rig.yaw, pitch: rig.pitch };
-      const { cloud } = await writeSave(acc.key, title ?? this.defaultSaveTitle(), kind, d);
+      const { cloud } = await writeSave(acc.key, title ?? this.defaultSaveTitle(), kind, d, slot);
       this.lastSave = { real: performance.now(), gameTime: this.world.time, kind };
       this.autosaveClock = 0;
       if (!cloud) this.toast(L('Bu cihaza kaydedildi; bağlantı gelince buluta yüklenecek', 'Saved on this device; it will upload when you are online'));
@@ -794,6 +850,8 @@ export class Game {
       this.drawDebt = 0;
       this.renderer.frame(real, Math.min(this.acc / STEP, 1));
       this.tutorial.update();
+      // Fazla kayıt uyarısı: e-posta penceresi ya da öğretici açıksa onlar kapanınca
+      if (this.cleanupDue && !this.login.isOpen && !this.modals.isOpen && !this.tutorial.busy) this.showCleanup();
       return;
     }
     const visible = document.visibilityState === 'visible';

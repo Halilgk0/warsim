@@ -15,6 +15,39 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'kayit-yerleri': {
+    title: 'Saves now have 4 slots',
+    summary: 'Every account has 4 save slots. Autosave writes to its own slot, and you choose the slot when you save. Players with more saves have a week to tidy up.',
+    cover: 'kayit-en.jpg',
+    files: ['kayit-uyari-en.jpg'],
+    captions: ['Accounts with too many saves see this notice every time they sign in.'],
+    sections: [
+      {
+        heading: 'Save slots',
+        bullets: [
+          'Every account has 4 save slots, one save in each.',
+          'Use Menu → Save and pick a slot. An empty slot saves straight away; you are asked before a full slot is overwritten.',
+          'The Saves list shows the 4 slots in order, empty ones too.',
+        ],
+      },
+      {
+        heading: 'Autosave',
+        bullets: [
+          'The game still autosaves every 5 minutes.',
+          'An autosave replaces the previous autosave of the game with the same name. If you start under a new name, it goes to slot 4 first, or to an empty slot if 4 is taken.',
+          'If there is no free slot, you are told before the game starts: delete a save, or play without autosave. If a slot frees up during the game, autosave starts by itself.',
+        ],
+      },
+      {
+        heading: 'If you have more saves',
+        bullets: [
+          'If you had more than 4 saves before this change, a notice appears every time you sign in. Your old saves are listed in their own section in Saves.',
+          'Delete the ones you don’t need. If you still have more than 4 one week after the notice, all but your newest 4 are deleted automatically, and the rest move into the slots.',
+          'With 4 saves or fewer there is nothing to do: your saves have already been placed in the slots.',
+        ],
+      },
+    ],
+  },
   'ansiklopedi-hava': {
     title: 'Encyclopedia renewed: air defence, search and a steel look',
     summary: 'The encyclopedia now has pages for 10 anti-aircraft guns too. Search and sorting on the list pages, a new steel look, and more realistic aircraft finishes in the game as well.',

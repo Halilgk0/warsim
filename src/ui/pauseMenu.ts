@@ -9,7 +9,7 @@ import { SCENARIOS } from '../sim/scenarios';
 import { $, esc, fmtTime } from './dom';
 import { L } from '../i18n';
 
-type View = 'main' | 'saves' | 'exit';
+type View = 'main' | 'saves' | 'slots' | 'exit';
 
 export class PauseMenu {
   isOpen = false;
@@ -19,17 +19,20 @@ export class PauseMenu {
   private busy = false;
   private msg = '';
   private title = '';
+  /** Kayıttan sonra ana menüye dön (Kaydet ve çık). */
+  private exitAfter = false;
   readonly saves: SavesPanel;
 
   constructor(private readonly game: Game) {
     this.saves = new SavesPanel((id) => void this.game.loadSave(id), () => this.render());
+    this.saves.saveTo = (slot) => void this.save(slot);
     this.el.addEventListener('click', (e) => this.onClick(e));
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
       if (t.name === 'stitle') this.title = t.value;
     });
     this.el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.target as HTMLElement).matches('input[name="stitle"]')) void this.save();
+      if (e.key === 'Enter' && (e.target as HTMLElement).matches('input[name="stitle"]') && this.view === 'main') this.showSlots(false);
       else if (e.key === 'Escape') this.close();
       e.stopPropagation();
     });
@@ -55,14 +58,30 @@ export class PauseMenu {
     if (resume) this.game.setTimeScale(this.resumeScale);
   }
 
-  private async save(): Promise<void> {
-    if (this.busy || !currentAccount()) return;
-    this.busy = true;
+  /** Kayıt yeri seçimi (Kaydet ya da Kaydet ve çık). */
+  private showSlots(exitAfter: boolean): void {
+    this.exitAfter = exitAfter;
+    this.view = 'slots';
     this.render();
-    const ok = await this.game.saveNow('manual', this.title.trim() || this.game.defaultSaveTitle());
-    this.busy = false;
-    this.msg = ok ? L('Kaydedildi.', 'Saved.') : L('Kaydedilemedi.', 'Could not save.');
-    if (ok) this.title = this.game.defaultSaveTitle();
+    void this.saves.refresh(currentAccount()?.key ?? null);
+  }
+
+  /** Seçilen yere elle kayıt; dolu yerin onayı listede alınır. */
+  private async save(slot: number): Promise<void> {
+    if (this.busy || !currentAccount()) return;
+    this.busy = this.saves.busy = true;
+    this.render();
+    const ok = await this.game.saveNow('manual', this.title.trim() || this.game.defaultSaveTitle(), slot);
+    this.busy = this.saves.busy = false;
+    if (ok && this.exitAfter) {
+      this.game.exitToMenu();
+      return;
+    }
+    this.msg = ok ? L(`Kaydedildi (${slot}. yer).`, `Saved (slot ${slot}).`) : L('Kaydedilemedi.', 'Could not save.');
+    if (ok) {
+      this.title = this.game.defaultSaveTitle();
+      this.view = 'main';
+    }
     this.render();
   }
 
@@ -73,7 +92,7 @@ export class PauseMenu {
       return;
     }
     const acc = currentAccount();
-    if (this.view === 'saves' && this.saves.handle(t, acc?.key ?? null)) return;
+    if ((this.view === 'saves' || this.view === 'slots') && this.saves.handle(t, acc?.key ?? null)) return;
     const b = t.closest<HTMLElement>('[data-pm]');
     if (!b) return;
     const g = this.game;
@@ -82,7 +101,7 @@ export class PauseMenu {
         this.close();
         return;
       case 'save':
-        void this.save();
+        this.showSlots(false);
         return;
       case 'login':
         g.login.open((a, created) => {
@@ -123,14 +142,7 @@ export class PauseMenu {
         }
         return;
       case 'exit-save':
-        void g.saveNow('manual', this.game.defaultSaveTitle()).then((ok) => {
-          if (ok) g.exitToMenu();
-          else {
-            this.msg = L('Kaydedilemedi.', 'Could not save.');
-            this.view = 'main';
-            this.render();
-          }
-        });
+        this.showSlots(true);
         return;
       case 'exit-now':
         g.exitToMenu();
@@ -146,10 +158,20 @@ export class PauseMenu {
     // Öğretici harekât içindir (it dalaşı ve saldırı senaryolarında hangar boş, kurulacak görev yok)
     const tutorial = (SCENARIOS.find((s) => s.id === g.scenarioId)?.group ?? 'harekat') === 'harekat';
     let body = '';
-    if (this.view === 'saves') {
-      body = `<div class="pm-head"><button class="icon" data-pm="back" title="${L('Geri', 'Back')}">‹</button><h2>${L('Kayıtlar', 'Saves')}</h2></div>
-        <p class="muted small">${L('Yüklenen kayıt şu anki oyunun yerini alır.', 'Loading a save replaces the current game.')}</p>
+    if (this.view === 'saves' || this.view === 'slots') {
+      // "Kaydet": yer seçilir (her yerde Buraya kaydet / Üstüne yaz); "Kayıtlar": yalnız yükle ve sil
+      const slots = this.view === 'slots';
+      const saveTo = this.saves.saveTo;
+      if (!slots) this.saves.saveTo = null;
+      const head = slots ? (this.exitAfter ? L('Kaydet ve çık', 'Save and quit') : L('Kaydet', 'Save')) : L('Kayıtlar', 'Saves');
+      body = `<div class="pm-head"><button class="icon" data-pm="back" title="${L('Geri', 'Back')}">‹</button><h2>${head}</h2></div>
+        ${slots
+          ? `<p class="muted small">${L('Bir kayıt yeri seç. Dolu yerin üstüne yazmadan önce sorulur.', 'Pick a save slot. You are asked before a full slot is overwritten.')}</p>
+            <div class="pm-save"><input name="stitle" maxlength="${NAME_MAX * 2}" value="${esc(this.title)}" placeholder="${L('Kayıt adı', 'Save name')}" ${this.busy ? 'disabled' : ''}></div>`
+          : `<p class="muted small">${L('Yüklenen kayıt şu anki oyunun yerini alır.', 'Loading a save replaces the current game.')}</p>`}
+        ${this.busy ? `<div class="mm-note">${L('Kaydediliyor…', 'Saving…')}</div>` : ''}
         ${this.saves.html()}`;
+      this.saves.saveTo = saveTo;
     } else if (this.view === 'exit') {
       body = `<h2>${L('Ana menüye dön', 'Back to main menu')}</h2>
         <p class="muted">${acc
@@ -170,7 +192,7 @@ export class PauseMenu {
       const saveBlock = acc
         ? `<div class="pm-save">
             <input name="stitle" maxlength="${NAME_MAX * 2}" value="${esc(this.title)}" placeholder="${L('Kayıt adı', 'Save name')}" ${this.busy ? 'disabled' : ''}>
-            <button class="primary" data-pm="save" ${this.busy ? 'disabled' : ''}>${this.busy ? L('Kaydediliyor…', 'Saving…') : L('Kaydet', 'Save')}</button>
+            <button class="primary" data-pm="save" ${this.busy ? 'disabled' : ''}>${L('Kaydet…', 'Save…')}</button>
           </div>`
         : `<div class="pm-guest"><span>${L('Misafir oyun kaydedilmez.', 'Guest games are not saved.')}</span><button data-pm="login">${L('Giriş yap ve kaydet', 'Log in and save')}</button></div>`;
       body = `<h2>${L('Duraklatıldı', 'Paused')}</h2>

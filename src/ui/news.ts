@@ -32,6 +32,42 @@ const img = (file: string) => `${import.meta.env.BASE_URL}news/${file}`;
 /** En yeni en üstte. */
 const NEWS_TR: NewsItem[] = [
   {
+    id: 'kayit-yerleri',
+    date: '2026-11-10',
+    title: 'Kayıtlar artık 4 yerde',
+    summary: 'Her hesapta 4 kayıt yeri var. Otomatik kayıt kendi yerine yazılır, elle kayıtta yeri sen seçersin. Daha fazla kaydı olanların bir haftası var.',
+    cover: img('kayit.jpg'),
+    images: [
+      { src: img('kayit-uyari.jpg'), caption: 'Fazla kaydı olan hesaba her girişte bu uyarı çıkar.' },
+    ],
+    sections: [
+      {
+        heading: 'Kayıt yerleri',
+        bullets: [
+          'Her hesapta 4 kayıt yeri var; her yerde bir kayıt durur.',
+          'Menü → Kaydet ile bir yer seçersin. Boş yere hemen kaydedilir, dolu yerin üstüne yazmadan önce sorulur.',
+          'Kayıtlar listesinde 4 yer sırayla görünür; boş yerler de.',
+        ],
+      },
+      {
+        heading: 'Otomatik kayıt',
+        bullets: [
+          'Oyun her 5 dakikada otomatik kaydedilmeye devam eder.',
+          'Otomatik kayıt, aynı adlı oyunun önceki otomatik kaydının üstüne yazılır. Yeni bir adla başlarsan önce 4. yere, o doluysa boş bir yere yazılır.',
+          'Boş yer yoksa oyun başlamadan söylenir: bir kaydı silebilir ya da otomatik kayıtsız oynayabilirsin. Oyun sırasında bir yer açılırsa otomatik kayıt kendiliğinden başlar.',
+        ],
+      },
+      {
+        heading: 'Daha fazla kaydın varsa',
+        bullets: [
+          'Bu düzenden önce 4’ten fazla kaydın varsa oyuna her girişte bir uyarı çıkar. Eski kayıtların Kayıtlar listesinde ayrı bir bölümde durur.',
+          'İstemediklerini sil. Uyarıdan sonraki bir hafta içinde 4’e inmezse en yeni 4 kayıt dışındakiler kendiliğinden silinir; kalanlar yerlere yerleşir.',
+          '4 ya da daha az kaydın varsa bir şey yapman gerekmez: kayıtların kendiliğinden yerlere yerleşti.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'ansiklopedi-hava',
     date: '2026-11-06',
     title: 'Ansiklopedi yenilendi: hava savunması, arama ve çelik görünüm',

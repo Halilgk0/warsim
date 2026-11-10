@@ -53,6 +53,8 @@ export interface SaveMeta {
   mapSize?: number;
   /** Kayıt biçimi sürümü. */
   v?: number;
+  /** Kayıt yeri (1-4). Yoksa kayıt yerlerinden önceki fazla kayıt: temizlenmeyi bekler. */
+  slot?: number;
   /** Bu tarayıcıdaki kopya buluta yüklendi mi (yalnız yerel önbellekte). */
   synced?: boolean;
   /** Listede: yalnız bu cihazda (buluta yüklenmeyi bekliyor). */
@@ -425,6 +427,13 @@ export async function syncPending(account: string): Promise<void> {
   }
 }
 
+let cleanupBy: number | null = null;
+
+/** Fazla (yersiz) kayıtların sunucuda silineceği an; son listeye göre. Yoksa null. */
+export function savesCleanupBy(): number | null {
+  return cleanupBy;
+}
+
 /** Hesabın kayıtları, en yenisi önce: bulut + bu cihazda bekleyenler. Bağlantı yoksa yalnız bu cihazdakiler. */
 export async function listSaves(account: string): Promise<SaveMeta[]> {
   let local = await localList(account).catch(() => [] as SaveMeta[]);
@@ -432,7 +441,9 @@ export async function listSaves(account: string): Promise<SaveMeta[]> {
   try {
     await syncPending(account);
     local = await localList(account);
-    cloud = (await api<{ saves: SaveMeta[] }>('GET', '/saves')).saves;
+    const r = await api<{ saves: SaveMeta[]; cleanupBy?: number | null }>('GET', '/saves');
+    cloud = r.saves;
+    cleanupBy = r.cleanupBy ?? null;
   } catch {
     cloud = null;
   }
@@ -444,19 +455,22 @@ export async function listSaves(account: string): Promise<SaveMeta[]> {
   return [...cloud, ...pending].sort((a, b) => b.created - a.created);
 }
 
-/** Kaydet: önce bu cihaza, sonra buluta. cloud: buluta yüklendi mi (yoksa bağlanınca yüklenir). */
-export async function writeSave(account: string, title: string, kind: SaveKind, data: SaveData): Promise<{ meta: SaveMeta; cloud: boolean }> {
+/**
+ * Kaydet: önce bu cihaza, sonra buluta; o yerdeki önceki kayıt (elle ya da otomatik) silinir. cloud: buluta yüklendi mi
+ * (yoksa bağlanınca yüklenir).
+ */
+export async function writeSave(account: string, title: string, kind: SaveKind, data: SaveData, slot: number): Promise<{ meta: SaveMeta; cloud: boolean }> {
   const me = data.teams[data.playerTeam];
   const meta: SaveMeta = {
     id: newSaveId(),
     account, title, kind, created: Date.now(), gameTime: data.playTime ?? data.time, playerName: data.playerName,
     enemies: data.setup?.enemies ?? Math.max(0, data.teams.length - 1), money: Math.round(me?.money ?? 0),
     structures: data.structures.filter((s) => s.team === data.playerTeam && s.hp > 0).length,
-    mapId: data.mapId, mapSize: data.mapSize, v: data.v,
+    mapId: data.mapId, mapSize: data.mapSize, v: data.v, slot,
   };
   const json = JSON.stringify(data);
   await localPut({ ...meta, synced: false }, json);
-  if (kind === 'auto') await pruneLocalAutos(account, 3);
+  for (const m of await localList(account)) if (m.slot === slot && m.id !== meta.id) await localDelete(m.id);
   try {
     await upload(meta, json);
   } catch (e) {
@@ -486,10 +500,4 @@ export async function deleteSave(id: string): Promise<void> {
     }
   }
   await localDelete(id);
-}
-
-/** Bu cihazdaki otomatik kayıtlardan en yeni `keep` tanesi kalır (bulutta sunucu eler). */
-async function pruneLocalAutos(account: string, keep: number): Promise<void> {
-  const autos = (await localList(account)).filter((m) => m.kind === 'auto').sort((a, b) => b.created - a.created);
-  for (const m of autos.slice(keep)) await localDelete(m.id);
 }

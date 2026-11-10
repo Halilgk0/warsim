@@ -169,6 +169,15 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)
   yazılır, bağlantı yoksa orada bekler ve sonra yüklenir. Eski şifresiz hesabın (`warsim.accounts.v1`) sahibi şifre
   belirleyince bu tarayıcıdaki kayıtları yeni hesaba geçer.
+  - **Kayıt yerleri** (2026-11-10, `src/saveSlots.ts`, sabitler `shared.ts` `SAVE_SLOTS`): hesap başına 4 yer, yerde bir
+    kayıt (`SaveMeta.slot`); yazınca o yerdeki eski kayıt silinir (istemci ve sunucu). Otomatik kayıt `autoSlotFor`: aynı
+    adlı (komutan adı, `nameKey`) oyunun otomatik kaydının yeri, yoksa 4, 3, 2, 1'den ilk boş; yer yoksa alınmaz, ana menü
+    başlamadan ve yüklemeden önce söyler (`mainMenu.ts` `warnNoAutoSlot`). Elle kayıtta oyuncu yeri seçer (duraklatma →
+    Kaydet), dolu yere onayla.
+  - Yersiz (önceki) kayıtlar: sunucu `listSaves` toplam 4'ü aşınca `accounts.saves_warned`'a (migration 0008) ilk uyarı
+    anını yazar, `cleanupBy` döner; oyun her girişte uyarır (`game.ts` `checkSaveCleanup`, bildirim penceresi
+    `modals.openNotice`). 7 gün sonra yerdekiler ve en yeni yersizler kalır, gerisi silinir; sığınca yersizler boş yerlere
+    yerleşir (otomatikler 4'ten, elle olanlar 1'den). Yasal metinler bunu anlatır.
 - **`src/net/`:** sunucuyla konuşma (`api.ts`), istemci ve sunucu ortak kuralları (`shared.ts`: ad anahtarı, ölçütler),
   skor istatistiği (`stats.ts`).
 - **`worker/` + `migrations/`: sunucu (Cloudflare Worker + D1).** Oyunun dosyalarını Cloudflare sunar, worker yalnız

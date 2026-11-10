@@ -48,7 +48,17 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-05';
+export const LEGAL_VERSION = '2026-11-10';
+
+/**
+ * Kayıt yerleri (2026-11-10): hesap başına 4 yer, her yerde bir kayıt. Otomatik kayıt aynı adlı oyunun önceki otomatik
+ * kaydının yerine, yoksa önce 4. yere, o doluysa boş bir yere yazılır. Bu düzenden önceki fazla kayıtlar (yeri olmayan) için
+ * hesaba uyarı gösterilir; SAVE_CLEANUP_DAYS içinde temizlenmezse sunucu en yeni 4 kayıt dışındakileri siler.
+ */
+export const SAVE_SLOTS = 4;
+export const SAVE_AUTO_HOME = 4;
+export const SAVE_CLEANUP_DAYS = 7;
+export const validSlot = (s: unknown): s is number => typeof s === 'number' && Number.isInteger(s) && s >= 1 && s <= SAVE_SLOTS;
 
 /** Geri bildirim: görüş metninin en büyük uzunluğu ve "Steam'de _ $ veririm" üst sınırı. */
 export const FEEDBACK_MAX = 2000;
