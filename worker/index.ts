@@ -22,7 +22,7 @@
 
 import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, SAVE_AUTO_HOME, SAVE_CLEANUP_DAYS, SAVE_SLOTS, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
-import { LATEST_NEWS_MAIL, newsMail, unsubPage, unsubUrl } from './newsMail';
+import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
 import { feedbackMail } from './feedbackMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
@@ -750,8 +750,8 @@ const newsToken = (env: Env, id: number): Promise<string> => sha256(`news-unsub:
 
 /** Sıradaki tek hesaba son haberi gönderir. Önce işaretlenir: görev yarıda kesilse de kimseye iki kez gitmez. */
 async function sendNextNewsMail(env: Env, now: number): Promise<void> {
-  const news = LATEST_NEWS_MAIL;
-  if (!mailReady(env) || !env.ADMIN_KEY || now > news.at + NEWS_MAIL_DAYS * DAY_MS) return;
+  const news = latestNewsMail();
+  if (!news || !mailReady(env) || !env.ADMIN_KEY || now > news.at + NEWS_MAIL_DAYS * DAY_MS) return;
   const mark = `mail:${news.id}`;
   const a = await env.DB.prepare(
     `SELECT id, email, lang FROM accounts WHERE news_opt = 1 AND email IS NOT NULL AND news_at <= ?

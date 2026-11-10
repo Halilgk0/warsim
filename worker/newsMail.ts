@@ -1,7 +1,10 @@
-// Haber e-postası: yalnız izin verenlere (news_opt = 1), hesabın dilinde. Yeni haber duyurulacaksa LATEST_NEWS_MAIL değişir;
-// push'tan sonra zamanlı görev (index.ts scheduled) kendiliğinden gönderir. Her e-postada çıkma bağlantısı vardır.
+// Haber e-postası: yalnız izin verenlere (news_opt = 1), hesabın dilinde. Gönderilen, haberlerin en üstündeki haberdir
+// (latestNewsMail); yeni haber push edilince zamanlı görev (index.ts scheduled) kendiliğinden gönderir. Her e-postada
+// çıkma bağlantısı vardır.
 
 import type { Mail } from './codeMail';
+import { NEWS_TR, type NewsSection, img } from '../src/ui/newsData';
+import { NEWS_EN } from '../src/ui/newsEn';
 
 const SITE = 'https://warsimbox.com';
 const FONT = "Nunito,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -28,36 +31,40 @@ export interface NewsMail {
   en: NewsText;
 }
 
-export const LATEST_NEWS_MAIL: NewsMail = {
-  id: 'ansiklopedi-hava',
-  at: Date.UTC(2026, 10, 7, 23, 59),
-  image: 'news/ansiklopedi2.jpg',
-  imageEn: 'news/ansiklopedi2-en.jpg',
-  tr: {
-    subject: 'WarSimBox: Ansiklopedi yenilendi, boyalar gerçeğe yaklaştı',
-    title: 'Ansiklopedi yenilendi',
-    lead: 'Ansiklopedide artık 10 uçaksavar topunun da sayfası var; arama, sıralama ve oyundaki çelik görünüm geldi. Uçakların boyaları oyunda da daha gerçekçi.',
-    bullets: [
-      'Hava savunması bölümü: M2 Browning’den 12,8 cm Flak 40’a her topun tarihçesi, künyesi ve oyundaki değerleri.',
-      'Liste sayfalarında arama kutusu (bf109, p51, ülke, yıl) ve yıla, ada ya da hıza göre sıralama.',
-      'Boyasız uçaklar (P-51D, B-17G, MiG-15…) beyaz değil gümüş; boyalı uçaklarda solmuş levhalar ve kir izleri. İniş takımları da düzeltildi.',
-    ],
-    button: 'Ansiklopediyi aç',
-    link: '/ansiklopedi/',
-  },
-  en: {
-    subject: 'WarSimBox: The encyclopedia renewed, more realistic paint',
-    title: 'The encyclopedia renewed',
-    lead: 'The encyclopedia now has a page for each of the 10 anti-aircraft guns, plus search, sorting and the game’s steel look. Aircraft paint is more realistic in the game too.',
-    bullets: [
-      'Air defence section: history, specs and in-game stats for every gun from the M2 Browning to the 12.8 cm Flak 40.',
-      'A search box on the list pages (bf109, p51, country, year) and sorting by year, name or speed.',
-      'Unpainted aircraft (P-51D, B-17G, MiG-15…) are silver instead of white; painted ones have faded panels and grime streaks. Landing gear has been fixed too.',
-    ],
-    button: 'Open the encyclopedia',
-    link: '/en/encyclopedia/',
-  },
-};
+const escHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Haberin e-postadaki maddeleri: her bölümün ilk maddesi (yoksa metni), en çok 3; eksikse diğer maddelerle tamamlanır. */
+function mailBullets(sections: NewsSection[]): string[] {
+  const first = sections.map((s) => s.bullets?.[0] ?? s.text?.[0]).filter((x): x is string => !!x);
+  const rest = sections.flatMap((s) => [...(s.bullets ?? []).slice(1), ...(s.text ?? []).slice(s.bullets?.length ? 0 : 1)]);
+  return [...first, ...rest].slice(0, 3).map(escHtml);
+}
+
+/**
+ * Duyurulacak haber: haberlerin en üstündeki (newsData.ts NEWS_TR[0], İngilizcesi newsEn.ts). Yeni haber eklenip push
+ * edilince zamanlı görev onu izin verenlere kendiliğinden gönderir (2026-11-10 kararı: her haber e-postayla gider).
+ * Haber noMail ise null. Duyuru zamanı haberin günü sonu (UTC): o ana kadar izin verenler alır, bir hafta sürer.
+ */
+export function latestNewsMail(): NewsMail | null {
+  const n = NEWS_TR[0];
+  if (!n || n.noMail) return null;
+  const e = NEWS_EN[n.id];
+  const path = (p: string) => p.replace(/^\/+/, '');
+  const tr: NewsText = {
+    subject: `WarSimBox: ${n.title}`, title: escHtml(n.title), lead: escHtml(n.summary), bullets: mailBullets(n.sections), button: 'Oyunu aç',
+  };
+  const en: NewsText = e
+    ? { subject: `WarSimBox: ${e.title}`, title: escHtml(e.title), lead: escHtml(e.summary), bullets: mailBullets(e.sections), button: 'Open the game' }
+    : { ...tr, button: 'Open the game' };
+  return {
+    id: n.id,
+    at: Date.parse(`${n.date}T23:59:00Z`),
+    image: path(n.cover),
+    imageEn: e?.cover ? path(img(e.cover)) : undefined,
+    tr,
+    en,
+  };
+}
 
 /** Çıkma bağlantısı: hesap ve imza. Şifre ya da oturum gerekmez, bağlantı yalnız o hesabın iznini kapatır. */
 export const unsubUrl = (id: number, token: string, en: boolean): string =>

@@ -2,7 +2,7 @@
 // Türkçe görünür). Tarih ve görseller Türkçe kayıttan gelir; captions görsellerle aynı sırada. Görselde yazı varsa
 // İngilizcesi cover ve files ile verilir (public/news'teki dosya adı).
 
-import type { NewsSection } from './news';
+import type { NewsSection } from './newsData';
 import { SOUND_CREDITS } from '../audio/credits';
 
 export interface NewsText {

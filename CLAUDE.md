@@ -159,7 +159,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   (`feedback.ts`; sunucudan warsimbox@gmail.com'a e-posta: görüş için e-postalı hesap, yalnız fiyat için misafire komutan
   adı yeter; `worker/index.ts` `sendFeedback`), hesap penceresi (`loginBox.ts`), skor tablosu (`leaderboard.ts`, ana menüde Skorlar sekmesi), profil
   (`profile.ts`: ad etiketi ya da Menü → Profil; skorlar, sıra, şifre değiştirme).
-  - `news.ts`: haberler. Yeni haber listenin en üstüne yazılır (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
+  - `news.ts`: haberler (görünüm; verisi `newsData.ts`). Yeni haber `newsData.ts`'te listenin en üstüne yazılır ve izin
+    verenlere e-postayla da gider (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
     İngilizce görseli `cover` ve `files` ile verilir). Okunmamış işareti kendiliğinden çıkar: açılan haberin kimliği hesaba
     yazılır (`accounts.news_seen`), misafirde işaret yok. `MARK_DAYS`'ten eski haber işaretlenmez.
   - `production.ts`: üretim menüsü (fabrika; uçak ve top satırları) ve yuva penceresi (bataryada top takma). Pencere açıkken yalnız `data-cell` hücreleri güncellenir; tam çizim düğmeyi kaçırıyordu. Resimler hazır dosya (`public/uretim`; araştırma dosyası ve `plan/` altındaki siluetler de): telefon bu pencereler için model kurmaz, liste metni kısa kalır. Yeni uçak ya da top eklenince, model değişince `npm run uretim:gorsel [ac-<uçak> gun-<top>]`.
@@ -194,9 +195,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Adres 6 haneli kodla doğrulanmadan kaydedilmez. Kod warsimbox@gmail.com'dan Gmail SMTP ile gider (`worker/mail.ts`,
     içerik `worker/codeMail.ts`; Google uygulama şifresi yalnız Cloudflare sırrı `MAIL_PASSWORD`, repoya girmez). Sınırlar `worker/index.ts`
     `LIMIT_*`: başkasının kutusuna yağdırılmasın, Gmail'in günlük sınırı (~500) aşılmasın.
-  - Haber e-postası: `worker/newsMail.ts` `LATEST_NEWS_MAIL` değişip push edilince zamanlı görev dakikada bir, izin vermiş tek
-    hesaba gönderir (bir haftalık pencere). Kime gittiği `news_seen`'de `mail:<haber>`. Çıkma `/api/news/unsubscribe`. Her haber
-    e-postayla gitmek zorunda değil; yalnız duyurulmak istenen haber için değiştir.
+  - Haber e-postası: her yeni haber kendiliğinden e-postayla gider (2026-11-10 kararı). `worker/newsMail.ts`
+    `latestNewsMail` haberlerin en üstündekinden (`src/ui/newsData.ts` `NEWS_TR[0]`, İngilizcesi `newsEn.ts`) e-postayı
+    kurar: başlık, özet, bölümlerin ilk maddeleri, kapak (İngilizcesi varsa İngilizce hesaplara). Push edilince zamanlı görev
+    dakikada bir, izin vermiş tek hesaba gönderir; haberin günü sonuna kadar izin verenler alır, bir hafta sürer. Kime
+    gittiği `news_seen`'de `mail:<haber>`. Çıkma `/api/news/unsubscribe`. Gitmemesi gereken haberde `noMail: true`.
+    `newsData.ts` ve `newsEn.ts` sunucu da okuduğu için DOM'a, Vite'e ya da oyun koduna bağlanmamalı.
   - Teşekkür (6 saat): toplam oynama 6 saati geçen hesaba aynı zamanlı görev bir kez teşekkür e-postası atar
     (`worker/thanksMail.ts`, işaret `mail:tesekkur-6s`). Yalnız `news_opt = 1` olanlara: izinsiz ticari ileti yasal risk,
     kullanıcıyla böyle kararlaştırıldı. Oyunun içinde ise herkese (misafir dahil) bir kez teşekkür penceresi açılır
