@@ -403,8 +403,8 @@ export class Hud {
       html = touch
         ? `<span>${L('Dokun: seç · Sürükle: kaydır · İki parmak: yakınlaş, çevir, eğ · Çift dokun: takip', 'Tap: select · Drag: pan · Two fingers: zoom, rotate, tilt · Double tap: follow')}</span>`
         : `<span>${L(
-          'Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · Tab: sıradaki · Boşluk: duraklat · 1-6: hız · T: araştırma',
-          'Click: select · Drag: pan · Right drag: rotate · Wheel: zoom · F: follow · Tab: next · Space: pause · 1-6: speed · T: research',
+          'Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · Tab: sıradaki · Boşluk: duraklat · 1-3: hız · T: araştırma',
+          'Click: select · Drag: pan · Right drag: rotate · Wheel: zoom · F: follow · Tab: next · Space: pause · 1-3: speed · T: research',
         )}</span>`;
     }
     // Her karede yeniden yazılırsa düğmeye dokunuş kaçıyor

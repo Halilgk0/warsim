@@ -193,9 +193,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     kullanıcıyla böyle kararlaştırıldı. Oyunun içinde ise herkese (misafir dahil) bir kez teşekkür penceresi açılır
     (`ui/thanks.ts`; hesapta `news_seen` `tesekkur-6s`, misafirde `warsim.tesekkur`; misafir süresi `warsim.oynama`).
   - Yerel deneme: `node tools/mail-dev.mjs` (sahte SMTP; kodlar http://localhost:2526), `.dev.vars` ayarları dosyasında.
-  - E-postası olmayan eski hesaba oyun açılınca ve girişte sorulur (`loginBox.ts` `askEmail`), zorunlu değil. Kapatınca
-    7 gün sorulmaz (`persist.ts` `shouldAskEmail`; hesap başına, tarayıcıda). Sonradan Profil'den eklenir; yenilik izni
-    de oradan açılıp kapanır.
+  - E-postası olmayan eski hesaba oyun her açılışta ve her girişte sorulur (`loginBox.ts` `askEmail`, `persist.ts`
+    `shouldAskEmail`), adres bağlanana kadar; ertelenmez (2026-11-10 kararı). Pencere "Şimdi değil" ile kapatılabilir,
+    sonraki girişte yine açılır. Adres Profil'den de eklenir; yenilik izni de oradan açılıp kapanır.
   - Yeni migration canlı veritabanına push'tan önce uygulanır (`wrangler d1 migrations apply warsimbox --remote`);
     Workers Builds'in bunu yaptığını varsayma. Yalnız eklemeli değişiklik: eski worker yeni tabloyla çalışabilsin.
   - Skorlar: harekâtın en yüksek değerlerine göre artış, akla yatkınlık sınırlarıyla kırpılır. Tüm zamanlar ve ISO hafta.

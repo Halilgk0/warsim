@@ -1027,7 +1027,6 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
   .research-chip { min-width: calc(165px * var(--ui)); padding: calc(6px * var(--ui)) calc(11px * var(--ui)); }
   .money-chip { min-width: calc(130px * var(--ui)); padding: calc(6px * var(--ui)) calc(11px * var(--ui)); }
   .top-actions button { padding: calc(7px * var(--ui)) calc(8px * var(--ui)); }
-  .timebar button[data-speed="2"], .timebar button[data-speed="8"] { display: none; }
 }
 @media (max-width: 1000px) {
   .top-actions [data-open="settings"] { display: none; }
@@ -1514,7 +1513,6 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   #topbar { top: 6px; left: max(6px, env(safe-area-inset-left)); right: max(6px, env(safe-area-inset-right)); gap: 5px; }
   .brand, .research-chip, .mc-sub { display: none; }
   .timebar, .top-actions { padding: 3px; gap: 2px; }
-  .timebar button[data-speed="2"], .timebar button[data-speed="8"] { display: none; }
   .top-actions [data-open="settings"] { display: none; }
   .money-chip { min-width: 0; }
   .panel { top: calc(48px * var(--ui)); max-height: calc(100% - calc(56px * var(--ui))); width: calc(270px * var(--ui)); }

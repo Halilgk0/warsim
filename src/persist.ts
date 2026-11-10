@@ -189,7 +189,8 @@ export async function deleteAccount(password: string): Promise<void> {
   await api('DELETE', '/me', { pass: await clientHash(acc.name, password) });
   for (const m of await localList(acc.key).catch(() => [] as SaveMeta[])) await localDelete(m.id).catch(() => {});
   try {
-    localStorage.removeItem(EMAIL_LATER_KEY + acc.key);
+    // Eski e-posta erteleme kaydı (artık okunmuyor) kalmasın
+    localStorage.removeItem('warsim.emailLater.' + acc.key);
   } catch {
     /* depolama kapalı */
   }
@@ -237,29 +238,13 @@ function adoptLegacy(acc: Account): void {
   void rekeyLocal(keys, acc.key).catch(() => {});
 }
 
-/** E-posta sorusunu erteleme zamanı: hesap başına, bu tarayıcıda. */
-const EMAIL_LATER_KEY = 'warsim.emailLater.';
-const EMAIL_LATER_MS = 7 * 86400000;
-
-/** Eski hesaba e-posta sorulacak mı: hesapta adres yoksa ve son 7 günde ertelenmediyse. */
+/**
+ * Eski hesaba e-posta sorulacak mı: hesapta adres yoksa her girişte (oyun açılınca ve giriş yapınca), adres bağlanana
+ * kadar. Ertelenmez (2026-11-10 kararı; önceden kapatınca 7 gün sorulmuyordu, eski `warsim.emailLater.*` anahtarları artık
+ * okunmuyor).
+ */
 export function shouldAskEmail(): boolean {
-  const acc = currentAccount();
-  if (acc?.hasEmail !== false) return false;
-  try {
-    return Date.now() - Number(localStorage.getItem(EMAIL_LATER_KEY + acc.key)) >= EMAIL_LATER_MS;
-  } catch {
-    return true;
-  }
-}
-
-export function postponeEmailAsk(): void {
-  const acc = currentAccount();
-  if (acc?.hasEmail !== false) return;
-  try {
-    localStorage.setItem(EMAIL_LATER_KEY + acc.key, String(Date.now()));
-  } catch {
-    /* depolama kapalı: bir sonraki açılışta yine sorulur */
-  }
+  return currentAccount()?.hasEmail === false;
 }
 
 /** Hesap bu haberi okudu mu. Hesabı olmayan için okundu bilgisi tutulmaz: null. */

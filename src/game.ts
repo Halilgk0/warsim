@@ -44,6 +44,8 @@ import { MAP_BASE, MAP_SCALE } from './sim/mapData';
 import { AutoFast } from './autoFast';
 
 const STEP = 1 / 60;
+/** En yüksek oyun hızı (düğmeler 1×, 2×, 4×). */
+const MAX_SPEED = 4;
 /** Otomatik kayıt aralığı (gerçek zaman, oyun akarken). */
 const AUTOSAVE_SEC = 300;
 /** Sekme arka plana geçince kayıt: son kayıttan bu kadar oyun saniyesi geçmişse. */
@@ -163,7 +165,7 @@ export class Game {
       if (this.mode === 'menu') this.menu.render();
       const acc = currentAccount();
       if (acc) void syncPending(acc.key).catch(() => {});
-      // E-postası olmayan eski hesaba sorulur, zorunlu değil
+      // E-postası olmayan eski hesaba her açılışta sorulur (adres bağlanana kadar; pencere kapatılabilir)
       if (shouldAskEmail() && this.mode === 'menu' && !this.login.isOpen) this.login.askEmail();
     });
     requestAnimationFrame(this.loop);
@@ -504,7 +506,9 @@ export class Game {
     else if (this.selectedAircraftId !== null) this.follow(this.selectedAircraftId);
   }
 
+  /** Oyun hızı: duraklat, 1×, 2×, 4×. Üstü yok (2026-11-10 kararı: hızlandırma en çok 4×). */
   setTimeScale(n: number): void {
+    n = Math.min(n, MAX_SPEED);
     this.timeScale = n;
     if (n > 0) this.lastScale = n;
   }
@@ -645,9 +649,6 @@ export class Game {
         case 'Digit1': this.setTimeScale(1); break;
         case 'Digit2': this.setTimeScale(2); break;
         case 'Digit3': this.setTimeScale(4); break;
-        case 'Digit4': this.setTimeScale(8); break;
-        case 'Digit5': this.setTimeScale(16); break;
-        case 'Digit6': this.setTimeScale(32); break;
         case 'KeyF': this.toggleFollow(); break;
         case 'KeyH': this.hangar.toggle(); break;
         case 'KeyB': this.build.toggle(); break;

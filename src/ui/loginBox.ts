@@ -2,7 +2,7 @@
 // şifremi unuttum (kurtarma koduyla), hesap açılınca bir kez gösterilen kurtarma kodu ve e-postası olmayan eski hesaba
 // zorunlu olmayan e-posta sorusu. Tarayıcının şifre yöneticisi çalışsın diye gerçek bir form.
 
-import { type Account, NAME_MAX, cleanName, currentAccount, login, nameError, postponeEmailAsk, recoverAccount, register, requestEmailCode, saveEmail, shouldAskEmail } from '../persist';
+import { type Account, NAME_MAX, cleanName, currentAccount, login, nameError, recoverAccount, register, requestEmailCode, saveEmail, shouldAskEmail } from '../persist';
 import { apiMessage } from '../net/api';
 import { EMAIL_MAX, PASS_MAX, PASS_MIN, validEmail } from '../net/shared';
 import { legalUrl } from '../yasal/liste';
@@ -104,8 +104,6 @@ export class LoginBox {
   }
 
   close(): void {
-    // E-posta sorusu nasıl kapanırsa kapansın (Şimdi değil, Esc, dışarı dokunma) 7 gün sorulmaz; adres eklendiyse etkisi yok
-    if (this.isOpen && this.mode === 'email') postponeEmailAsk();
     this.pending = null;
     this.isOpen = false;
     this.el.classList.add('hidden');
@@ -338,8 +336,8 @@ export class LoginBox {
         <form class="login-card" role="dialog" aria-modal="true" novalidate>
           <div class="login-head"><b>${L('E-posta adresini ekle', 'Add your email address')}</b></div>
           <p class="muted small">${L(
-            'Şifreni ve kurtarma kodunu kaybedersen hesabının sana ait olduğunu doğrulamamıza yardımcı olur; önemli konularda da sana ulaşabiliriz. Zorunlu değil, istersen sonra Profil’den ekleyebilirsin.',
-            'If you lose your password and recovery code, it helps us confirm the account is yours, and we can reach you about important matters. It is optional, and you can add it later in your Profile.',
+            'Şifreni ve kurtarma kodunu kaybedersen hesabının sana ait olduğunu doğrulamamıza yardımcı olur; önemli konularda da sana ulaşabiliriz. Hesabına bir e-posta adresi bağlayana kadar bu pencere her girişte açılır.',
+            'If you lose your password and recovery code, it helps us confirm the account is yours, and we can reach you about important matters. This window opens every time you sign in until you link an email address to your account.',
           )}</p>
           ${emailInput(this.emailValue)}
           ${consentBoxes(true)}

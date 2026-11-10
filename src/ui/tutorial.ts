@@ -544,8 +544,8 @@ export class Tutorial {
         id: 'time', ch: 'map',
         target: () => visible('#timebar'),
         text: () => L(
-          'Savaş gerçek zamanlı akar. Buradan duraklatır ya da 32 katına kadar hızlandırırsın; yanındaki sayaç gerçek oynama süreni gösterir, hızlanmaz. Sen okurken öğretici zamanı durdurur.',
-          'The war runs in real time. Pause it or speed it up to 32× here; the counter beside it shows your real play time and does not speed up. While you read, the tutorial stops the clock.',
+          'Savaş gerçek zamanlı akar. Buradan duraklatır ya da 4 katına kadar hızlandırırsın; yanındaki sayaç gerçek oynama süreni gösterir, hızlanmaz. Sen okurken öğretici zamanı durdurur.',
+          'The war runs in real time. Pause it or speed it up to 4× here; the counter beside it shows your real play time and does not speed up. While you read, the tutorial stops the clock.',
         ),
       },
       // ---------------------------------------------------------- ilk görev
