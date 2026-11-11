@@ -43,6 +43,7 @@ export const ENCYCLOPEDIA: Record<string, string> = {
   f8f: 'grumman-f8f-1-bearcat',
   f4u4: 'vought-f4u-4-corsair',
   b29: 'boeing-b-29-superfortress',
+  me262u4: 'messerschmitt-me-262-a-1a-u4',
   he162: 'heinkel-he-162-salamander',
   seafury: 'hawker-sea-fury',
   f80c: 'lockheed-f-80c-shooting-star',

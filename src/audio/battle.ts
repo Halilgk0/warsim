@@ -185,6 +185,8 @@ interface GunVoice {
 export class BattleSound {
   private engines = new Map<number, EngineVoice>();
   private guns = new Map<string, GunVoice>();
+  /** Yavaş atan ağır topların (GunSpec.standoff) son görülen mermi sayısı: "uçak:silah" → mermi. */
+  private slowAmmo = new Map<string, number>();
   /** Yakın geçişi çalınan uçaklar: tekrar çalınabileceği an (bağlam saati). */
   private flybys = new Map<number, number>();
   private flybyEnds: number[] = [];
@@ -206,6 +208,7 @@ export class BattleSound {
     this.engines.clear();
     for (const g of this.guns.values()) g.voice.stop(0.03);
     this.guns.clear();
+    this.slowAmmo.clear();
     this.flybys.clear();
     this.lastWorldTime = -1;
   }
@@ -349,6 +352,15 @@ export class BattleSound {
       if (ac.firing) {
         const n: Partial<Record<GunClass, number>> = {};
         ac.guns.forEach((g, i) => {
+          if (g.standoff) {
+            // Yavaş atan ağır top (50 mm, saniyede 2,5 mermi): seri döngüsü yerine mermi başına tek vuruş (orta uçaksavar kaydı,
+            // biraz pes). Mermi sayısı azaldıysa atmıştır; ilk görüldüğünde ateş ediyorsa ilk mermisi az önce çıkmıştır
+            const key = `${ac.id}:${i}`;
+            const was = this.slowAmmo.get(key) ?? ac.gunAmmo[i] + 1;
+            if (ac.gunAmmo[i] < was) sound.play('aa_pom', 'world', { gain: h.gain * 1.1, rate: 0.84 + Math.random() * 0.05, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb, when: now + h.delay * 0.5 });
+            this.slowAmmo.set(key, ac.gunAmmo[i]);
+            return;
+          }
           if (ac.gunAmmo[i] > 0) n[gunClass(g)] = (n[gunClass(g)] ?? 0) + barrels(g);
         });
         for (const [cls, cnt] of Object.entries(n) as [GunClass, number][]) firing.push({ key: `${ac.id}:${cls}`, snd: gunSound(cls, cnt), h });

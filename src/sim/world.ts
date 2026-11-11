@@ -1248,7 +1248,7 @@ export class World {
         pos.copy(ac.pos).addScaledVector(ac.fwd, L * 0.36).addScaledVector(ac.upv, 0.35);
         break;
       default:
-        pos.copy(ac.pos).addScaledVector(ac.fwd, L * 0.42);
+        pos.copy(ac.pos).addScaledVector(ac.fwd, gun.muzzle ?? L * 0.42);
     }
     dir.copy(ac.fwd);
   }

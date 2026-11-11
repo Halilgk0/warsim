@@ -89,6 +89,15 @@ export interface Livery {
   skin?: Skin;
   /** Gövdenin bu z'den gerisi farklı kaplama (Hurricane: kumaş; Il-2: ahşap). */
   aft?: { z: number; skin: 'fabric' | 'wood' };
+  /**
+   * Yıpranma (0..1, yakında): panel kenarlarında ve hücum kenarlarında dökülen boya (altından alüminyum), koyu akış
+   * izleri, taneli püskürtme yüzeyi ve yüzeyden yüzeye değişen parlama (tek parlaklık plastik gibi duruyordu).
+   */
+  worn?: number;
+  /** Boya tonu çarpanı (1 = olduğu gibi). */
+  tone?: number;
+  /** Yanlarda alt renk üstüne sık üst renk benekleri (0..1; geç Luftwaffe jetleri, Me 262). */
+  mottle?: number;
 }
 
 const two = (a: number, b: number, under: number, o: Partial<Livery> = {}): Livery => ({ top: [a, b], under, finish: 'matte', ...o });
@@ -121,7 +130,9 @@ export const LIVERIES: Record<string, Livery> = {
   ju87d: two(RLM70, RLM71, RLM65, { camo: 'splinter' }),
   he111: two(RLM70, RLM71, RLM65, { camo: 'splinter' }),
   ju88: two(RLM70, RLM71, RLM65, { camo: 'splinter' }),
-  me262: two(RLM81, RLM82, RLM76, { camo: 'soft' }),
+  // Me 262: üstte 81/82 yumuşak desen, yanlarda (gövde, nasel, kuyruk) 76 üstüne sık 81/82 benekleri; kullanılmış uçak
+  me262: two(RLM81, RLM82, RLM76, { camo: 'soft', worn: 1, tone: 0.92, mottle: 1 }),
+  me262u4: two(RLM81, RLM82, RLM76, { camo: 'soft', worn: 1, tone: 0.92, mottle: 1 }),
   he162: two(RLM81, RLM82, RLM76, { camo: 'soft' }),
   ar234: two(RLM81, RLM82, RLM76, { camo: 'soft' }),
   // ABD: geç dönem çıplak metal; erken dönem zeytin yeşili; donanma lacivert

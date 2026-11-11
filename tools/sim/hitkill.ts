@@ -10,7 +10,7 @@ import { gauss } from '../../src/core/math';
 
 const CAL: [string, number, 'small' | 'heavy' | 'cannon'][] = [
   ['7,7 mm', 0.62, 'small'], ['12,7 mm', 1.4, 'heavy'], ['20 mm MG FF', 3.8, 'cannon'], ['20 mm Hispano', 5.5, 'cannon'],
-  ['20 mm MG 151', 6, 'cannon'], ['30 mm MK 108', 22, 'cannon'],
+  ['20 mm MG 151', 6, 'cannon'], ['30 mm MK 108', 22, 'cannon'], ['50 mm MK 214', 80, 'cannon'],
 ];
 const targets = (process.argv[2] ?? 'spitfire1,bf109e,hurricane1,fw190a5,p47d,he111,b17g').split(',');
 const N = Number(process.argv[3] ?? 300);

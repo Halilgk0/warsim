@@ -131,7 +131,8 @@ export class NewsView {
       ${s.heading ? `<h3>${esc(s.heading)}</h3>` : ''}
       ${(s.text ?? []).map((p) => `<p>${esc(p)}</p>`).join('')}
       ${s.bullets ? `<ul>${s.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
-      ${s.links ? `<ul class="news-links">${s.links.map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}`).join('');
+      ${s.links ? `<ul class="news-links">${s.links.map((l) => `<li><a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a></li>`).join('')}</ul>` : ''}
+      ${s.video ? `<figure class="news-video"><video src="${s.video.src}" poster="${s.video.poster}" autoplay muted loop playsinline controls preload="metadata"></video><figcaption>${esc(s.video.caption)}</figcaption></figure>` : ''}`).join('');
     const gallery = n.images.map((g) => `<figure><img src="${g.src}" alt="" loading="lazy"><figcaption>${esc(g.caption)}</figcaption></figure>`).join('');
     return `<div class="news-head"><button class="news-back" data-nw="back">‹ ${L('Haberler', 'News')}</button><button class="icon" data-nw="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
       <article class="news-article">

@@ -112,6 +112,13 @@ export interface GunSpec {
   dispersion: number;
   range: number;
   ammo: number;
+  /**
+   * Uzaktan ateş topu (50 mm MK 214 A): bombardıman uçağına nişancıların menzili dışından, kendi menzilinin sınırında
+   * açılır (ai/combat.ts tryFire). Atışı yavaş: sesi seri döngüsü değil, mermi başına tek vuruş (audio/battle.ts).
+   */
+  standoff?: boolean;
+  /** Burun silahında namlu ağzının uçak merkezinden uzaklığı (m; yoksa gövde boyunun 0,42'si): burundan taşan uzun namlu. */
+  muzzle?: number;
 }
 
 export interface BombDef {
@@ -357,6 +364,8 @@ interface GunType {
   mv: number;
   disp: number;
   range: number;
+  standoff?: boolean;
+  muzzle?: number;
 }
 
 const GT: Record<string, GunType> = {
@@ -380,6 +389,9 @@ const GT: Record<string, GunType> = {
   nr23: { name: '23 mm NR-23', caliber: 'cannon', rpm: 850, dmg: 6, mv: 680, disp: 0.016, range: 750 },
   mk108: { name: '30 mm MK 108', caliber: 'cannon', rpm: 650, dmg: 22, mv: 540, disp: 0.02, range: 450 },
   n37: { name: '37 mm N-37', caliber: 'cannon', rpm: 400, dmg: 18, mv: 690, disp: 0.018, range: 800 },
+  // Mauser MK 214 A (5 cm Pak 38'den türetildi): dakikada 150 mermi, 920 m/sn, 1,54 kg'lık mermi. Bombardıman kollarına
+  // nişancıların menzili dışından ateş için; tek isabet ağır hasar verir, yavaş atışla avcıyı vurmak zordur.
+  mk214: { name: '50 mm MK 214 A', caliber: 'cannon', rpm: 150, dmg: 80, mv: 920, disp: 0.012, range: 1300, standoff: true, muzzle: 6.6 },
 };
 
 /**
@@ -404,6 +416,8 @@ function gun(type: keyof typeof GT, count: number, rpg: number, mount: GunMount 
     dispersion: t.disp,
     range: t.range,
     ammo: Math.max(1, Math.round((count * rpg) / k)),
+    ...(t.standoff ? { standoff: true } : {}),
+    ...(t.muzzle ? { muzzle: t.muzzle } : {}),
   };
 }
 
@@ -499,9 +513,11 @@ interface AircraftDef {
   vmaxKmh: number;
   vmaxAlt: number;
   playable?: boolean;
+  /** Aynı motorlu temel sürüm: kendi belgelenmiş tavanı olmayan türevde irtifa düşüşü üssü onun CEILINGS satırından. */
+  lapseOf?: string;
 }
 
-const inline = (name: string, kw: number, critAlt: number, o: Partial<EngineSpec> = {}): EngineSpec => ({
+const inline =(name: string, kw: number, critAlt: number, o: Partial<EngineSpec> = {}): EngineSpec => ({
   name, kind: 'inline', count: 1, kw, critAlt, wep: 1, propEff: 0.81, spool: 0.6, tsfc: 0, ...o,
 });
 const radial = (name: string, kw: number, critAlt: number, o: Partial<EngineSpec> = {}): EngineSpec => ({
@@ -1165,6 +1181,20 @@ const DEFS: AircraftDef[] = [
   },
   // ============================================================ Çeşitlilik: diğer ilk nesil jetler
   {
+    // Me 262 A-1a/U4 "Pulkzerstörer": 1945 baharında iki uçak (W.Nr. 111899 ve 170083) burnuna tek 50 mm MK 214 A
+    // takılarak denendi, üretime alınmadı. Gövde, kanat ve motorlar A-1a ile aynı. Top ve mermisi dört MK 108'den
+    // ~250 kg ağır (MK 214 A 490 kg; kaynaklar 30 mermi verir). Bu sürümün belgelenmiş hızı ve tavanı yok: hız A-1a'nın
+    // değeri, tavan aynı motorun irtifa düşüşüyle ve artan ağırlıkla kendiliğinden biraz alçalır.
+    id: 'me262u4', name: 'Messerschmitt Me 262 A-1a/U4', abbr: 'Me 262/U4', origin: 'Almanya', year: 1945,
+    generation: 'J1', role: 'fighter', model: 'me262u4',
+    description: 'Bombardıman avcısı denemesi: burundaki dört topun yerine tek 50 mm MK 214 A. Dakikada 150 mermi atar, 30 mermi taşır; bombardıman kollarına nişancıların menzili dışından ateş açar. Avcıya isabet ettirmesi zordur.',
+    hp: 165, armor: 0.12, crew: 1, engine: jet('2 × Junkers Jumo 004B', 8.8, { count: 2, spool: 10, tsfc: 0.14 }),
+    massEmpty: 4750, fuelKg: 1950, wingArea: 21.7, span: 12.65, clMax: 1.3, mcrit: 0.8, cdWave: 0.08, machTuck: 0.45, vneKmh: 950, nMax: 7,
+    roll: [80, 450, 420], tactic: 'energy', tailDragger: false, rearView: 0.45,
+    guns: [gun('mk214', 1, 30, 'nose')], loadouts: [STD],
+    buildTime: 240, cruiseAlt: 7000, vmaxKmh: 870, vmaxAlt: 7000, lapseOf: 'me262',
+  },
+  {
     id: 'he162', name: 'Heinkel He 162 A-2 Salamander', abbr: 'He 162', origin: 'Almanya', year: 1945,
     generation: 'J1', role: 'fighter', model: 'he162',
     description: '“Halk avcısı”: 90 günde tasarlanıp üretilen, sırtında tek motorlu, küçük ahşap kanatlı jet. Hızlı ve çevik ama yakıtı yarım saat yeter; motoru hassas, uçuşu affetmez.',
@@ -1333,13 +1363,14 @@ export function climbRateAt(s: AircraftSpec, h: number, mass: number, st: Thrust
  * belirgin sarsıntıyla uyarır, Hellcat ve Sıfır uysaldı. Bf 109'un kanat ucu çıtaları tutunmayı yumuşatır.
  */
 const SPIN_PRONE: Record<string, number> = {
-  mig15: 2.4, i16: 1.8, fw190a5: 1.6, p51d: 1.2, p38j: 0.8, yak3: 1.1, la7: 1.1, me262: 1.2, he162: 1.6,
+  mig15: 2.4, i16: 1.8, fw190a5: 1.6, p51d: 1.2, p38j: 0.8, yak3: 1.1, la7: 1.1, me262: 1.2, me262u4: 1.2, he162: 1.6,
   spitfire1: 0.6, spitfire5: 0.6, spitfire9: 0.6, hurricane1: 0.6, f6f5: 0.6, a6m2: 0.7, bf109e: 0.8, bf109f: 0.8,
   bf109g: 0.9, p47d: 0.8, f86f: 0.8, meteor3: 0.8, vampire: 0.8, f80c: 0.9,
 };
 
-/** Gerçek gövde uzunlukları (m). */
+/** Gerçek gövde uzunlukları (m). Me 262 A-1a/U4: burundan taşan ~2 m'lik namlu sayılmaz (isabet kutusu gövdedir). */
 const LENGTHS: Record<string, number> = {
+  me262u4: 10.6,
   hurricane1: 9.58, spitfire1: 9.12, spitfire5: 9.12, spitfire9: 9.47, meteor3: 12.57, f86f: 11.4, bf109e: 8.64, bf109f: 8.94,
   bf109g: 9.02, p51d: 9.83, me262: 10.6, mig15: 10.1, bf110c: 12.1, fw190a5: 8.95, p47d: 11.0, f84g: 11.6, il2: 11.6, il2m3: 11.6,
   typhoon: 9.73, il10: 11.12, ju87b: 11.0, sbd3: 10.09, ju87d: 11.5, sb2c: 11.18, he111: 16.4, ju88a4: 14.36, b25j: 16.13,
@@ -1392,7 +1423,7 @@ function derive(dd: AircraftDef): AircraftSpec {
   const m = s.massEmpty + s.fuelKg * 0.75;
   const st = state(1, ab);
   // İrtifa düşüşü: bilinen servis tavanına göre bulunmuş üs (Cd0'dan önce: azami hız düşüş bölgesinde olabilir)
-  const ceil = CEILINGS[dd.id];
+  const ceil = CEILINGS[dd.lapseOf ?? dd.id];
   s.engine.lapse = ceil ? ceil[1] : undefined;
   // Cd0: bilinen azami hızda itki = sürükleme
   {

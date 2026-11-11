@@ -68,6 +68,8 @@ const PARS = /* glsl */ `
   uniform vec4 skMarkT[ ${MAX_MARKS} ];
   /** x ulus (0 yok), y arma sayısı */
   uniform vec2 skNat;
+  /** x yıpranma, y ton çarpanı, z yan benek yoğunluğu */
+  uniform vec4 skD;
 
   float skHash3( vec3 c ) { return fract( sin( dot( c, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ); }
   float skNoise( vec3 p ) {
@@ -160,6 +162,8 @@ const COLOR = /* glsl */ `
   // Dönel gövdelerde köşe sarımı ve normali içe dönük (çift yüzlü çizimde ışık yine doğru): görünen yüze göre düzelt
   vec3 skN = normalize( vSkN ) * ( gl_FrontFacing ? 1.0 : -1.0 );
   float skPanel = 0.5;
+  // Parlama çarpanı (yıpranmış boyada yüzeyden yüzeye değişir; specularStrength'e uygulanır)
+  float skSpec = 1.0;
   {
     // Kamuflaj: üstten yanlara sarılan desen (gövde yanında y de katılır), ölçek açıklığa göre
     vec2 q = vec2( skP.x + skP.y * 0.9, skP.z ) * 1.45 / skB.w;
@@ -183,6 +187,20 @@ const COLOR = /* glsl */ `
     vec3 c = mix( skTop0, skTop1, camo );
     if ( skA.y > 2.5 ) c = mix( c, skTop2, camo2 );
     if ( skA.w > 0.5 ) c = mix( skSides, skTop0, smoothstep( 0.35, 0.55, skN.y ) );
+    if ( skD.z > 0.0 ) {
+      // Sık yan benekleri: alt renk üstünde iki üst rengin 20–40 cm'lik püskürtme lekeleri; üst yüzden yanlara yumuşak geçiş.
+      // Uzakta (leke pikselden küçülünce) ortalama renge söner
+      float side = 1.0 - smoothstep( 0.3, 0.68, skN.y );
+      float far = smoothstep( 0.15, 0.45, length( fwidth( skP ) ) * 6.0 );
+      float th = 0.6 - 0.1 * skD.z;
+      // Benek: küçük ve yumuşak kenarlı, kenarında ikinci bir ince gürültü (elle püskürtme düzensizliği)
+      float n1 = skNoise( skP * 6.0 + 3.1 ) * 0.8 + skNoise( skP * 15.0 + 1.3 ) * 0.2;
+      float n2 = skNoise( skP * 6.0 + 17.3 ) * 0.8 + skNoise( skP * 15.0 + 8.9 ) * 0.2;
+      float m1 = mix( smoothstep( th - 0.06, th + 0.08, n1 ), 0.42, far );
+      float m2 = mix( smoothstep( th - 0.04, th + 0.1, n2 ), 0.3, far );
+      vec3 sc = mix( mix( skUnder, skTop1, m1 ), skTop0, m2 * ( 1.0 - 0.5 * m1 ) );
+      c = mix( c, sc, side );
+    }
     if ( skA.z > 0.5 ) {
       // Yüksek yanlar: alt renk üstünde seyrek püskürtme benekler
       float side = 1.0 - smoothstep( 0.2, 0.42, skN.y );
@@ -210,12 +228,27 @@ const COLOR = /* glsl */ `
           c *= ( 1.0 + ( skPanel - 0.5 ) * 0.12 ) * vec3( 1.0 + ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02, 1.0, 1.0 - ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02 );
         #else
           // Boya: levhalar farklı solmuş ve rötuşlanmış; tek tonlu yüzey plastik gibi duruyordu
-          c *= 1.0 + ( skPanel - 0.5 ) * 0.1;
+          // (Yıpranmış boyada levha farkı az: kare kare ton farkı fayans gibi duruyordu; yerine sürekli lekeler ve izler)
+          c *= 1.0 + ( skPanel - 0.5 ) * 0.1 * ( 1.0 - 0.6 * skD.x );
           // Kir ve yağ izi: hava akışı yönünde (z) uzayan silik koyu çizgiler; alt yüzde ve arka gövdede daha çok
           // Uzakta (desen pikselden küçülünce) söner: kıpırdamasın
           float grime = smoothstep( 0.45, 0.85, skNoise( vec3( skP.x * 3.4, skP.y * 3.4, skP.z * 0.32 ) ) )
             * ( 1.0 - smoothstep( 0.3, 0.8, length( fwidth( skP ) ) * 3.4 ) );
-          c *= 1.0 - grime * ( 0.08 + 0.08 * smoothstep( 0.2, -0.5, skN.y ) + 0.04 * smoothstep( 0.0, -4.0, skP.z ) );
+          c *= 1.0 - grime * ( 0.08 + 0.08 * smoothstep( 0.2, -0.5, skN.y ) + 0.04 * smoothstep( 0.0, -4.0, skP.z ) ) * ( 1.0 + 0.8 * skD.x );
+          if ( skD.x > 0.0 ) {
+            float near = 1.0 - smoothstep( 0.004, 0.02, length( fwidth( skP ) ) );
+            // Solmuş ve rötuşlanmış lekeler: püskürtmenin üstünde metre ölçeğinde açık-koyu bölgeler
+            c *= 1.0 + ( skNoise( skP * 0.9 + 31.0 ) - 0.5 ) * 0.14 * skD.x;
+            // Boya dökülmesi: panel dikişlerinin ve hücum kenarlarının yanında küçük aşınmalar, altından alüminyum
+            float seam = max( skLine( skP.z, 0.74, 0.03 ), skLine( skP.x, 0.58, 0.03 ) * step( 0.95, abs( skP.x ) ) );
+            float lead = smoothstep( 0.78, 0.95, skN.z );
+            float chip = smoothstep( 0.76, 0.8, skNoise( skP * 16.0 ) ) * max( seam, lead ) * near * skD.x;
+            c = mix( c, vec3( 0.34, 0.35, 0.36 ), chip );
+            // Taneli püskürtme yüzeyi ve değişen parlama: kirli yer mat, dökük yer parlak
+            float grain = skNoise( skP * 45.0 );
+            c *= 1.0 - 0.06 * skD.x * grain * near;
+            skSpec = ( 0.55 + 0.9 * grain ) * ( 1.0 - 0.6 * grime ) + chip * 4.0;
+          }
         #endif
         // Panel çizgisi gerçekte ince bir gölge: birkaç metreden belli belirsiz (boyada biraz daha koyu: dolgu ve kir)
         #ifdef SKIN_METAL
@@ -247,6 +280,7 @@ const COLOR = /* glsl */ `
       float fade = 0.2 + 0.08 * smoothstep( 0.2, 0.8, skN.y );
       c = mix( c, vec3( skL ) * vec3( 1.0, 1.0, 0.98 ) + 0.012, fade );
     #endif
+    c *= skD.y;
 
     // Egzoz isi: çıkışın gerisinde, gövde ya da nasel yanında koyulaşan iz
     float soot = 0.0;
@@ -331,6 +365,7 @@ export function skinMaterial(info: SkinInfo, detail: number): THREE.MeshPhongMat
     skMarkN: { value: vec4s(marks.map((s) => new THREE.Vector4(s.n.x, s.n.y, s.n.z, s.fin ? 2 : s.fuselage ? 1 : 0)), MAX_MARKS) },
     skMarkT: { value: vec4s(marks.map((s) => new THREE.Vector4(s.t.x, s.t.y, s.t.z, 0)), MAX_MARKS) },
     skNat: { value: new THREE.Vector2(info.nation ? NATION_ID[info.nation] : 0, marks.length) },
+    skD: { value: new THREE.Vector4(lv.worn ?? 0, lv.tone ?? 1, lv.mottle ?? 0, 0) },
   };
   m.userData.skin = u;
   m.onBeforeCompile = (shader) => {
@@ -342,6 +377,7 @@ export function skinMaterial(info: SkinInfo, detail: number): THREE.MeshPhongMat
     let fs = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${ATMO_PARS}\n${PARS}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${COLOR}`)
+      .replace('#include <specularmap_fragment>', '#include <specularmap_fragment>\nspecularStrength *= skSpec;')
       // Havadaki uçağı gök her yandan aydınlatır: gölgedeki yüz kömür gibi kararmasın
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= 1.3;\n#include <aomap_fragment>');
     if (o.env > 0) fs = fs.replace('#include <opaque_fragment>', `${ENV(o.env, o.base)}\n#include <opaque_fragment>`);

@@ -868,7 +868,8 @@ button.link.prd-more { font-size: calc(11px * var(--ui)); padding: 10px 8px; mar
 .news-sheet.steel .news-article h3 { color: #d3ddd7; padding-left: calc(9px * var(--ui)); border-left: calc(3px * var(--ui)) solid #6fa68a; }
 .news-sheet.steel .news-article li::marker { color: #6fa68a; }
 .news-sheet.steel .news-lead { color: #bccac2; }
-.news-sheet.steel .news-gallery figcaption { color: #a2b1a9; }
+.news-sheet.steel .news-gallery figcaption, .news-sheet.steel .news-video figcaption { color: #a2b1a9; }
+.news-sheet.steel .news-video video { border-radius: calc(4px * var(--ui)); box-shadow: 0 0 0 1px #39453f; }
 .news-sheet.steel .soc { background: #2c3733; color: #d3ddd7; }
 /* Teşekkür penceresi (6 saat) */
 .modal-card.thanks { width: min(calc(560px * var(--ui)), 95vw); }
@@ -1339,6 +1340,10 @@ button.danger:hover { background: #ecc7bf; }
 .news-gallery figure { margin: 0; }
 .news-gallery img { width: 100%; border-radius: calc(14px * var(--ui)); display: block; }
 .news-gallery figcaption { font-size: calc(12px * var(--ui)); color: var(--muted); font-weight: 700; text-align: center; margin-top: calc(6px * var(--ui)); }
+/* Haber videosu (dikey): ekran yüksekliğine sığar, ortada */
+.news-video { margin: calc(14px * var(--ui)) 0; }
+.news-video video { display: block; margin: 0 auto; max-width: 100%; max-height: calc(var(--vh100) * 0.8); border-radius: calc(14px * var(--ui)); background: #000; }
+.news-video figcaption { font-size: calc(12px * var(--ui)); color: var(--muted); font-weight: 700; text-align: center; margin-top: calc(6px * var(--ui)); }
 
 /* Geri bildirim */
 .fb-card {

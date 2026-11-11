@@ -236,6 +236,7 @@ export const TECH: TechNode[] = [
   ac('lancaster', 'bombardiman', 4, 290, ['ac_b25j']),
   ac('mosquito', 'taarruz', 4, 230, ['ac_il2m3', 'm_100oct']),
   ac('he162', 'enerji', 5, 220, ['ac_me262']),
+  ac('me262u4', 'enerji', 5, 230, ['ac_me262']),
   ac('f80c', 'agir', 5, 250, ['ac_p47d', 'j_centrifugal']),
   ac('vampire', 'hafif', 5, 240, ['ac_spitfire9', 'j_centrifugal']),
   ac('ar234', 'bombardiman', 5, 280, ['ac_ju88a4', 'j_axial']),

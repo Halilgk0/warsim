@@ -267,7 +267,9 @@ function tryFire(ac: Aircraft, brain: Brain, tgt: Aircraft, aimErr: number, R: n
   if (!gun || !ac.armed) return false;
   if (headOn && brain.combat.headOnShoot === false) return false;
   // Ateş açma mesafesi pilota bağlı: acemi uzaktan (çoğu ıskalar), usta yakına sokulup açar (savaşta tipik 200–400 m)
-  const open = Math.min(gun.range, 200 + 250 / ac.skill);
+  // Uzaktan ateş topu (50 mm MK 214 A): bombardıman uçağına nişancıların menzili (~750 m) dışından, topun menzil sınırında açılır
+  const standoff = !!gun.standoff && tgt.spec.role === 'bomber';
+  const open = standoff ? gun.range : Math.min(gun.range, 200 + 250 / ac.skill);
   // Kafa kafaya avcıya pencere kısa. Büyük bombardıman uçağına önden saldırıda atış ~700 m'de açılır: ~250 m/sn
   // yaklaşmada ateş penceresi zaten iki saniyeyi bulmaz
   const fireRange = headOn ? (tgt.spec.role === 'bomber' ? Math.min(gun.range, Math.max(open, 700)) : open * 0.65) : open;
@@ -280,8 +282,87 @@ function tryFire(ac: Aircraft, brain: Brain, tgt: Aircraft, aimErr: number, R: n
   return false;
 }
 
+/**
+ * Uzaktan ateş saldırısı (50 mm MK 214 A, Me 262 A-1a/U4): bombardıman uçağına nişancıların menzili dışından ateş edilir,
+ * kutunun içine girilmez. Avcı hedefin arkasına, kutunun yanından dolanarak geçer; arkadan yaklaşırken gazı kısıp
+ * yaklaşma hızını ~45 m/sn'ye indirir (ateş penceresi uzasın: saniyede 2,5 mermi), topun menzilinde ateş açar ve
+ * nişancı menziline girmeden kopar (dönüş sırasında ~100 m daha yaklaşılır, pay ona göre). Kopuş kutudan yana doğru
+ * sert dönüştür; uzaklaşınca yeniden arkaya geçilir. Gaz ayarını döndürür.
+ */
+function standoffAttack(ac: Aircraft, brain: Brain, tgt: Aircraft, R: number, closure: number, ata: number, tailAspect: number, cmd: FlyCommand): number {
+  const cs = brain.combat;
+  if (cs.phase === 'climb') setPhase(brain, 'attack');
+  if (cs.phase === 'extend') {
+    // İlk saniyelerde seçilen yöne kır, sonra yatayda uzaklaş (uzun alçalış irtifayı boşa harcar)
+    if (cs.phaseTime < 6) cmd.dir.copy(cs.boxDir);
+    else cmd.dir.set(cs.boxDir.x, 0, cs.boxDir.z).normalize();
+    cmd.maxG = Math.min(cmd.maxG, ac.spec.nMax * 0.8);
+    brain.status = L('Uzaktan atış: nişancı menzilinin dışına kopuyor', 'Stand-off attack: breaking away outside the gunners’ range');
+    if ((R > 2400 && cs.phaseTime > 5) || cs.phaseTime > 30) setPhase(brain, 'attack');
+    return 1;
+  }
+  _tmp.set(tgt.fwd.x, 0, tgt.fwd.z);
+  if (_tmp.lengthSq() < 1e-4) _tmp.set(0, 0, 1);
+  _tmp.normalize();
+  const reach = tgt.spec.turrets.reduce((m, t) => Math.max(m, t.gun.range), 0) * 1.1;
+  if (R < reach + 150 && cs.phaseTime > 1) {
+    // Kopuş: bombardıman rotasına dik ve biraz geriye, kutunun ortasına göre bulunduğumuz yana sert dönüş, hafif alçalarak.
+    // (Önden geçişin 35–60°'lik kopuşu burada yetmez: arkadan gelen avcı kutuya çapraz girip yan uçakların dibinden geçiyordu)
+    let cx = tgt.pos.x;
+    let cz = tgt.pos.z;
+    if (tgt.flight) {
+      let n = 0;
+      cx = 0;
+      cz = 0;
+      for (const m of tgt.flight.members) {
+        if (!m.airborne) continue;
+        cx += m.pos.x;
+        cz += m.pos.z;
+        n++;
+      }
+      cx = n ? cx / n : tgt.pos.x;
+      cz = n ? cz / n : tgt.pos.z;
+    }
+    const lat = (ac.pos.x - cx) * -_tmp.z + (ac.pos.z - cz) * _tmp.x;
+    const side = Math.abs(lat) > 60 ? Math.sign(lat) : ac.id % 2 ? 1 : -1;
+    cs.boxDir.set(-_tmp.z * side - _tmp.x * 0.35, -0.12, _tmp.x * side - _tmp.z * 0.35).normalize();
+    setPhase(brain, 'extend');
+    cmd.dir.copy(cs.boxDir);
+    return 1;
+  }
+  if (tailAspect < 0.5) {
+    // Hedefin 2,2 km arkasına: önde ya da yandayken kutunun 2,5 km yanından dolan, arkaya geçtikçe yanal pay sıfırlanır
+    const along = (ac.pos.x - tgt.pos.x) * _tmp.x + (ac.pos.z - tgt.pos.z) * _tmp.z;
+    const lat = (ac.pos.x - tgt.pos.x) * -_tmp.z + (ac.pos.z - tgt.pos.z) * _tmp.x;
+    const off = (lat >= 0 ? 1 : -1) * 2500 * clamp((along + 2200) / 1500, 0, 1);
+    _aim.set(tgt.pos.x - _tmp.x * 2200 - _tmp.z * off, tgt.pos.y + 50, tgt.pos.z - _tmp.z * 2200 + _tmp.x * off);
+    cmd.dir.subVectors(_aim, ac.pos).normalize();
+    cmd.maxG = Math.min(cmd.maxG, energyG(ac));
+    cmd.liftUse = 0.85;
+    brain.status = `${L('Uzaktan atış: arkasına geçiyor', 'Stand-off attack: getting behind')} (${tgt.callsign})`;
+    return 1;
+  }
+  cmd.dir.copy(ata < 30 * DEG ? _aimDir : _los);
+  cmd.liftUse = 0.85;
+  brain.status = `${L('Uzaktan atış: arkadan yaklaşıyor', 'Stand-off attack: closing from astern')} (${tgt.callsign})`;
+  return R < 4000 ? clamp(0.75 - (closure - 45) * 0.02, 0.35, 1) : 1;
+}
+
 function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: FlyCommand): void {
   const s = ac.spec;
+  // Uzaktan ateş topu kutunun en yakın uçağına ateş eder: menzil ve kopuş, kutunun bize bakan kenarına göre ölçülür
+  // (asıl hedef kutunun önündeyken arkadaki uçakların nişancı menziline giriliyordu)
+  if (ac.aimGun?.standoff && tgt.spec.role === 'bomber' && tgt.flight) {
+    let best = tgt.pos.distanceToSquared(ac.pos);
+    for (const m of tgt.flight.members) {
+      if (!m.airborne || m.status !== 'flying') continue;
+      const d2 = m.pos.distanceToSquared(ac.pos);
+      if (d2 < best) {
+        best = d2;
+        tgt = m;
+      }
+    }
+  }
   if (!ac.guns.length) return;
   const cs = brain.combat;
   cs.phaseTime += dt;
@@ -356,7 +437,10 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
   cmd.wep = true;
   let throttle = 1;
 
-  if (energyFighter && cs.phase === 'climb') {
+  // Uzaktan ateş topu, nişancıları ateş edebilen bombardıman uçağına: kendi düzeniyle saldırır (savunmasız hedefe olağan saldırı)
+  if (ac.aimGun?.standoff && ac.armed && tgt.spec.role === 'bomber' && tgt.turrets.some((t) => t.ammo > 0)) {
+    throttle = standoffAttack(ac, brain, tgt, R, closure, ata, tailAspect, cmd);
+  } else if (energyFighter && cs.phase === 'climb') {
     // Hızı koruyarak tırman: azami hıza yakınken tırmanış açısı, hız düştükçe yataya geç (en iyi tırmanma hızına
     // kadar yavaşlayan avcı, peşindeki dönüş avcısına kolay hedef oluyordu). Hedef arkadaysa düz git, değilse
     // yumuşakça uzaklaş: sert dönüş enerji yakar.

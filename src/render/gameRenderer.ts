@@ -732,7 +732,8 @@ export class GameRenderer {
         }
         if (w.time - v.lastMuzzle > 0.07) {
           if (ac.firing) {
-            _v.copy(ac.pos).addScaledVector(ac.fwd, 5 * scale);
+            // Çizilen uçağın (ara konum ve yön) burnunda: simülasyon konumu bir adım önde olabilir, alev burnun önünde kalıyordu
+            _v.set(0, 0, 1).applyQuaternion(v.iq).multiplyScalar((ac.guns[0]?.muzzle ?? 5) * scale).add(v.ip);
             this.effects.muzzle(_v, vis);
             v.lastMuzzle = w.time;
           }

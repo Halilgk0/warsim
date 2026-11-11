@@ -88,7 +88,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Dalga sürüklemesi (`aero.ts` `waveCd`) Lock kuralıyla ıraksama Mach'ına (`mdd`, yoksa mcrit + 0,1) kadar artar,
       ötesinde dik yükselir. Belgelenen hızı Mdd'nin üstünde olan jetin `mdd`'si tanımda verilir; F-86 ve MiG-15'inki,
       gerçekteki gibi deniz seviyesinde en hızlı olacakları biçimde seçildi.
+    - Türev sürüm (Me 262 A-1a/U4, `me262u4`): kendi belgelenmiş tavanı yoksa tanımda `lapseOf` ile temel sürümün irtifa
+      düşüşünü alır. Modeli temel sürümün `case`'ini paylaşır (`models.ts` `me262`), farkı bir bayrakla kurulur.
   - `ai/`: kol, dalaş, pike, taarruz, bombardıman, taret, pist operasyonları.
+    - Uzaktan ateş topu (`GunSpec.standoff`; 50 mm MK 214 A): bombardıman kutusunun en yakın uçağına arkadan, nişancı
+      menzili dışından ateş eder, menzile girmeden yana kırıp yeniden arkaya geçer (`combat.ts` `standoffAttack`). Sesi
+      seri döngüsü değil, mermi başına tek vuruş (`audio/battle.ts`). Bot bu uçağı araştırmaz (`commander.ts`
+      `VEHICLE_PRIORITY`'de yok): eklemek bot dengesini değiştirir.
     - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.

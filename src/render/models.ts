@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { b29: 1.25, a26: 1.35, lancaster: 1.25, b17: 1.25, b25: 1.3, ju88: 1.3, he111: 1.3, blenheim: 1.4, pe2: 1.4, p38: 1.4, mosquito: 1.4, bf110: 1.4, ad4: 1.5, sb2c: 1.5, sbd: 1.5, ju87d: 1.5, ju87b: 1.5, il10: 1.5, il2m3: 1.5, il2: 1.5, seafury: 1.5, a6m: 1.5, i16: 1.5, f8f: 1.5, f4u: 1.5, f6f: 1.5, p40: 1.5, la7: 1.5, yak3: 1.5, p47: 1.5, typhoon: 1.5, fw190: 1.5, p51d: 1.5, bf109g: 1.5, bf109f: 1.5, bf109e: 1.5, hurricane: 1.5, spitfire: 1.5, spitfire5: 1.5, spitfire9: 1.5, mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5, canberra: 1.5, il28: 1.5 };
+const HIRES: Record<string, number> = { b29: 1.25, a26: 1.35, lancaster: 1.25, b17: 1.25, b25: 1.3, ju88: 1.3, he111: 1.3, blenheim: 1.4, pe2: 1.4, p38: 1.4, mosquito: 1.4, bf110: 1.4, ad4: 1.5, sb2c: 1.5, sbd: 1.5, ju87d: 1.5, ju87b: 1.5, il10: 1.5, il2m3: 1.5, il2: 1.5, seafury: 1.5, a6m: 1.5, i16: 1.5, f8f: 1.5, f4u: 1.5, f6f: 1.5, p40: 1.5, la7: 1.5, yak3: 1.5, p47: 1.5, typhoon: 1.5, fw190: 1.5, p51d: 1.5, bf109g: 1.5, bf109f: 1.5, bf109e: 1.5, hurricane: 1.5, spitfire: 1.5, spitfire5: 1.5, spitfire9: 1.5, mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, me262u4: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5, canberra: 1.5, il28: 1.5 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -2247,10 +2247,14 @@ function defineModel(key: string): ModelDef {
         ],
       };
     }
-    case 'me262': {
+    case 'me262':
+    case 'me262u4': {
       // Me 262 A-1a, ölçüler üç görünüş çiziminden. Üçgen kesitli gövde (geniş alt, dar üst), sivri burun ve üstünde dört
       // MK 108 ağzı, yana açılan kanopi. Kanat kökte kalın, firar kenarı motorun içinde kırılır; hücum kenarı oklu.
       // Kanat altında yuvarlak Jumo 004 naselleri: küçük giriş ve içinde göbek, arkada koyu egzoz ve soğan biçimli koni.
+      // A-1a/U4 (me262u4): aynı gövde; MK 108 ağızları yok, burun ucundan tek 50 mm MK 214 A'nın namlusu ~2,1 m taşar
+      // (top 4,16 m; dipte kalın geri tepme kovanı, uçta silindir namlu freni). Fotoğraf: W.Nr. 170083 "V083".
+      const u4 = key === 'me262u4';
       const H = new JetHull([
         [4.4, 0.01, 0.01, -0.02, 0], [4.25, 0.3, 0.18, -0.18, -0.04], [3.95, 0.4, 0.36, -0.3, -0.08], [3.29, 0.58, 0.48, -0.46, -0.16], [2.01, 0.79, 0.61, -0.57, -0.24],
         [0.38, 0.85, 0.63, -0.66, -0.3], [-1.2, 0.76, 0.55, -0.66, -0.3], [-2.65, 0.52, 0.42, -0.46, -0.16], [-3.87, 0.36, 0.36, -0.3, -0.04], [-5.08, 0.18, 0.27, -0.18, 0.02], [-6.3, 0.03, 0.07, -0.11, -0.02],
@@ -2275,15 +2279,26 @@ function defineModel(key: string): ModelDef {
       return {
         solids: [
           H.geo(14),
-          ...[1, -1].flatMap((sd) => [[0.4, 3.45], [0.2, 3.45]].map(([y, z]) => portAt(sd * H.sideX(z, y), y, z, 0.03, 0.24))),
-          tag(H.patch(1, 0.35, -0.85, Math.PI / 2 - 0.34, Math.PI / 2 + 0.34, 0.006), 'dark'),
+          ...(u4
+            ? [
+              tag(body([[6.56, 0.03], [6.55, 0.064], [6.25, 0.064], [6.24, 0.044], [4.76, 0.052], [4.75, 0.078], [4.2, 0.082]], 10, { y: -0.005 }), 'dark'),
+              tag(new THREE.CircleGeometry(0.03, sg(10)).translate(0, -0.005, 6.56), 'dark'),
+              // Namlu freninin üstünde iki bilezik
+              ...[6.33, 6.47].map((z) => tag(body([[z + 0.03, 0.064], [z + 0.03, 0.074], [z - 0.03, 0.074], [z - 0.03, 0.064]], 10, { y: -0.005 }), 'dark')),
+            ]
+            : [1, -1].flatMap((sd) => [[0.4, 3.45], [0.2, 3.45]].map(([y, z]) => portAt(sd * H.sideX(z, y), y, z, 0.03, 0.24)))),
+          tag(H.patch(1, 0.45, -1.05, Math.PI / 2 - 0.34, Math.PI / 2 + 0.34, 0.006), 'dark'),
+          // Kanopi gövdeye yayılır: yanları gövde yanlarının devamı (camın en geniş yeri gövdenin o yükseklikteki genişliğinde,
+          // gövdenin içinden çıkar ve aynı eğimle yukarı devam eder); tepesi gövde sırtının ~0,2 m üstünde. Ön cam küt, arkada
+          // sırta yumuşak inen kaplama. (Önce dar ve yüksek bir kabarcık, sonra sırta eklenen kaplamayla kule gibi duruyordu.)
           ...jetCanopy({
-            screen: [[0.86, 0.16, 0.66, 0.35, 0.6], [0.41, 0.27, 0.97, 0.35, 0.68]],
-            glass: [[0.41, 0.27, 0.97, 0.35, 0.68], [0.19, 0.3, 1.02, 0.35, 0.68], [-0.2, 0.3, 1.02, 0.35, 0.68], [-0.59, 0.27, 0.97, 0.35, 0.68], [-1.0, 0.18, 0.84, 0.35, 0.66]],
-            aft: [[-0.95, 0.19, 0.86, 0.3, 0.6], [-1.2, 0.15, 0.75, 0.3, 0.55], [-1.68, 0.05, 0.56, 0.25, 0.48], [-1.9, 0.01, 0.47, 0.25, 0.42]],
-            frames: [0.41, -0.6, -0.95],
-            posts: [[0.1, 0.67, 0.84], [0.19, 0.93, 0.43]],
-            pilot: { z: -0.05, len: 1.4, h: 0.36, y: 0.74, w: 0.3 },
+            screen: [[1.0, 0.3, 0.66, 0.2, 0.45], [0.5, 0.37, 0.8, 0.2, 0.45]],
+            glass: [[0.5, 0.37, 0.8, 0.2, 0.45], [0.15, 0.37, 0.84, 0.2, 0.45], [-0.35, 0.32, 0.84, 0.2, 0.45], [-0.8, 0.28, 0.8, 0.2, 0.45], [-1.15, 0.25, 0.75, 0.2, 0.45]],
+            aft: [[-1.1, 0.25, 0.76, 0.2, 0.45], [-1.5, 0.21, 0.69, 0.2, 0.44], [-2.0, 0.14, 0.6, 0.2, 0.42], [-2.4, 0.06, 0.52, 0.2, 0.4], [-2.6, 0.01, 0.47, 0.2, 0.38]],
+            frames: [0.5, -0.75, -1.1],
+            posts: [[0.25, 0.58, 0.98], [0.3, 0.74, 0.54]],
+            pilot: { z: -0.15, len: 1.4, h: 0.34, y: 0.5, w: 0.3 },
+            p: 1.9,
           }),
           // İç kanat tek parça (kalın kök, firar kenarı kırılır); dışında flap ve kanatçık, uç yuvarlak
           ...[1, -1].map((sd) => airfoilPart([
@@ -4493,7 +4508,7 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'sabre') return sabreGear(gearHeight(spec));
   if (kind === 'f84') return thunderjetGear(gearHeight(spec));
   if (kind === 'p80') return shootingStarGear(gearHeight(spec));
-  if (kind === 'me262') return schwalbeGear(gearHeight(spec));
+  if (kind === 'me262' || kind === 'me262u4') return schwalbeGear(gearHeight(spec));
   if (kind === 'meteor') return meteorGear(gearHeight(spec));
   if (kind === 'vampire') return vampireGear(gearHeight(spec));
   if (kind === 'he162') return salamanderGear(gearHeight(spec));

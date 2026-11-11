@@ -65,6 +65,7 @@ export const DESC_EN: Record<string, string> = {
   ad4: 'A piston dive and attack aircraft built in the jet age: 3600 kg on 15 pylons, four 20 mm cannon, hours over the target. Slow but very tough.',
   a26b: 'A fast twin-engine attack bomber: eight 12.7 mm guns in the nose, 1800 kg of bombs inside, rockets under the wings; remote-controlled dorsal and ventral turrets.',
   b29: 'A huge pressurised strategic bomber: up to 9 tons of bombs from above 9 km, with centrally fire-controlled remote turrets. The peak of the piston era.',
+  me262u4: 'A bomber-destroyer trial: one 50 mm MK 214 A in place of the four nose cannon. It fires 150 rounds a minute and carries 30; it opens fire on bomber formations from beyond the gunners\' range. Hard to hit a fighter with.',
   he162: 'The "People\'s Fighter": designed and built in 90 days, a small wooden-winged jet with its engine on its back. Fast and agile, but its fuel lasts half an hour; the engine is delicate and it forgives nothing.',
   f80c: 'America\'s first jet fighter in service. After meeting the MiG-15 over Korea it gave way to the F-86 and became a fighter-bomber: tip tanks, bombs and rockets for close air support.',
   vampire: 'A small twin-boom, single-engine jet: the short jet pipe wastes little of the engine\'s power. Very agile, four 20 mm cannon; it reaches its Mach limit early at high speed.',

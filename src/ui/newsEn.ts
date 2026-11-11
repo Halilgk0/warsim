@@ -2,7 +2,7 @@
 // Türkçe görünür). Tarih ve görseller Türkçe kayıttan gelir; captions görsellerle aynı sırada. Görselde yazı varsa
 // İngilizcesi cover ve files ile verilir (public/news'teki dosya adı).
 
-import type { NewsSection } from './newsData';
+import { img, type NewsSection } from './newsData';
 import { SOUND_CREDITS } from '../audio/credits';
 
 export interface NewsText {
@@ -15,6 +15,45 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'me262-u4': {
+    title: 'New aircraft: Me 262 A-1a/U4',
+    summary: 'The Me 262 with a single 50 mm cannon in its nose joins the research tree: it fires on bomber formations from beyond the reach of their gunners. Both Me 262 models have also been rebuilt.',
+    captions: [
+      'Me 262 A-1a/U4: the 50 mm barrel sticks out about two metres beyond the nose.',
+      'Me 262 A-1a: new paint and a low canopy that sits into the fuselage.',
+    ],
+    sections: [
+      {
+        heading: 'Me 262 A-1a/U4',
+        bullets: [
+          'A trial version of the Me 262 with a single 50 mm Mauser MK 214 A in place of the four 30 mm cannon in the nose. Two aircraft were converted and tested in the spring of 1945.',
+          'The cannon fires 150 rounds a minute at a muzzle velocity of 920 m/s; the aircraft carries about 30 rounds.',
+          'Every hit does heavy damage. With its slow rate of fire it is weak against fighters.',
+          'Airframe and engines are those of the Me 262; the cannon and its ammunition add about 250 kg.',
+          'It comes after the Me 262 in the research tree and has its own page in the encyclopedia.',
+        ],
+      },
+      {
+        heading: 'Stand-off fire',
+        bullets: [
+          'The U4 closes in from behind on the nearest bomber of the box and fires from beyond the reach of its gunners.',
+          'It breaks away before entering their range, gets behind again and takes the next shot.',
+          'Every round is heard on its own, and it leaves from the tip of the long barrel.',
+        ],
+      },
+      {
+        video: { src: img('me262.mp4'), poster: img('me262-video.jpg'), caption: 'The Me 262 and the U4 against bomber formations at dawn (in-game footage).' },
+      },
+      {
+        heading: 'Both Me 262 models rebuilt',
+        bullets: [
+          'New paint: dense dark green and brown mottles over the light sides, worn paint at panel joints and leading edges.',
+          'The surface no longer has the same sheen everywhere: some areas are matt, some slightly glossy, and the aircraft is a little darker. The plastic look is gone.',
+          'The cockpit has been rebuilt: the canopy is lower and spreads into the fuselage, sitting as a continuation of it as on the real aircraft.',
+        ],
+      },
+    ],
+  },
   'kayit-yerleri': {
     title: 'Saves now have 4 slots',
     summary: 'Every account has 4 save slots. Autosave writes to its own slot, and you choose the slot when you save. Players with more saves have a week to tidy up.',

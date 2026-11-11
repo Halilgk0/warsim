@@ -42,6 +42,8 @@ const TECH_PRIORITY = [
   'j_tiptank', 'j_37mm', 'j_radarsight', 'j_hydraulic',
 ];
 
+// Me 262 A-1a/U4 (ac_me262u4) listede yok: tek 50 mm toplu bombardıman avcısı avcıya karşı zayıf, bot ise en yeni avcıyı
+// her işe gönderir (bestUnlocked). Araştırmazsa hiç üretmez; eklemek bot dengesini değiştirir (240 dk'lık ölçüm ister).
 const VEHICLE_PRIORITY = [
   'ac_spitfire1', 'ac_bf109f', 'ac_sbd3', 'ac_ju88a4', 'ac_bf110c', 'ac_p40e', 'ac_il2', 'ac_a6m2', 'ac_spitfire5', 'ac_bf109g',
   'ac_fw190a5', 'ac_pe2', 'ac_il2m3', 'ac_ju87d', 'ac_b25j', 'ac_yak3', 'ac_la7', 'ac_spitfire9', 'ac_p51d', 'ac_p47d', 'ac_p38j',

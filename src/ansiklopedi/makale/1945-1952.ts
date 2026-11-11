@@ -202,6 +202,63 @@ export const A1945_1952: Article[] = [
     ],
   },
   {
+    id: 'me262u4',
+    summary: t(
+      'Burnunda tek 50 mm top taşıyan Me 262: bombardıman kollarına menzil dışından ateş etme denemesi.',
+      'A Me 262 with a single 50 mm cannon in its nose: a trial at shooting bomber formations from out of range.',
+    ),
+    lead: t(
+      'Messerschmitt Me 262 A-1a/U4, Me 262’nin burnundaki dört 30 mm topun yerine tek bir 50 mm Mauser MK 214 A takılmış deneme sürümüdür. Amaç, Amerikan bombardıman kollarına nişancıların menzili dışından ateş edip tek isabetle uçak düşürmekti. 1945 ilkbaharında iki uçak dönüştürülüp denendi; sürüm üretime alınmadı.',
+      'The Messerschmitt Me 262 A-1a/U4 was a trial version of the Me 262 with a single 50 mm Mauser MK 214 A in place of the four 30 mm cannon in the nose. The aim was to fire on American bomber formations from beyond the reach of their gunners and bring an aircraft down with one hit. Two aircraft were converted and tested in the spring of 1945; the version was not put into production.',
+    ),
+    facts: [
+      { k: K.first, v: t('1945 ilkbaharı (50 mm topla)', 'Spring 1945 (with the 50 mm cannon)') },
+      { k: K.service, v: t('Hizmete girmedi; yalnız deneme uçakları', 'Never entered service; trial aircraft only') },
+      { k: K.designer, v: t('Messerschmitt AG; top Mauser', 'Messerschmitt AG; cannon by Mauser') },
+      { k: K.maker, v: t('Messerschmitt AG (Lechfeld’de dönüştürüldü)', 'Messerschmitt AG (converted at Lechfeld)') },
+      { k: K.built, v: t('2 (Me 262 A-1a’dan dönüştürme)', '2 (converted from Me 262 A-1a)') },
+      { k: K.engine, v: t('2 × Junkers Jumo 004B, eksenel akışlı turbojet, her biri 8,8 kN', '2 × Junkers Jumo 004B axial-flow turbojets, 8.8 kN each') },
+      { k: K.speed, v: t('Bu sürüm için belgelenmiş değer yok; Me 262 A-1a yaklaşık 870 km/sa', 'No documented figure for this version; the Me 262 A-1a about 870 km/h') },
+      { k: K.guns, v: t('Burunda 1 × 50 mm MK 214 A: dakikada 150 mermi, 920 m/sn, yaklaşık 30 mermi', '1 × 50 mm MK 214 A in the nose: 150 rounds a minute, 920 m/s, about 30 rounds') },
+      { k: K.crew, v: t('1', '1') },
+      { k: K.size, v: t('12,65 m / 10,6 m (namlu hariç)', '12.65 m / 10.6 m (without the barrel)') },
+    ],
+    sections: [
+      {
+        h: t('Nişancıların menzili dışından', 'From beyond the gunners’ reach'),
+        p: [
+          t(
+            'Sıkı düzende uçan bombardıman uçaklarının onlarca makinelisi, yaklaşan avcı için en büyük tehlikeydi. Alman çözümlerinden biri, bu makinelilerin etkili menzilinin dışından ateş edebilecek kadar büyük bir toptu. 50 mm’lik toplar 5 cm Pak 38 tanksavar topundan türetildi: Rheinmetall’in BK 5’i Me 410’da kullanıldı, Mauser’in MK 214 A’sı ise Me 262 için düşünüldü.',
+            'The dozens of machine guns of bombers flying in tight formation were the greatest danger to an approaching fighter. One German answer was a cannon big enough to fire from outside the effective range of those guns. The 50 mm weapons were derived from the 5 cm Pak 38 anti-tank gun: Rheinmetall’s BK 5 was used in the Me 410, while Mauser’s MK 214 A was meant for the Me 262.',
+          ),
+          t(
+            'MK 214 A otomatik doldurmalıydı ve dakikada yaklaşık 150 mermi atıyordu; yaklaşık 1,5 kg’lık mermisi namludan 920 m/sn hızla çıkıyordu. Top dört metreden uzundu: Me 262’nin burnundaki dört MK 108 sökülüp yerine takıldığında namlusu burun ucundan yaklaşık iki metre dışarı taşıyordu.',
+            'The MK 214 A was automatically loaded and fired about 150 rounds a minute; its shell of about 1.5 kg left the muzzle at 920 m/s. The gun was more than four metres long: when the four MK 108s in the Me 262’s nose were removed and it was fitted in their place, its barrel stuck out about two metres beyond the tip of the nose.',
+          ),
+        ],
+      },
+      {
+        h: t('İki deneme uçağı', 'Two trial aircraft'),
+        p: [
+          t(
+            'İki Me 262 A-1a (seri numaraları 111899 ve 170083) Lechfeld’de bu topla donatıldı ve Mart ile Nisan 1945’te denendi. Yer ve hava atışları yapıldı, ama sürüm üretime kabul edilmedi ve savaş birkaç hafta sonra bitti. Uçağın muharebede sonuç aldığına dair güvenilir bir kayıt yoktur.',
+            'Two Me 262 A-1as (serial numbers 111899 and 170083) were fitted with the gun at Lechfeld and tested in March and April 1945. Ground and air firing trials were carried out, but the version was not accepted for production and the war ended a few weeks later. There is no reliable record of the aircraft achieving anything in combat.',
+          ),
+          t(
+            '170083 numaralı uçak Lechfeld’de Amerikalıların eline geçti ve ele geçirilen Alman uçaklarını toplayan ekibe katıldı. Savaştan kısa süre sonra Cherbourg’a götürülürken motoru yandı; pilotu paraşütle atladı, uçak kayboldu.',
+            'Aircraft 170083 fell into American hands at Lechfeld and joined the team collecting captured German aircraft. Shortly after the war, while being ferried to Cherbourg, it suffered an engine fire; its pilot bailed out and the aircraft was lost.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda bir bombardıman avcısıdır: gövdesi ve motorları Me 262 ile aynıdır, top yüzünden biraz daha ağırdır. Tek 50 mm topu saniyede 2,5 mermi atar ve 30 mermi taşır. Bombardıman kollarına arkadan yaklaşır, nişancıların menzili dışından, yaklaşık 1,3 kilometreden ateş açar ve nişancı menziline girmeden yana kırıp yeniden arkaya geçer; tek isabeti ağır hasar verir. Yavaş atışı yüzünden avcıları vurması zordur; bomba taşımaz.',
+        'In the game it is a bomber destroyer: its airframe and engines are those of the Me 262, and the gun makes it a little heavier. Its single 50 mm cannon fires 2.5 rounds a second and carries 30. It closes on bomber formations from astern, opens fire from beyond the reach of their gunners at about 1.3 kilometres, then breaks away to the side before coming within their range and gets behind again; a single hit does heavy damage. Its slow fire makes fighters hard to hit, and it carries no bombs.',
+      ),
+    ],
+  },
+  {
     id: 'he162',
     summary: t(
       '“Halk avcısı”: 90 günde tasarlanıp uçurulan, sırtında motoru olan küçük jet.',

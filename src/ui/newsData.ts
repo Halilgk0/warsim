@@ -10,6 +10,8 @@ export interface NewsSection {
   bullets?: string[];
   /** Bağlantılı liste (yeni sekmede açılır): kaynak künyeleri. */
   links?: { text: string; href: string }[];
+  /** Bölümde sessiz, kendiliğinden dönen video (e-postaya girmez): dosya, kapak görseli, alt yazı. */
+  video?: { src: string; poster: string; caption: string };
 }
 
 export interface NewsItem {
@@ -31,6 +33,48 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
+  {
+    id: 'me262-u4',
+    date: '2026-11-11',
+    title: 'Yeni uçak: Me 262 A-1a/U4',
+    summary: 'Burnunda tek 50 mm top taşıyan Me 262 araştırma ağacına geldi: bombardıman kollarına nişancıların menzili dışından ateş eder. İki Me 262’nin modeli de yenilendi.',
+    cover: img('me262u4.jpg'),
+    images: [
+      { src: img('me262u4-model.jpg'), caption: 'Me 262 A-1a/U4: 50 mm’lik namlu burnun yaklaşık iki metre önüne taşar.' },
+      { src: img('me262-model.jpg'), caption: 'Me 262 A-1a: yeni boya ve gövdeye oturan alçak kanopi.' },
+    ],
+    sections: [
+      {
+        heading: 'Me 262 A-1a/U4',
+        bullets: [
+          'Me 262’nin burnundaki dört 30 mm top yerine tek bir 50 mm Mauser MK 214 A taşıyan deneme sürümü. 1945 ilkbaharında iki uçak dönüştürülüp denendi.',
+          'Top dakikada 150 mermi atar, mermi namludan 920 m/sn hızla çıkar; uçak yaklaşık 30 mermi taşır.',
+          'İsabet eden her mermi ağır hasar verir. Atış yavaş olduğu için avcıya karşı zayıftır.',
+          'Gövde ve motorlar Me 262 ile aynı; top ve mermileri uçağı yaklaşık 250 kg ağırlaştırır.',
+          'Araştırma ağacında Me 262’den sonra gelir. Ansiklopedide kendi sayfası var.',
+        ],
+      },
+      {
+        heading: 'Uzaktan ateş',
+        bullets: [
+          'U4 bombardıman kutusunun en yakın uçağına arkadan yaklaşır ve nişancıların menzili dışından ateş eder.',
+          'Menzile girmeden yana kırar, yeniden arkaya geçip bir sonraki atışı yapar.',
+          'Her mermi ayrı ayrı duyulur; mermi uzun namlunun ucundan çıkar.',
+        ],
+      },
+      {
+        video: { src: img('me262.mp4'), poster: img('me262-video.jpg'), caption: 'Me 262 ve U4 gün doğumunda bombardıman kollarına karşı (oyundan çekim).' },
+      },
+      {
+        heading: 'İki Me 262’nin modeli yenilendi',
+        bullets: [
+          'Yeni boya: yanlarda açık zemin üstünde sık koyu yeşil ve kahve benekler, panel birleşimlerinde ve hücum kenarlarında aşınmış boya.',
+          'Yüzey artık her yerde aynı parlaklıkta değil: mat ve hafif parlak yerler var, uçak biraz daha koyu. Plastik görünüm gitti.',
+          'Kokpit yeniden yapıldı: kanopi alçaldı ve gövdeye yayıldı, gerçekteki gibi gövdenin devamı olarak duruyor.',
+        ],
+      },
+    ],
+  },
   {
     id: 'kayit-yerleri',
     date: '2026-11-10',
