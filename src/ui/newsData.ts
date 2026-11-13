@@ -34,6 +34,39 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'ogretici-konular',
+    date: '2026-11-14',
+    // Yalnız oyunda: e-postayla duyurulmaz (2026-11-14, kullanıcının kararı)
+    noMail: true,
+    title: 'Öğretici artık konu konu',
+    summary: 'Oyunun içinden istediğin konuyu açıp yalnız o kısmı izleyebilirsin. Adımlar artık kamerayı senin yapılarına götürüyor ve dokunmanı bekliyor.',
+    cover: img('ogretici-konu.jpg'),
+    images: [
+      { src: img('ogretici-adim.jpg'), caption: 'Para ve hazine konusu: kamera madenine gider, sol panelden hazineye girersin.' },
+    ],
+    sections: [
+      {
+        heading: 'Konu listesi',
+        bullets: [
+          'Üst çubuktaki düğmelerin en solunda Öğretici var (telefonda yalnız kitap simgesi); duraklatma menüsünde de.',
+          'Yedi konu: harita ve kamera, görev planlama ve kalkış, para ve hazine, inşa ve personel, üretim ve uçaksavar, araştırma ve hangar, düşman ve savaş.',
+          'Bir konuya basınca yalnız onun adımları bu harekâtın içinde gösterilir. Bitince liste yeniden açılır, konu izlendi diye işaretlenir.',
+          'Her konunun altında adımları yazılı; arama kutusuyla aradığını (maden, radar, kalkış…) bulursun.',
+          'Liste açıkken oyun durur, kapatınca kaldığı hızla sürer.',
+        ],
+      },
+      {
+        heading: 'Daha etkileşimli adımlar',
+        bullets: [
+          'Adımlar yalnız yazı değil: kamera haritadaki madenine, fabrikana ya da bataryana gider; üstüne dokunur, sol panelden ilgili pencereye girersin.',
+          'Toplu üretim ve "Bitince tekrarla", araştırmada sekme, kart ve dosya, düşman listesinden hedefe gitme de adım adım gösteriliyor.',
+          'İlk harekâttaki baştan sona öğretici de bu adımları içeriyor; istediğin yeri atlayabilirsin.',
+          '"Adımı geç" ve "Kapat" telefonda daha kolay basılıyor.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'me262-u4',
     date: '2026-11-11',
     title: 'Yeni uçak: Me 262 A-1a/U4',

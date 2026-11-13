@@ -15,6 +15,34 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'ogretici-konular': {
+    title: 'The tutorial now comes in topics',
+    summary: 'Open any topic from inside the game and watch just that part. The steps now fly the camera to your own buildings and wait for you to tap.',
+    cover: 'ogretici-konu-en.jpg',
+    files: ['ogretici-adim-en.jpg'],
+    captions: ['Money and treasury: the camera flies to your mine and you open the treasury from the left panel.'],
+    sections: [
+      {
+        heading: 'Topic list',
+        bullets: [
+          'Tutorial is the leftmost button on the top bar (just a book icon on phones); it is in the pause menu too.',
+          'Seven topics: map and camera, planning and launching a mission, money and treasury, building and personnel, production and anti-aircraft guns, research and hangar, enemies and war.',
+          'Pick a topic and only its steps are shown, inside your current campaign. When it ends the list opens again and the topic is marked as watched.',
+          'Each topic lists its steps underneath; the search box finds what you need (mine, radar, take-off…).',
+          'The game pauses while the list is open and carries on at the same speed when you close it.',
+        ],
+      },
+      {
+        heading: 'More hands-on steps',
+        bullets: [
+          'The steps are more than text: the camera flies to your mine, factory or battery on the map, you tap it and open the matching window from the left panel.',
+          'Batch production and "Repeat when done", the research tabs, cards and dossier, and going to a target from the enemy list are shown step by step too.',
+          'The full tutorial in your first campaign includes these steps; you can skip any part.',
+          '"Skip step" and "Close" are easier to tap on phones.',
+        ],
+      },
+    ],
+  },
   'me262-u4': {
     title: 'New aircraft: Me 262 A-1a/U4',
     summary: 'The Me 262 with a single 50 mm cannon in its nose joins the research tree: it fires on bomber formations from beyond the reach of their gunners. Both Me 262 models have also been rebuilt.',

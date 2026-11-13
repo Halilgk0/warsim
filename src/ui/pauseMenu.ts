@@ -15,7 +15,8 @@ export class PauseMenu {
   isOpen = false;
   private el = $('pausemenu');
   private view: View = 'main';
-  private resumeScale = 1;
+  /** Menü kapanınca dönülecek oyun hızı (öğretici konu listesi de bunu kullanır). */
+  resumeScale = 1;
   private busy = false;
   private msg = '';
   private title = '';
@@ -126,8 +127,9 @@ export class PauseMenu {
         g.feedback.open(g.world.playerName || acc?.name || '');
         return;
       case 'tutorial':
+        // Konu listesi: istenen konu bu harekâtın içinde (2026-11-13; eskiden baştan başlardı)
         this.close(false);
-        g.tutorial.begin(false);
+        g.tutorial.openTopics(this.resumeScale);
         return;
       case 'back':
         this.view = 'main';
