@@ -301,6 +301,9 @@ export class Game {
   }
 
   exitToMenu(): void {
+    // Skor bildirimi dakikada birdi: misafir oynayıp hesap açan, kaydedip bir dakika dolmadan menüye dönen oyuncunun hiç
+    // bildirimi gitmiyordu (2026-11-13). Menüye dönerken hemen bildir
+    if (this.mode === 'play' && currentAccount()) this.stats.flush(this.world, this.playerTeam);
     this.showMainMenu();
   }
 
@@ -441,6 +444,8 @@ export class Game {
       const { cloud } = await writeSave(acc.key, title ?? this.defaultSaveTitle(), kind, d, slot);
       this.lastSave = { real: performance.now(), gameTime: this.world.time, kind };
       this.autosaveClock = 0;
+      // Kayıtla birlikte skor da bildirilir (misafirken oynanıp hesap açılınca alınan ilk kayıt dahil)
+      this.stats.flush(this.world, this.playerTeam);
       if (!cloud) this.toast(L('Bu cihaza kaydedildi; bağlantı gelince buluta yüklenecek', 'Saved on this device; it will upload when you are online'));
       else this.toast(kind === 'auto' ? L('Otomatik kayıt alındı', 'Autosaved') : L('Oyun kaydedildi', 'Game saved'));
       return true;
