@@ -95,10 +95,41 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       menzili dışından ateş eder, menzile girmeden yana kırıp yeniden arkaya geçer (`combat.ts` `standoffAttack`). Sesi
       seri döngüsü değil, mermi başına tek vuruş (`audio/battle.ts`). Bot bu uçağı araştırmaz (`commander.ts`
       `VEHICLE_PRIORITY`'de yok): eklemek bot dengesini değiştirir.
+    - Bot ekonomisi (2026-11-13): ilk 3 maden ikinci üsten önce (4 fazla güçlendirdi); üs yeri 3 denemede bulunamazsa 30 dk üs aranmaz;
+      savunma ve yatırım payı tehdide göre (`threat`: son 30 dk vurulduysa savunma ×1,6, 60 dk sakinse savunma ×0,6 ve
+      yatırım ×1,3); ağır hasarlı maden varken yeni maden yok; itfaiyenin alanındaki maden, batarya ve radar yola bağlanır
+      (`linkToRoads`). 240 dk ölçümünde maden 2 → 4, kazanç +%46, filo 15 → 18.
     - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
+    - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
+      alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana
+      değen her ızgara hücresi tam düzdür (`terrain.ts` `flattenFootprint`, bir hücre köşegeni taşar), yoksa yapı havada
+      kalır. Kalan farkı çizimde `render/ground.ts` kapatır.
+    - Kasaba (2026-11-12): harekâtta her taraf bir belediye binasıyla (`townhall`, 5.500 kr, gelirsiz) başlar; önünden ana
+      cadde çıkar. Evler ancak kendi yolunun yanına kurulur (`world.roadRules`, yalnız harekâtta; `structure.ts`
+      `ROAD_KINDS`). Yollar `sim/roads.ts` (düz parçalar, `world.roads`; `checkRoad` / `placeRoad`, metre başına
+      `ROAD_COST`): her parça mevcut bir yoldan başlar, araziyi düzleştirmez, yıkılmaz. Botlar evleri `findLot` ile
+      yola dizer, arsa bitince `growRoads` ile sokak açar (yol boyunca her 100 m'de bir kavşak yeri boş kalır). Yolsuz
+      eski kayıt yüklenince her tarafa bedava belediye verilir (`save.ts`, `campaign.ts` `foundTown`).
+    - Bakım personeli (2026-11-13): her uçak 1 kişi (`economy.ts` `MAINT_CREW`). Hangarda, havada ve fabrika bandındaki
+      uçaklar `world.maintOf` ile her seferinde sayılır, `crewFree`'den düşer; sipariş (`orderAircraft`, nedeni `orderBlock`)
+      ve pazar alımı boşta kişi ister. Harekât her tarafa 4 evle başlar (16 kişi: 6 bakımcı + 8 uçuş + 2 boş). Bütün
+      kalkışlar `launchPackage`'dan geçer, mürettebat orada ayrılır.
+      - Kuraldan önceki kayıt (`maintRule` yok) açılınca her tarafa eksik konut bedava kurulur (`campaign.ts`
+        `maintHousing`; sokak da bedava uzar): eksik, bakımcılardan eski fazlayla (konut − itfaiye − bütün uçuş
+        mürettebatı) karşılanamayan kısım; böylece eskiden kalkan her uçak yine kalkar. Ad sayaçları yüklendikten sonra
+        kurulur. Yer bulunamazsa son çare o kadar uçak `noMaint`. Oyuncuya bir kez bildirim (`game.ts` `showMaintGift`).
+      - Testler: scratchpad `sehir/test/bakim_test.ts` (59 deneme), tarayıcı `eski_kayit_tel.mjs`, `uretim_tel.mjs`.
+    - İtfaiye merkezi (2026-11-12, `structures/fireStation.ts`): yolun yanına kurulur, kadrosu evlerden gelir
+      (`personnel.staff`, `crewFree` düşer: kuruluşta 4, seviye başına +2; üç seviye). Alanındaki hasarlı ev, apartman ve
+      belediyeye ekip yollardan araçla gider (`roads.ts` `roadPath`; ekip büyüklüğü `FIRE_CREW`, büyük binalar önce),
+      elle onarımın yarı fiyatına onarır (`FIRE_COST_RATE`, `world.chargeRepair`; para yetmezse ekip bekler). İtfaiyenin baktığı binada elle onarım açılmaz (`world.fireCovers`); maden, üs, fabrika, radar ve
+      batarya yalnız oyuncu onları yola bağladıysa (`roadLinked`: kendi yolu tabanına 17,5 m yaklaşıyor) ve alandaysa itfaiyece onarılır (`fireCrewFor`), yoksa eskisi gibi elle. Ekip yalnız merkezle aynı yol kümesindeki yapılara gider (`stationReaches`, `world.roadComponent`; ikinci belediyenin bağlantısız sokaklarına gitmez). Evler yıkılıp nüfus kadroyu karşılamazsa ekip o oranda küçülür (`world.staffRatio`). İtfaiye üstlenince elle onarım kapanır. Uç durum testleri: scratchpad `sehir/test/itfaiye_test.ts` (38 deneme). Botlar kasaba 6 eve ulaşınca bir merkez kurar, 12 ve 20 evde yükseltir (`commander.ts` `FIRE_HOMES`, `upgradeFire`; araştırma para beklerken yükseltmez). Seviye atlayınca model değişir (`cityModels.ts`
+      `firestation`, görünüm yeniden kurulur); araçlar `render/fireVehicles.ts`.
+    - Para kalemleri: `world.pay` / `earn` kalem alır (`economy.ts` `MoneyCat`), toplamlar `Team.flow`'da; belediye
+      ekranı (`ui/town.ts`) bunları gösterir. Belediye ekranında personel dökümü de var (uçuşta, bakımda, itfaiyede, boşta, yerine gelen). Yeni ödeme ya da gelir eklerken kalemini ver.
     - `airDefense.ts`: silahlar gerçek sistemlerdir (kaynaklar dosyanın başında). Silah kimlikleri (`mg`, `aa88`…) kayıtlara yazılır, değişmez.
       Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
@@ -134,7 +165,22 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `lamps.ts`: yapı ışıkları (kameraya dönük lambalar, yerde ışık havuzları). Akşam `archNight` ile yanar; gündüz
     üçgenleri çöker, maliyeti yok.
   - `structures.ts`: hava üssü, uçaksavar, radar, fabrika.
-    - Yeni üs yapıları `|x| ≤ 400` içinde kalsın: simülasyonun üs alanı bu (dışına başka yapı kurulabiliyor).
+    - Yeni üs yapıları `|x| ≤ 400` içinde kalsın: simülasyonun üs alanı bu (dışına başka yapı kurulabiliyor). Üssün
+      çizimi düzleşen alanın dışına taşarsa `flattenStructure`'ı da güncelle.
+  - `roads.ts`: şehir yollarının şeridi (araziyi izler, arazi değişince yeniden oturur; yol boyunca ağaç temizlenir),
+    yol önizlemesi ve yerleşim ızgarası (`BuildGrid`: 5 m, `sim/roads.ts` `GRID`). İnşa ederken ızgara açıkken yapı
+    ızgarada gezer, şehir yapıları yola dizilip ön cephesiyle yola döner (`game.ts` `refreshBuild`); alt çubuktaki
+    Izgara düğmesi (X) serbest yerleşime geçirir (`warsim.grid`). Yerleştirirken model
+    ya da silüet gösterilmez, yalnız süslü taban işareti (`FootprintGhost`; 2026-11-12 kararı: hangi tasarımın geleceği
+    kurulunca belli olur). Çizici logaritmik derinlik kullanır: kendi
+    gölgelendiricisi olan ağ derinlikte kaybolur, standart malzemeyi `onBeforeCompile` ile genişlet.
+  - `ground.ts`: yapıyı araziye oturtur (eğime göre). Düz alanın dışında kalan ya da yanına kurulan yapının
+    düzleştirmesiyle arazisi değişen parçalar inilir: ince parçalar (arsa, yol, çit) eğimi izler, gövdeler bütün olarak
+    kayar ve alt köşeleri toprağa uzar, çatılar altlarındaki gövdeyle gider. ArchBatch parça bilgisini (`userData.parts`)
+    kullanır. Yeni yapı kurulunca yakındakiler yeniden oturtulur (`gameRenderer.ts` `syncStructures`).
+    Yere yatan geniş ince parçalar (asfalt, beton, arsa, toprak saha, pist; 40 m'den geniş) `arch.ts` `drape` ile üst yüzü
+    35 m'lik üçgenlere bölünür: eğimde ve tümsekte ortası toprağa gömülmez (2026-11-13; üssün düzleşen alanının kenarında 8 m'ye
+    kadar gömülüyordu). Gövdeler (bina, hangar, fabrika) bölünmez. Daha sık bölme telefonda üçgeni çok artırıyor.
     - Park eden uçaklar `placeParked`: en yeni yarısı hangar ağzı, T2, çadır hangar, sığınak ve siperlere, kalanı
       aprona. Tür başına InstancedMesh (`models.ts` `parkedParts`).
   - `models.ts`: kodla üretilen parametrik uçaklar. Modelde `+x` sol kanat (burun `+z`, üst `+y`).
@@ -161,9 +207,22 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Yeni uçağa eklerken bu dört parçayı ve ışıkları tanıma ekle.
   - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
     malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
-  - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, köy, yol), `palette.ts`.
+  - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, kaya, çiftlik), `palette.ts`.
+  - **Harita süsleri** (2026-11-13, `decor.ts`): haritanın dekor şehirleri, sokakları, şehirleri bağlayan yollar ve yol boyu
+    köyler kaldırıldı (yalnız çizimden: `CITIES` arazinin düzlüklerini ve başlangıç yeri kuralını biçimlendirmeye devam
+    eder, eski kayıtlar bozulmasın; arazi örtüsü `cities: []`). Yerine her harekâtta az sayıda süs: küçük köyler (toprak
+    yol, yola bakan evler, kuyu, ahır; bazen bir ev yıkık), tek çiftlik evleri, yıkık evler, terk edilmiş maden ocakları
+    (200 km'de ~5 köy, ~9 ev, ~3 maden; alanla ölçeklenir). Yerler ana üslerden tohumlanır (aynı kayıt aynı süsler), ana
+    üslerden ≥14 km, birbirinden ayrı, düz ve kuru yerde. Yalnız görüntü: üstüne yapı kurulan süs gizlenir
+    (`landcover.ts` `builtNear`), kapladığı yere ağaç konmaz (`setDecorClearings`). Modeller `cityModels.ts`
+    (`buildDecorModel`: `ruin`, `oldmine`, `barn`, `well`; köy evleri `buildCityModel`); bir süs tek ağ (`ArchBatch.setOrigin`),
+    yıkık parçalar hasar gölgelendiricili ikinci malzemede, zemin ve bitki sağlam malzemede. Köylerin ~%65'i ve tek evlerin yarısı gece ışık yakar (sokak lambası, kuyu feneri, pencere); ötekiler karartmada (`setArchLit` 0). Haritada sönük işaret (`.dlabel`, `updateLabels`): 9 km'den yakında simge ve ad (Köy, Çiftlik evi, Yıkık ev, Terk edilmiş maden), uzakta yalnız simge; etiketler kapalıysa ya da üstüne yapı kurulduysa yok. Kurulum kare başına ~5 ms
+    dilimle, kameraya yakın olan önce; kameradan 16 km ötesi ve harita görünümü çizilmez.
+  - `groundTex.ts` (2026-11-13): açılışta üretilen 256 px'lik karo doku. Arazi iki ölçekte okur (her kalitede: ucuz;
+    yordamsal arazi dokusu yalnız Yüksek'te kalır), ağaç taçları bir kez (`scenery.ts` `leafy`). Ağaç geometrileri
+    `props.ts`: taç köşeleri ton taşır (alt koyu, üst açık); yakın yapraklı ağaç 68, iğne yapraklı 32 üçgen.
   - **Boş arazi ağaçlı** (2026-11-10): `landcoverGen.ts` ormanın dışındaki açık araziye de seyrek ağaç ve koru yazar
-    (`open`, tarla, şehir, üs yeri, ağaç sınırı ve uçurum hariç). Yakın ağaçlar `scenery.ts`'te yol, köy, çiftlik ve şehir
+    (`open`, tarla, şehir, üs yeri, ağaç sınırı ve uçurum hariç). Yakın ağaçlar `scenery.ts`'te çiftlik ve süs (`decor.ts`)
     çevresine dikilmez (`keepOut`, 40 m hücre; `buildSettlements` doldurur). Yalnız görüntü: sim arazisi değişmez.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
 - **`src/audio/`:**
@@ -181,6 +240,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     yazılır (`accounts.news_seen`), misafirde işaret yok. `MARK_DAYS`'ten eski haber işaretlenmez.
   - `production.ts`: üretim menüsü (fabrika; uçak ve top satırları) ve yuva penceresi (bataryada top takma). Pencere açıkken yalnız `data-cell` hücreleri güncellenir; tam çizim düğmeyi kaçırıyordu. Resimler hazır dosya (`public/uretim`; araştırma dosyası ve `plan/` altındaki siluetler de): telefon bu pencereler için model kurmaz, liste metni kısa kalır. Yeni uçak ya da top eklenince, model değişince `npm run uretim:gorsel [ac-<uçak> gun-<top>]`.
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
+    Oyunun içinden konu listesi (2026-11-13, `openTopics`): üst çubuktaki düğmelerin en solundaki Öğretici (telefonda yalnız
+    simge) ve duraklatma menüsü. `TOPICS` adımları konulara böler; ana maddeye basınca yalnız o konunun adımları bu harekâtın
+    içinde çalışır, bitince liste "izlendi" işaretiyle yeniden açılır; alt maddeler yalnız göstermek ve aramak için. Yeni
+    adım eklenince `TOPICS`'e de yaz. Yalnız harekâtta. `deep` adımlar (etkileşimli: kamera oyuncunun yapısına uçar `flyToOwn`, oyuncu dokunup seçer, sol panelden ilgili pencereye girer) hem baştan sona turda hem konularda; tur 65 adım (~10 dk). Konu turu denemesi: scratchpad `sehir/decor/konu_tur.cjs`. Liste çelik temanın koyu renklerinde; her konu kartının arkasında oyunun kendi sahnesi (`public/ogretici/<konu>.webp`, 900×300; üretimi scratchpad `sehir/decor/kart_gorsel.cjs`: harita, maden, kasaba, itfaiye ve fabrika oyundan çekilir, görev, araştırma ve savaş açılış görsellerinden kırpılır). Admin paneli gibi açık ve düz görünüm reddedildi (2026-11-13).
     Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
     güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.
 - **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)

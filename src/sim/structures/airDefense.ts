@@ -35,11 +35,11 @@ function shellDrop(w: AAWeaponDef, t: number): number {
   return G * ((u * u - T * T) / 4 - ((T * T) / 2) * Math.log(u / T));
 }
 
-/** Batarya seviyesi yükseltme: gereken araştırma, süre ve maliyet (seviye 2, 3, 4). */
+/** Batarya seviyesi yükseltme: gereken araştırma, süre ve maliyet (seviye 2, 3, 4; 2026-11-11'de ×1,5). */
 const LEVELS: { req: string; time: number; cost: number }[] = [
-  { req: 'hd_fort1', time: 60, cost: 1600 },
-  { req: 'hd_fort2', time: 90, cost: 3150 },
-  { req: 'hd_fort3', time: 140, cost: 5800 },
+  { req: 'hd_fort1', time: 60, cost: 2400 },
+  { req: 'hd_fort2', time: 90, cost: 4750 },
+  { req: 'hd_fort3', time: 140, cost: 8700 },
 ];
 
 export type AASensorId = 'rangefinder' | 'predictor' | 'gunRadar' | 'proximity';
@@ -55,19 +55,19 @@ export interface AASensorDef {
 
 export const AA_SENSORS: Record<AASensorId, AASensorDef> = {
   rangefinder: {
-    id: 'rangefinder', name: L('Optik telemetre', 'Optical rangefinder'), requires: 'hd_rangefinder', installTime: 30, cost: 950,
+    id: 'rangefinder', name: L('Optik telemetre', 'Optical rangefinder'), requires: 'hd_rangefinder', installTime: 30, cost: 1450,
     desc: L('Nişan hatası %15–25 azalır, hedef 1 sn daha çabuk alınır.', 'Aiming error drops by 15–25%, targets are acquired 1 s sooner.'),
   },
   predictor: {
-    id: 'predictor', name: L('Mekanik atış hesaplayıcı', 'Mechanical predictor'), requires: 'hd_predictor', installTime: 40, cost: 1900,
+    id: 'predictor', name: L('Mekanik atış hesaplayıcı', 'Mechanical predictor'), requires: 'hd_predictor', installTime: 40, cost: 2850,
     desc: L('Orta ve ağır toplarda ön nişan otomatik: hata %30–40 azalır.', 'Automatic lead for medium and heavy guns: error drops by 30–40%.'),
   },
   gunRadar: {
-    id: 'gunRadar', name: L('Atış kontrol radarı', 'Gun-laying radar'), requires: 'hd_gunradar', installTime: 60, cost: 3700,
+    id: 'gunRadar', name: L('Atış kontrol radarı', 'Gun-laying radar'), requires: 'hd_gunradar', installTime: 60, cost: 5550,
     desc: L('Hedefi gözle görmeden tam menzilde izler; ağır topların hatası yarıya iner.', 'Tracks targets at full range without seeing them; heavy gun error is halved.'),
   },
   proximity: {
-    id: 'proximity', name: L('Yakınlık tapası', 'Proximity fuze'), requires: 'hd_vt', installTime: 30, cost: 2650,
+    id: 'proximity', name: L('Yakınlık tapası', 'Proximity fuze'), requires: 'hd_vt', installTime: 30, cost: 4000,
     desc: L('Orta ve ağır mermiler hedefin yanında patlar: öldürücü yarıçap %50 büyür.', 'Medium and heavy shells burst next to the target: lethal radius grows by 50%.'),
   },
 };

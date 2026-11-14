@@ -4,7 +4,9 @@
 import { World } from './sim/world';
 import { SCENARIOS } from './sim/scenarios';
 import type { Aircraft } from './sim/aircraft/aircraft';
-import type { Structure, StructureKind } from './sim/structures/structure';
+import { STRUCTURE_DEFS, type Structure, type StructureKind } from './sim/structures/structure';
+import { GRID, LOT_LINE, ROAD_MIN, lotAt, nearestRoad } from './sim/roads';
+import type { GridFrame } from './render/roads';
 import type { FlightGroup } from './sim/ai/flightGroup';
 import { GameRenderer } from './render/gameRenderer';
 import { Hud } from './ui/hud';
@@ -19,7 +21,7 @@ import { aircraftNode } from './sim/tech';
 import { groundLevel, mapKey, terrainMap } from './sim/terrain';
 import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
-import { setupCampaign } from './sim/campaign';
+import { setupCampaign, type MaintGift } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
 import { type SaveKind, currentAccount, listSaves, readSave, refreshSession, savesCleanupBy, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
 import { autoSlotFor } from './saveSlots';
@@ -44,7 +46,7 @@ import { sound } from './audio/sound';
 import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
-import { L, LOCALE } from './i18n';
+import { L, LOCALE, count } from './i18n';
 import { SAVE_SLOTS } from './net/shared';
 import { Tutorial } from './ui/tutorial';
 import { MAP_BASE, MAP_SCALE } from './sim/mapData';
@@ -62,7 +64,13 @@ export type Interaction =
   | { mode: 'none' }
   | { mode: 'pickTarget' }
   | { mode: 'pickWaypoint' }
-  | { mode: 'build'; kind: StructureKind; heading: number; x: number; z: number; ok: boolean; reason?: string };
+  /** heading: oyuncunun R ile verdiği yön; face: kurulacak yön (yola dizilince yol belirler). px, pz: imlecin yerdeki yeri. */
+  | { mode: 'build'; kind: StructureKind; heading: number; face: number; x: number; z: number; px: number; pz: number; ok: boolean; reason?: string }
+  /** Yol çizimi: önce başlangıç (mevcut yolun üstünde), sonra uç; kurulunca uçtan devam eder. ux, uz: ızgaranın doğrultusu. */
+  | { mode: 'road'; start: { x: number; z: number; ux: number; uz: number } | null; x: number; z: number; ux: number; uz: number; px: number; pz: number; ok: boolean; reason?: string; cost: number; length: number };
+
+/** Yerleşim ızgarası açık mı (tarayıcıda saklanır). */
+const GRID_KEY = 'warsim.grid';
 
 /** Kısa, sabit kimlik özeti (FNV-1a, onaltılık). */
 function hashId(s: string): string {
@@ -108,6 +116,8 @@ export class Game {
   private readonly alerts = new AlertSound();
   /** Kameranın takip ettiği uçak (motor seslerinde Doppler dinleyicisi). */
   private followId: number | null = null;
+  /** "Üsse dön" kaç kez kullanıldı (öğretici adımı bunu bekler). */
+  homeCount = 0;
   /** Ana menü ya da oyun. */
   mode: 'menu' | 'play' = 'menu';
   /** Son kayıt (gerçek zaman, oyun zamanı, tür). */
@@ -142,7 +152,7 @@ export class Game {
     this.renderer = new GameRenderer(document.getElementById('viewport')!, document.getElementById('labels')!);
     this.renderer.rig.onClick = (x, y) => this.handleClick(x, y);
     this.renderer.rig.onDoubleClick = (x, y) => this.handleDoubleClick(x, y);
-    this.renderer.rig.onRightClick = () => this.cancelInteraction();
+    this.renderer.rig.onRightClick = () => this.cancelStep();
     this.renderer.rig.onHover = (x, y) => this.handleHover(x, y);
     this.hud = new Hud(this);
     this.left = new LeftPanel(this);
@@ -298,6 +308,28 @@ export class Game {
       rig.pitch = cam.pitch;
     } else this.focusHome();
     this.toast(`${L('Kayıt yüklendi', 'Save loaded')} · ${mapById(d.mapId).name} · ${L('oyun', 'game')} ${fmtTime(w.playTime)}`);
+    // Bakım personeli kuralından önceki kayıt: kural ve bedava konut bir kez söylenir (sonraki kayıtta maintRule var)
+    const gift = w.maintGift;
+    w.maintGift = null;
+    if (gift) this.showMaintGift(gift);
+  }
+
+  private showMaintGift(g: MaintGift): void {
+    const built = g.buildings > 0
+      ? L(`Filon eskisi gibi uçabilsin diye kasabana <b>${g.buildings} konut (${g.people} kişi)</b> bedava kuruldu.`,
+        `So your fleet can fly as before, <b>${count(g.buildings, 'home')} (${g.people} people)</b> were built in your town for free.`)
+      : L('Konutun yetiyordu, ek bina gerekmedi.', 'Your housing was enough; no new buildings were needed.');
+    const exempt = g.exempt > 0
+      ? `<p>${L(`Kasabada yer kalmadığı için ${g.exempt} uçak bakımcısız uçmaya devam edecek.`, `There was no room left in town, so ${count(g.exempt, 'aircraft', 'aircraft')} keep flying without ground crew.`)}</p>`
+      : '';
+    this.modals.openNotice(
+      L('Yeni kural: bakım personeli', 'New rule: ground crew'),
+      `<p>${L(
+        'Artık her uçak <b>1 bakım personeli</b> ister: üretimde ayrılır, uçak düşene ya da satılana dek onda kalır. Uçuş mürettebatı ayrıca gerekir.',
+        'Every aircraft now needs <b>1 ground crew</b>: assigned when it is built, they stay with it until it is lost or sold. Its flight crew is needed on top.',
+      )}</p><p>${built}</p>${exempt}`,
+      [{ label: L('Devam et', 'Continue'), primary: true, run: () => {} }],
+    );
   }
 
   exitToMenu(): void {
@@ -358,6 +390,25 @@ export class Game {
       rig.target.set(0, 0, 0);
       rig.distance = 250000;
     }
+  }
+
+  /**
+   * Üsse dön (üst çubuktaki ev düğmesi, G): kamera nerede olursa olsun ana üsse; takip bırakılır. Üs kalmadıysa oyuncunun
+   * başka bir yapısına, hiç yapı yoksa söyler. Yön korunur (oyuncu haritada yönünü kaybetmesin), üs ekrana sığar.
+   */
+  goHome(): void {
+    this.homeCount++;
+    const rig = this.renderer.rig;
+    if (rig.following) rig.release();
+    const base = this.world.airbasesOf(this.playerTeam).find((b) => b.s.active) ?? this.world.airbasesOf(this.playerTeam)[0];
+    const s = base?.s ?? this.world.structures.find((x) => x.team === this.playerTeam && !x.destroyed);
+    if (!s) {
+      this.toast(L('Üs ya da yapı kalmadı', 'No base or structure left'));
+      return;
+    }
+    rig.target.set(s.pos.x, s.pos.y, s.pos.z);
+    rig.distance = base ? 9000 : 4000;
+    rig.pitch = 52 * (Math.PI / 180);
   }
 
   // ------------------------------------------------------------------ kayıt
@@ -591,38 +642,166 @@ export class Game {
     this.setTimeScale(this.timeScale === 0 ? this.lastScale : 0);
   }
 
+  /** İptal düğmesi, Esc, sağ tık: yol çiziminde önce başlangıç noktasını bırakır, sonra kipten çıkar. */
+  cancelStep(): void {
+    const it = this.interaction;
+    if (it.mode === 'road' && it.start) {
+      it.start = null;
+      this.refreshBuild();
+      return;
+    }
+    this.cancelInteraction();
+  }
+
+  /** Yerleşim ızgarası: açıkken yapı ızgarada gezer (şehir yapıları yola dizilir), kapalıyken serbest. */
+  buildGrid = ((): boolean => {
+    try {
+      return localStorage.getItem(GRID_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  })();
+
+  toggleGrid(): void {
+    this.buildGrid = !this.buildGrid;
+    try {
+      localStorage.setItem(GRID_KEY, this.buildGrid ? '1' : '0');
+    } catch { /* gizli pencere: yalnız bu oturum */ }
+    this.refreshBuild();
+  }
+
   cancelInteraction(): void {
     const mode = this.interaction.mode;
-    if (mode === 'build') this.build.close();
+    if (mode === 'build' || mode === 'road') this.build.close();
     this.interaction = { mode: 'none' };
     this.renderer.ghost = null;
+    this.renderer.roadGhost = null;
+    this.renderer.gridFrame = null;
     // Haritadan seçim bitince planlayıcının düğmeleri ("Ekleniyor… (Esc bitir)") eski hâlinde kalmasın
     if ((mode === 'pickTarget' || mode === 'pickWaypoint') && this.planner.isOpen) this.planner.refresh();
   }
 
   beginBuild(kind: StructureKind): void {
     this.planner.close();
-    this.interaction = { mode: 'build', kind, heading: 0, x: 0, z: 0, ok: false };
+    this.renderer.roadGhost = null;
+    this.interaction = { mode: 'build', kind, heading: 0, face: 0, x: 0, z: 0, px: 0, pz: 0, ok: false };
+  }
+
+  /** Yol çizimine başla (İnşa → Şehir → Yol). */
+  beginRoad(): void {
+    this.planner.close();
+    this.renderer.ghost = null;
+    this.interaction = { mode: 'road', start: null, x: 0, z: 0, ux: 1, uz: 0, px: 0, pz: 0, ok: false, cost: 0, length: 0 };
   }
 
   private handleHover(x: number, y: number): void {
     const it = this.interaction;
-    if (it.mode !== 'build') return;
+    if (it.mode !== 'build' && it.mode !== 'road') return;
     const p = this.renderer.groundPoint(x, y);
     if (!p) return;
-    it.x = p.x;
-    it.z = p.z;
+    it.px = p.x;
+    it.pz = p.z;
     this.refreshBuild();
   }
 
-  /** Yerleşim uygunluğunu mevcut konum ve yönle yeniden değerlendir. */
+  /**
+   * Yerleşimi imlecin yerine göre yeniden değerlendir. Izgara açıkken yapı ızgara noktalarına oturur; şehir yapıları
+   * kendi yolunun yakınındaysa yolun kenarındaki arsaya dizilir ve ön cephesiyle yola döner (ızgara da yolun
+   * doğrultusuna döner). Izgara kapalıyken yapı imlecin durduğu yerde, oyuncunun verdiği yönle kalır.
+   */
   private refreshBuild(): void {
     const it = this.interaction;
+    if (it.mode === 'road') {
+      this.refreshRoad();
+      return;
+    }
     if (it.mode !== 'build') return;
-    const chk = this.world.checkPlacement(this.playerTeam, it.kind, it.x, it.z, it.heading);
+    const def = STRUCTURE_DEFS[it.kind];
+    let x = it.px;
+    let z = it.pz;
+    let face = it.heading;
+    let frame: GridFrame | null = null;
+    if (this.buildGrid) {
+      const radius = Math.min(260, Math.max(120, Math.max(def.halfW, def.halfL) + 90));
+      const road = def.category === 'city' && it.kind !== 'townhall'
+        ? nearestRoad(this.world.roads, this.playerTeam, x, z, LOT_LINE + 2 * Math.max(def.halfW, def.halfL) + 20) : null;
+      if (road) {
+        const lot = lotAt(road, Math.min(road.len, Math.round(road.s / GRID) * GRID), road.side, def.halfL);
+        x = lot.x;
+        z = lot.z;
+        face = lot.heading;
+        // Arsa çizgisi (LOT_LINE) ızgara çizgisine denk gelsin: başlangıç yarım hücre yana
+        frame = { x, z, ox: road.road.ax - road.dz * (GRID / 2), oz: road.road.az + road.dx * (GRID / 2), ux: road.dx, uz: road.dz, radius };
+      } else {
+        x = Math.round(x / GRID) * GRID;
+        z = Math.round(z / GRID) * GRID;
+        frame = { x, z, ox: 0, oz: 0, ux: 1, uz: 0, radius };
+      }
+    }
+    it.x = x;
+    it.z = z;
+    it.face = face;
+    const chk = this.world.checkPlacement(this.playerTeam, it.kind, x, z, face);
     it.ok = chk.ok;
     it.reason = chk.reason;
-    this.renderer.ghost = { kind: it.kind, x: it.x, z: it.z, heading: it.heading, ok: chk.ok };
+    this.renderer.ghost = { kind: it.kind, x, z, heading: face, ok: chk.ok };
+    this.renderer.gridFrame = frame;
+  }
+
+  /** Yol çizimi: başlangıç mevcut yolun üstüne yapışır; uç önce yakındaki yola, yoksa (ızgara açıksa) ızgaraya. */
+  private refreshRoad(): void {
+    const it = this.interaction;
+    if (it.mode !== 'road') return;
+    const w = this.world;
+    const team = this.playerTeam;
+    let x = it.px;
+    let z = it.pz;
+    const snapEnds = (h: { s: number; len: number }): number => (h.s < 6 ? 0 : h.len - h.s < 6 ? h.len : h.s);
+    if (!it.start) {
+      const h = nearestRoad(w.roads, team, x, z, 60);
+      if (h) {
+        const s = snapEnds({ s: this.buildGrid ? Math.min(h.len, Math.round(h.s / GRID) * GRID) : h.s, len: h.len });
+        it.x = h.road.ax + h.dx * s;
+        it.z = h.road.az + h.dz * s;
+        it.ux = h.dx;
+        it.uz = h.dz;
+        it.ok = true;
+        it.reason = undefined;
+      } else {
+        it.x = x;
+        it.z = z;
+        it.ok = false;
+        it.reason = w.roads.some((r) => r.team === team)
+          ? L('Yolun başlayacağı yeri mevcut bir yolun üstünde seç', 'Pick the starting point on an existing road')
+          : L('Önce belediye binası kur: yollar onun caddesinden başlar', 'Build a town hall first: roads start from its street');
+      }
+      it.cost = 0;
+      it.length = 0;
+      this.renderer.roadGhost = { ax: it.x, az: it.z, ok: it.ok };
+      this.renderer.gridFrame = this.buildGrid && h ? { x: it.x, z: it.z, ox: it.x, oz: it.z, ux: it.ux, uz: it.uz, radius: 150 } : null;
+      return;
+    }
+    const st = it.start;
+    const h = nearestRoad(w.roads, team, x, z, 8);
+    if (h && Math.hypot(h.x - st.x, h.z - st.z) > ROAD_MIN) {
+      const s = snapEnds(h);
+      x = h.road.ax + h.dx * s;
+      z = h.road.az + h.dz * s;
+    } else if (this.buildGrid) {
+      const u = Math.round(((x - st.x) * st.ux + (z - st.z) * st.uz) / GRID) * GRID;
+      const v = Math.round(((x - st.x) * -st.uz + (z - st.z) * st.ux) / GRID) * GRID;
+      x = st.x + st.ux * u - st.uz * v;
+      z = st.z + st.uz * u + st.ux * v;
+    }
+    const chk = w.checkRoad(team, st.x, st.z, x, z);
+    it.x = x;
+    it.z = z;
+    it.ok = chk.ok;
+    it.reason = chk.reason;
+    it.cost = chk.cost;
+    it.length = chk.length;
+    this.renderer.roadGhost = { ax: st.x, az: st.z, bx: x, bz: z, ok: chk.ok };
+    this.renderer.gridFrame = this.buildGrid ? { x, z, ox: st.x, oz: st.z, ux: st.ux, uz: st.uz, radius: 150 } : null;
   }
 
   /** İnşa: yapıyı 15° döndür (R). */
@@ -635,12 +814,34 @@ export class Game {
   /** İnşa: hayaletin durduğu yere kur (tıklama ya da "Yerleştir"). */
   placeBuild(): void {
     const it = this.interaction;
+    if (it.mode === 'road') {
+      if (!it.ok) {
+        sound.play('error', 'ui');
+        return;
+      }
+      if (!it.start) {
+        it.start = { x: it.x, z: it.z, ux: it.ux, uz: it.uz };
+        sound.play('click', 'ui');
+      } else {
+        const st = it.start;
+        if (!this.world.placeRoad(this.playerTeam, st.x, st.z, it.x, it.z)) {
+          sound.play('error', 'ui');
+          return;
+        }
+        sound.play('place', 'ui');
+        // Yol uçtan devam eder; ızgara yeni yolun doğrultusunda
+        const len = Math.hypot(it.x - st.x, it.z - st.z) || 1;
+        it.start = { x: it.x, z: it.z, ux: (it.x - st.x) / len, uz: (it.z - st.z) / len };
+      }
+      this.refreshBuild();
+      return;
+    }
     if (it.mode !== 'build') return;
     if (!it.ok) {
       sound.play('error', 'ui');
       return;
     }
-    const s = this.world.placeStructure(this.playerTeam, it.kind, it.x, it.z, it.heading);
+    const s = this.world.placeStructure(this.playerTeam, it.kind, it.x, it.z, it.face);
     if (!s) {
       sound.play('error', 'ui');
       return;
@@ -657,7 +858,7 @@ export class Game {
 
   private handleClick(x: number, y: number): void {
     const it = this.interaction;
-    if (it.mode === 'build') {
+    if (it.mode === 'build' || it.mode === 'road') {
       this.handleHover(x, y);
       // Dokunmatikte üzerine gelme yok: dokunuş hayaleti taşır, "Yerleştir" kurar
       if (!this.renderer.rig.lastTouch) this.placeBuild();
@@ -724,6 +925,7 @@ export class Game {
         case 'Digit2': this.setTimeScale(2); break;
         case 'Digit3': this.setTimeScale(4); break;
         case 'KeyF': this.toggleFollow(); break;
+        case 'KeyG': this.goHome(); break;
         case 'KeyH': this.hangar.toggle(); break;
         case 'KeyB': this.build.toggle(); break;
         case 'KeyU': this.modals.toggleFactory(); break;
@@ -739,6 +941,9 @@ export class Game {
         case 'KeyR':
           this.rotateBuild();
           break;
+        case 'KeyX':
+          if (this.interaction.mode === 'build' || this.interaction.mode === 'road') this.toggleGrid();
+          break;
         case 'Tab':
           e.preventDefault();
           this.cycle(e.shiftKey ? -1 : 1);
@@ -746,7 +951,7 @@ export class Game {
         case 'Escape':
           if (this.hangar.isOpen) this.hangar.close();
           else if (this.modals.isOpen) this.modals.close();
-          else if (this.interaction.mode !== 'none') this.cancelInteraction();
+          else if (this.interaction.mode !== 'none') this.cancelStep();
           else if (this.planner.isOpen) this.planner.close();
           else if (this.build.isOpen) this.build.close();
           else if (this.selectedAircraftId !== null || this.selectedStructureId !== null) {

@@ -2,7 +2,7 @@
 // yerleşimi aynı ızgaradan okunur; böylece uzaktan görülen orman lekesi yakından ağaç olur.
 // Yapı tabanları (üsler, fabrikalar, şehir binaları) ormandan ve tarladan temizlenir.
 
-import { CITIES, MAP_BASE, MAP_HALF as HALF, TEAM_SITES } from '../sim/mapData';
+import { MAP_BASE, MAP_HALF as HALF, TEAM_SITES } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, TERRAIN_W, heights, terrainMap } from '../sim/terrain';
 import { clamp, smoothstep } from '../core/math';
 import { type Circle, type LandcoverGrids, type LandcoverMap, fillLandcover } from './landcoverGen';
@@ -30,11 +30,31 @@ let STATIC_CLEAR: Circle[] = [];
 
 /** Oyunda kurulan yapıların tabanları (her kare güncellenir). */
 let dynamicClear: Circle[] = [];
+/** Süs köyleri, tek evler ve terk edilmiş madenler (decor.ts; harekât başına): ağaç ve çiftlik konmaz. */
+let decorClear: Circle[] = [];
 let clearVersion = 0;
 
 export function setClearings(list: Circle[]): void {
   dynamicClear = list;
   clearVersion++;
+}
+
+/** Kalıcı açıklık ekle (video çekimlerindeki süs şehri: ağaç ve köy konmaz; harita değişene dek). */
+export function addClearings(list: Circle[]): void {
+  STATIC_CLEAR.push(...list);
+  clearVersion++;
+}
+
+/** Süslerin kapladığı yerler (decor.ts; yeni harekâtta değişir). */
+export function setDecorClearings(list: Circle[]): void {
+  decorClear = list;
+  clearVersion++;
+}
+
+/** Bu dairenin içinde oyunda kurulmuş bir yapı ya da yol var mı (süs o zaman gizlenir). */
+export function builtNear(x: number, z: number, r: number): boolean {
+  for (const c of dynamicClear) if ((x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + r) ** 2) return true;
+  return false;
 }
 
 export function clearingsVersion(): number {
@@ -45,6 +65,7 @@ export function clearingsVersion(): number {
 export function cleared(x: number, z: number, pad = 0): boolean {
   for (const c of dynamicClear) if ((x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + pad) ** 2) return true;
   for (const c of STATIC_CLEAR) if ((x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + pad) ** 2) return true;
+  for (const c of decorClear) if ((x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + pad) ** 2) return true;
   return false;
 }
 
@@ -66,7 +87,8 @@ export function landcoverMap(): LandcoverMap {
   return {
     n: TERRAIN_N, w: TERRAIN_W, cell: TERRAIN_CELL, half: HALF,
     cellK: MAP_BASE / TERRAIN_N / TERRAIN_CELL,
-    cities: CITIES,
+    // Haritanın dekor şehirleri 2026-11-13'te kaldırıldı (mapWorker.ts aynı; arazinin düzlükleri yerinde kalır)
+    cities: [],
     statics: TEAM_SITES.map((t) => ({ x: t.site.x, z: t.site.z, r: 2600 })),
   };
 }

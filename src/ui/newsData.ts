@@ -10,7 +10,7 @@ export interface NewsSection {
   bullets?: string[];
   /** Bağlantılı liste (yeni sekmede açılır): kaynak künyeleri. */
   links?: { text: string; href: string }[];
-  /** Bölümde sessiz, kendiliğinden dönen video (e-postaya girmez): dosya, kapak görseli, alt yazı. */
+  /** Haber videosu: oyunda oynatılır; e-postada kapak görseli videoya bağlantı olur. */
   video?: { src: string; poster: string; caption: string };
 }
 
@@ -33,6 +33,54 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
+  {
+    id: 'kasaba-itfaiye',
+    date: '2026-11-14',
+    title: 'Kasabaya yol açıldı: itfaiye ve bakım personeli',
+    summary: 'Harekâtta her taraf artık belediye binası ve ana caddesiyle başlıyor. Evler nüfus sağlar; uçaklar bakım personeli ister, itfaiye yollardan hasarlı yapılara ulaşır.',
+    cover: img('kasaba-kapak.webp'),
+    images: [
+      { src: img('kasaba.webp'), caption: 'Yeni kasaba yolları ve yol kenarındaki evler.' },
+      { src: img('itfaiye.webp'), caption: 'Üçüncü seviyeye yükseltilmiş itfaiye merkezi.' },
+    ],
+    sections: [
+      {
+        heading: 'Yollar ve kasaba',
+        bullets: [
+          'Her taraf harekâta bir belediye binası ve önünden çıkan ana caddeyle başlar. Evler artık yol kenarına kurulur; yeni sokakları mevcut yollardan uzatabilirsin.',
+          'Kasaba büyüdükçe evler ve apartmanlar nüfus sağlar. Belediye ekranında gelir ve personel dökümünü görebilirsin.',
+        ],
+      },
+      {
+        heading: 'Uçakların bakım ekibi',
+        bullets: [
+          'Her uçak için bir bakım personeli gerekir. Uçuş mürettebatından ayrı olan bu kişiler evlerden gelir; uçak üretime alınınca bakımcı da ayrılır.',
+          'Bakım personeli yetersizse yeni uçak siparişi verilemez. Eski kayıtlar açıldığında, önceki uçaklarını kullanmaya devam edebilmen için gereken konutlar ücretsiz eklenir.',
+        ],
+      },
+      {
+        heading: 'Yollara çıkan itfaiye',
+        bullets: [
+          'İtfaiye merkezi evlerden personel alır. Ekipler, merkezin ulaşabildiği ve yol bağlantısı olan hasarlı yapıları onarır.',
+          'İtfaiyenin yaptığı onarım elle onarımın yarı maliyetindedir. Merkez büyüyen kasabanın ihtiyacına göre yükseltilebilir.',
+        ],
+      },
+      {
+        heading: 'Haritada yeni ayrıntılar',
+        bullets: [
+          'Harekât haritasında küçük köyler, tek çiftlik evleri, yıkık evler ve terk edilmiş maden ocakları görebilirsin. Bunlar görsel süslerdir; oyun ekonomisine katılmaz.',
+        ],
+      },
+      {
+        heading: 'Şehir güncellemesi videosu',
+        video: {
+          src: img('city-update.mp4'),
+          poster: img('city-update-poster.webp'),
+          caption: 'Kasabalar, yollar ve itfaiye merkezleri (oyundan görüntüler).',
+        },
+      },
+    ],
+  },
   {
     id: 'ogretici-konular',
     date: '2026-11-14',

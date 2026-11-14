@@ -6,7 +6,8 @@ import {
   CITY_KINDS, ECONOMY_KINDS, MILITARY_KINDS, STRUCTURE_DEFS, STRUCT_GLYPH, type StructureCategory, type StructureKind,
 } from '../sim/structures/structure';
 import { TECH_BY_ID } from '../sim/tech';
-import { fmtMoney } from '../sim/economy';
+import { HOUSE_INCOME, ROAD_COST, fmtMoney } from '../sim/economy';
+import { ROAD_MAX, TOWN_ROAD } from '../sim/roads';
 import { $, esc, fmtDur, nf } from './dom';
 import { L, count } from '../i18n';
 
@@ -21,7 +22,8 @@ export class BuildBar {
       const t = e.target as HTMLElement;
       const b = t.closest<HTMLButtonElement>('button[data-kind]');
       if (b) {
-        game.beginBuild(b.dataset.kind as StructureKind);
+        if (b.dataset.kind === 'road') game.beginRoad();
+        else game.beginBuild(b.dataset.kind as StructureKind);
         this.render();
         return;
       }
@@ -51,10 +53,17 @@ export class BuildBar {
   close(): void {
     this.isOpen = false;
     this.el.classList.add('hidden');
-    if (this.game.interaction.mode === 'build') {
+    if (this.game.interaction.mode === 'build' || this.game.interaction.mode === 'road') {
       this.game.interaction = { mode: 'none' };
       this.game.renderer.ghost = null;
+      this.game.renderer.roadGhost = null;
+      this.game.renderer.gridFrame = null;
     }
+  }
+
+  /** Kip dışarıdan değişince (panelden "Yol ekle") kartları yeniden çiz. */
+  refresh(): void {
+    if (this.isOpen) this.render();
   }
 
   update(): void {
@@ -71,7 +80,7 @@ export class BuildBar {
     const team = w.teams[g.playerTeam];
     const mine = w.structures.filter((s) => s.team === g.playerTeam && !s.destroyed);
     const busy = (cat: StructureCategory) => mine.filter((s) => s.build < 1 && s.def.category === cat).length;
-    const active = g.interaction.mode === 'build' ? g.interaction.kind : null;
+    const active = g.interaction.mode === 'build' ? g.interaction.kind : g.interaction.mode === 'road' ? 'road' : null;
     const kinds = this.tab === 'city' ? CITY_KINDS : this.tab === 'economy' ? ECONOMY_KINDS : MILITARY_KINDS;
     const econ = w.economyEnabled;
     const cards = kinds.map((k) => {
@@ -85,6 +94,10 @@ export class BuildBar {
         `${fmtDur(d.buildTime)}`,
         `${Math.round(d.halfW * 2)}×${Math.round(d.halfL * 2)} m`,
         d.population ? L(`${d.population} kişi`, `${d.population} people`) : '',
+        HOUSE_INCOME[k] ? `+${HOUSE_INCOME[k]} kr/${L('dk', 'min')}` : '',
+        k === 'park' ? L('evlere +%10 kira', 'houses +10% rent') : '',
+        k === 'townhall' ? L(`${TOWN_ROAD} m cadde`, `${TOWN_ROAD} m street`) : '',
+        k === 'firestation' ? L('4 boşta personel', '4 free personnel') : '',
         d.jobs ? L(`iş ${d.jobs}`, `${d.jobs} jobs`) : '',
       ].filter(Boolean).join(' · ');
       return `<button class="bcard ${active === k ? 'active' : ''} ${poor ? 'poor' : ''}" data-kind="${k}" ${locked ? 'disabled' : ''} title="${esc(d.desc)}${poor ? L(' — para yetmiyor', ' — not enough money') : ''}">
@@ -93,19 +106,31 @@ export class BuildBar {
         <small>${locked ? `${L('Araştırma', 'Research')}: ${esc(TECH_BY_ID[d.requires!].name)}` : stats}</small>
         <small class="bdesc">${esc(d.desc)}</small>
       </button>`;
-    }).join('');
+    });
+    // Yol: yapı değil, iki noktayla çizilir (belediye kartından sonra)
+    if (this.tab === 'city') {
+      const roads = w.roads.filter((r) => r.team === g.playerTeam);
+      const desc = L('Mevcut bir yoldan başlayan sokak çiz: başlangıcı ve ucu seç. Evler ancak yolların yanına kurulur.',
+        'Draw a street from an existing road: pick its start and its end. Houses can only be built beside roads.');
+      cards.splice(1, 0, `<button class="bcard ${active === 'road' ? 'active' : ''}" data-kind="road" ${roads.length ? '' : 'disabled'} title="${esc(desc)}">
+        <span class="btop"><span class="bicon">═</span>${econ ? `<span class="cost">${ROAD_COST} kr/m</span>` : ''}${roads.length ? `<span class="bcount">${roads.length}</span>` : ''}</span>
+        <b>${L('Yol', 'Road')}</b>
+        <small>${roads.length ? L(`hemen biter · en çok ${ROAD_MAX} m`, `built at once · up to ${ROAD_MAX} m`) : L('önce belediye binası', 'town hall first')}</small>
+        <small class="bdesc">${esc(desc)}</small>
+      </button>`);
+    }
+    const cardsHtml = cards.join('');
     const city = mine.filter((s) => s.def.category === 'city' && s.active);
     const pop = city.reduce((a, s) => a + (s.def.population ?? 0), 0);
-    const jobs = city.reduce((a, s) => a + (s.def.jobs ?? 0), 0);
     const pers = w.teams[g.playerTeam].personnel;
     const mines = mine.filter((s) => s.kind === 'mine');
     const info = this.tab === 'economy'
       ? (econ ? L(`Hazine <b>${fmtMoney(team.money)}</b> · maden üretimi <b>${fmtMoney(w.mineRate(g.playerTeam))}/dk</b> · `, `Treasury <b>${fmtMoney(team.money)}</b> · mine output <b>${fmtMoney(w.mineRate(g.playerTeam))}/min</b> · `) : '')
-        + L(`${mines.length} ocak. Damarın verimi yere göre çok değişir ve ocak kurulana dek bilinmez; ocaklar arası en az 2,5 km. Her yeni ocak %30 daha pahalı. Aynı anda 2 ekonomi inşaatı.`,
-          `${count(mines.length, 'mine')}. Yield varies a lot by place and is unknown until the mine is built; mines must be at least 2.5 km apart. Each new mine costs 30% more. 2 economy builds at a time.`)
+        + L(`${mines.length} ocak. Damarın verimi yere göre çok değişir ve ocak kurulana dek bilinmez; ocaklar yan yana kurulabilir. Her yeni ocak %30 daha pahalı. Aynı anda 2 ekonomi inşaatı.`,
+          `${count(mines.length, 'mine')}. Yield varies a lot by place and is unknown until the mine is built; mines can stand side by side. Each new mine costs 30% more. 2 economy builds at a time.`)
       : this.tab === 'city'
-      ? L(`Personel <b>${w.personnelEnabled ? `${w.crewFree(g.playerTeam)} boşta / ${pers.capacity}` : nf.format(pop)}</b> · iş yeri <b>${nf.format(jobs)}</b> · ${city.length} yapı. Ev 4, apartman 16 kişi barındırır; kurmaya devam etmek için yer seçmeyi sürdür<span class="kbd"> (Esc bitirir)</span>. Aynı anda 4 şehir inşaatı ilerler (şu an ${busy('city')}).`,
-        `Personnel <b>${w.personnelEnabled ? `${w.crewFree(g.playerTeam)} free / ${pers.capacity}` : nf.format(pop)}</b> · jobs <b>${nf.format(jobs)}</b> · ${count(city.length, 'building')}. A house holds 4 people, an apartment block 16; keep picking spots to build more<span class="kbd"> (Esc to finish)</span>. 4 city builds progress at a time (now ${busy('city')}).`)
+      ? L(`Personel <b>${w.personnelEnabled ? `${w.crewFree(g.playerTeam)} boşta / ${pers.capacity}` : nf.format(pop)}</b> · kira <b>${fmtMoney(w.houseRate(g.playerTeam))}/dk</b> · ${city.length} yapı. Evler yolların yanına kurulur (yol: belediyenin caddesinden başlayan sokaklar); 2, 3 ya da 4, apartman 16 kişi barındırır ve kira getirir; parkın 300 m yakınındaki evler %10 fazla; kurmaya devam etmek için yer seçmeyi sürdür<span class="kbd"> (Esc bitirir)</span>. Aynı anda 4 şehir inşaatı ilerler (şu an ${busy('city')}).`,
+        `Personnel <b>${w.personnelEnabled ? `${w.crewFree(g.playerTeam)} free / ${pers.capacity}` : nf.format(pop)}</b> · rent <b>${fmtMoney(w.houseRate(g.playerTeam))}/min</b> · ${count(city.length, 'building')}. Houses go beside roads (streets drawn from the town hall's street); they hold 2, 3 or 4 people, an apartment block 16, and pay rent; houses within 300 m of a park earn 10% more; keep picking spots to build more<span class="kbd"> (Esc to finish)</span>. 4 city builds progress at a time (now ${busy('city')}).`)
       : L(`Kendi bölgende (yapılarına 30 km) düz ve kuru bir yer seç; R ile döndür. Fabrikayı üs panelinden üssün yanına da kurabilirsin. Aynı anda en fazla 3 askerî inşaat (şu an ${busy('military')}).`,
         `Pick flat, dry ground in your territory (within 30 km of your structures); rotate with R. You can also build a factory next to a base from the base panel. At most 3 military builds at a time (now ${busy('military')}).`);
     // Yer seçerken kartlar dar ekranda gizlenir (harita görünsün; kontroller alt çubukta)
@@ -120,6 +145,6 @@ export class BuildBar {
         <span class="muted small">${info}</span>
         <button class="icon" data-act="close">✕</button>
       </div>
-      <div class="bcards ${this.tab}">${cards}</div>`;
+      <div class="bcards ${this.tab}">${cardsHtml}</div>`;
   }
 }

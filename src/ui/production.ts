@@ -8,7 +8,7 @@ import type { Structure } from '../sim/structures/structure';
 import { SPEC_LIST, type AircraftSpec } from '../sim/aircraft/specs';
 import { AA_WEAPONS, AA_WEAPON_ORDER, type AAWeaponDef, type AAWeaponId, gunBuildTime, practicalPerMin } from '../sim/structures/airDefense';
 import { aircraftNode } from '../sim/tech';
-import { aircraftPrice, fmtMoney } from '../sim/economy';
+import { MAINT_CREW, aircraftPrice, fmtMoney } from '../sim/economy';
 import { QUEUE_MAX } from '../sim/structures/factory';
 import { settings } from './settings';
 import { bar, esc, fmtDur, nf } from './dom';
@@ -30,6 +30,7 @@ const ICON = {
   shell: svg('M5 14V7l3-5 3 5v7z'),
   time: svg('M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2M8 5v3l2 2'),
   lock: svg('M4 7h8v7H4zM5.5 7V5a2.5 2.5 0 0 1 5 0v2'),
+  person: svg('M8 2.5a2.3 2.3 0 1 0 0 4.6a2.3 2.3 0 1 0 0-4.6M3.5 14c0-2.8 2-4.6 4.5-4.6s4.5 1.8 4.5 4.6'),
 };
 const info = (icon: string, text: string, title: string) => `<span class="prd-ic" title="${esc(title)}">${icon}${esc(text)}</span>`;
 
@@ -42,14 +43,22 @@ export function changeQty(id: string, delta: number): void {
 
 export const qtyOf = (id: string): number => qty.get(id) ?? 1;
 
-/** Adet seçici ve üret düğmesi: düğmede toplam fiyat. Parası ya da bant yeri yetmiyorsa kapalı. */
-function buildControls(id: string, act: string, price: number, money: number, econ: boolean, room: number): string {
+/**
+ * Adet seçici ve üret düğmesi: düğmede toplam fiyat ve (uçakta, personel kuralı açıkken) bakım personeli. Bant yeri, para
+ * ya da boşta personel yetmiyorsa kapalı görünür ama dokunuşu alır: dokununca nedeni uyarı olarak çıkar (telefonda
+ * title görünmez; modals.ts). `crew`: boştaki kişi (top için ya da kural kapalıyken sınırsız).
+ */
+function buildControls(id: string, act: string, price: number, money: number, econ: boolean, room: number, crew = Infinity): string {
   const n = qtyOf(id);
   const total = price * n;
-  const can = room >= n && (!econ || money >= total);
-  const why = room < n ? L('Bantta yer yok', 'The line is full') : L('Para yetmiyor', 'Not enough money');
+  const people = Number.isFinite(crew) ? n * MAINT_CREW : 0;
+  const can = room >= n && (!econ || money >= total) && crew >= people;
+  const why = room < n ? L('Bantta yer yok', 'The line is full')
+    : econ && money < total ? L('Para yetmiyor', 'Not enough money')
+    : L(`Bakım personeli yetmiyor: ${people} kişi gerekli, ${crew} boşta (ev kur)`, `Not enough ground crew: ${people} needed, ${crew} free (build houses)`);
+  const tip = people ? L(`Her uçak ${MAINT_CREW} bakım personeli ister`, `Each aircraft needs ${MAINT_CREW} ground crew`) : '';
   return `<div class="prd-qty"><button class="mini" data-act="fab-qty" data-id="${id}" data-d="-1" title="${L('Azalt', 'Fewer')}">−</button><b>${n}</b><button class="mini" data-act="fab-qty" data-id="${id}" data-d="1" title="${L('Artır', 'More')}">+</button></div>
-    <button class="mini ${can ? 'primary' : ''}" data-act="${act}" data-id="${id}" ${can ? '' : `disabled title="${why}"`}>${L('Üret', 'Build')}${econ ? ` · ${fmtMoney(total)}` : ''}</button>`;
+    <button class="mini ${can ? 'primary' : 'off'}" data-act="${act}" data-id="${id}" title="${can ? tip : why}" ${can ? '' : `aria-disabled="true" data-why="${why}"`}>${L('Üret', 'Build')}${econ ? ` · ${fmtMoney(total)}` : ''}${people ? ` · <span class="prd-crew${crew < people ? ' short' : ''}">${ICON.person}${people}</span>` : ''}</button>`;
 }
 
 /** Bant sayısı ve son siparişi iptal. */
@@ -87,6 +96,7 @@ function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
     info(ICON.climb, `${nf1.format(sp.climbRate)} m/${L('sn', 's')}`, L('Tırmanma', 'Climb')),
     info(ICON.ceiling, `${nf1.format(sp.ceiling / 1000)} km`, L('Servis tavanı', 'Service ceiling')),
     info(ICON.time, fmtDur(sp.buildTime), L('Üretim süresi', 'Build time')),
+    info(ICON.person, `${sp.crew}`, L(`Uçuş mürettebatı: kalkarken ${sp.crew} kişi`, `Flight crew: ${sp.crew} at take-off`)),
     open ? `<button class="link prd-more" data-act="spec-info" data-spec="${sp.id}">${L('İncele', 'Inspect')}</button>` : '',
   ].join('');
   const head = `${cell(`${key}-img`, 'prd-thumb', thumbImg('ac', sp.id))}
@@ -105,7 +115,7 @@ function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
     ${cell(`${key}-svc`, 'prd-n', counter(L('Serviste', 'In service'), service))}
     ${cell(`${key}-q`, 'prd-n', lineCell(queued, 'fab-del', sp.id))}
     ${cell(`${key}-bar`, 'prd-prog', progressCell(first?.progress ?? 0, first ? ((1 - first.progress) * sp.buildTime) / factor : 0, !first && queued > 0))}
-    ${cell(`${key}-act`, 'prd-act', buildControls(sp.id, 'fab-add', price, team.money, w.economyEnabled, QUEUE_MAX - f.queue.length))}
+    ${cell(`${key}-act`, 'prd-act', buildControls(sp.id, 'fab-add', price, team.money, w.economyEnabled, QUEUE_MAX - f.queue.length, w.crewFree(s.team)))}
   </div>`;
 }
 
@@ -160,11 +170,14 @@ export function factoryBody(game: Game, s: Structure, tab: FactoryTab): string {
   const f = s.factory!;
   const note = tab === 'top'
     ? L('Biten top depoya girer. Takmak için haritada bataryaya dokun, yuvasını seç.', 'A finished gun goes into stock. To fit it, tap a battery on the map and pick a gun pit.')
-    : L('Biten uçak üssün hangarına teslim edilir.', 'A finished aircraft is delivered to the base hangar.');
+    : w.personnelEnabled
+      ? L(`Biten uçak üssün hangarına teslim edilir. Her uçak ${MAINT_CREW} bakım personeli ister: siparişte ayrılır, uçak düşene ya da satılana dek onda kalır. Uçarken pilotu ve mürettebatı ayrıca gerekir.`,
+        `A finished aircraft is delivered to the base hangar. Each aircraft needs ${MAINT_CREW} ground crew: assigned when ordered, they stay with it until it is lost or sold. Its pilot and crew are needed on top when it flies.`)
+      : L('Biten uçak üssün hangarına teslim edilir.', 'A finished aircraft is delivered to the base hangar.');
   return `<div class="prd-head">
       <div class="seg prd-tabs"><button class="${tab === 'ucak' ? 'active' : ''}" data-act="fab-tab" data-v="ucak">${L('Uçaklar', 'Aircraft')}</button><button class="${tab === 'top' ? 'active' : ''}" data-act="fab-tab" data-v="top">${L('Hava savunma', 'Air defence')}</button></div>
       ${pick}
-      ${cell('prd-money', 'prd-money', w.economyEnabled ? `${L('Hazine', 'Treasury')} <b>${fmtMoney(team.money)}</b>` : '')}
+      ${cell('prd-money', 'prd-money', `${w.economyEnabled ? `${L('Hazine', 'Treasury')} <b>${fmtMoney(team.money)}</b>` : ''}${w.personnelEnabled && tab === 'ucak' ? ` <span class="prd-pers" title="${L('Üretimde her uçak için 1 kişi ayrılır', 'One person is assigned per aircraft ordered')}">${ICON.person}<b class="${w.crewFree(s.team) < MAINT_CREW ? 'bad' : ''}">${w.crewFree(s.team)}</b> ${L('boşta', 'free')}</span>` : ''}`)}
     </div>
     ${s.active ? '' : `<p class="note warn">${L('Fabrika çalışmıyor: inşaat ya da onarım sürüyor.', 'The factory is not running: under construction or repair.')}</p>`}
     <div class="prd-list">${rows}</div>

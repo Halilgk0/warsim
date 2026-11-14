@@ -14,17 +14,22 @@ import { FlightGroup } from './ai/flightGroup';
 import { MISSION_NAMES, TASK_NAMES, TASK_SPLIT, defaultLoadout, type FlightTask, type MissionPlan, type MissionType, type Roe } from './ai/missions';
 import type { FormationType } from './ai/formation';
 import type { BeltId } from './aircraft/ammo';
-import { Structure, STRUCTURE_DEFS, type StructureKind } from './structures/structure';
+import { ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
+import {
+  GRID, LOT_LINE, ROAD_MAX, ROAD_MIN, ROAD_REACH, ROAD_SLOPE, ROAD_VERGE, TOWN_ROAD, lotAt, nearestRoad, projectOnRoad, roadComponents, roadHitsRect, type Road,
+} from './roads';
 import { BASE_UPGRADES, bestRunwayHeading, newAirframe, runwayScore, type Airbase, type Airframe, type BaseUpgrade, type TakeoffRequest } from './structures/airbase';
+import { FIRE_STAFF, FIRE_UPGRADE_COST, FIRE_UPGRADE_STAFF, FIRE_UPGRADE_TIME, fireCrewFor, stationReaches } from './structures/fireStation';
 import { Research, TECH_BY_ID } from './tech';
 import { TeamIntel } from './intel';
 import { Commander, alertScramble } from './commander';
+import type { MaintGift } from './campaign';
 import {
-  BASE_UPGRADE_COST, KILL_REWARD, MINE_RATE, SELLERS, SELL_RATE, STRUCTURE_COST, STRUCTURE_REWARD, aircraftPrice, fmtMoney,
-  oreRichness, researchCost, type LedgerEntry, type MarketOffer,
+  BASE_UPGRADE_COST, HOUSE_INCOME, KILL_REWARD, MAINT_CREW, MARKET_ON, MINE_RATE, PARK_BONUS, PARK_RANGE, ROAD_COST, SELLERS, SELL_RATE, STRUCTURE_COST, STRUCTURE_REWARD, aircraftPrice, fmtMoney,
+  oreRichness, researchCost, type LedgerEntry, type MarketOffer, type MoneyCat,
 } from './economy';
-import { flattenFootprint, footprintStats, groundLevel, lineOfSight, resetTerrainEdits, terrainHeight } from './terrain';
-import { MAP_ID, MAP_SIZE } from './mapData';
+import { footprintStats, groundLevel, lineOfSight, resetTerrainEdits, terrainHeight } from './terrain';
+import { MAP_HALF, MAP_ID, MAP_SIZE } from './mapData';
 import { evaluateMission, type MissionReport } from './missionResult';
 import { G, clamp, gauss, rand } from '../core/math';
 import { EN, L, lower } from '../i18n';
@@ -52,7 +57,8 @@ export const LAST_STAND = 300;
  * onarımı REPAIR_DELAY bekler. Baskınlar arasındaki hasarı geri getirir ama süren bir kuşatmayı silmez.
  */
 export const REPAIR_COST = 0.8;
-export const REPAIR_TIME = 21600;
+/** 2026-11-13: 6 saatten 3 saate (oyun zamanı; kullanıcı kararı: itfaiyenin gidemediği üs ve fabrika çok uzun bekliyordu). */
+export const REPAIR_TIME = 10800;
 export const REPAIR_DELAY = 600;
 
 export type LogCategory = 'combat' | 'kill' | 'strike' | 'ops' | 'defense' | 'build' | 'research' | 'info';
@@ -90,10 +96,20 @@ export interface Team {
   incomeAcc: number;
   incomeHist: number[];
   mineAcc: number;
+  /** Ev gelirinin deftere yazılmamış kısmı (30 sn'de bir tek satır). */
+  houseAcc: number;
+  /** Kalem kalem toplam gelir ve gider (belediye ekranı). Eski kayıtlarda boş başlar. */
+  flow: Partial<Record<MoneyCat, number>>;
 }
 
+/** Birbirinin yanına (yalnız taban payıyla) kurulabilen yapılar. */
+const SIDE_BY_SIDE: ReadonlySet<StructureKind> = new Set<StructureKind>(['mine', 'aa', 'radar']);
+
+/** Botların kasabasında sokak açılacak yerler: yol boyunca her bu kadar metrede bir arsa boş bırakılır (m). */
+const JUNCTION = 100;
+
 /**
- * Personel (pilot ve mürettebat): evler barındırır (1 ev = 4 kişi). Her uçak mürettebatı kadar kişiyle kalkar;
+ * Personel (pilot ve mürettebat): evler barındırır (boyuna göre 2–4 kişi). Her uçak mürettebatı kadar kişiyle kalkar;
  * yeterli kişi yoksa uçak hangarda kalır. Düşen uçağın mürettebatı kaybedilir, paraşütle kendi bölgesine inen
  * ya da kendi bölgesine zorunlu inen geri döner. Kayıplar konut kapasitesine kadar yavaşça yerine konur.
  */
@@ -106,6 +122,8 @@ export interface Personnel {
   capacity: number;
   /** Kayıpların yerine gelen personel birikimi. */
   recruit: number;
+  /** İtfaiye merkezlerinin kadrosu (uçuşa çıkamaz; saniyede bir sayılır). */
+  staff: number;
 }
 
 /** Kayıplar konut kapasitesine kadar bu hızla yerine konur (kişi/sn). */
@@ -274,6 +292,8 @@ export class World {
   playerTeam = 0;
   /** Personel kuralları (harekâtta açık; it dalaşı senaryolarında kapalı). */
   personnelEnabled = false;
+  /** Bakım kuralından önceki kayıt yüklenince oyuncuya verilen bedava konut (kaydedilmez; game.ts bir kez söyler). */
+  maintGift: MaintGift | null = null;
   /** Para kuralları (harekâtta açık). */
   economyEnabled = false;
   /** Oyuncunun adı (komutan) ve kampanya kurulumu (kayıt ve arayüz için). */
@@ -299,13 +319,28 @@ export class World {
   private slowTimer = 0;
   /** Yapı adı sayaçları (kayıtla birlikte saklanır). */
   readonly nameCounters = new Map<string, number>();
+  /** Şehir yolları (roads.ts) ve değişim sayacı (çizim bunu izler). */
+  readonly roads: Road[] = [];
+  roadVersion = 0;
+  private nextRoadId = 1;
+  /** Yol kümeleri önbelleği (roadVersion değişince yeniden). */
+  private roadComp = { ver: -1, map: new Map<number, number>() };
+
+  /** Yolun bağlı olduğu küme (roads.ts roadComponents). */
+  roadComponent(id: number): number {
+    if (this.roadComp.ver !== this.roadVersion) this.roadComp = { ver: this.roadVersion, map: roadComponents(this.roads) };
+    return this.roadComp.map.get(id) ?? -1;
+  }
+
+  /** Yol kuralı (harekât): evler ancak bir yolun yanına kurulur. Senaryolarda kapalı. */
+  roadRules = false;
 
   addTeam(name: string, color: string, initialTech: string[] = [], ai = false): Team {
     const t: Team = {
       id: this.teams.length, name, color, research: new Research(initialTech), intel: new TeamIntel(), flightCounter: 0, ai,
-      personnel: { people: 0, reserved: 0, capacity: 0, recruit: 0 },
-      money: 0, ledger: [], earned: 0, spent: 0, reserve: 0, eliminated: false, repairAcc: 0, lastStand: null, incomeAcc: 0, incomeHist: [], mineAcc: 0,
-      kills: 0, peakFleet: 0, gunStock: {},
+      personnel: { people: 0, reserved: 0, capacity: 0, recruit: 0, staff: 0 },
+      money: 0, ledger: [], earned: 0, spent: 0, reserve: 0, eliminated: false, repairAcc: 0, lastStand: null, incomeAcc: 0, incomeHist: [], mineAcc: 0, houseAcc: 0,
+      kills: 0, peakFleet: 0, gunStock: {}, flow: {},
     };
     this.teams.push(t);
     // Araştırma başlarken ödenir; iptalde kısmi iade
@@ -313,9 +348,9 @@ export class World {
       const price = node.specId && SPECS[node.specId] ? aircraftPrice(SPECS[node.specId]) : undefined;
       const cost = researchCost(node, price);
       if (this.economyEnabled && cost > 0 && t.money - cost < t.reserve) return null;
-      return this.pay(t.id, cost, `${L('Araştırma', 'Research')}: ${node.specId ? SPECS[node.specId]?.abbr ?? node.name : node.name}`) ? (this.economyEnabled ? cost : 0) : null;
+      return this.pay(t.id, cost, `${L('Araştırma', 'Research')}: ${node.specId ? SPECS[node.specId]?.abbr ?? node.name : node.name}`, 'research') ? (this.economyEnabled ? cost : 0) : null;
     };
-    t.research.refunder = (amount) => this.earn(t.id, amount, L('Araştırma iptali (iade)', 'Research cancelled (refund)'));
+    t.research.refunder = (amount) => this.earn(t.id, amount, L('Araştırma iptali (iade)', 'Research cancelled (refund)'), 'refund');
     return t;
   }
 
@@ -327,29 +362,31 @@ export class World {
   }
 
   /** Öde: yetmezse false (hiçbir şey düşülmez). */
-  pay(team: number, cost: number, reason: string): boolean {
+  pay(team: number, cost: number, reason: string, cat: MoneyCat): boolean {
     if (!this.economyEnabled || cost <= 0) return true;
     const t = this.teams[team];
     if (!t || t.money < cost) return false;
     t.money -= cost;
     t.spent += cost;
+    t.flow[cat] = (t.flow[cat] ?? 0) + cost;
     this.record(t, -cost, reason);
     return true;
   }
 
-  earn(team: number, amount: number, reason: string): void {
+  earn(team: number, amount: number, reason: string, cat: MoneyCat): void {
     if (!this.economyEnabled || amount <= 0) return;
     const t = this.teams[team];
     if (!t) return;
-    this.credit(t, amount);
+    this.credit(t, amount, cat);
     this.record(t, amount, reason);
   }
 
   /** Deftere yazmadan kasaya ekle (maden geliri her adımda akar; deftere toplu yazılır). */
-  private credit(t: Team, amount: number): void {
+  private credit(t: Team, amount: number, cat: MoneyCat): void {
     t.money += amount;
     t.earned += amount;
     t.incomeAcc += amount;
+    t.flow[cat] = (t.flow[cat] ?? 0) + amount;
   }
 
   private record(t: Team, amount: number, reason: string): void {
@@ -365,9 +402,13 @@ export class World {
       t.incomeHist.push(t.incomeAcc);
       if (t.incomeHist.length > 60) t.incomeHist.shift();
       t.incomeAcc = 0;
-      if (t.mineAcc >= 1 && Math.floor(this.time) % 30 === 0) {
-        this.record(t, t.mineAcc, L('Maden geliri', 'Mine income'));
+      // Maden ve ev geliri tek satır (defter iki satırla dolmasın)
+      if (t.mineAcc + t.houseAcc >= 1 && Math.floor(this.time) % 30 === 0) {
+        const why = t.mineAcc >= 1 && t.houseAcc >= 1 ? L('Maden ve ev geliri', 'Mine and housing income')
+          : t.mineAcc >= 1 ? L('Maden geliri', 'Mine income') : L('Ev geliri', 'Housing income');
+        this.record(t, t.mineAcc + t.houseAcc, why);
         t.mineAcc = 0;
+        t.houseAcc = 0;
       }
       if (t.repairAcc >= 1 && Math.floor(this.time) % 30 === 0) {
         this.record(t, -Math.round(t.repairAcc), L('Onarım', 'Repairs'));
@@ -457,14 +498,43 @@ export class World {
     return sum * 60;
   }
 
+  /** Evlerin şu anki toplam geliri (kr/dk). */
+  houseRate(team: number): number {
+    let sum = 0;
+    for (const s of this.structures) if (s.team === team && s.active) sum += this.houseOutput(s);
+    return sum * 60;
+  }
+
+  /** Bir evin saniyelik geliri (ev değilse 0; hasar düşürür, yakındaki her park %10 artırır). */
+  houseOutput(s: Structure): number {
+    const r = HOUSE_INCOME[s.kind];
+    return r ? (r / 60) * (0.3 + 0.7 * (s.hp / s.maxHp)) * (1 + PARK_BONUS * this.parksNear(s)) : 0;
+  }
+
+  /** Evin yakınındaki (PARK_RANGE) aynı tarafa ait bitmiş park sayısı. */
+  parksNear(s: Structure): number {
+    let n = 0;
+    for (const p of this.structures) {
+      if (p.kind === 'park' && p.team === s.team && p.active && Math.hypot(p.pos.x - s.pos.x, p.pos.z - s.pos.z) <= PARK_RANGE) n++;
+    }
+    return n;
+  }
+
   /** Bir madenin saniyelik geliri (hasar üretimi düşürür). */
   mineOutput(s: Structure): number {
     return MINE_RATE * s.richness * (0.3 + 0.7 * (s.hp / s.maxHp));
   }
 
-  /** İnşaat maliyeti: her yeni maden öncekilerden %30 pahalı (sınırsız kartopu olmasın). */
+  /**
+   * İnşaat maliyeti: her yeni maden öncekilerden %30 pahalı (sınırsız kartopu olmasın). Hava üssü kalmamış taraf yenisini
+   * yarı fiyatına kurar: üs başlangıç parasından pahalı, son üssünü kaybeden yoksa toparlanamıyordu.
+   */
   structureCost(team: number, kind: StructureKind): number {
     const base = STRUCTURE_COST[kind];
+    if (kind === 'airbase') {
+      const has = this.structures.some((s) => s.team === team && s.kind === 'airbase' && !s.destroyed);
+      return has ? base : Math.round(base / 2 / 50) * 50;
+    }
     if (kind !== 'mine') return base;
     const n = this.structures.filter((s) => s.team === team && s.kind === 'mine' && !s.destroyed).length;
     return Math.round((base * (1 + 0.3 * n)) / 50) * 50;
@@ -475,8 +545,10 @@ export class World {
     const f = s.factory;
     const spec = SPECS[specId];
     if (!f || !spec || f.queue.length >= QUEUE_MAX) return false;
+    // Her uçak bir bakım personeli ister: boşta kimse yoksa sipariş alınmaz
+    if (this.crewFree(s.team) < MAINT_CREW) return false;
     const price = aircraftPrice(spec);
-    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${spec.abbr}`)) return false;
+    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${spec.abbr}`, 'aircraft')) return false;
     f.enqueue(specId, this.economyEnabled ? price : 0);
     return true;
   }
@@ -486,7 +558,7 @@ export class World {
     const f = s.factory;
     if (!f || f.gunQueue.length >= QUEUE_MAX || !this.teams[s.team].research.has(AA_WEAPONS[gun].requires ?? undefined)) return false;
     const price = AA_WEAPONS[gun].cost;
-    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${AA_WEAPONS[gun].name}`)) return false;
+    if (!this.pay(s.team, price, `${L('Üretim', 'Production')}: ${AA_WEAPONS[gun].name}`, 'gun')) return false;
     f.gunQueue.push({ gun, progress: 0, paid: this.economyEnabled ? price : 0 });
     return true;
   }
@@ -499,7 +571,7 @@ export class World {
       if (f.gunQueue[i].gun !== gun) continue;
       const it = f.gunQueue[i];
       f.gunQueue.splice(i, 1);
-      if (it.paid > 0) this.earn(s.team, Math.round(it.paid * (1 - it.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${AA_WEAPONS[gun].name}`);
+      if (it.paid > 0) this.earn(s.team, Math.round(it.paid * (1 - it.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${AA_WEAPONS[gun].name}`, 'refund');
       return;
     }
   }
@@ -522,13 +594,13 @@ export class World {
     const item = f?.queue[index];
     if (!f || !item) return;
     f.queue.splice(index, 1);
-    if (item.paid > 0) this.earn(s.team, Math.round(item.paid * (1 - item.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${SPECS[item.specId]?.abbr ?? ''}`);
+    if (item.paid > 0) this.earn(s.team, Math.round(item.paid * (1 - item.progress)), `${L('Sipariş iptali', 'Order cancelled')}: ${SPECS[item.specId]?.abbr ?? ''}`, 'refund');
   }
 
   /** Üs tesisi inşaatı (ücretli). */
   startBaseUpgrade(base: Airbase, key: BaseUpgrade): boolean {
     if (base.job || base.upgrades.has(key) || !base.s.active) return false;
-    if (!this.pay(base.s.team, BASE_UPGRADE_COST[key], `${L('Üs tesisi', 'Base facility')}: ${BASE_UPGRADES[key].name}`)) return false;
+    if (!this.pay(base.s.team, BASE_UPGRADE_COST[key], `${L('Üs tesisi', 'Base facility')}: ${BASE_UPGRADES[key].name}`, 'facility')) return false;
     return base.startUpgrade(key);
   }
 
@@ -539,7 +611,7 @@ export class World {
     const research = this.teams[s.team].research;
     const opt = aa.options(research).find((o) => o.key === key);
     if (!opt || !opt.enabled) return false;
-    if (!this.pay(s.team, opt.cost, `${s.name}: ${opt.label}`)) return false;
+    if (!this.pay(s.team, opt.cost, `${s.name}: ${opt.label}`, 'facility')) return false;
     return aa.start(key, research);
   }
 
@@ -550,7 +622,7 @@ export class World {
 
   private updateMarket(): void {
     const m = this.market;
-    if (!this.economyEnabled || this.time < m.nextRefresh) return;
+    if (!MARKET_ON || !this.economyEnabled || this.time < m.nextRefresh) return;
     m.nextRefresh = this.time + 240;
     m.offers = m.offers.filter((o) => o.count > 0 && o.expires > this.time);
     const me = this.teams[this.playerTeam];
@@ -581,8 +653,12 @@ export class World {
     if (!o || o.count <= 0) return L('Teklif kalmadı', 'Offer no longer available');
     n = Math.min(n, o.count, base.freeSlots);
     if (n <= 0) return L('Üssün hangarında yer yok', 'No room in the base hangar');
+    // Her uçak bir bakım personeli ister: boştakiler kadar alınır
+    const crew = Math.floor(this.crewFree(team) / MAINT_CREW);
+    if (crew <= 0) return L('Bakım personeli yetmiyor: her uçak 1 kişi ister (ev kur)', 'Not enough ground crew: each aircraft needs 1 person (build houses)');
+    n = Math.min(n, crew);
     const spec = SPECS[o.specId];
-    if (!this.pay(team, o.unitPrice * n, `${L('Pazardan alım', 'Market purchase')}: ${n} × ${spec.abbr} (${o.seller})`)) return L('Para yetmiyor', 'Not enough money');
+    if (!this.pay(team, o.unitPrice * n, `${L('Pazardan alım', 'Market purchase')}: ${n} × ${spec.abbr} (${o.seller})`, 'market')) return L('Para yetmiyor', 'Not enough money');
     o.count -= n;
     for (let i = 0; i < n; i++) base.addAirframe(newAirframe(o.specId, team));
     this.log(L(`${o.seller}: ${n} × ${spec.name} satın alındı, ${base.s.name} hangarına teslim edildi`, `${o.seller}: ${n} × ${spec.name} bought, delivered to the ${base.s.name} hangar`), team, 'build');
@@ -594,18 +670,97 @@ export class World {
     if (af.status !== 'ready' || !base.inventory.includes(af)) return false;
     const spec = SPECS[af.specId];
     base.removeAirframe(af);
-    this.earn(base.s.team, Math.round(aircraftPrice(spec) * SELL_RATE * (1 - af.wear * 0.3)), `${L('Satış', 'Sale')}: ${spec.abbr}`);
+    this.earn(base.s.team, Math.round(aircraftPrice(spec) * SELL_RATE * (1 - af.wear * 0.3)), `${L('Satış', 'Sale')}: ${spec.abbr}`, 'refund');
     this.log(L(`${base.s.name}: ${spec.name} pazarda satıldı`, `${base.s.name}: ${spec.name} sold on the market`), base.s.team, 'build');
     return true;
   }
 
   // ------------------------------------------------------------------ personel
 
-  /** Kalkabilecek boş mürettebat (personel kuralları kapalıysa sınırsız). */
+  /** Kalkabilecek boş mürettebat (personel kuralları kapalıysa sınırsız): uçanlar, itfaiye kadrosu ve bakımcılar düşer. */
   crewFree(team: number): number {
     if (!this.personnelEnabled) return Infinity;
     const p = this.teams[team].personnel;
-    return Math.max(0, Math.floor(p.people - p.reserved));
+    return Math.max(0, Math.floor(p.people - p.reserved - p.staff - this.maintOf(team)));
+  }
+
+  /**
+   * Bakım personeli: tarafın hangarlarındaki (havadakiler dahil) ve fabrika bantlarındaki her uçak için MAINT_CREW kişi.
+   * Her seferinde sayılır: uçak düşünce, satılınca ya da sipariş iptal edilince kişi hemen boşa çıkar. Kuraldan önceki
+   * kayıtların uçakları (noMaint) saymaz.
+   */
+  maintOf(team: number): number {
+    if (!this.personnelEnabled) return 0;
+    let n = 0;
+    for (const s of this.structures) {
+      if (s.team !== team) continue;
+      if (s.airbase) for (const af of s.airbase.inventory) if (!af.noMaint) n++;
+      if (s.factory) for (const q of s.factory.queue) if (!q.noMaint) n++;
+    }
+    return n * MAINT_CREW;
+  }
+
+  /** Bu fabrikaya uçak siparişi verilemiyorsa nedeni (bant dolu, bakım personeli ya da para yetmiyor). */
+  orderBlock(s: Structure, specId: string): string | null {
+    const f = s.factory;
+    const spec = SPECS[specId];
+    if (!f || !spec) return L('Fabrika yok', 'No factory');
+    if (f.queue.length >= QUEUE_MAX) return L('Bantta yer yok', 'The line is full');
+    if (this.crewFree(s.team) < MAINT_CREW) {
+      return L(`Bakım personeli yetmiyor: her uçak ${MAINT_CREW} kişi ister, boşta kimse yok (ev kur)`, `Not enough ground crew: each aircraft needs ${MAINT_CREW}, nobody is free (build houses)`);
+    }
+    if (!this.canAfford(s.team, aircraftPrice(spec))) return L('Para yetmiyor', 'Not enough money');
+    return null;
+  }
+
+  /** İtfaiye kadrosunu yeniden say (kuruluş, yükseltme ve yıkımdan hemen sonra da çağrılır). */
+  countStaff(team: number): void {
+    let n = 0;
+    for (const s of this.structures) if (s.team === team && s.fire && !s.destroyed) n += s.fire.reserved;
+    this.teams[team].personnel.staff = n;
+  }
+
+  /**
+   * Bu yapıyı itfaiye mi onarır: ekip giden bir tür, yola bağlı ve kendi tarafının çalışan bir merkezinin alanında, o
+   * merkezle aynı yol kümesinde. Merkezin kendisini kendi ekibi onarır.
+   */
+  fireCovers(s: Structure): boolean {
+    if (s.fire) return true;
+    if (fireCrewFor(this, s) <= 0) return false;
+    for (const o of this.structures) if (o.fire && stationReaches(this, o, s)) return true;
+    return false;
+  }
+
+  /**
+   * Kadronun nüfusla karşılanan oranı (0–1): evler yıkılıp uçmayan kişi sayısı itfaiye kadrosunun altına düşerse merkezler
+   * o oranda az ekip çıkarır.
+   */
+  staffRatio(team: number): number {
+    if (!this.personnelEnabled) return 1;
+    const p = this.teams[team]?.personnel;
+    if (!p || p.staff <= 0) return 1;
+    return Math.max(0, Math.min(1, (p.people - p.reserved) / p.staff));
+  }
+
+  /** İtfaiye merkezini bir seviye yükselt: bedeli peşin, 2 boşta personel ister. Olmuyorsa nedeni döner. */
+  fireUpgradeBlock(s: Structure): string | null {
+    const f = s.fire;
+    if (!f || !s.active) return L('Merkez hazır değil', 'The station is not ready');
+    if (f.job) return L('Yükseltme sürüyor', 'Upgrade under way');
+    if (f.level >= 3) return L('En yüksek seviyede', 'Already at the top level');
+    if (this.personnelEnabled && this.crewFree(s.team) < FIRE_UPGRADE_STAFF) return L(`${FIRE_UPGRADE_STAFF} boşta personel gerekir (ev kur)`, `Needs ${FIRE_UPGRADE_STAFF} free personnel (build houses)`);
+    const cost = FIRE_UPGRADE_COST[f.level + 1];
+    if (!this.canAfford(s.team, cost)) return `${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(cost)})`;
+    return null;
+  }
+
+  startFireUpgrade(s: Structure): boolean {
+    const f = s.fire;
+    if (!f || this.fireUpgradeBlock(s)) return false;
+    if (!this.pay(s.team, FIRE_UPGRADE_COST[f.level + 1], `${s.name}: ${L(`${f.level + 1}. seviye`, `level ${f.level + 1}`)}`, 'facility')) return false;
+    f.job = { left: FIRE_UPGRADE_TIME, total: FIRE_UPGRADE_TIME };
+    this.countStaff(s.team);
+    return true;
   }
 
   /** Konut kapasitesi ve kayıp yerine gelenler (saniyede bir). */
@@ -614,6 +769,7 @@ export class World {
       const p = t.personnel;
       let cap = 0;
       for (const s of this.structures) if (s.team === t.id && s.active) cap += s.def.population ?? 0;
+      this.countStaff(t.id);
       // Yeni konut tamamlanınca sakinleri hemen gelir; yıkılınca uçmayanlar ayrılır
       if (cap > p.capacity) p.people += cap - p.capacity;
       p.capacity = cap;
@@ -664,7 +820,7 @@ export class World {
     const tally = this.missionTally.get(key) ?? { success: 0, fail: 0, none: 0 };
     tally[r.outcome]++;
     this.missionTally.set(key, tally);
-    if (r.outcome === 'success' && r.reward > 0) this.earn(fl.team, r.reward, `${L('Görev başarılı', 'Mission success')}: ${MISSION_NAMES[fl.plan.type]} (${fl.name})`);
+    if (r.outcome === 'success' && r.reward > 0) this.earn(fl.team, r.reward, `${L('Görev başarılı', 'Mission success')}: ${MISSION_NAMES[fl.plan.type]} (${fl.name})`, 'mission');
     const icon = r.outcome === 'success' ? '✓' : r.outcome === 'fail' ? '✗' : '–';
     const word = r.outcome === 'success' ? L('başarılı', 'succeeded') : r.outcome === 'fail' ? L('başarısız', 'failed') : L('sonuçsuz', 'inconclusive');
     const money = r.outcome === 'success' && r.reward > 0 && this.economyEnabled ? ` (+${fmtMoney(r.reward)})` : '';
@@ -678,14 +834,15 @@ export class World {
   }
 
   /** Bir yapı için verilen halkada uygun yer (senaryo kurulumu ve yapay zekâ inşaatı). */
-  findSpot(team: number, kind: StructureKind, cx: number, cz: number, rMin: number, rMax: number, seed = 0, heading = 0): { x: number; z: number } | null {
+  /** Uygun yer ara (free: para ve inşaat sırası sorulmaz; harekât başlangıç yapıları için). */
+  findSpot(team: number, kind: StructureKind, cx: number, cz: number, rMin: number, rMax: number, seed = 0, heading = 0, free = false, noRoad = false): { x: number; z: number } | null {
     for (let r = rMin; r <= rMax; r += 120) {
       const n = r < 1 ? 1 : Math.max(8, Math.round((2 * Math.PI * r) / 90));
       for (let i = 0; i < n; i++) {
         const a = ((i + seed * 0.37) / n) * Math.PI * 2;
         const x = cx + Math.cos(a) * r;
         const z = cz + Math.sin(a) * r;
-        if (this.checkPlacement(team, kind, x, z, heading).ok) return { x, z };
+        if (this.checkPlacement(team, kind, x, z, heading, null, free, noRoad).ok) return { x, z };
       }
     }
     return null;
@@ -795,11 +952,124 @@ export class World {
     }
     // Damar verimi doğal araziye göre (düzleştirmeden önce)
     const rich = kind === 'mine' ? oreRichness(x, z) : 0;
-    flattenFootprint(x, z, def.halfW + 20, def.halfL + 40, h, elev, kind === 'airbase' ? 260 : 90);
+    flattenStructure(kind, x, z, h, elev);
     const s = new Structure(team, kind, name, new Vector3(x, elev, z), h, built);
     s.richness = rich;
     this.structures.push(s);
+    if (kind === 'townhall') this.addRoad(team, ...World.townRoad(x, z, h));
     return s;
+  }
+
+  // ------------------------------------------------------------------ yollar
+
+  /** Belediye binasının önünden çıkan ana caddenin uçları (bina tabanının 5 m önünden başlar). */
+  static townRoad(x: number, z: number, headingRad: number): [number, number, number, number] {
+    const fx = Math.sin(headingRad);
+    const fz = -Math.cos(headingRad);
+    const d = STRUCTURE_DEFS.townhall.halfL + ROAD_VERGE;
+    return [x + fx * d, z + fz * d, x + fx * (d + TOWN_ROAD), z + fz * (d + TOWN_ROAD)];
+  }
+
+  /** Yolu doğrudan ekle (kural sorulmaz: belediyenin caddesi, kayıt yükleme). */
+  addRoad(team: number, ax: number, az: number, bx: number, bz: number, id?: number): Road {
+    const r: Road = { id: id ?? this.nextRoadId, team, ax, az, bx, bz };
+    this.nextRoadId = Math.max(this.nextRoadId, r.id + 1);
+    this.roads.push(r);
+    this.roadVersion++;
+    return r;
+  }
+
+  /**
+   * Yol parçası kurulabilir mi. Mevcut bir yoldan başlamalı (free: belediyenin caddesi, sorulmaz), suya girmemeli, çok dik
+   * olmamalı, bir yapının içinden geçmemeli, mevcut bir yolun üstüne binmemeli.
+   */
+  checkRoad(team: number, ax: number, az: number, bx: number, bz: number, free = false): PlacementCheck & { cost: number; length: number } {
+    const len = Math.hypot(bx - ax, bz - az);
+    const cost = Math.ceil((len * ROAD_COST) / 10) * 10;
+    const fail = (reason: string) => ({ ok: false, reason, elevation: 0, cost, length: len });
+    if (len < ROAD_MIN) return fail(L(`Yol çok kısa (en az ${ROAD_MIN} m)`, `Road too short (at least ${ROAD_MIN} m)`));
+    if (len > ROAD_MAX) return fail(L(`Yol çok uzun (tek parça en çok ${ROAD_MAX} m)`, `Road too long (at most ${ROAD_MAX} m per piece)`));
+    if (!free && !nearestRoad(this.roads, team, ax, az, 1.5)) return fail(L('Yol mevcut bir yoldan başlamalı', 'A road must start from an existing road'));
+    const dx = (bx - ax) / len;
+    const dz = (bz - az) / len;
+    const n = Math.ceil(len / 5);
+    const step = len / n;
+    let prev = terrainHeight(ax, az);
+    for (let i = 0; i <= n; i++) {
+      const x = ax + dx * step * i;
+      const z = az + dz * step * i;
+      if (Math.abs(x) > MAP_HALF * 0.97 || Math.abs(z) > MAP_HALF * 0.97) return fail(L('Harita dışında', 'Outside the map'));
+      const h = terrainHeight(x, z);
+      if (h < 2) return fail(L('Yol suya giremez', 'A road cannot cross water'));
+      if (Math.abs(h - prev) / step > ROAD_SLOPE) return fail(L('Yol için çok dik', 'Too steep for a road'));
+      prev = h;
+      // Mevcut bir yolun üstüne binme (kesişmek serbest: yalnız aynı doğrultuda üst üste gelen yol)
+      const s = step * i;
+      if (s > 8 && s < len - 8) {
+        const o = nearestRoad(this.roads, -1, x, z, 4);
+        if (o && Math.abs(o.dx * dx + o.dz * dz) > 0.9) return fail(L('Burada zaten yol var', 'There is already a road here'));
+      }
+      for (const st of this.structures) {
+        if (!st.airbase || st.destroyed) continue;
+        const { u, v } = st.airbase.toRunway(x, z);
+        if (Math.abs(u) < 1430 && v > -270 && v < 710) return fail(L('Yol hava üssünün içinden geçemez', 'A road cannot cross an airbase'));
+      }
+    }
+    const probe: Road = { id: 0, team, ax, az, bx, bz };
+    for (const st of this.structures) {
+      if (st.destroyed || st.airbase) continue;
+      if (roadHitsRect(probe, st.pos.x, st.pos.z, st.def.halfW, st.def.halfL, st.heading, ROAD_VERGE - 0.5)) {
+        return fail(L('Yol bir yapının içinden geçemez', 'A road cannot cross a structure'));
+      }
+    }
+    if (!free && !this.canAfford(team, cost)) return fail(`${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(cost)})`);
+    return { ok: true, elevation: 0, cost, length: len };
+  }
+
+  /** Yol parçası kur: bedeli peşin (`free`: bedava; eski kayda verilen konutun sokağı), hemen biter. */
+  placeRoad(team: number, ax: number, az: number, bx: number, bz: number, free = false): Road | null {
+    const chk = this.checkRoad(team, ax, az, bx, bz, free);
+    if (!chk.ok) return null;
+    if (!free && !this.pay(team, chk.cost, `${L('Yol', 'Road')}: ${Math.round(chk.length)} m`, 'road')) return null;
+    return this.addRoad(team, ax, az, bx, bz);
+  }
+
+  /**
+   * Yol kenarında boş arsa (botlar ve başlangıç evleri): evin merkezi ve yola bakan yönü. Yol boyunca her JUNCTION
+   * metrede bir yer boş bırakılır; kasaba büyürken yan sokak oradan açılır (growRoads).
+   */
+  findLot(team: number, kind: StructureKind, free = false): { x: number; z: number; heading: number } | null {
+    const def = STRUCTURE_DEFS[kind];
+    for (const r of this.roads) {
+      if (r.team !== team) continue;
+      const h = projectOnRoad(r, r.ax, r.az);
+      for (let s = def.halfW + 4; s <= h.len - def.halfW; s += GRID) {
+        const m = s % JUNCTION;
+        if (Math.min(m, JUNCTION - m) < def.halfW + ROAD_VERGE + 3) continue;
+        for (const side of [1, -1] as const) {
+          const p = lotAt(h, s, side, def.halfL);
+          if (this.checkPlacement(team, kind, p.x, p.z, p.heading, null, free).ok) return p;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Kasabayı büyüt (botlar): boş bırakılan kavşak yerlerinden yan sokak aç, olmazsa yolu uzat. Yol kurulduysa true. */
+  growRoads(team: number, free = false): boolean {
+    const cands: [number, number, number, number][] = [];
+    for (const r of this.roads) {
+      if (r.team !== team) continue;
+      const h = projectOnRoad(r, r.ax, r.az);
+      for (let s = JUNCTION; s <= h.len + 1; s += JUNCTION) {
+        const x = r.ax + h.dx * Math.min(s, h.len);
+        const z = r.az + h.dz * Math.min(s, h.len);
+        for (const side of [1, -1]) cands.push([x, z, x - h.dz * side * JUNCTION, z + h.dx * side * JUNCTION]);
+      }
+      cands.push([r.bx, r.bz, r.bx + h.dx * JUNCTION, r.bz + h.dz * JUNCTION]);
+    }
+    for (const c of cands) if (this.placeRoad(team, ...c, free)) return true;
+    return false;
   }
 
   structureName(team: number, kind: StructureKind): string {
@@ -809,7 +1079,8 @@ export class World {
     return `${this.teams[team].name} ${lower(STRUCTURE_DEFS[kind].name)} ${n}`;
   }
 
-  checkPlacement(team: number, kind: StructureKind, x: number, z: number, headingRad: number, attachTo: number | null = null): PlacementCheck {
+  /** Yerleşim kontrolü. free: para ve inşaat sırası sorulmaz (başlangıç yapıları bedava; fabrika başlangıç parasından pahalı). */
+  checkPlacement(team: number, kind: StructureKind, x: number, z: number, headingRad: number, attachTo: number | null = null, free = false, noRoad = false): PlacementCheck {
     const def = STRUCTURE_DEFS[kind];
     const research = this.teams[team].research;
     const stats = footprintStats(x, z, def.halfW, def.halfL, headingRad);
@@ -843,6 +1114,9 @@ export class World {
         if ((Math.abs(u) < 1430 && v > -270 && v < 710) || (Math.abs(u) < 3800 && Math.abs(v) < 300)) {
           return fail(L('Hava üssüne ya da yaklaşma koridoruna çok yakın', 'Too close to an airbase or its approach corridor'));
         }
+      } else if (SIDE_BY_SIDE.has(kind) && SIDE_BY_SIDE.has(s.kind)) {
+        // Maden, batarya ve radar yan yana kurulabilir (2026-11-13): yalnız tabanlar çakışmasın
+        if (d < (Math.max(def.halfW, def.halfL) + Math.max(s.def.halfW, s.def.halfL)) * 0.92) return fail(L('Başka bir yapıya çok yakın', 'Too close to another structure'));
       } else {
         const otherR = s.kind === 'airbase' ? 1400 : s.def.radius * 1.6 + 60;
         if (d < myR + otherR - 200) return fail(L('Başka bir yapıya çok yakın', 'Too close to another structure'));
@@ -851,9 +1125,23 @@ export class World {
       if (s.team === team) nearOwn = Math.min(nearOwn, d);
     }
     if (nearOwn > TERRITORY) return fail(L(`Kendi bölgenizden çok uzak (en fazla ${TERRITORY / 1000} km)`, `Too far from your territory (at most ${TERRITORY / 1000} km)`));
-    if (kind === 'mine' && this.structures.some((s) => s.kind === 'mine' && !s.destroyed && Math.hypot(s.pos.x - x, s.pos.z - z) < 2500)) {
-      return fail(L('Başka bir madene çok yakın (en az 2,5 km)', 'Too close to another mine (at least 2.5 km)'));
+    // Yollar: hiçbir yapı yolun üstüne kurulmaz; evler (yol kuralı açıkken) ancak kendi yolunun yanına
+    for (const r of this.roads) {
+      if (roadHitsRect(r, x, z, def.halfW, def.halfL, headingRad, ROAD_VERGE - 0.5)) return fail(L('Yolun üstüne inşa edilemez', 'Cannot build on a road'));
     }
+    if (this.roadRules && !noRoad && ROAD_KINDS.has(kind) && !nearestRoad(this.roads, team, x, z, LOT_LINE + Math.max(def.halfW, def.halfL) + ROAD_REACH)) {
+      return fail(this.roads.some((r) => r.team === team)
+        ? L('Bu yapı yolun yanına kurulur: bir yola yaklaştır ya da yol ekle', 'This goes beside a road: move next to one or add a road')
+        : L('Önce belediye binası kur: evler ve itfaiye onun yoluna dizilir', 'Build a town hall first: houses and the fire station line its road'));
+    }
+    if (kind === 'firestation' && !free && this.personnelEnabled && this.crewFree(team) < FIRE_STAFF[1]) {
+      return fail(L(`${FIRE_STAFF[1]} boşta personel gerekir (ev kur)`, `Needs ${FIRE_STAFF[1]} free personnel (build houses)`));
+    }
+    if (kind === 'townhall') {
+      const rc = this.checkRoad(team, ...World.townRoad(x, z, headingRad), true);
+      if (!rc.ok) return fail(`${L('Önündeki cadde için yer yok', 'No room for the street in front')}: ${lower(rc.reason ?? '')}`);
+    }
+    if (free) return { ok: true, elevation };
     const cost = this.structureCost(team, kind);
     if (!this.canAfford(team, cost)) return fail(`${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(cost)})`);
     // Askerî: aynı anda 3 inşaat. Şehir: 12'ye kadar sıraya alınır, 4'ü aynı anda ilerler
@@ -873,24 +1161,27 @@ export class World {
     return s;
   }
 
-  checkBaseFactory(base: Airbase): PlacementCheck {
+  checkBaseFactory(base: Airbase, free = false): PlacementCheck {
     const p = base.factoryPad();
     if (this.structures.some((s) => s.attachedTo === base.s.id && !s.destroyed)) return { ok: false, reason: L('Bu üssün fabrikası zaten var', 'This base already has a factory'), elevation: 0 };
     if (!base.s.active) return { ok: false, reason: L('Üs inşaatı bitmeli', 'The base must be finished first'), elevation: 0 };
-    return this.checkPlacement(base.s.team, 'factory', p.x, p.z, base.s.heading, base.s.id);
+    return this.checkPlacement(base.s.team, 'factory', p.x, p.z, base.s.heading, base.s.id, free);
   }
 
-  placeStructure(team: number, kind: StructureKind, x: number, z: number, headingRad: number, attachTo: number | null = null): Structure | null {
-    const chk = this.checkPlacement(team, kind, x, z, headingRad, attachTo);
+  /** noRoad: yol kuralı sorulmaz (botun son çaresi: kasabası büyüyemiyorsa personelsiz kalmasın). */
+  placeStructure(team: number, kind: StructureKind, x: number, z: number, headingRad: number, attachTo: number | null = null, noRoad = false): Structure | null {
+    const chk = this.checkPlacement(team, kind, x, z, headingRad, attachTo, false, noRoad);
     if (!chk.ok) return null;
     const def = STRUCTURE_DEFS[kind];
-    if (!this.pay(team, this.structureCost(team, kind), `${L('İnşaat', 'Construction')}: ${def.name}`)) return null;
+    if (!this.pay(team, this.structureCost(team, kind), `${L('İnşaat', 'Construction')}: ${def.name}`, 'build')) return null;
     const rich = kind === 'mine' ? oreRichness(x, z) : 0;
-    flattenFootprint(x, z, def.halfW + 20, def.halfL + 40, headingRad, chk.elevation, kind === 'airbase' ? 260 : def.category === 'city' ? 50 : 90);
+    flattenStructure(kind, x, z, headingRad, chk.elevation);
     const s = new Structure(team, kind, this.structureName(team, kind), new Vector3(x, chk.elevation, z), headingRad, false);
     s.richness = rich;
     s.attachedTo = attachTo;
     this.structures.push(s);
+    if (kind === 'townhall') this.addRoad(team, ...World.townRoad(x, z, headingRad));
+    if (kind === 'firestation') this.countStaff(team);
     this.log(L(`${s.name}: inşaat başladı (${def.buildTime} sn)`, `${s.name}: construction started (${def.buildTime} s)`), team, 'build');
     return s;
   }
@@ -1399,7 +1690,7 @@ export class World {
     }
     this.teams[team]?.research.award(50 + target.hpMax * 0.3);
     if (team !== target.team && this.teams[team]) this.teams[team].kills++;
-    if (team !== target.team) this.earn(team, Math.round(aircraftPrice(target.spec) * KILL_REWARD), `${L('Düşürülen', 'Kill')}: ${target.spec.abbr}`);
+    if (team !== target.team) this.earn(team, Math.round(aircraftPrice(target.spec) * KILL_REWARD), `${L('Düşürülen', 'Kill')}: ${target.spec.abbr}`, 'kill');
   }
 
   /**
@@ -1665,19 +1956,29 @@ export class World {
       const inc = this.mineOutput(s) * dt;
       const t = this.teams[s.team];
       s.earned += inc;
-      this.credit(t, inc);
+      this.credit(t, inc, 'mine');
       t.mineAcc += inc;
+    }
+    if (s.active && this.economyEnabled && HOUSE_INCOME[s.kind]) {
+      const inc = this.houseOutput(s) * dt;
+      const t = this.teams[s.team];
+      s.earned += inc;
+      this.credit(t, inc, 'rent');
+      t.houseAcc += inc;
     }
     if (s.repairing) this.updateRepair(s, dt);
     s.airbase?.update(this, dt);
     s.aa?.update(this, s, dt);
     s.radar?.update(this, s, dt);
+    s.fire?.update(this, s, dt);
     s.factory?.update(this, s, dt);
   }
 
   /** Onarımı başlat ya da durdur (bitmiş, ayakta ve hasarlı yapı). */
   setRepair(s: Structure, on: boolean): boolean {
     if (on && (!s.active || s.hp >= s.maxHp || s.repairing)) return false;
+    // İtfaiyenin baktığı binada paralı onarım açılmaz
+    if (on && this.fireCovers(s)) return false;
     s.repairing = on;
     // Botların onarımları günlüğü doldurmasın
     if (on && !this.teams[s.team]?.ai) this.log(L(`${s.name}: onarım başladı`, `${s.name}: repairs started`), s.team, 'build');
@@ -1685,9 +1986,26 @@ export class World {
   }
 
   /** Tam onarıma kalan bedel (kr) ve süre (s). */
-  repairEstimate(s: Structure): { cost: number; time: number } {
+  repairEstimate(s: Structure, rate = 1): { cost: number; time: number } {
     const f = Math.max(0, 1 - s.hp / s.maxHp);
-    return { cost: this.economyEnabled ? Math.round((STRUCTURE_COST[s.kind] * REPAIR_COST * f) / 50) * 50 : 0, time: f * REPAIR_TIME };
+    return { cost: this.economyEnabled ? Math.round((STRUCTURE_COST[s.kind] * REPAIR_COST * rate * f) / 50) * 50 : 0, time: f * REPAIR_TIME };
+  }
+
+  /**
+   * Onarım bedelini öde: dh can artışının karşılığı (yapı fiyatının REPAIR_COST'u, hasarla orantılı). rate: elle onarım 1,
+   * itfaiye 0,5 (FIRE_COST_RATE). Para yetmezse false: onarım o adımda ilerlemez, para gelince sürer. Deftere 30 sn'de
+   * bir tek satır "Onarım" (tickIncome).
+   */
+  chargeRepair(s: Structure, dh: number, rate = 1): boolean {
+    if (!this.economyEnabled || dh <= 0) return true;
+    const cost = (dh / s.maxHp) * STRUCTURE_COST[s.kind] * REPAIR_COST * rate;
+    const t = this.teams[s.team];
+    if (!t || t.money < cost) return false;
+    t.money -= cost;
+    t.spent += cost;
+    t.repairAcc += cost;
+    t.flow.repair = (t.flow.repair ?? 0) + cost;
+    return true;
   }
 
   /** Onarım bekliyor mu (son isabetten sonra REPAIR_DELAY); bekliyorsa kalan süre. */
@@ -1699,14 +2017,7 @@ export class World {
   private updateRepair(s: Structure, dt: number): void {
     if (!s.active || this.repairWait(s) > 0) return;
     const dh = Math.min(s.maxHp - s.hp, (s.maxHp / REPAIR_TIME) * dt);
-    if (this.economyEnabled) {
-      const cost = (dh / s.maxHp) * STRUCTURE_COST[s.kind] * REPAIR_COST;
-      const t = this.teams[s.team];
-      if (t.money < cost) return;
-      t.money -= cost;
-      t.spent += cost;
-      t.repairAcc += cost;
-    }
+    if (!this.chargeRepair(s, dh)) return;
     s.hp += dh;
     if (s.hp >= s.maxHp - 1e-6) {
       s.hp = s.maxHp;
@@ -2005,7 +2316,7 @@ export class World {
     this.teams[team]?.research.award((before - s.hp) * 0.5);
     if (s.hp <= 0) {
       this.teams[team]?.research.award(250);
-      this.earn(team, Math.round(STRUCTURE_COST[s.kind] * STRUCTURE_REWARD), `${L('Yıkılan düşman yapısı', 'Enemy structure destroyed')}: ${s.def.name}`);
+      this.earn(team, Math.round(STRUCTURE_COST[s.kind] * STRUCTURE_REWARD), `${L('Yıkılan düşman yapısı', 'Enemy structure destroyed')}: ${s.def.name}`, 'wreck');
       this.events.push({ kind: 'structureDestroyed', id: s.id });
       s.repairing = false;
       this.log(L(`${source}: ${s.name} imha edildi!`, `${source}: ${s.name} destroyed!`), team, 'strike');

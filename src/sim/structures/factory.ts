@@ -10,6 +10,8 @@ export interface ProductionItem {
   progress: number;
   /** Siparişte ödenen tutar (iptalde iade için). */
   paid: number;
+  /** Bakım personeli kuralından önceki kayıttan: bakımcı istemez, teslim edilen uçak da istemez. */
+  noMaint?: boolean;
 }
 
 /** Bantta en çok bu kadar sipariş (uçak ve top ayrı ayrı). */
@@ -66,12 +68,16 @@ export class Factory {
     }
     this.queue.shift();
     const af = newAirframe(item.specId, s.team);
+    if (item.noMaint) af.noMaint = true;
     base.addAirframe(af);
     world.log(L(`${s.name}: ${spec.name} üretildi, ${base.s.name} hangarına teslim edildi`, `${s.name}: ${spec.name} built, delivered to the ${base.s.name} hangar`), s.team, 'build');
-    // Tekrar: yeni sipariş yeniden ödenir; para yetmezse tekrar durur
-    if (this.repeat && !world.orderAircraft(s, item.specId)) {
-      this.repeat = false;
-      world.log(L(`${s.name}: para yetmediği için tekrarlı üretim durdu`, `${s.name}: repeat production stopped, not enough money`), s.team, 'build');
+    // Tekrar: yeni sipariş yeniden ödenir; para ya da bakım personeli yetmezse tekrar durur
+    if (this.repeat) {
+      const why = world.orderBlock(s, item.specId);
+      if (why || !world.orderAircraft(s, item.specId)) {
+        this.repeat = false;
+        world.log(L(`${s.name}: tekrarlı üretim durdu (${why ?? 'para yetmiyor'})`, `${s.name}: repeat production stopped (${why ?? 'not enough money'})`), s.team, 'build');
+      }
     }
   }
 }

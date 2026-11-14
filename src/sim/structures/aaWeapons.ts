@@ -64,7 +64,7 @@ export interface AAWeaponDef {
   rank: number;
   /** Orta/ağır top (hesaplayıcı ve yakınlık tapasından yararlanır). */
   medium: boolean;
-  /** Kurulum maliyeti (kr). */
+  /** Kurulum maliyeti (kr; 2026-11-11'de ×1,5). */
   cost: number;
   /** Namlu dönüş hızı (°/sn): elle çevrilen ağır top yavaş, hafif top ve makineli hızlı. */
   slew: number;
@@ -78,7 +78,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'The water-cooled anti-aircraft form of the American heavy machine gun. Belt-fed, it fires without pause, but its small bullet does little to an armoured attacker.'),
     origin: 'ABD', year: 1933, bore: 12.7, shellKg: 0.046, dragC: 0.17, mag: 0, reload: 0,
     rate: 8.75, muzzleVel: 890, damage: 1.4, dispersion: 0.012, kind: 'tracer', burstRadius: 0, caliber: 'heavy',
-    installTime: 20, rank: 1, medium: false, cost: 300, slew: 60,
+    installTime: 20, rank: 1, medium: false, cost: 450, slew: 60,
   },
   // 2 cm Flak 38: dakikada 450 seri, ~200 pratik; 20'lik şarjör; izli mermi 6 sn'de (~2.200 m) kendini imha eder
   aa20: {
@@ -87,7 +87,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'The most widely used German light flak gun. It empties its 20-round magazine in under three seconds, then the crew changes it. Its tracer self-destructs after 6 seconds.'),
     origin: 'Almanya', year: 1939, bore: 20, shellKg: 0.12, mag: 20, reload: 3.3, crew: 5,
     rate: 7.5, muzzleVel: 900, damage: 6, dispersion: 0.01, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
-    installTime: 30, rank: 2, medium: false, cost: 850, slew: 45,
+    installTime: 30, rank: 2, medium: false, cost: 1300, slew: 45,
   },
   // Oerlikon 20 mm: dakikada 450 seri, 250–320 pratik; 60'lık tambur. Kaynaklarda etkili menzil ~900 m (Flak 38 için ~1.070 m): oyundaki menzil
   // Flak 38'in izli mermi menziliyle aynı oranda (~1.900 m). Nişancı omuz desteğiyle elle çevirir: dönüş hızı tahmin
@@ -97,7 +97,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'A Swiss design that became the close-in gun of the Allied navies. The gunner leans into shoulder rests and swings it by hand, so it turns quickly. Its 60-round drum gives longer bursts than the Flak 38 magazine, but its tracer is useful at shorter range.'),
     origin: 'İsviçre', year: 1939, bore: 20, shellKg: 0.123, mag: 60, reload: 4.6, drum: true,
     rate: 7.5, muzzleVel: 820, damage: 6, dispersion: 0.011, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
-    installTime: 30, rank: 2.5, medium: false, cost: 1000, slew: 60,
+    installTime: 30, rank: 2.5, medium: false, cost: 1500, slew: 60,
   },
   // 2 cm Flakvierling 38: dört namlu, dakikada 1.800 seri, 800 pratik; 4 × 20'lik şarjör
   aa20q: {
@@ -106,7 +106,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'Four Flak 38s on one mount. In a burst of a few seconds it fires four times as much as a single gun: the most dangerous light weapon against low attackers.'),
     origin: 'Almanya', year: 1940, bore: 20, shellKg: 0.12, mag: 80, reload: 3.3, crew: 8,
     rate: 30, muzzleVel: 900, damage: 6, dispersion: 0.012, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
-    installTime: 40, rank: 3, medium: false, cost: 1600, slew: 40,
+    installTime: 40, rank: 3, medium: false, cost: 2400, slew: 40,
   },
   // 3,7 cm Flak 36: dakikada 150–160 seri; kaynaklar pratikte 60–120 diyor (burada ~90); 6'lık tarak; 14 sn'lik izli 4.200 m'de imha
   aa37: {
@@ -115,7 +115,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'A medium gun covering the heights the 20 mm cannot reach. Shells are hand-fed in 6-round clips and the tracer self-destructs at 4.2 km. One hit badly damages a small aircraft.'),
     origin: 'Almanya', year: 1936, bore: 37, shellKg: 0.64, mag: 6, reload: 1.6, crew: 7,
     rate: 2.6, muzzleVel: 820, damage: 24, dispersion: 0.008, kind: 'tracer', burstRadius: 9, caliber: 'cannon',
-    installTime: 45, rank: 4, medium: true, cost: 1600, slew: 30,
+    installTime: 45, rank: 4, medium: true, cost: 2400, slew: 30,
   },
   // Bofors 40 mm L/60: yüksek açıda dakikada 120 seri, pratik 80–100; 4'lük tarak; pratik tavan ~3.800 m; dönüş 50°/sn
   aa40: {
@@ -124,7 +124,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'A Swedish design used by both sides in the war. Fed continuously with 4-round clips, its barrel swings fast and its 0.9 kg shell can follow a low aircraft.'),
     origin: 'İsveç', year: 1934, bore: 40, shellKg: 0.9, mag: 4, reload: 0.67, crew: 4,
     rate: 2, muzzleVel: 880, damage: 30, dispersion: 0.007, kind: 'tracer', burstRadius: 11, caliber: 'cannon',
-    installTime: 50, rank: 5, medium: true, cost: 2500, slew: 50,
+    installTime: 50, rank: 5, medium: true, cost: 3750, slew: 50,
   },
   // 8,8 cm Flak 36: dakikada 15–20; en büyük tapa ayarı (30 sn) 9.900 m, etkili tavan 8.000 m
   aa88: {
@@ -133,7 +133,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'The backbone of German heavy flak. Its time-fuzed shell takes about 20 seconds to reach 8 km, so it misses an aircraft that changes course. Hits from one gun are rare; its effect comes from massed batteries.'),
     origin: 'Almanya', year: 1936, bore: 88, shellKg: 9.2, mag: 0, reload: 0, crew: 10, aim: 0.87,
     rate: 0.29, muzzleVel: 820, damage: 55, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
-    installTime: 60, rank: 6, medium: true, cost: 3350, slew: 12,
+    installTime: 60, rank: 6, medium: true, cost: 5000, slew: 12,
   },
   // 90 mm M1: 21 Mart 1940'ta kabul edildi. M1A1 dakikada 20 atış, 10,56 kg mermi, en yüksek tavan 13.300 m (etkili aynı kuralla ~11.500 m)
   aa90: {
@@ -142,7 +142,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'The US heavy anti-aircraft gun. It sets up on four long folding arms and a round platform and fires 20 rounds a minute. In 1944 it was used with radar and proximity fuzes; in the game too it gains a lot from those devices.'),
     origin: 'ABD', year: 1940, bore: 90, shellKg: 10.56, mag: 0, reload: 0, crew: 8, aim: 0.87,
     rate: 0.33, muzzleVel: 820, damage: 59, dispersion: 0, kind: 'flak', burstRadius: 23, caliber: 'cannon',
-    installTime: 65, rank: 6.3, medium: true, cost: 3900, slew: 14,
+    installTime: 65, rank: 6.3, medium: true, cost: 5850, slew: 14,
   },
   // 8,8 cm Flak 41: ilk teslimat 1943, 1.000 m/sn, dakikada 20–25, etkili tavan 11.300 m, en yüksek 14.700 m, 556 adet üretildi
   aa41: {
@@ -151,7 +151,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'The new generation of the 8.8 cm: 1,000 m/s muzzle velocity and an 11.3 km effective ceiling. Its low turntable and tall shield set it apart from the Flak 36. In reality it was complex and expensive, and only 556 were built.'),
     origin: 'Almanya', year: 1943, bore: 88, shellKg: 9.4, mag: 0, reload: 0, aim: 0.87,
     rate: 0.375, muzzleVel: 1000, damage: 56, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
-    installTime: 75, rank: 6.6, medium: true, cost: 4800, slew: 14,
+    installTime: 75, rank: 6.6, medium: true, cost: 7200, slew: 14,
   },
   // 12,8 cm Flak 40: dakikada 10–12; en yüksek tavan 14.800 m, etkili tavan aynı kuralla ~13.000 m
   aa128: {
@@ -160,7 +160,7 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
       'A very heavy gun used in fixed positions and on flak towers. Its 26 kg shell climbs very high with a wide splinter radius, but it fires only 10–12 rounds a minute.'),
     origin: 'Almanya', year: 1942, bore: 128, shellKg: 26, mag: 0, reload: 0,
     rate: 0.18, muzzleVel: 880, damage: 95, dispersion: 0, kind: 'flak', burstRadius: 32, caliber: 'cannon',
-    installTime: 90, rank: 7, medium: true, cost: 6300, slew: 8,
+    installTime: 90, rank: 7, medium: true, cost: 9450, slew: 8,
   },
 };
 

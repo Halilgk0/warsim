@@ -3,6 +3,7 @@
 // Deniz: yüksekliği 0'ın altındaki köşeler deniz yüzeyine indirilir ve derinliğe göre maviye boyanır.
 
 import * as THREE from 'three';
+import { groundU } from './groundTex';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { smoothstep } from '../core/math';
 import { MAP_HALF as HALF, MAP_SCALE, MAP_SIZE } from '../sim/mapData';
@@ -171,6 +172,8 @@ export const waterU = {
   waterQ: { value: 1 },
   /** Arazi dokusu (0 kapalı: düşük kalite). */
   terrDetail: { value: 1 },
+  /** Zemin dokusu (groundTex.ts): her kalitede; iki ölçekte okunur. */
+  terrGrass: groundU.terrGrass,
 };
 
 /**
@@ -182,6 +185,7 @@ const LAND_PARS = /* glsl */ `
   varying vec2 vLand;
   varying vec3 vTN;
   uniform float terrDetail;
+  uniform sampler2D terrGrass;
   float tHash( vec2 c ) { return fract( sin( dot( c, vec2( 41.13, 289.71 ) ) ) * 43758.5453 ); }
   /**
    * Dönemli değer gürültüsü: konum 8.192 m'lik kareye indirgenir (hassasiyet), k: bu karede kaç hücre (tam sayı);
@@ -204,6 +208,11 @@ const LAND_FS = /* glsl */ `
     float lfw = length( fwidth( vCloudW.xz ) );
     float macro = tNoise( lp, 9.0 ) * 0.6 + tNoise( lp + 113.0, 38.0 ) * 0.4;
     diffuseColor.rgb *= 0.9 + 0.2 * macro;
+    // Zemin dokusu: yakında ot sapları (16 m'lik karo), orta mesafede öbekler (128 m'lik karo, çevrilmiş: tekrar
+    // görünmesin). Tarlada zayıf (saban izleri ayrı). Uzakta doku küçültülmüş düzeylerden nötre döner
+    float gk = 1.0 - 0.6 * vLand.x;
+    diffuseColor.rgb *= mix( vec3( 1.0 ), texture2D( terrGrass, lp / 16.0 ).rgb * 2.0, 0.6 * gk )
+      * mix( vec3( 1.0 ), texture2D( terrGrass, lp.yx / 128.0 + 0.37 ).rgb * 2.0, 0.45 * gk );
     if ( terrDetail > 0.5 ) {
       float near = 1.0 - smoothstep( 0.4, 3.0, lfw );
       float micro = tNoise( lp, 2540.0 ) * 0.55 + tNoise( lp + 7.0, 10404.0 ) * 0.45;

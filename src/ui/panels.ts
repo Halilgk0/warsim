@@ -7,6 +7,7 @@ import { STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
 import { AA_WEAPONS, AA_SENSORS, type AASensorId, type AAWeaponId, type UpgradeOption } from '../sim/structures/airDefense';
 import { BASE_UPGRADES, type BaseUpgrade } from '../sim/structures/airbase';
 import { RADAR_LEVELS } from '../sim/structures/radar';
+import { FIRE_COST_RATE, FIRE_RADIUS, FIRE_STAFF, FIRE_UPGRADE_COST, FIRE_UPGRADE_STAFF, fireCrewFor } from '../sim/structures/fireStation';
 import { SPECS } from '../sim/aircraft/specs';
 import { TECH_BY_ID, type Research } from '../sim/tech';
 import { PALETTE } from '../render/palette';
@@ -62,6 +63,8 @@ export class LeftPanel {
       if (s.radar) return this.radar(s);
       if (s.factory) return this.factory(s);
       if (s.kind === 'mine') return this.mine(s);
+      if (s.kind === 'townhall') return this.townhall(s);
+      if (s.fire) return this.firestation(s);
       if (s.def.category === 'city') return this.cityBuilding(s);
     }
     return this.overview();
@@ -74,7 +77,6 @@ export class LeftPanel {
     const w = this.game.world;
     const city = w.structures.filter((x) => x.team === s.team && x.def.category === 'city' && x.active);
     const pop = city.reduce((a, x) => a + (x.def.population ?? 0), 0);
-    const jobs = city.reduce((a, x) => a + (x.def.jobs ?? 0), 0);
     const near = w.structures.filter((x) => x !== s && x.team === s.team && x.def.category === 'city' && Math.hypot(x.pos.x - s.pos.x, x.pos.z - s.pos.z) < 800).length;
     return `
       ${this.head(s)}
@@ -82,18 +84,88 @@ export class LeftPanel {
       <div class="kv">
         ${d.population ? `<span>${L('Nüfus', 'Population')}</span><span>${nf.format(d.population)}</span>` : ''}
         ${d.jobs ? `<span>${L('İş yeri', 'Jobs')}</span><span>${nf.format(d.jobs)}</span>` : ''}
+        ${w.houseOutput(s) ? `<span>${L('Kira', 'Rent')}</span><span>${nf.format(w.houseOutput(s) * 60)} kr/${L('dk', 'min')}${w.parksNear(s) ? ` (${L('park', 'parks')} +%${w.parksNear(s) * 10})` : ''}</span>` : ''}
         <span>${L('Taban', 'Footprint')}</span><span>${Math.round(d.halfW * 2)} × ${Math.round(d.halfL * 2)} m</span>
         <span>${L('Yakındaki bina', 'Buildings nearby')}</span><span>${near}</span>
       </div>
       <h3>${L('Şehir geneli', 'Whole city')}</h3>
       <div class="kv">
         <span>${L('Toplam nüfus', 'Total population')}</span><span>${nf.format(pop)}</span>
-        <span>${L('Toplam iş yeri', 'Total jobs')}</span><span>${nf.format(jobs)}</span>
-        <span>${L('İşsiz / boş kadro', 'Unemployed / vacancies')}</span><span>${pop > jobs ? L(`${nf.format(pop - jobs)} işsiz`, `${nf.format(pop - jobs)} unemployed`) : L(`${nf.format(jobs - pop)} boş kadro`, `${nf.format(jobs - pop)} vacancies`)}</span>
+        <span>${L('Toplam kira', 'Total rent')}</span><span>${nf.format(w.houseRate(s.team))} kr/${L('dk', 'min')}</span>
       </div>
       <p class="note">${L(
-        'Şehir yapıları şimdilik personel barındırır (ev 4, apartman 16 kişi). Vergi ve iş gücü ilerideki bir aşamada ekonomiye bağlanacak.',
-        'For now, city buildings house personnel (a house 4 people, an apartment block 16). Taxes and workforce join the economy in a later stage.',
+        'Evler personel barındırır (ev 2–4, apartman 16 kişi) ve kira getirir. 300 m içindeki her park kirayı %10 artırır.',
+        'Houses hold personnel (a house 2–4 people, an apartment block 16) and pay rent. Each park within 300 m adds 10% to the rent.',
+      )}</p>`;
+  }
+
+  // ------------------------------------------------------------------ belediye
+
+  private townhall(s: Structure): string {
+    const w = this.game.world;
+    const t = w.teams[s.team];
+    const homes = w.structures.filter((x) => x.team === s.team && x.active && (x.def.population ?? 0) > 0).length;
+    const roads = w.roads.filter((r) => r.team === s.team).reduce((a, r) => a + Math.hypot(r.bx - r.ax, r.bz - r.az), 0);
+    return `
+      ${this.head(s)}
+      <p class="muted">${esc(s.def.desc)}</p>
+      <div class="kv">
+        <span>${L('Nüfus', 'Population')}</span><span>${nf.format(t.personnel.capacity)}</span>
+        <span>${L('Konut', 'Homes')}</span><span>${homes}</span>
+        <span>${L('Yollar', 'Roads')}</span><span>${nf.format(roads)} m</span>
+        <span>${L('Toplam kira', 'Total rent')}</span><span>${nf.format(w.houseRate(s.team))} kr/${L('dk', 'min')}</span>
+      </div>
+      <button class="wide primary" data-act="town">${L('Belediye ekranı ›', 'Town hall screen ›')}</button>
+      <button class="wide" data-act="market">${L('Hazine ›', 'Treasury ›')}</button>
+      <div class="btn-row">
+        <button data-act="open-road">${L('Yol ekle', 'Add a road')}</button>
+        <button data-act="open-build">${L('Ev kur', 'Build houses')}</button>
+      </div>
+      <p class="note">${L(
+        'Belediye ekranında şehrin gelir ve giderleri, süren araştırma, üretim ve inşaatlar görünür. Evler ancak yolların yanına kurulur; yeni sokaklar mevcut bir yoldan başlar.',
+        'The town hall screen shows the town\'s income and spending, and research, production and construction under way. Houses can only be built beside roads; new streets start from an existing road.',
+      )}</p>`;
+  }
+
+  // ------------------------------------------------------------------ itfaiye
+
+  private firestation(s: Structure): string {
+    const w = this.game.world;
+    const f = s.fire!;
+    const near = w.structures.filter((o) => o !== s && o.team === s.team && !o.destroyed && Math.hypot(o.pos.x - s.pos.x, o.pos.z - s.pos.z) <= f.radius && fireCrewFor(w, o) > 0);
+    const hurt = near.filter((o) => o.active && o.hp < o.maxHp - 0.5).length;
+    const crews = f.crews.map((c) => {
+      const t = w.structureById(c.targetId);
+      const st = c.state === 'out' ? L('yolda', 'on the way') : c.state === 'work' ? L('onarıyor', 'repairing') : L('dönüyor', 'returning');
+      return `<div class="frow"><span>${c.big ? '🚒' : '🚐'} ${esc(t?.name ?? '—')}</span><small>${L(`${c.people} kişi`, count(c.people, 'person', 'people'))} · ${st}${t && c.state === 'work' ? ` · ${pct(t.hp / t.maxHp)}` : ''}</small></div>`;
+    }).join('');
+    let up = '';
+    if (f.job) {
+      up = `<div class="frow"><span>${L(`${f.level + 1}. seviyeye yükseltiliyor`, `Upgrading to level ${f.level + 1}`)}</span><small>${fmtDur(f.job.left)}</small></div>${bar((1 - f.job.left / f.job.total) * 100, 'var(--warn)')}`;
+    } else if (f.level < 3) {
+      const block = w.fireUpgradeBlock(s);
+      const cost = FIRE_UPGRADE_COST[f.level + 1];
+      up = `<button class="wide primary" data-act="fire-up" ${block ? 'disabled' : ''}>${L(`${f.level + 1}. seviyeye yükselt`, `Upgrade to level ${f.level + 1}`)}${this.cost(cost)}</button>
+        <p class="note">${block ? `<b class="bad">${esc(block)}.</b> ` : ''}${L(
+          `+${FIRE_UPGRADE_STAFF} personel (${FIRE_UPGRADE_STAFF} boşta kişi ister), kapsama ${FIRE_RADIUS[f.level + 1]} m, bina büyür.`,
+          `+${FIRE_UPGRADE_STAFF} staff (needs ${FIRE_UPGRADE_STAFF} free people), ${FIRE_RADIUS[f.level + 1]} m coverage, a bigger building.`)}</p>`;
+    }
+    return `
+      ${this.head(s)}
+      <p class="muted">${esc(s.def.desc)}</p>
+      <div class="kv">
+        <span>${L('Seviye', 'Level')}</span><span>${f.level} / 3</span>
+        <span>${L('Kadro', 'Staff')}</span><span>${L(`${FIRE_STAFF[f.level]} kişi · ${f.staff - f.out - f.selfCrew} merkezde`, `${FIRE_STAFF[f.level]} · ${f.staff - f.out - f.selfCrew} at the station`)}</span>
+        <span>${L('Kapsama', 'Coverage')}</span><span>${f.radius} m</span>
+        <span>${L('Alandaki bina', 'Buildings in area')}</span><span>${near.length}${hurt ? ` · <b class="bad">${L(`${hurt} hasarlı`, `${hurt} damaged`)}</b>` : ''}</span>
+        <span>${L('Onarılan bina', 'Buildings repaired')}</span><span>${f.repaired}</span>
+      </div>
+      ${f.selfCrew ? `<div class="frow"><span>🔧 ${L('Merkez onarılıyor', 'Repairing the station')}</span><small>${L(`${f.selfCrew} kişi`, count(f.selfCrew, 'person', 'people'))}</small></div>` : ''}
+      ${crews ? `<h3>${L('Görevdeki ekipler', 'Crews out')}</h3>${crews}` : ''}
+      ${up}
+      <p class="note">${L(
+        'Ekipler alandaki hasarlı binalara yollardan araçla gider: küçük ve orta eve 1, büyük eve 2, apartmana ve belediyeye 3 kişi; iş çoksa büyük binalar önce. Onarım elle onarımın yarı fiyatına; para yetmezse ekip bekler. Radar, batarya ve maden ocağına da gider, ama yalnız onları yola bağladıysan ve alandaysalar (radar ve maden 2, batarya 2, yükseltilmiş batarya 3 kişi). Hava üssü ve fabrikayı kendin onarırsın.',
+        'Crews drive along the roads to damaged buildings in the area: 1 person for a small or medium house, 2 for a large house, 3 for an apartment block or the town hall; bigger buildings first when busy. Repairs cost half as much as a manual repair; without money the crew waits. They also go to radars, batteries and mines, but only if you have connected those to a road and they are in the area (2 for a radar or a mine, 2 for a battery, 3 for an upgraded battery). Airbases and factories you repair yourself.',
       )}</p>`;
   }
 
@@ -119,7 +191,7 @@ export class LeftPanel {
         'Damarın verimi yerden yere çok değişir ve haritada görünmez; kurmadan bilinmez. Düşman madenleri de bombalanabilir: yıkılan ocak ganimet getirir.',
         'Yield varies a lot from place to place and is not shown on the map; you only find out by building. Enemy mines can be bombed too: a destroyed mine brings loot.',
       )}</p>
-      <button class="wide" data-act="market">${L('Hazine ve pazar ›', 'Treasury and market ›')}</button>`;
+      <button class="wide" data-act="market">${L('Hazine ›', 'Treasury ›')}</button>`;
   }
 
   /** Maliyet etiketi (para kuralları kapalıysa boş). */
@@ -151,6 +223,17 @@ export class LeftPanel {
   private repairRow(s: Structure): string {
     const w = this.game.world;
     if (s.team !== this.game.playerTeam || !s.active || s.hp >= s.maxHp) return '';
+    // İtfaiyenin baktığı bina: paralı onarım yok, ekibin durumu
+    if (w.fireCovers(s)) {
+      if (s.fire) return '';
+      let st = L('itfaiye ekibi bekleniyor', 'waiting for a fire crew');
+      for (const o of w.structures) {
+        const c = o.fire?.crews.find((x) => x.targetId === s.id && x.state !== 'back');
+        if (c) st = c.state === 'work' ? L('itfaiye ekibi onarıyor', 'a fire crew is repairing it') : L('itfaiye ekibi yolda', 'a fire crew is on the way');
+      }
+      const fc = w.repairEstimate(s, FIRE_COST_RATE).cost;
+      return `<div class="frow repair"><span>🚒 ${st}${fc ? ` · ≈ ${fmtMoney(fc)}` : ''}</span></div>`;
+    }
     const est = w.repairEstimate(s);
     const cost = est.cost ? ` · ≈ ${fmtMoney(est.cost)}` : '';
     if (s.repairing) {
@@ -158,7 +241,10 @@ export class LeftPanel {
       const st = wait > 0 ? L(`vurulduğu için ${fmtDur(wait)} bekliyor`, `paused ${fmtDur(wait)} after being hit`) : `${L('kalan', 'left')} ${fmtDur(est.time)}${cost}`;
       return `<div class="frow repair"><span>🔧 ${L('Onarılıyor', 'Repairing')} · ${st}</span><button class="link" data-act="repair-stop">${L('Durdur', 'Stop')}</button></div>`;
     }
-    return `<button class="wide" data-act="repair" title="${L('Onarım yavaş ilerler, bedeli adım adım ödenir; yapı vurulursa 5 dk durur.', 'Repairs are slow and paid step by step; they pause for 5 min if the structure is hit.')}">${L('Onar', 'Repair')} · ${fmtDur(est.time)}${cost}</button>`;
+    // Radar, batarya ve maden: yola bağlanıp itfaiye alanına alınırsa yarı fiyatına onarılır
+    const tip = s.kind === 'radar' || s.kind === 'aa' || s.kind === 'mine'
+      ? `<p class="note">${L('Bu yapıya bir yol bağlarsan ve bir itfaiye merkezinin alanındaysa itfaiye yarı fiyatına onarır.', 'Connect a road to this structure and, if it is inside a fire station\'s area, crews repair it for half the price.')}</p>` : '';
+    return `<button class="wide" data-act="repair" title="${L('Onarım yavaş ilerler, bedeli adım adım ödenir; yapı vurulursa 5 dk durur.', 'Repairs are slow and paid step by step; they pause for 5 min if the structure is hit.')}">${L('Onar', 'Repair')} · ${fmtDur(est.time)}${cost}</button>${tip}`;
   }
 
   // ------------------------------------------------------------------ genel bakış
@@ -181,7 +267,6 @@ export class LeftPanel {
     const others = w.structures.filter((s) => s.team === me && !s.airbase && s.def.category !== 'city');
     const city = w.structures.filter((s) => s.team === me && s.def.category === 'city');
     const cityPop = city.filter((s) => s.active).reduce((a, s) => a + (s.def.population ?? 0), 0);
-    const cityJobs = city.filter((s) => s.active).reduce((a, s) => a + (s.def.jobs ?? 0), 0);
     const cityBuilding = city.filter((s) => s.build < 1 && !s.destroyed).length;
     const otherRows = others.map((s) => {
       let sub = s.destroyed ? L('yıkık', 'destroyed') : s.build < 1 ? `${L('inşaat', 'building')} ${pct(s.build)}` : pct(s.hp / s.maxHp);
@@ -204,23 +289,23 @@ export class LeftPanel {
       <h3>${L('Hazine', 'Treasury')}</h3>
       <div class="frow pers"><b>${fmtMoney(tm.money)}</b> · ${L('son 1 dk', 'last min')} <span class="pos">+${fmtMoney(w.incomeRate(me))}</span>
         <small>${L(
-          `${mines.length} maden ocağı · ${fmtMoney(w.mineRate(me))}/dk. Gelir: maden, düşürülen düşman uçağı, yıkılan düşman yapısı, pazarda satış.`,
-          `${count(mines.length, 'mine')} · ${fmtMoney(w.mineRate(me))}/min. Income: mines, enemy aircraft shot down, enemy structures destroyed, market sales.`,
+          `${mines.length} maden ocağı · ${fmtMoney(w.mineRate(me))}/dk · evler ${fmtMoney(w.houseRate(me))}/dk. Gelir: maden, ev kirası, görevler, düşürülen düşman uçağı, yıkılan düşman yapısı.`,
+          `${count(mines.length, 'mine')} · ${fmtMoney(w.mineRate(me))}/min · houses ${fmtMoney(w.houseRate(me))}/min. Income: mines, rent, missions, enemy aircraft shot down, enemy structures destroyed.`,
         )}
-        <button class="link" data-act="market">${L('Hazine ve pazar ›', 'Treasury and market ›')}</button> <button class="link" data-act="open-econ">${L('İnşa › Ekonomi', 'Build › Economy')}</button></small></div>` : '';
+        <button class="link" data-act="market">${L('Hazine ›', 'Treasury ›')}</button> <button class="link" data-act="open-econ">${L('İnşa › Ekonomi', 'Build › Economy')}</button></small></div>` : '';
     const pers = w.teams[me].personnel;
     const persHtml = w.personnelEnabled ? `
       <h3>${L('Personel', 'Personnel')}</h3>
-      <div class="frow pers"><b>${L(`${w.crewFree(me)} kişi boşta`, `${w.crewFree(me)} free`)}</b> · ${L(`${pers.reserved} uçuşta`, `${pers.reserved} flying`)} · ${L(`konut ${pers.capacity} kişilik`, `housing for ${pers.capacity}`)}${pers.people < pers.capacity ? L(` · ${pers.capacity - pers.people} eksik, yerine geliyor`, ` · ${pers.capacity - pers.people} short, replacements on the way`) : ''}
+      <div class="frow pers"><b>${L(`${w.crewFree(me)} kişi boşta`, `${w.crewFree(me)} free`)}</b> · ${L(`${pers.reserved} uçuşta`, `${pers.reserved} flying`)} · ${L(`${w.maintOf(me)} bakımda`, `${w.maintOf(me)} ground crew`)} · ${L(`konut ${pers.capacity} kişilik`, `housing for ${pers.capacity}`)}${pers.people < pers.capacity ? L(` · ${pers.capacity - pers.people} eksik, yerine geliyor`, ` · ${pers.capacity - pers.people} short, replacements on the way`) : ''}
         <small>${L(
-          '1 ev = 4 kişi, 1 apartman = 16 kişi. Uçaklar mürettebatı kadar kişiyle kalkar; eksikse hangarda bekler.',
-          '1 house = 4 people, 1 apartment block = 16. An aircraft takes off only with its full crew; otherwise it waits in the hangar.',
+          'Ev boyuna göre 2, 3 ya da 4 kişi, apartman 16 kişi. Her uçağın 1 bakımcısı var (üretimde ayrılır). Uçaklar mürettebatı kadar kişiyle kalkar; eksikse hangarda bekler.',
+          'A house holds 2, 3 or 4 people by size, an apartment block 16. Every aircraft keeps 1 ground crew (assigned when built). An aircraft takes off only with its full crew; otherwise it waits in the hangar.',
         )} <button class="link" data-act="open-build">${L('İnşa › Şehir', 'Build › City')}</button></small></div>` : '';
     return `${moneyHtml}${persHtml}
       <p class="muted small">${L('Havadaki kollar sağ paneldeki <b>Aktif görevler</b> bölümünde.', 'Airborne flights are listed under <b>Active missions</b> in the right panel.')}${flights.length ? L(` Şu an ${flights.length} kol görevde.`, ` ${count(flights.length, 'flight')} out now.`) : ''}</p>
       <h3>${L('Hava üsleri', 'Airbases')}</h3><div class="list">${baseRows || `<p class="muted">${L('Hava üssü yok.', 'No airbases.')}</p>`}</div>
       ${others.length ? `<h3>${L('Yapılar', 'Structures')}</h3><div class="list">${otherRows}</div>` : ''}
-      ${city.length ? `<h3>${L('Şehir', 'City')}</h3><div class="frow"><b>${L(`${city.length} bina`, count(city.length, 'building'))}</b> · ${L('nüfus', 'population')} ${nf.format(cityPop)} · ${L('iş', 'jobs')} ${nf.format(cityJobs)}${cityBuilding ? ` · ${cityBuilding} ${L('inşaat', 'under construction')}` : ''}</div>` : ''}
+      ${city.length ? `<h3>${L('Şehir', 'City')}</h3><div class="frow"><b>${L(`${city.length} bina`, count(city.length, 'building'))}</b> · ${L('nüfus', 'population')} ${nf.format(cityPop)} · ${L('kira', 'rent')} ${fmtMoney(w.houseRate(me))}/${L('dk', 'min')}${cityBuilding ? ` · ${cityBuilding} ${L('inşaat', 'under construction')}` : ''}</div>` : ''}
       ${enemy.length ? `<h3>${L('Bilinen düşman hedefleri', 'Known enemy targets')}</h3><div class="list enemy-list">${enemyRows}</div>` : ''}`;
   }
 
@@ -457,8 +542,17 @@ export class LeftPanel {
       case 'open-econ':
         g.build.open('economy');
         return;
+      case 'town':
+        g.modals.open('town');
+        return;
+      case 'open-road':
+        g.build.open('city');
+        g.beginRoad();
+        g.build.refresh();
+        return;
       case 'market':
-        g.modals.open('market');
+        // Maden panelinden: o madenin hazinesi; başka yerden: genel hazine
+        g.modals.openTreasury(s?.kind === 'mine' && s.team === g.playerTeam ? s.id : null);
         return;
       case 'research-hd':
         g.modals.open('research', 'hd');
@@ -486,6 +580,9 @@ export class LeftPanel {
         break;
       case 'repair':
         if (s) g.world.setRepair(s, true);
+        break;
+      case 'fire-up':
+        if (s?.fire) g.world.startFireUpgrade(s);
         break;
       case 'repair-stop':
         if (s) g.world.setRepair(s, false);

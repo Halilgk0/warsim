@@ -97,6 +97,11 @@ export class Director {
   /** Son karede kameranın baktığı nokta ve uzaklığı. */
   readonly look = new THREE.Vector3();
   lookDist = 100;
+  /**
+   * Görüş açısı çarpanı: çekimler dikey kadraja (9:16) göre ayarlı. Yatay kadrajda aynı dikey açı çok geniş kalır, özne
+   * küçülür; kayıt kipi yatayda açıyı daraltır (1 = değişmez).
+   */
+  fovScale = 1;
   private readonly last = new THREE.Vector3();
   private hasLast = false;
   private shakeAmp = 0;
@@ -180,7 +185,8 @@ export class Director {
       cam.quaternion.multiply(_q);
     }
     this.shakeAmp *= Math.exp(-dt * 4.5);
-    if (Math.abs(cam.fov - shot.fov) > 1e-3) cam.fov = shot.fov;
+    const fov = shot.fov * this.fovScale;
+    if (Math.abs(cam.fov - fov) > 1e-3) cam.fov = fov;
     cam.near = 0.5;
     cam.far = 260000;
     cam.updateProjectionMatrix();

@@ -182,13 +182,18 @@ export function footprintStats(
   return { min, max, mean: sum / n, water: water / n, outside };
 }
 
-/** İnşaat için zemini düzleştirir (kenarlarda yumuşak geçiş). */
+/**
+ * İnşaat için zemini düzleştirir (kenarlarda yumuşak geçiş). Yükseklik ızgara köşelerinde ve hücre içi düzlem: tabana
+ * değen her hücrenin dört köşesi de tam hedefte olmalı, yoksa hücre içinde eğim kalır ve yapı havada durur. Bu yüzden tam
+ * düzleşen bölge tabandan bir hücre köşegeni (1,42 hücre) taşar, yumuşak geçiş onun dışında başlar.
+ */
 export function flattenFootprint(
   cx: number, cz: number, halfW: number, halfL: number, headingRad: number, target: number, margin: number,
 ): void {
   const fx = Math.sin(headingRad);
   const fz = -Math.cos(headingRad);
-  const ext = Math.hypot(halfW, halfL) + margin;
+  const full = TERRAIN_CELL * 1.42;
+  const ext = Math.hypot(halfW + full, halfL + full) + margin;
   const i0 = Math.max(0, Math.floor((cx - ext + HALF) / TERRAIN_CELL));
   const i1 = Math.min(TERRAIN_N, Math.ceil((cx + ext + HALF) / TERRAIN_CELL));
   const j0 = Math.max(0, Math.floor((cz - ext + HALF) / TERRAIN_CELL));
@@ -199,7 +204,7 @@ export function flattenFootprint(
       const z = -HALF + j * TERRAIN_CELL - cz;
       const u = Math.abs(x * fx + z * fz);
       const v = Math.abs(x * -fz + z * fx);
-      const out = Math.max(u - halfL, v - halfW);
+      const out = Math.max(u - halfL, v - halfW) - full;
       const w = out <= 0 ? 1 : 1 - smoothstep(0, margin, out);
       if (w <= 0) continue;
       const k = j * TERRAIN_W + i;

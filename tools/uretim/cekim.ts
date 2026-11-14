@@ -4,6 +4,10 @@
 import * as THREE from 'three';
 import { buildAircraftModel } from '../../src/render/models';
 import { buildAAGun } from '../../src/render/structures';
+import { buildCityModel } from '../../src/render/cityModels';
+import { ArchBatch, archMaterial } from '../../src/render/arch';
+import type { StructureKind } from '../../src/sim/structures/structure';
+import { mulberry32 } from '../../src/core/math';
 import { SPECS } from '../../src/sim/aircraft/specs';
 import { TECH } from '../../src/sim/tech';
 import { AA_WEAPON_ORDER, type AAWeaponId } from '../../src/sim/structures/airDefense';
@@ -109,6 +113,29 @@ function gun(id: AAWeaponId): string {
   return framedShot(scene, cam);
 }
 
+/** Maden ocağı görsellerinin sayısı (hazine penceresi: render/thumbs.ts mineThumb aynı sayıyı kullanır). */
+const MINE_SHOTS = 3;
+
+/** Yapı (maden ocağı): 3/4 üstten; tohum modelin çeşidini seçer. */
+function structure(kind: StructureKind, seed: number): string {
+  const scene = lit();
+  scene.fog = new THREE.Fog(0xffffff, 1e6, 2e6);
+  const b = new ArchBatch();
+  buildCityModel(kind, mulberry32((seed + 1) * 977), b);
+  const g = new THREE.Group();
+  b.build(g, archMaterial());
+  g.rotation.y = -0.65 + seed * 0.5;
+  scene.add(g);
+  g.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(g);
+  const c = box.getCenter(new THREE.Vector3());
+  const r = Math.max(box.getSize(new THREE.Vector3()).length() * 0.5, 1);
+  const cam = new THREE.PerspectiveCamera(30, W / H, 0.5, 4000);
+  cam.position.set(c.x, c.y + r * 1.5, c.z + r * 2.8);
+  cam.lookAt(c);
+  return framedShot(scene, cam);
+}
+
 // ------------------------------------------------------------------ araştırma siluetleri
 
 /** Çelik zeminde durum renkleri (research.ts INK aynı adları kullanır). */
@@ -175,6 +202,7 @@ export function names(): string[] {
   return [
     ...planes.map((id) => `ac-${id}`),
     ...AA_WEAPON_ORDER.map((id) => `gun-${id}`),
+    ...Array.from({ length: MINE_SHOTS }, (_, i) => `yapi-mine-${i}`),
     ...planes.flatMap((id) => inks.map((k) => `plan/ac-${id}-${k}`)),
     ...AA_WEAPON_ORDER.flatMap((id) => inks.map((k) => `plan/gun-${id}-${k}`)),
     ...later.map((id) => `plan/ac-${id}-locked`),
@@ -189,6 +217,10 @@ export function shot(name: string): string {
     const gunName = rest.startsWith('gun-');
     const planId = rest.slice(rest.indexOf('-') + 1, dash);
     return gunName ? gunPlan(planId as AAWeaponId, ink) : aircraftPlan(planId, ink);
+  }
+  if (name.startsWith('yapi-')) {
+    const [, kind, seed] = name.split('-');
+    return structure(kind as StructureKind, Number(seed));
   }
   const id = name.slice(name.indexOf('-') + 1);
   return name.startsWith('gun-') ? gun(id as AAWeaponId) : aircraft(id);

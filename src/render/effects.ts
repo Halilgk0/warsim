@@ -681,27 +681,57 @@ interface DebrisPiece {
   burning: boolean;
   smoke: number;
   age: number;
+  /** Kopan kanat parçası (ayrı biçim ve renk). */
+  wing: boolean;
+}
+
+/**
+ * Kopan kanat: uca doğru daralan, incelen ve geriye açılı yassı parça (x açıklık, z veter, y kalınlık; kök x = −0,5).
+ * Eskiden düz kutuydu: koyu, keskin köşeli bir levha gibi duruyordu.
+ */
+function wingPieceGeometry(): THREE.BufferGeometry {
+  const g = new THREE.BoxGeometry(1, 1, 1, 2, 1, 1);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const k = pos.getX(i) + 0.5;
+    const chord = 1 - 0.55 * k;
+    pos.setZ(i, pos.getZ(i) * chord - 0.18 * k);
+    // Profil: hücum kenarı (z > 0) kalın ve yuvarlak, firar kenarı ince
+    const front = pos.getZ(i) > -0.18 * k;
+    pos.setY(i, pos.getY(i) * (1 - 0.5 * k) * (front ? 1 : 0.35));
+  }
+  g.computeVertexNormals();
+  return g;
 }
 
 /** Enkaz: infilak eden ya da parçalanan uçaktan kopan, dönerek düşen parçalar (görsel). */
+const _e = new THREE.Euler();
+
 export class Debris {
-  readonly mesh: THREE.InstancedMesh;
+  /** Küçük parçalar ve kopan kanatlar (iki çizim). */
+  readonly mesh = new THREE.Group();
+  private readonly bits: THREE.InstancedMesh;
+  private readonly wings: THREE.InstancedMesh;
   private pieces: DebrisPiece[] = [];
 
   constructor(private readonly max = 600) {
-    this.mesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshLambertMaterial({ color: 0x77727c, flatShading: true }),
-      max,
-    );
-    this.mesh.count = 0;
-    this.mesh.frustumCulled = false;
-    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const make = (geo: THREE.BufferGeometry, mat: THREE.Material, n: number) => {
+      const m = new THREE.InstancedMesh(geo, mat, n);
+      m.count = 0;
+      m.frustumCulled = false;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      return m;
+    };
+    this.bits = make(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x77727c, flatShading: true }), max);
+    // Kanat: boyalı ya da çıplak metal ortalaması, açık gri; iki yüz de görünsün (ince parça döner)
+    this.wings = make(wingPieceGeometry(), new THREE.MeshLambertMaterial({ color: 0x9a9c9e, side: THREE.DoubleSide }), 40);
+    this.mesh.add(this.bits, this.wings);
   }
 
   clear(): void {
     this.pieces.length = 0;
-    this.mesh.count = 0;
+    this.bits.count = 0;
+    this.wings.count = 0;
   }
 
   /** count parça; size ≈ parça boyu (m). count = 1 ise kanat gibi uzun yassı parça. */
@@ -713,7 +743,7 @@ export class Debris {
       this.pieces.push({
         pos: pos.clone().add(randDir().multiplyScalar(size * 0.3)), vel: v, rot: new THREE.Euler(rand(0, 6), rand(0, 6), rand(0, 6)),
         spin: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), size: s, burning: burning && (wingPiece || Math.random() < 0.6),
-        smoke: Math.random() * 0.1, age: 0,
+        smoke: Math.random() * 0.1, age: 0, wing: wingPiece,
       });
     }
   }
@@ -744,15 +774,22 @@ export class Debris {
     }
     this.pieces.length = w;
     const k = Math.min(Math.max(scale, 1), 6);
+    let nb = 0;
+    let nw = 0;
     for (let i = 0; i < w; i++) {
       const p = this.pieces[i];
-      _q.setFromEuler(p.rot);
+      // Kanat yavaş döner (yassı parça havada süzülerek yuvarlanır)
+      _q.setFromEuler(p.wing ? _e.set(p.rot.x * 0.35, p.rot.y * 0.2, p.rot.z * 0.35) : p.rot);
       _s.copy(p.size).multiplyScalar(k);
       _m.compose(p.pos, _q, _s);
-      this.mesh.setMatrixAt(i, _m);
+      if (p.wing) {
+        if (nw < 40) this.wings.setMatrixAt(nw++, _m);
+      } else this.bits.setMatrixAt(nb++, _m);
     }
-    this.mesh.count = w;
-    markUsed(this.mesh, w);
+    this.bits.count = nb;
+    this.wings.count = nw;
+    markUsed(this.bits, nb);
+    markUsed(this.wings, nw);
   }
 }
 

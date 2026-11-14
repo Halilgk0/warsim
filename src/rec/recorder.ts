@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Video kaydı (yalnız geliştirme sunucusunda, adres ?rec): sinematik çekimler kare kare çizilir, ses aynı zamana
 // kilitli olarak OfflineAudioContext'te üretilir. Bilgisayarın hızından bağımsız, takılmasız 60 kare/sn.
 // tools/rec/record.mjs sayfayı Playwright ile açar ve çekim ister; kareler JPEG, ses WAV olarak ona gider.
@@ -61,6 +62,8 @@ function simStep(w: World): void {
 }
 
 /** Çekimin dünyası: harita, tohum, kurulum. */
+let decor: THREE.Group | null = null;
+
 function build(take: Take): World {
   if (terrainMap.id !== take.map) {
     loadMap(take.map);
@@ -76,6 +79,14 @@ function build(take: Take): World {
   try {
     const w = new World();
     take.setup(w);
+    // Çekime özel sahne süsü (yol gibi): önceki çekiminki kaldırılır
+    if (decor) renderer.scene.remove(decor);
+    decor = null;
+    if (take.decorate) {
+      decor = new THREE.Group();
+      take.decorate(decor, w);
+      renderer.scene.add(decor);
+    }
     return w;
   } finally {
     Math.random = fxRand;
@@ -212,7 +223,8 @@ async function record(id: string, opts: RecordOpts = {}): Promise<{ t0: number; 
   const battle = new BattleSound();
   beginTake();
   const d = new Director(renderer.camera);
-  const c: TakeCtx = { t: -warm, dt: STEP, w, s: found.subject, d, ac: (i) => w.aircraftById(i) };
+  // Yatay tuvalde (masaüstü, yatay telefon) çekimin dikey görüş açısı daralır: özne dikey kliptekine yakın büyüklükte kalır
+  if (innerWidth > innerHeight) d.fovScale = 0.6;  const c: TakeCtx = { t: -warm, dt: STEP, w, s: found.subject, d, ac: (i) => w.aircraftById(i) };
   const rig = renderer.rig;
 
   const frame = async (k: number): Promise<void> => {
@@ -260,6 +272,8 @@ export function startRecorder(): void {
   settings.graphics.quality = 'high';
   settings.graphics.clouds = true;
   renderer = new GameRenderer(vp, labels, { preserveBuffer: true });
+  // Çekimler yalnız görüntüdeki öğelere (sivil trafik gibi) buradan bakar
+  (window as unknown as { __recRenderer: GameRenderer }).__recRenderer = renderer;
   renderer.rig.director = () => {};
   Math.random = fxRand;
   const gl = renderer.renderer.getContext();

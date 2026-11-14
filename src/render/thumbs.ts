@@ -49,3 +49,8 @@ export function aircraftThumb(specId: string, color = 0x6f86b8): string {
   cache.set(key, url);
   return url;
 }
+
+/** Maden ocağının hazır görseli (public/uretim/yapi-mine-N.webp; tools/uretim üretir, MINE_SHOTS adet). */
+export function mineThumb(id: number): string {
+  return `${import.meta.env.BASE_URL}uretim/yapi-mine-${id % 3}.webp`;
+}

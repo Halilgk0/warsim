@@ -1,4 +1,4 @@
-// Pencereler: senaryolar, araştırma ağacı, hazine ve pazar, ayarlar (ses, görünüm).
+// Pencereler: senaryolar, araştırma ağacı, hazine (pazar kapalı; MARKET_ON), ayarlar (ses, görünüm).
 
 import type { Game } from '../game';
 import {
@@ -9,13 +9,14 @@ import { sound } from '../audio/sound';
 import { defaultSelection, researchBody, stageOf, type ResearchStage, type ResearchTab } from './research';
 import { TECH_BY_ID } from '../sim/tech';
 import type { AAWeaponId } from '../sim/structures/airDefense';
-import { marketBody, sellCandidate } from './market';
+import { townBody, townTitle } from './town';
+import { marketBody, marketTitle, sellCandidate } from './market';
 import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf } from './production';
 import { $, esc } from './dom';
 import { L } from '../i18n';
 import { thanksBody, thanksTitle } from './thanks';
 
-export type ModalKind = 'research' | 'settings' | 'market' | 'factory' | 'pit' | 'thanks' | 'notice';
+export type ModalKind = 'research' | 'settings' | 'market' | 'town' | 'factory' | 'pit' | 'thanks' | 'notice';
 
 /** Bildirim penceresinin düğmesi: tıklanınca pencere kapanır, sonra run çalışır. */
 export interface NoticeButton {
@@ -44,6 +45,8 @@ export class Modals {
   private marketBase: number | null = null;
   /** Pazarda son işlem uyarısı. */
   private marketMsg = '';
+  /** Hazine penceresinde açık olan maden (yoksa genel hazine). */
+  private treasuryMine: number | null = null;
   /** Üretim menüsünün fabrikası ve sekmesi. */
   private factoryId: number | null = null;
   private factoryTab: FactoryTab = 'ucak';
@@ -78,11 +81,21 @@ export class Modals {
       this.close();
       return;
     }
+    if (kind === 'market') this.treasuryMine = null;
     if (tab && tab !== this.tab) {
       this.tab = tab;
       this.sel = null;
     }
     this.kind = kind;
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
+  /** Hazine: genel (mineId null) ya da tek bir madenin hazinesi. Açıksa kapatmaz, görünümü değiştirir. */
+  openTreasury(mineId: number | null): void {
+    this.treasuryMine = mineId;
+    this.kind = 'market';
     this.isOpen = true;
     this.el.classList.remove('hidden');
     this.render();
@@ -164,7 +177,7 @@ export class Modals {
       if (!body || !patchCells(body, this.kind === 'factory' ? this.factoryHtml() : this.pitHtml())) this.render();
       return;
     }
-    if (this.kind !== 'research' && this.kind !== 'market') return;
+    if (this.kind !== 'research' && this.kind !== 'market' && this.kind !== 'town') return;
     const now = performance.now();
     if (now < this.next || now - this.lastScroll < 900) return;
     this.next = now + 500;
@@ -201,14 +214,17 @@ export class Modals {
       const s = this.game.world.structures.find((x) => x.id === this.pit?.id);
       title = L(`Silah yuvası ${(this.pit?.slot ?? 0) + 1}`, `Gun pit ${(this.pit?.slot ?? 0) + 1}`) + (s ? ` · ${s.name}` : '');
       body = this.pitHtml();
+    } else if (this.kind === 'town') {
+      title = townTitle(this.game.world, this.game.playerTeam);
+      body = townBody(this.game.world, this.game.playerTeam);
     } else if (this.kind === 'market') {
-      title = L('Hazine ve pazar', 'Treasury and market');
-      body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase);
+      title = marketTitle(this.game.world, this.game.playerTeam, this.treasuryMine);
+      body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase, this.treasuryMine);
     }
     // Bildirim ana menünün ve hesap penceresinin de üstünde açılır
     this.el.classList.toggle('over', this.kind === 'notice');
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' ? ' steel' : ''}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' ? ' steel' : ''}${this.kind === 'town' || this.kind === 'market' ? ' civic' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
@@ -350,6 +366,11 @@ export class Modals {
       case 'fab-del-gun': {
         const s = g.world.structures.find((x) => x.id === this.factoryId);
         if (!s?.factory) return;
+        // Kapalı görünen üret düğmesi: nedeni söyle (para, bant yeri ya da bakım personeli)
+        if (b.dataset.why) {
+          g.toast(b.dataset.why, true);
+          return;
+        }
         const act = b.dataset.act;
         // Toplu üretim: seçili adet kadar sipariş; düğme yetmediğinde zaten kapalı
         if (act === 'fab-add') for (let i = qtyOf(b.dataset.id!); i > 0 && g.world.orderAircraft(s, b.dataset.id!); i--);
@@ -390,6 +411,35 @@ export class Modals {
         if (s && this.pit && g.world.installGun(s, this.pit.slot, b.dataset.id as AAWeaponId)) this.close();
         return;
       }
+      case 'town-treasury':
+        this.openTreasury(null);
+        break;
+      case 'mk-all':
+        this.openTreasury(null);
+        break;
+      case 'mk-mine': {
+        // Listedeki madene dokunuş: kamera o madene gider, pencere o madenin hazinesine döner
+        const st = this.game.world.structureById(Number(b.dataset.id));
+        if (st) {
+          this.game.focusStructure(st);
+          this.openTreasury(st.id);
+        }
+        break;
+      }
+      case 'mk-build':
+        this.close();
+        this.game.build.open('economy');
+        break;
+      case 'town-build':
+        this.close();
+        this.game.build.open('city');
+        break;
+      case 'town-research':
+        this.open('research', 'arac');
+        break;
+      case 'town-factory':
+        this.openFactory(this.factoryId);
+        break;
       case 'close':
         this.close();
         return;

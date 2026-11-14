@@ -11,7 +11,9 @@ import { TECH_BY_ID, type Research } from './tech';
 import { AA_WEAPONS, AA_WEAPON_ORDER, type AAWeaponId } from './structures/airDefense';
 import { rand } from '../core/math';
 import { groundLevel } from './terrain';
-import { BASE_UPGRADE_COST, aircraftPrice, researchCost } from './economy';
+import { BASE_UPGRADE_COST, MAINT_CREW, aircraftPrice, researchCost } from './economy';
+import { FIRE_STAFF, FIRE_UPGRADE_COST, roadLinked } from './structures/fireStation';
+import { ROAD_MAX, ROAD_MIN, nearestRoad } from './roads';
 import { L } from '../i18n';
 
 /** Botun bataryaları: hafif, orta ve ağır; sınıfta açık olan ilk top. */
@@ -90,6 +92,10 @@ type Need =
  * fonların taşanı araştırmaya, yükseltmelere ve fazla uçağa gider.
  */
 const INVEST_SHARE = 0.2;
+/** Botun itfaiye kurduğu ve yükselttiği ev sayıları (seviye 1, 2, 3). */
+const FIRE_HOMES = [0, 6, 12, 20];
+/** İtfaiye harcamasından sonra kasada kalması gereken (askerî fon dışında) para. */
+const FIRE_SPARE = 3000;
 /** İkinci üs kurulana kadar: son üs yıkılınca kasada yenisinin parası yoksa taraf elenir. */
 const INVEST_SHARE_ONE_BASE = 0.35;
 const DEFENSE_SHARE_ONE_BASE = 0.05;
@@ -101,9 +107,10 @@ const FORCE_SHARE = 0.3;
  * zaman kısınca ikinci üsler azaldı ve botlar 170–230. dakikalarda elenmeye başladı (0/16 → 7/16).
  */
 const DEFENSE_SHARE = 0.15;
-const DEFENSE_MAX = 9000;
-/** Fon dolmadan da yatırım yapılır: kasada maliyetinin üstünde bu kadar para varsa. */
-const INVEST_SPARE = 6000;
+/** Savunma fonu tavanı (2026-11-11 hava savunması fiyatları ×1,5: 9.000 → 13.500). */
+const DEFENSE_MAX = 13500;
+/** Fon dolmadan da yatırım yapılır: kasada maliyetinin üstünde bu kadar para varsa (yapılar ×3: 6.000 → 18.000). */
+const INVEST_SPARE = 18000;
 
 interface Fleet {
   fighters: number;
@@ -154,8 +161,17 @@ export class Commander {
   private raidTimer: number;
   private capCooldown = 20;
   private homeSeed = 3;
+  /** Kasabada arsa bulunamayan deneme sayısı (üçten sonra yolsuz ev). */
+  private noLot = 0;
   /** Sıradaki yatırım (maden, hava üssü, fabrika) için ayrılan para (gelirin INVEST_SHARE'i). */
   private investFund = 0;
+  /** Üs yeri art arda bulunamadı: bu zamana dek yatırım sırası üssü atlar (kaydedilmez). */
+  private baseFails = 0;
+  /** Ev yeri bulunamadı: bu zamana dek ev aranmaz (kaydedilmez). */
+  private housingRetry = 0;
+  /** Yola bağlama denemeleri (yapı → zaman). */
+  private readonly linkTried = new Map<number, number>();
+  private baseBlockedUntil = 0;
   /** Bu turun yatırım hedefi. */
   private invest: Invest | null = null;
   /** Üsler arası uçak dengelemesine kalan süre (s). */
@@ -260,6 +276,7 @@ export class Commander {
       this.ensureHousing(world);
       this.produce(world, fleet);
       this.ensureInvest(world);
+      this.upgradeFire(world);
       this.autoRepair(world);
     }
     if (this.opts.production && this.ferryTimer <= 0) {
@@ -324,10 +341,15 @@ export class Commander {
     const own = world.structures.filter((s) => s.team === this.team && !s.destroyed);
     const mines = own.filter((s) => s.kind === 'mine');
     const bases = own.filter((s) => s.kind === 'airbase');
-    const mineOk = mines.length < this.minesWanted(world, bases.length) && !mines.some((m) => m.build < 1);
+    // Ağır hasarlı maden önce onarılır (onarım parası yeni madene gitmesin), sonra yenisi
+    const mineHurt = mines.some((m) => m.hp < m.maxHp * 0.6);
+    const mineOk = mines.length < this.minesWanted(world, bases.length) && !mines.some((m) => m.build < 1) && !mineHurt;
     const mine: Invest = { kind: 'mine', cost: world.structureCost(this.team, 'mine') };
-    if (mineOk && mines.length < 2) return mine;
-    if (bases.length < this.basesWanted(world) && !bases.some((b) => b.build < 1)) {
+    // İlk 3 maden üsten önce (2026-11-13; 4 botları fazla güçlendirdi): üs birikimi beklerken madenler 240 dakika 2'de kalıyordu; bir maden kendini
+    // birkaç dakikada öder. Üs yeri art arda bulunamazsa sıra bir süre madene ve fabrikaya geçer
+    if (mineOk && mines.length < 3) return mine;
+    const baseOk = world.time >= this.baseBlockedUntil;
+    if (baseOk && bases.length < this.basesWanted(world) && !bases.some((b) => b.build < 1)) {
       return { kind: 'airbase', cost: world.structureCost(this.team, 'airbase') };
     }
     if (mineOk) return mine;
@@ -336,6 +358,65 @@ export class Commander {
       if (bare) return { kind: 'factory', cost: world.structureCost(this.team, 'factory'), base: bare };
     }
     return null;
+  }
+
+  /**
+   * İtfaiye (2026-11-13): kasaba 6 eve ulaşınca bir merkez, 12 ve 20 evde yükseltme. Yatırım sırasının dışında (orada
+   * ikinci hava üssünü bekleyip hiç kurulmuyordu, 3×240 dk ölçümü): askerî fona dokunmadan, kasada FIRE_SPARE fazlası
+   * varsa. Kadrosu boşta olmalı (ensureHousing kadroyu da sayar).
+   */
+  private upgradeFire(world: World): void {
+    if (!world.roadRules || !world.personnelEnabled) return;
+    const own = world.structures.filter((s) => s.team === this.team && !s.destroyed);
+    const homes = own.filter((s) => (s.def.population ?? 0) > 0).length;
+    const free = world.teams[this.team].money - this.forceFund;
+    const st = own.find((s) => s.kind === 'firestation');
+    if (!st) {
+      const cost = world.structureCost(this.team, 'firestation');
+      if (homes < FIRE_HOMES[1] || free < cost + FIRE_SPARE || world.crewFree(this.team) < FIRE_STAFF[1] + 2) return;
+      let lot = world.findLot(this.team, 'firestation');
+      if (!lot && world.growRoads(this.team)) lot = world.findLot(this.team, 'firestation');
+      if (lot) world.placeStructure(this.team, 'firestation', lot.x, lot.z, lot.heading);
+      return;
+    }
+    const f = st.fire;
+    if (!f || !st.active || f.level >= 3 || f.job) return;
+    this.linkToRoads(world, st, free);
+    if (homes < FIRE_HOMES[f.level + 1] || world.fireUpgradeBlock(st)) return;
+    if (free < FIRE_UPGRADE_COST[f.level + 1] + FIRE_SPARE) return;
+    world.startFireUpgrade(st);
+  }
+
+  /**
+   * İtfaiyenin alanındaki maden, batarya ve radar yola bağlı değilse en yakın yoldan yapının kenarına kısa bir yol (en
+   * çok ROAD_MAX) çek: itfaiye ancak yola bağlı yapıyı onarır, bedeli elle onarımın yarısı. Yapı başına 10 dakikada bir
+   * deneme.
+   */
+  private linkToRoads(world: World, st: Structure, free: number): void {
+    const f = st.fire;
+    if (!f || free < FIRE_SPARE * 2) return;
+    for (const s of world.structures) {
+      if (s.team !== this.team || s.destroyed || (s.kind !== 'mine' && s.kind !== 'aa' && s.kind !== 'radar')) continue;
+      if (Math.hypot(s.pos.x - st.pos.x, s.pos.z - st.pos.z) > f.radius || roadLinked(world, s)) continue;
+      if ((this.linkTried.get(s.id) ?? -1e9) > world.time - 600) continue;
+      this.linkTried.set(s.id, world.time);
+      const hit = nearestRoad(world.roads, this.team, s.pos.x, s.pos.z, ROAD_MAX + Math.hypot(s.def.halfW, s.def.halfL));
+      if (!hit) continue;
+      // Yapının yola bakan kenarı: taban dikdörtgeninin o yöndeki sınırı + 8 m
+      let ux = hit.x - s.pos.x;
+      let uz = hit.z - s.pos.z;
+      const d = Math.hypot(ux, uz) || 1;
+      ux /= d;
+      uz /= d;
+      const a = Math.abs(ux * Math.cos(s.heading) + uz * Math.sin(s.heading));
+      const b = Math.abs(ux * Math.sin(s.heading) - uz * Math.cos(s.heading));
+      const edge = Math.min(a > 1e-3 ? s.def.halfW / a : Infinity, b > 1e-3 ? s.def.halfL / b : Infinity);
+      const ex = s.pos.x + ux * (edge + 8);
+      const ez = s.pos.z + uz * (edge + 8);
+      const len = Math.hypot(ex - hit.x, ez - hit.z);
+      if (len < ROAD_MIN || len > ROAD_MAX) continue;
+      if (world.placeRoad(this.team, hit.x, hit.z, ex, ez)) return;
+    }
   }
 
   /** Hasarı %10'u geçen yapıları onar (onarım yavaş ve vurulunca bekler; bedeli adım adım ödenir). */
@@ -432,7 +513,12 @@ export class Commander {
     const tm = world.teams[this.team];
     const inv = this.invest;
     const oneBase = world.airbasesOf(this.team).length < 2;
-    this.investFund = inv ? Math.min(this.investFund + income * (oneBase ? INVEST_SHARE_ONE_BASE : INVEST_SHARE), inv.cost) : 0;
+    // Tehdit (2026-11-13): yakın zamanda bombalanan ya da yapısı vurulan bot savunmaya daha çok, uzun süredir sakin olan
+    // yatırıma (maden, üs) daha çok ayırır; kalan para araştırmaya gider
+    const threat = this.threat(world);
+    const investK = threat === 'calm' ? 1.3 : 1;
+    const defenseK = threat === 'hot' ? 1.6 : threat === 'calm' ? 0.6 : 1;
+    this.investFund = inv ? Math.min(this.investFund + income * (oneBase ? INVEST_SHARE_ONE_BASE : INVEST_SHARE) * investK, inv.cost) : 0;
     const need = this.need;
     // Filo yarının altına indiyse acil: sıradaki uçağın bütün parası hemen ayrılır (10 uçak kaybeden bot filo fonuyla
     // saatlerce 2 uçakla kalıyordu)
@@ -441,9 +527,20 @@ export class Commander {
     // Kasada olmayan para ayrılamaz (önce filo)
     this.forceFund = Math.min(this.forceFund, tm.money);
     // Savunma fonu filodan sonra, yatırımdan önce
-    this.defenseFund = Math.max(0, Math.min(this.defenseFund + income * (oneBase ? DEFENSE_SHARE_ONE_BASE : DEFENSE_SHARE), DEFENSE_MAX, tm.money - this.forceFund));
+    this.defenseFund = Math.max(0, Math.min(this.defenseFund + income * (oneBase ? DEFENSE_SHARE_ONE_BASE : DEFENSE_SHARE) * defenseK, DEFENSE_MAX, tm.money - this.forceFund));
     this.investFund = Math.max(0, Math.min(this.investFund, tm.money - this.forceFund - this.defenseFund));
     return this.investFund + this.forceFund + this.defenseFund;
+  }
+
+  /**
+   * Tehdit düzeyi: son 30 dakikada bombardıman akını yedi ya da bir yapısı vuruldu (hot); son 60 dakikada hiçbiri
+   * olmadı (calm); arası normal.
+   */
+  private threat(world: World): 'hot' | 'normal' | 'calm' {
+    let last = memoryOf(world, this.team).lastBomberRaid;
+    for (const s of world.structures) if (s.team === this.team && Number.isFinite(s.lastHit) && s.lastHit > last) last = s.lastHit;
+    const ago = world.time - last;
+    return ago < 1800 ? 'hot' : ago > 3600 ? 'calm' : 'normal';
   }
 
   /** Araştırma para bekliyor mu (yükseltmeler, ek bataryalar ve fazla uçak önce onu bekler). */
@@ -522,6 +619,12 @@ export class Commander {
       const fs = foe !== null ? world.structures.find((s) => s.team === foe && s.kind === 'airbase' && !s.destroyed) : undefined;
       const dir = fs ? Math.atan2(fs.pos.z - main.s.pos.z, fs.pos.x - main.s.pos.x) : null;
       placed = this.placeAirbase(world, [main.s], dir, 20000, 35000);
+      // Üç denemede yer yoksa 30 dakika üs aranmaz (fon madene ve fabrikaya akar)
+      if (placed) this.baseFails = 0;
+      else if (++this.baseFails >= 3) {
+        this.baseFails = 0;
+        this.baseBlockedUntil = world.time + 1800;
+      }
     }
     if (placed) this.investFund = Math.max(0, this.investFund - inv.cost);
   }
@@ -616,20 +719,53 @@ export class Commander {
 
   /** Personel kuralları açıkken uçakların mürettebatına yetecek kadar konut kur. */
   private ensureHousing(world: World): void {
-    if (!world.personnelEnabled) return;
+    if (!world.personnelEnabled || world.time < this.housingRetry) return;
     const p = world.teams[this.team].personnel;
-    let need = 0;
-    for (const b of world.airbasesOf(this.team)) for (const af of b.inventory) need += SPECS[af.specId].crew;
+    // Uçuş mürettebatı + her uçağın bakımcısı (fabrika bandındakiler dahil) + itfaiye kadrosu
+    let need = p.staff;
+    for (const b of world.airbasesOf(this.team)) for (const af of b.inventory) need += SPECS[af.specId].crew + (af.noMaint ? 0 : MAINT_CREW);
+    for (const s of world.structures) {
+      if (s.team === this.team && s.factory) for (const q of s.factory.queue) need += SPECS[q.specId].crew + (q.noMaint ? 0 : MAINT_CREW);
+    }
     const pending = world.structures
       .filter((s) => s.team === this.team && s.build < 1 && !s.destroyed && s.def.category === 'city')
       .reduce((a, s) => a + (s.def.population ?? 0), 0);
-    const target = Math.min(need + 4, 140);
+    const target = Math.min(need + 4, 180);
     if (p.capacity + pending >= target) return;
     const base = world.airbasesOf(this.team)[0];
     if (!base) return;
-    const kind = target - p.capacity - pending >= 16 ? 'apartment' : 'house';
-    const spot = world.findSpot(this.team, kind, base.s.pos.x, base.s.pos.z, 2300, 6500, this.homeSeed++);
-    if (spot) world.placeStructure(this.team, kind, spot.x, spot.z, 0);
+    // Ev boyu karışık (kasaba tek tip görünmesin); büyük açıkta apartman
+    const kind = target - p.capacity - pending >= 16 ? 'apartment' : (['house', 'midhouse', 'house', 'smallhouse'] as const)[this.homeSeed % 4];
+    if (!world.roadRules) {
+      const spot = world.findSpot(this.team, kind, base.s.pos.x, base.s.pos.z, 2300, 6500, this.homeSeed++);
+      if (spot) world.placeStructure(this.team, kind, spot.x, spot.z, 0);
+      return;
+    }
+    // Yol kuralı: evler kasabanın yollarına dizilir. Yol yoksa (belediye hiç kurulamadı ya da eski kayıt) önce belediye;
+    // arsa kalmadıysa kasaba bir sokak büyür. Üst üste olmuyorsa son çare yolsuz ev (personelsiz kalmasın)
+    if (!world.roads.some((r) => r.team === this.team)) {
+      for (let k = 0; k < 4; k++) {
+        const h = (((this.homeSeed + k) % 8) * Math.PI) / 4;
+        const spot = world.findSpot(this.team, 'townhall', base.s.pos.x, base.s.pos.z, 2300, 6500, this.homeSeed + k, h);
+        if (spot && world.placeStructure(this.team, 'townhall', spot.x, spot.z, h)) break;
+      }
+      this.homeSeed++;
+      if (!world.roads.some((r) => r.team === this.team) && ++this.noLot <= 3) return;
+    }
+    let lot = world.findLot(this.team, kind);
+    if (!lot && world.growRoads(this.team)) lot = world.findLot(this.team, kind);
+    if (lot && world.placeStructure(this.team, kind, lot.x, lot.z, lot.heading)) {
+      this.noLot = 0;
+      this.homeSeed++;
+      return;
+    }
+    if (++this.noLot <= 3) return;
+    const spot = world.findSpot(this.team, kind, base.s.pos.x, base.s.pos.z, 2300, 6500, this.homeSeed++, 0, false, true);
+    if (spot && world.placeStructure(this.team, kind, spot.x, spot.z, 0, null, true)) return;
+    // Yer yok: 2 dakika ev aranmaz (2026-11-13: her turda yeniden aranıp başarısız olunca 240. dakikada simülasyonun
+    // %70'ini yiyordu); sonra yoldan yeniden denenir
+    this.noLot = 0;
+    this.housingRetry = world.time + 120;
   }
 
   /** Bu rolde üretilecek tip (avcı dışında pike, taarruz ya da bombardıman uçağı). */
@@ -641,7 +777,8 @@ export class Commander {
       return l.length ? l[seed % 3 === 2 ? l.length - 1 : 0].id : null;
     }
     // Ağır bombardıman ancak kasa bolsa: He 111 bir Ju 87'nin 2,5 katı, asgari filo onu beklerken araştırma duruyordu
-    const rich = !world.economyEnabled || tm.money > 30000;
+    // Uçaklar ×1,4 (2026-11-11): eşik 30.000 → 42.000
+    const rich = !world.economyEnabled || tm.money > 42000;
     const l = [...bestUnlocked(tm.research, 'diveBomber', 1), ...bestUnlocked(tm.research, 'attacker', 1), ...(rich ? bestUnlocked(tm.research, 'bomber', 1) : [])];
     if (!l.length) l.push(...bestUnlocked(tm.research, 'bomber', 1));
     return l.length ? l[seed % l.length].id : null;
@@ -1024,7 +1161,9 @@ export function alertScramble(world: World, team: number, alwaysOn: boolean, dt:
     // Savunma kalkışı: hedef savunma bölgesinden çıkınca bırakılır
     // Bot kolu kendi yapılarından BOT_LEASH'ten uzağa kovalamaz: dönen taarruz uçaklarının kaybının çoğu 10 km'den uzakta, avcıdandı
     for (const f of fl) f.leash = alwaysOn ? BOT_LEASH : b.alert.radius + 15000;
-    if (fl.length) world.log(L(`${b.s.name}: alarm! ${count} × ${launchSpec.abbr} önlemeye kalkıyor (${target.callsign})`, `${b.s.name}: scramble! ${count} × ${launchSpec.abbr} taking off to intercept (${target.callsign})`), team, 'defense');
+    // Personel yetmezse istenenden az kalkar: günlükte kalkan sayı
+    const went = fl.reduce((a, f) => a + f.expected, 0);
+    if (went > 0) world.log(L(`${b.s.name}: alarm! ${went} × ${launchSpec.abbr} önlemeye kalkıyor (${target.callsign})`, `${b.s.name}: scramble! ${went} × ${launchSpec.abbr} taking off to intercept (${target.callsign})`), team, 'defense');
     b.alert.cooldown = alwaysOn ? rand(20, 60) : 40;
   }
 }

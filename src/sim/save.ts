@@ -7,17 +7,18 @@
 
 import { Vector3 } from 'three';
 import { World, type LogEntry } from './world';
-import { Structure, STRUCTURE_DEFS, type StructureKind } from './structures/structure';
+import { Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
 import { reserveAirframeIds, type Airframe, type BaseUpgrade } from './structures/airbase';
 import { AA_WEAPONS, type AASensorId, type AAWeaponId } from './structures/airDefense';
 import type { GunItem } from './structures/factory';
 import { Commander, type CommanderOptions, type CommanderState } from './commander';
-import type { LedgerEntry, MarketOffer } from './economy';
+import type { LedgerEntry, MarketOffer, MoneyCat } from './economy';
+import { foundTown, maintHousing } from './campaign';
 import type { MissionReport } from './missionResult';
 import { SLOT_ORDER, type Slot } from './tech';
-import { flattenFootprint, loadMap } from './terrain';
+import { loadMap } from './terrain';
 import { MAP_BASE } from './mapData';
-import { L } from '../i18n';
+import { L, count } from '../i18n';
 
 /** 2: 300 km haritalar (eski 150 km kayıtları yüklenemez). */
 export const SAVE_VERSION = 2;
@@ -50,6 +51,8 @@ interface TeamSave {
   peakFleet?: number;
   eliminated?: boolean;
   lastStand?: number | null;
+  /** Kalem kalem gelir ve gider (2026-11-12 öncesi kayıtlarda yok). */
+  flow?: Partial<Record<MoneyCat, number>>;
 }
 
 interface StructureSave {
@@ -88,7 +91,9 @@ interface StructureSave {
     shotsFired: number;
   };
   radar?: { level: 1 | 2 };
-  factory?: { queue: { specId: string; progress: number; paid: number }[]; repeat: boolean; guns?: GunItem[] };
+  /** İtfaiye merkezi: seviye ve süren yükseltme (ekipler kayıtta merkeze dönmüş sayılır). */
+  fire?: { level: 1 | 2 | 3; job: { left: number; total: number } | null; repaired: number };
+  factory?: { queue: { specId: string; progress: number; paid: number; noMaint?: boolean }[]; repeat: boolean; guns?: GunItem[] };
 }
 
 export interface SaveData {
@@ -111,6 +116,12 @@ export interface SaveData {
   economyEnabled: boolean;
   teams: TeamSave[];
   structures: StructureSave[];
+  /** Şehir yolları: kimlik, taraf, iki uç (2026-11-12 öncesi kayıtlarda yok: yüklenirken her tarafa belediye verilir). */
+  roads?: [number, number, number, number, number, number][];
+  /** Yol kuralı açık mı (harekât). */
+  roadRules?: boolean;
+  /** Bakım personeli kuralıyla kaydedildi (2026-11-13). Yoksa eski kayıt: o anki uçaklar ve siparişler bakımcı istemez. */
+  maintRule?: boolean;
   commanders: { team: number; opts: CommanderOptions; state: CommanderState }[];
   market: { offers: MarketOffer[]; nextRefresh: number; nextId: number };
   nameCounters: [string, number][];
@@ -137,7 +148,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     },
     people: t.personnel.people, capacity: t.personnel.capacity, recruit: t.personnel.recruit,
     money: t.money, ledger: t.ledger.map((e) => ({ ...e })), earned: t.earned, spent: t.spent, kills: t.kills, peakFleet: t.peakFleet,
-    eliminated: t.eliminated, lastStand: t.lastStand,
+    eliminated: t.eliminated, lastStand: t.lastStand, flow: { ...t.flow },
   }));
   const structures: StructureSave[] = w.structures.map((s) => {
     const o: StructureSave = {
@@ -171,6 +182,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
       };
     }
     if (s.radar) o.radar = { level: s.radar.level };
+    if (s.fire) o.fire = { level: s.fire.level, job: s.fire.job ? { ...s.fire.job } : null, repaired: s.fire.repaired };
     if (s.factory) o.factory = { queue: s.factory.queue.map((q) => ({ ...q })), repeat: s.factory.repeat, guns: s.factory.gunQueue.map((q) => ({ ...q })) };
     return o;
   });
@@ -190,6 +202,9 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     economyEnabled: w.economyEnabled,
     teams,
     structures,
+    roads: w.roads.map((r) => [r.id, r.team, r.ax, r.az, r.bx, r.bz]),
+    roadRules: w.roadRules,
+    maintRule: true,
     commanders: w.commanders.map((c) => ({ team: c.team, opts: { ...c.opts }, state: c.saveState() })),
     market: { offers: w.market.offers.map((o) => ({ ...o })), nextRefresh: w.market.nextRefresh, nextId: w.market.nextId },
     nameCounters: [...w.nameCounters],
@@ -246,13 +261,14 @@ export function deserializeWorld(d: SaveData): World {
     t.peakFleet = ts.peakFleet ?? 0;
     t.eliminated = ts.eliminated ?? false;
     t.lastStand = ts.lastStand ?? null;
+    t.flow = ts.flow ? { ...ts.flow } : {};
   }
   let maxAirframe = 0;
   for (const o of d.structures) {
     const def = STRUCTURE_DEFS[o.kind];
     const pos = new Vector3(o.pos[0], o.pos[1], o.pos[2]);
     // Taban düzleştirmesi (inşaattakiler dahil: inşaat başlarken düzleştirilmişti)
-    flattenFootprint(pos.x, pos.z, def.halfW + 20, def.halfL + 40, o.heading, pos.y, o.kind === 'airbase' ? 260 : def.category === 'city' ? 50 : 90);
+    flattenStructure(o.kind, pos.x, pos.z, o.heading, pos.y);
     const s = new Structure(o.team, o.kind, o.name, pos, o.heading, o.build >= 1, o.id);
     s.build = o.build;
     // Bina canları değişince eski kayıttaki can orana göre taşınır (sağlam ev %33 hasarlı görünmesin)
@@ -293,6 +309,11 @@ export function deserializeWorld(d: SaveData): World {
       aa.shotsFired = o.aa.shotsFired;
     }
     if (s.radar && o.radar) s.radar.level = o.radar.level;
+    if (s.fire && o.fire) {
+      s.fire.level = o.fire.level;
+      s.fire.job = o.fire.job ? { ...o.fire.job } : null;
+      s.fire.repaired = o.fire.repaired;
+    }
     if (s.factory && o.factory) {
       s.factory.queue.push(...o.factory.queue.map((q) => ({ ...q })));
       s.factory.repeat = o.factory.repeat;
@@ -301,6 +322,18 @@ export function deserializeWorld(d: SaveData): World {
     w.structures.push(s);
   }
   reserveAirframeIds(maxAirframe);
+  if (d.roads) {
+    for (const [id, team, ax, az, bx, bz] of d.roads) w.addRoad(team, ax, az, bx, bz, id);
+    w.roadRules = d.roadRules ?? false;
+  } else if (d.setup) {
+    // Yolsuz eski harekât kaydı: ayakta kalan her tarafa üssünün yakınında bedava belediye ve ana cadde. Eski evler
+    // yerinde kalır; yeni evler yola dizilir
+    for (const t of w.teams) {
+      const base = w.airbasesOf(t.id)[0];
+      if (!t.eliminated && base) foundTown(w, t.id, base, 0);
+    }
+    w.roadRules = true;
+  }
   for (const c of d.commanders) {
     const cm = new Commander(c.team, { ...c.opts });
     cm.loadState(c.state);
@@ -313,5 +346,16 @@ export function deserializeWorld(d: SaveData): World {
   w.logs.push(...d.logs);
   if (d.missionReports) w.missionReports.push(...d.missionReports);
   for (const [k, v] of d.missionTally ?? []) w.missionTally.set(k, { ...v });
+  // Bakım personeli kuralından önceki harekât kaydı: her tarafa eksik konut bedava (campaign.ts maintHousing); oyuncuya
+  // oyun bir kez söyler (game.ts applySave). Ad sayaçları ve günlük yüklendikten sonra: yeni evlerin adı çakışmasın
+  if (!d.maintRule && d.setup && d.personnelEnabled) {
+    for (const t of w.teams) {
+      const g = maintHousing(w, t.id);
+      if (t.id === w.playerTeam) w.maintGift = g;
+      if (g.buildings > 0) {
+        w.log(L(`Bakım personeli kuralı: filo için ${g.buildings} konut (${g.people} kişi) bedava kuruldu`, `Ground crew rule: ${count(g.buildings, 'home')} (${g.people} people) built for the fleet for free`), t.id, 'build');
+      }
+    }
+  }
   return w;
 }

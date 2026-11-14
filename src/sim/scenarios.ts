@@ -148,8 +148,8 @@ export const SCENARIOS: Scenario[] = [
     id: 'harekat',
     group: 'harekat',
     name: L('Harekât (1 düşman)', 'Campaign (1 enemy)'),
-    description: L('Mavi batıda, Kırmızı doğuda; arada dağlar ve körfez. İki taraf da ana üs, fabrika, 1 maden ve 2 evle başlar. Ana menüden 5 düşmana kadar harekât açılabilir.',
-      'Blue in the west, Red in the east; mountains and a gulf in between. Both sides start with a main base, a factory, 1 mine and 2 houses. Campaigns with up to 5 enemies start from the main menu.'),
+    description: L('Mavi batıda, Kırmızı doğuda; arada dağlar ve körfez. İki taraf da ana üs, fabrika, 1 maden ve 4 evle başlar. Ana menüden 5 düşmana kadar harekât açılabilir.',
+      'Blue in the west, Red in the east; mountains and a gulf in between. Both sides start with a main base, a factory, 1 mine and 4 houses. Campaigns with up to 5 enemies start from the main menu.'),
     build(w) {
       setupCampaign(w, { enemies: 1, playerName: '' });
     },

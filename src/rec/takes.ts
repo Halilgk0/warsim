@@ -12,6 +12,10 @@ import { AASite } from '../sim/structures/airDefense';
 import { newAirframe } from '../sim/structures/airbase';
 import type { StructureKind } from '../sim/structures/structure';
 import { Director, ease, flightDir, lerp, phase, type Shot } from './director';
+import { MIG_TAKES } from './migTakes';
+import { KLIP_TAKES } from './klipTakes';
+import { ME262_TAKES } from './me262Takes';
+import { SEHIR_TAKES } from './sehirTakes';
 
 export interface Subject {
   /** Çekimin uçakları (ilki ana özne). */
@@ -64,6 +68,8 @@ export interface Take {
    * toplara bakarken uzağa nişan alan çekimde namlu alevleri dev görünmesin diye küçük verilir.
    */
   fxDist?: number;
+  /** Kayıt kipinde sahneye çekime özel süs (yol, iskele gibi; simülasyona girmez). */
+  decorate?(group: THREE.Group, w: World): void;
   shot(c: TakeCtx): Shot;
 }
 
@@ -1451,6 +1457,10 @@ export const TAKES: Take[] = [
     },
   },
   horizonSmoke('aksam_duman', SMOKE_SIDE),
+  ...MIG_TAKES,
+  ...KLIP_TAKES,
+  ...ME262_TAKES,
+  ...SEHIR_TAKES,
 ];
 
 /** Akşam B-17 yörüngesi: uçuş yönünden açı (derece; 180 tam arka, sağ +), başta ve sonda. */

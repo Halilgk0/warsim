@@ -33,6 +33,8 @@ export interface Airframe {
   kills: number;
   sorties: number;
   aircraftId: number | null;
+  /** Bakım personeli kuralından (2026-11-13) önceki kayıttan: bakımcı istemez (world.maintOf). */
+  noMaint?: boolean;
 }
 
 export interface TakeoffRequest {
@@ -307,7 +309,9 @@ export class Airbase {
 
   /** Üsse bağlı fabrikanın yeri: hangar sırasının arkası. */
   factoryPad(out = new Vector3()): Vector3 {
-    return this.runwayPoint(0, 700, out);
+    // Üssün tesisleri ve tel örgüsü pistin bu yanında 720 m'ye uzanır, fabrika merkezinden 300 m yayılır: 700'de iç içe
+    // giriyordu (2026-11-11); 1.080'de arada ~60 m boşluk kalır
+    return this.runwayPoint(0, 1080, out);
   }
 
   readyOf(specId: string): Airframe[] {

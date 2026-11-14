@@ -15,6 +15,7 @@ interface NewsText {
   lead: string;
   bullets: string[];
   button: string;
+  video?: { url: string; button: string };
   /** Düğmenin gittiği yol (yoksa ana sayfa). */
   link?: string;
 }
@@ -50,12 +51,21 @@ export function latestNewsMail(): NewsMail | null {
   if (!n || n.noMail) return null;
   const e = NEWS_EN[n.id];
   const path = (p: string) => p.replace(/^\/+/, '');
+  const video = n.sections.find((s) => s.video)?.video;
+  const videoUrl = video ? path(video.src) : undefined;
   const tr: NewsText = {
     subject: `WarSimBox: ${n.title}`, title: escHtml(n.title), lead: escHtml(n.summary), bullets: mailBullets(n.sections), button: 'Oyunu aç',
+    video: videoUrl ? { url: videoUrl, button: 'Videoyu izle' } : undefined,
   };
   const en: NewsText = e
-    ? { subject: `WarSimBox: ${e.title}`, title: escHtml(e.title), lead: escHtml(e.summary), bullets: mailBullets(e.sections), button: 'Open the game' }
-    : { ...tr, button: 'Open the game' };
+    ? {
+      subject: `WarSimBox: ${e.title}`, title: escHtml(e.title), lead: escHtml(e.summary), bullets: mailBullets(e.sections), button: 'Open the game',
+      video: videoUrl ? { url: videoUrl, button: 'Watch the video' } : undefined,
+    }
+    : {
+      ...tr, button: 'Open the game',
+      video: videoUrl ? { url: videoUrl, button: 'Watch the video' } : undefined,
+    };
   return {
     id: n.id,
     at: Date.parse(`${n.date}T23:59:00Z`),
@@ -80,7 +90,7 @@ export function newsMail(m: NewsMail, en: boolean, unsub: string): Mail {
   return {
     subject: t.subject,
     headers: [`List-Unsubscribe: <${unsub}>`, 'List-Unsubscribe-Post: List-Unsubscribe=One-Click'],
-    text: `${t.title}\n\n${t.lead}\n\n${t.bullets.map((b) => `- ${b}`).join('\n')}\n\n${t.button}: ${SITE}${t.link ?? ''}\n\n${why}\n${leave}: ${unsub}\n\nWarSimBox · ${SITE}`,
+    text: `${t.title}\n\n${t.lead}\n\n${t.bullets.map((b) => `- ${b}`).join('\n')}\n\n${t.button}: ${SITE}${t.link ?? ''}${t.video ? `\n${t.video.button}: ${SITE}/${t.video.url}` : ''}\n\n${why}\n${leave}: ${unsub}\n\nWarSimBox · ${SITE}`,
     html: `<!doctype html>
 <html lang="${en ? 'en' : 'tr'}">
 <head>
@@ -101,7 +111,9 @@ export function newsMail(m: NewsMail, en: boolean, unsub: string): Mail {
       </tr></table>
     </td></tr>
     <tr><td height="3" bgcolor="#c49e58" style="background:#c49e58;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
-    <tr><td bgcolor="#171e1b" style="background:#171e1b;line-height:0;"><img src="${SITE}/${en && m.imageEn ? m.imageEn : m.image}" width="520" alt="" style="display:block;width:100%;height:auto;border:0;"></td></tr>
+    <tr><td bgcolor="#171e1b" style="background:#171e1b;line-height:0;">${t.video
+      ? `<a href="${SITE}/${t.video.url}" style="display:block;line-height:0;"><img src="${SITE}/${en && m.imageEn ? m.imageEn : m.image}" width="520" alt="${t.video.button}" style="display:block;width:100%;height:auto;border:0;"></a>`
+      : `<img src="${SITE}/${en && m.imageEn ? m.imageEn : m.image}" width="520" alt="" style="display:block;width:100%;height:auto;border:0;">`}</td></tr>
     <tr><td bgcolor="#171e1b" style="background:#171e1b;border-radius:0 0 18px 7px;padding:22px 24px 24px;color:#f0f4f1;">
       <div style="font-size:22px;font-weight:800;line-height:1.25;margin:0 0 8px;">${t.title}</div>
       <div style="font-size:15px;line-height:1.5;color:#d3ddd7;margin:0 0 12px;">${t.lead}</div>
@@ -109,6 +121,9 @@ export function newsMail(m: NewsMail, en: boolean, unsub: string): Mail {
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 0;"><tr>
         <td bgcolor="#467a62" style="background:#467a62;border-radius:12px;"><a href="${SITE}${t.link ?? ''}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;">${t.button}</a></td>
       </tr></table>
+      ${t.video ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0;"><tr>
+        <td bgcolor="#3a4741" style="background:#3a4741;border-radius:12px;"><a href="${SITE}/${t.video.url}" style="display:inline-block;padding:11px 22px;font-size:14px;font-weight:800;color:#f0f4f1;text-decoration:none;">${t.video.button} ▶</a></td>
+      </tr></table>` : ''}
       <div style="font-size:12px;line-height:1.5;color:#93a39a;margin:18px 0 0;padding-top:14px;border-top:1px solid #39453f;">${why}<br><a href="${unsub}" style="color:#a6dcc0;font-weight:700;">${leave}</a></div>
     </td></tr>
     <tr><td align="center" style="padding:16px 8px 0;font-size:12px;line-height:1.5;color:#93a39a;">

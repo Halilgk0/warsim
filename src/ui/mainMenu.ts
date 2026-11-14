@@ -468,7 +468,7 @@ export class MainMenu {
             <div class="mm-label">${L('Düşman sayısı', 'Enemies')}</div>
             <div class="seg">${enemyBtns}</div>
             <div class="mm-foes">${foes}</div>
-            <p class="muted small">${L('Herkes herkese karşı. Her ülke ana hava üssü, uçak fabrikası, 1 maden ocağı ve 2 evle başlar.', 'Free for all. Every country starts with a main airbase, an aircraft factory, 1 mine and 2 houses.')}</p>
+            <p class="muted small">${L('Herkes herkese karşı. Her ülke ana hava üssü, uçak fabrikası, 1 maden ocağı ve 4 evle başlar.', 'Free for all. Every country starts with a main airbase, an aircraft factory, 1 mine and 4 houses.')}</p>
           </div>
           ${siteMap(this.mapId, this.currentLayout()?.sites ?? null, this.size)}
         </div>

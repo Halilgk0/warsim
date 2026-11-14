@@ -3,7 +3,7 @@
 // Ağaç ve kayalar arazi parçası başına, kameraya yakınken üretilir; yollar ve yerleşimler açılışta bir kez.
 
 import * as THREE from 'three';
-import { CITIES, MAP_HALF as HALF, MAP_SIZE, TEAM_SITES } from '../sim/mapData';
+import { MAP_HALF as HALF, MAP_SIZE } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, groundLevel, terrainHeight, terrainMap } from '../sim/terrain';
 import { chunkCells } from './terrain';
 import { clamp, mulberry32, smoothstep } from '../core/math';
@@ -18,6 +18,31 @@ const KEEP_CELL = 40;
 import { BOX, CYL, GABLE, broadleafFarGeo, broadleafGeo, coniferFarGeo, coniferGeo, freeze, rockGeo } from './props';
 import { linkAtmosphere } from './atmosphere';
 import { linkCloudShadow } from './clouds';
+import { groundU } from './groundTex';
+
+type TreeShader = { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string };
+
+/**
+ * Yaprak dokusu: taç rengi ortak zemin dokusuyla beneklenir (tek doku okuması; dünya konumundan, ağaçtan ağaca farklı
+ * düşer). Köşe konumu project_vertex'ten önce okunur: çağıranın begin_vertex değişikliği (küçültme) hesaba girer.
+ */
+function leafy(shader: TreeShader): void {
+  Object.assign(shader.uniforms, groundU);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec2 vLeafUv;')
+    .replace('#include <project_vertex>', [
+      '#ifdef USE_INSTANCING',
+      '  vec3 leafW = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;',
+      '#else',
+      '  vec3 leafW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;',
+      '#endif',
+      'vLeafUv = ( mod( leafW.xz, 4096.0 ) + leafW.y * vec2( 1.1, 0.8 ) ) / 4.0;',
+      '#include <project_vertex>',
+    ].join('\n'));
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nuniform sampler2D terrGrass;\nvarying vec2 vLeafUv;')
+    .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix( vec3( 1.0 ), texture2D( terrGrass, vLeafUv ).rgb * 2.0, 0.65 );');
+}
 
 /** Bulut gölgesi alan düz Lambert malzemesi (ağaç, kaya, köy evleri). */
 function shadedLambert(o: THREE.MeshLambertMaterialParameters, key: string): THREE.MeshLambertMaterial {
@@ -172,6 +197,17 @@ function farBlocks(
 export class Scenery {
   readonly group = new THREE.Group();
   private readonly vegMat = shadedLambert({ vertexColors: true, flatShading: true }, 'vegCloud');
+  /** Yakın ağaçlar: yaprak dokulu (kayalar vegMat'te kalır). */
+  private readonly treeNearMat = ((): THREE.MeshLambertMaterial => {
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    m.onBeforeCompile = (shader) => {
+      linkAtmosphere(shader);
+      linkCloudShadow(shader);
+      leafy(shader);
+    };
+    m.customProgramCacheKey = () => 'treeNearLeaf';
+    return m;
+  })();
   private readonly bldMat = shadedLambert({ flatShading: true }, 'bldCloud');
   private readonly treeB = broadleafGeo(0xffffff);
   private readonly treeC = coniferGeo(0xffffff);
@@ -193,13 +229,10 @@ export class Scenery {
   private q = { near: 1300, thin: 2500, fade: [5500, 8500] as [number, number], settle: 10000 };
   private readonly chunks: Chunk[] = [];
   private readonly chunkGroup = new THREE.Group();
-  private roadNear: THREE.Mesh | null = null;
-  private roadFar: THREE.LineSegments | null = null;
   private settle: THREE.Group = new THREE.Group();
   private settleBlocks: SettleBlock[] = [];
-  private roads: THREE.Vector3[][] = [];
   private settleVersion = 0;
-  /** Ağaç konmayacak hücreler (yol, köy, çiftlik, şehir); yerleşimlerle birlikte kurulur. */
+  /** Ağaç konmayacak hücreler (çiftlikler); yerleşimlerle birlikte kurulur. Süs köyleri ve yapılar açıklık listesinde (cleared). */
   private keepOut = new Set<number>();
 
   private keepKey(x: number, z: number): number {
@@ -213,7 +246,7 @@ export class Scenery {
     }
   }
 
-  /** Bu noktaya ağaç konmaz mı (yol, köy, çiftlik, şehir). */
+  /** Bu noktaya ağaç konmaz mı (çiftlik). */
   private keptOut(x: number, z: number): boolean {
     return this.keepOut.has(this.keepKey(x, z));
   }
@@ -227,7 +260,7 @@ export class Scenery {
     for (let i = 0; i < NC * NC; i++) this.chunks.push({ group: null, version: -1, trees: [] });
     this.group.add(this.chunkGroup, this.settle);
     this.near = [this.treeB, this.treeC].map((geo) => {
-      const m = new THREE.InstancedMesh(geo, this.vegMat, NEAR_CAP);
+      const m = new THREE.InstancedMesh(geo, this.treeNearMat, NEAR_CAP);
       m.count = 0;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NEAR_CAP * 3), 3).setUsage(THREE.DynamicDrawUsage);
@@ -240,10 +273,9 @@ export class Scenery {
     this.rebuild();
   }
 
-  /** Gün döngüsü: gök ışığına göre ışıksız yol çizgisinin rengi. */
+  /** Gün döngüsü: gök ışığı (şimdilik yalnız saklanır; ışıksız harita çizgisi kalmadı). */
   setLight(k: number): void {
     this.light = k;
-    if (this.roadFar) (this.roadFar.material as THREE.LineBasicMaterial).color.setHex(ROAD_LINE).multiplyScalar(k);
   }
 
   /**
@@ -265,8 +297,9 @@ export class Scenery {
           ${dense ? 'keep *= step( tDist, treeParams.y );' : ''}
           keep *= 1.0 - smoothstep( treeFade.x, treeFade.y, tDist );
           transformed *= keep;`);
+      leafy(shader);
     };
-    m.customProgramCacheKey = () => (dense ? 'treeDense' : 'treeFar');
+    m.customProgramCacheKey = () => (dense ? 'treeDenseLeaf' : 'treeFarLeaf');
     return m;
   }
 
@@ -350,21 +383,10 @@ export class Scenery {
       ch.trees = [];
       ch.version = -1;
     }
-    for (const m of [this.roadNear, this.roadFar]) {
-      if (!m) continue;
-      this.group.remove(m);
-      m.geometry.dispose();
-    }
+    // Haritanın yolları ve dekor şehirleri 2026-11-13'te kaldırıldı (yerine harekâta özgü süs köyleri: decor.ts)
     this.clearSettlements();
-    const roads = buildRoads();
-    this.roads = roads;
-    this.roadNear = roadRibbon(roads);
-    this.roadFar = roadLines(roads);
-    this.group.add(this.roadNear, this.roadFar);
-    freeze(this.roadNear);
-    freeze(this.roadFar);
     this.setLight(this.light);
-    this.buildSettlements(roads);
+    this.buildSettlements();
     this.settleVersion = clearingsVersion();
   }
 
@@ -389,7 +411,7 @@ export class Scenery {
     this.settleDirtyAt = -1;
     this.settleVersion = ver;
     this.clearSettlements();
-    this.buildSettlements(this.roads);
+    this.buildSettlements();
   }
 
   /** Kameraya göre ağaç/kaya parçalarını üret, göster, gizle; yakın ağaç halkasını kameranın konumuna göre topla. */
@@ -438,10 +460,7 @@ export class Scenery {
       }
     }
     this.gatherNear(cam, show);
-    // Yol şeridi yalnız arazinin tam çözünürlükte olduğu yakın görünümde (uzakta kaba arazinin altında kalıp yanıp sönüyordu)
-    if (this.roadNear) this.roadNear.visible = camDist < 11000;
-    if (this.roadFar) this.roadFar.visible = camDist >= 9000;
-    // Yerleşimler: uzakta piksel altı (şehirler arazide renk olarak görünür); ayrıntılar yalnız yakında
+    // Yerleşimler (çiftlikler): uzakta piksel altı; ayrıntılar yalnız yakında
     this.settle.visible = camDist < 20000;
     const detail = camDist < 9000;
     for (const b of this.settleBlocks) {
@@ -537,14 +556,12 @@ export class Scenery {
 
   // ------------------------------------------------------------------ yerleşimler
 
-  private buildSettlements(roads: THREE.Vector3[][]): void {
+  /** Çiftlikler (ahır, silo, ev, ağaç). Haritanın şehirleri ve yol boyu köyleri 2026-11-13'te kaldırıldı. */
+  private buildSettlements(): void {
     const walls = new BlockedList();
     const roofs = new BlockedList();
-    const caps = new BlockedList();
-    const bands = new BlockedList();
     const silos = new BlockedList();
     const trees = new BlockedList();
-    const streets: THREE.Vector3[][] = [];
     const rng = mulberry32(4242);
     const house = (x: number, z: number, yaw: number, s = 1) => {
       const w = (8 + rng() * 4) * s;
@@ -554,127 +571,12 @@ export class Scenery {
       walls.push(x, y, z, w, h + 0.6, d, yaw, WALLS[Math.floor(rng() * WALLS.length)]);
       roofs.push(x, y + h + 0.6, z, w + 1, 2.6 + rng() * 1.2, d + 1, yaw + (rng() < 0.5 ? 0 : Math.PI / 2), ROOFS[Math.floor(rng() * ROOFS.length)]);
     };
-    const tower = (x: number, z: number, yaw: number, floors: number, w: number, d: number) => {
-      const H = floors * 3.2;
-      const y = groundLevel(x, z) - 0.6;
-      const wall = WALLS[Math.floor(rng() * WALLS.length)];
-      walls.push(x, y, z, w, H + 0.6, d, yaw, wall);
-      caps.push(x, y + H + 0.6, z, w + 0.6, 0.7, d + 0.6, yaw, 0x8a8884);
-      for (let f = 0; f < floors; f++) bands.push(x, y + 0.6 + f * 3.2 + 1.0, z, w + 0.3, 1.3, d - 2, yaw, 0x5d6b78);
-    };
     const tree = (x: number, z: number, s = 1) => {
       const size = (9 + rng() * 6) * s;
       trees.push(x, groundLevel(x, z) - 0.4, z, size, size, size, rng() * 6.28, TREES_B[Math.floor(rng() * TREES_B.length)]);
     };
-    // Ağaç konmayacak yerler: yollar (iki yana 30 m) ve şehirler; köyler ve çiftlikler aşağıda kurulurken eklenir
+    // Ağaç konmayacak yerler: çiftlikler aşağıda kurulurken eklenir
     this.keepOut.clear();
-    for (const road of roads) {
-      for (let i = 1; i < road.length; i++) {
-        const a = road[i - 1];
-        const b = road[i];
-        const n = Math.max(1, Math.ceil(a.distanceTo(b) / 20));
-        for (let k = 0; k <= n; k++) this.keepCircle(a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n, 30);
-      }
-    }
-    for (const c of CITIES) this.keepCircle(c.x, c.z, c.r * 1.25);
-
-    // Dekor şehirleri: sokak ızgarası, merkezde apartman/ofis, çevrede evler, parklar
-    for (const c of CITIES) {
-      const yaw = rng() * Math.PI;
-      const fx = Math.cos(yaw);
-      const fz = Math.sin(yaw);
-      const B = 130;
-      const n = Math.ceil(c.r / B);
-      for (let a = -n; a <= n; a++) {
-        // Ana caddeler
-        if (a % 2 === 0) {
-          for (const dir of [0, 1]) {
-            const pts: THREE.Vector3[] = [];
-            const L = Math.sqrt(Math.max(0, c.r * c.r - (a * B) ** 2)) * 0.95;
-            for (let t = -L; t <= L; t += 90) {
-              const u = dir ? a * B : t;
-              const v = dir ? t : a * B;
-              const x = c.x + fx * u - fz * v;
-              const z = c.z + fz * u + fx * v;
-              pts.push(new THREE.Vector3(x, 0, z));
-            }
-            if (pts.length > 1) streets.push(pts);
-          }
-        }
-        for (let b = -n; b <= n; b++) {
-          const u0 = (a + 0.5) * B;
-          const v0 = (b + 0.5) * B;
-          const dist = Math.hypot(u0, v0);
-          if (dist > c.r * (0.85 + rng() * 0.25)) continue;
-          const cx = c.x + fx * u0 - fz * v0;
-          const cz = c.z + fz * u0 + fx * v0;
-          if (terrainHeight(cx, cz) < 5 || cleared(cx, cz, 80)) continue;
-          const central = 1 - dist / c.r;
-          const r = rng();
-          if (r < 0.07) {
-            for (let i = 0; i < 6; i++) tree(cx + (rng() - 0.5) * 90, cz + (rng() - 0.5) * 90);
-            continue;
-          }
-          if (central > 0.5 && r < 0.85) {
-            // Merkez: 2-4 blok, kat sayısı merkeze doğru artar
-            const k = 2 + Math.floor(rng() * 3);
-            for (let i = 0; i < k; i++) {
-              const ox = (rng() - 0.5) * 70;
-              const oz = (rng() - 0.5) * 70;
-              const floors = Math.round(4 + central * 8 + rng() * 4);
-              tower(cx + fx * ox - fz * oz, cz + fz * ox + fx * oz, -yaw, floors, 14 + rng() * 12, 16 + rng() * 20);
-            }
-          } else {
-            const k = 3 + Math.floor(rng() * 5);
-            for (let i = 0; i < k; i++) {
-              const ox = (rng() - 0.5) * 95;
-              const oz = (rng() - 0.5) * 95;
-              house(cx + fx * ox - fz * oz, cz + fz * ox + fx * oz, -yaw);
-              if (rng() < 0.45) tree(cx + fx * ox - fz * oz + 8, cz + fz * ox + fx * oz + 6, 0.8);
-            }
-          }
-        }
-      }
-    }
-
-    // Köyler: yol boyunca aralıklı, şehirlerden ve üslerden uzak
-    const sites = TEAM_SITES.map((t) => t.site);
-    for (const road of roads) {
-      let acc = 4000 + rng() * 4000;
-      for (let i = 1; i < road.length; i++) {
-        acc -= road[i].distanceTo(road[i - 1]);
-        if (acc > 0) continue;
-        acc = 6500 + rng() * 6000;
-        const p = road[i];
-        const q = road[i - 1];
-        const dx = p.x - q.x;
-        const dz = p.z - q.z;
-        const l = Math.hypot(dx, dz) || 1;
-        const h = terrainHeight(p.x, p.z);
-        if (h < 15 || h > 1300) continue;
-        if (CITIES.some((c) => Math.hypot(c.x - p.x, c.z - p.z) < c.r * 2.4)) continue;
-        if (sites.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 5000)) continue;
-        const side = rng() < 0.5 ? -1 : 1;
-        const cx = p.x - (dz / l) * side * 160;
-        const cz = p.z + (dx / l) * side * 160;
-        const yaw = Math.atan2(dx, dz);
-        this.keepCircle(cx, cz, 230);
-        const n = 6 + Math.floor(rng() * 10);
-        for (let k = 0; k < n; k++) {
-          const a = rng() * Math.PI * 2;
-          const r = 30 + rng() * 170;
-          const x = cx + Math.cos(a) * r;
-          const z = cz + Math.sin(a) * r;
-          if (sampleGrid(slopeGrid, x, z) > 0.3 || terrainHeight(x, z) < 4 || cleared(x, z, 40)) continue;
-          house(x, z, yaw + (rng() < 0.3 ? Math.PI / 2 : 0));
-          if (rng() < 0.6) tree(x + 10, z - 8);
-        }
-        // Köy camisi / kilisesi yerine nötr bir kule: yüksek tek yapı
-        const y = groundLevel(cx, cz) - 0.5;
-        walls.push(cx, y, cz, 7, 18, 7, yaw, 0xe8e2d4);
-        roofs.push(cx, y + 18, cz, 7.6, 6, 7.6, yaw, 0x5a5e66);
-      }
-    }
 
     // Çiftlikler: tarla bölgelerinde ahır + silo + birkaç ağaç
     // Çiftlik denemeleri harita alanıyla orantılı
@@ -683,7 +585,7 @@ export class Scenery {
       const x = (rng() - 0.5) * MAP_SIZE * 0.9;
       const z = (rng() - 0.5) * MAP_SIZE * 0.9;
       if (sampleGrid(fieldGrid, x, z) < 0.45 || rng() > 0.18) continue;
-      if (CITIES.some((c) => Math.hypot(c.x - x, c.z - z) < c.r * 1.3) || cleared(x, z, 300)) continue;
+      if (cleared(x, z, 300)) continue;
       const yaw = rng() * Math.PI;
       const y = groundLevel(x, z) - 0.5;
       this.keepCircle(x, z, 50);
@@ -699,250 +601,21 @@ export class Scenery {
       return m;
     };
     const keys = new Set<number>();
-    for (const l of [walls, roofs, caps, bands, silos, trees]) for (const k of l.blocks.keys()) keys.add(k);
+    for (const l of [walls, roofs, silos, trees]) for (const k of l.blocks.keys()) keys.add(k);
     for (const k of keys) {
       const g = new THREE.Group();
       const mk = (l: BlockedList, geo: THREE.BufferGeometry, mat: THREE.Material) => l.blocks.get(k)?.mesh(geo, mat) ?? null;
       for (const m of [
-        mk(walls, BOX, this.bldMat), mk(roofs, GABLE, this.bldMat), mk(caps, BOX, this.bldMat),
-        near(mk(bands, BOX, this.bldMat)), near(mk(silos, CYL, this.bldMat)), mk(trees, this.treeB, this.vegMat),
+        mk(walls, BOX, this.bldMat), mk(roofs, GABLE, this.bldMat),
+        near(mk(silos, CYL, this.bldMat)), mk(trees, this.treeB, this.treeNearMat),
       ]) if (m) g.add(m);
       this.settle.add(g);
       freeze(g);
       this.settleBlocks.push({ group: g, x0: -HALF + (k % SETTLE_NB) * SETTLE_BLOCK, z0: -HALF + Math.floor(k / SETTLE_NB) * SETTLE_BLOCK });
     }
-    // Şehir sokakları (yakın görünümde şerit)
-    const st = roadRibbon(streets, 9, 0x8a857c);
-    st.userData.near = true;
-    this.settle.add(st);
-    freeze(st);
   }
 }
 
 function disposeGroup(g: THREE.Group): void {
   for (const c of g.children) if (c instanceof THREE.InstancedMesh) c.dispose();
-}
-
-// ---------------------------------------------------------------------- yollar
-
-/** Kaba ızgarada A*: dik yamaç, yükseklik ve su pahalı; yollar geçitlerden kıvrılarak geçer. */
-function buildRoads(): THREE.Vector3[][] {
-  const G = 900;
-  const N = Math.floor(MAP_SIZE / G);
-  const hgt = new Float32Array(N * N);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) hgt[j * N + i] = terrainHeight(-HALF + (i + 0.5) * G, -HALF + (j + 0.5) * G);
-  const idx = (x: number, z: number) => {
-    const i = clamp(Math.floor((x + HALF) / G), 0, N - 1);
-    const j = clamp(Math.floor((z + HALF) / G), 0, N - 1);
-    return j * N + i;
-  };
-  // trim: yol bu yarıçapta biter (üs pistine, fabrika avlusuna girmesin)
-  const nodes = [
-    ...CITIES.map((c) => ({ x: c.x, z: c.z, trim: 0 })),
-    ...TEAM_SITES.map((t) => ({ x: t.site.x, z: t.site.z, trim: 1650 })),
-  ];
-  // Her düğümü en yakın iki komşusuna bağla
-  const pairs = new Set<string>();
-  nodes.forEach((a, ia) => {
-    const near = nodes.map((b, ib) => ({ ib, d: Math.hypot(a.x - b.x, a.z - b.z) })).filter((e) => e.ib !== ia).sort((p, q) => p.d - q.d);
-    for (const e of near.slice(0, ia < CITIES.length ? 3 : 2)) {
-      if (e.d > 90000) continue;
-      pairs.add(ia < e.ib ? `${ia}:${e.ib}` : `${e.ib}:${ia}`);
-    }
-  });
-  const used = new Float32Array(N * N);
-  // Üslerin içinden geçmek pahalı (yollar pistin üstünden geçmesin)
-  const avoid = new Float32Array(N * N).fill(1);
-  for (const n of nodes) {
-    if (!n.trim || n.trim < 1000) continue;
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const d = Math.hypot(-HALF + (i + 0.5) * G - n.x, -HALF + (j + 0.5) * G - n.z);
-        if (d < 2000) avoid[j * N + i] = 10;
-      }
-    }
-  }
-  const out: THREE.Vector3[][] = [];
-  for (const key of pairs) {
-    const [ia, ib] = key.split(':').map(Number);
-    const path = astar(hgt, N, G, idx(nodes[ia].x, nodes[ia].z), idx(nodes[ib].x, nodes[ib].z), used, avoid);
-    if (!path) continue;
-    // Denizi uzun geçen yol yok (adalar arası köprü kurulmaz)
-    let wet = 0;
-    for (const k of path) if (hgt[k] < 1) wet++;
-    if (wet > 3 && wet / path.length > 0.06) continue;
-    for (const k of path) used[k] = 1;
-    let pts = path.map((k) => new THREE.Vector3(-HALF + ((k % N) + 0.5) * G, 0, -HALF + (Math.floor(k / N) + 0.5) * G));
-    pts[0].set(nodes[ia].x, 0, nodes[ia].z);
-    pts[pts.length - 1].set(nodes[ib].x, 0, nodes[ib].z);
-    for (let it = 0; it < 3; it++) pts = chaikin(pts);
-    const a = nodes[ia];
-    const b = nodes[ib];
-    const road = resample(pts, 110).filter((p) => Math.hypot(p.x - a.x, p.z - a.z) >= a.trim && Math.hypot(p.x - b.x, p.z - b.z) >= b.trim);
-    if (road.length > 1) out.push(road);
-  }
-  return out;
-}
-
-function astar(hgt: Float32Array, N: number, G: number, start: number, goal: number, used: Float32Array, avoid: Float32Array): number[] | null {
-  const cost = new Float32Array(N * N).fill(Infinity);
-  const from = new Int32Array(N * N).fill(-1);
-  const heap: [number, number][] = [];
-  const push = (k: number, f: number) => {
-    heap.push([f, k]);
-    let i = heap.length - 1;
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (heap[p][0] <= heap[i][0]) break;
-      [heap[p], heap[i]] = [heap[i], heap[p]];
-      i = p;
-    }
-  };
-  const pop = () => {
-    const top = heap[0];
-    const last = heap.pop()!;
-    if (heap.length) {
-      heap[0] = last;
-      let i = 0;
-      for (;;) {
-        const l = i * 2 + 1;
-        const r = l + 1;
-        let m = i;
-        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
-        if (m === i) break;
-        [heap[m], heap[i]] = [heap[i], heap[m]];
-        i = m;
-      }
-    }
-    return top;
-  };
-  const gx = goal % N;
-  const gz = Math.floor(goal / N);
-  cost[start] = 0;
-  push(start, 0);
-  while (heap.length) {
-    const [, k] = pop();
-    if (k === goal) break;
-    const x = k % N;
-    const z = Math.floor(k / N);
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dz) continue;
-        const nx = x + dx;
-        const nz = z + dz;
-        if (nx < 3 || nz < 3 || nx >= N - 3 || nz >= N - 3) continue;
-        const nk = nz * N + nx;
-        const h0 = hgt[k];
-        const h1 = hgt[nk];
-        const len = Math.hypot(dx, dz) * G;
-        const grade = Math.abs(h1 - h0) / len;
-        let c = len * (1 + grade * grade * 900 + Math.max(0, h1 - 600) / 500);
-        if (h1 < 2) c *= 6;
-        c *= avoid[nk];
-        // Var olan yolu paylaşmak ucuz (ağ birleşsin)
-        if (used[nk]) c *= 0.55;
-        const nc = cost[k] + c;
-        if (nc < cost[nk]) {
-          cost[nk] = nc;
-          from[nk] = k;
-          push(nk, nc + Math.hypot(nx - gx, nz - gz) * G);
-        }
-      }
-    }
-  }
-  if (from[goal] < 0 && goal !== start) return null;
-  const path: number[] = [];
-  for (let k = goal; k >= 0; k = from[k]) {
-    path.push(k);
-    if (k === start) break;
-  }
-  return path.reverse();
-}
-
-function chaikin(pts: THREE.Vector3[]): THREE.Vector3[] {
-  if (pts.length < 3) return pts;
-  const out = [pts[0]];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
-    out.push(a.clone().lerp(b, 0.25), a.clone().lerp(b, 0.75));
-  }
-  out.push(pts[pts.length - 1]);
-  return out;
-}
-
-function resample(pts: THREE.Vector3[], step: number): THREE.Vector3[] {
-  const out: THREE.Vector3[] = [pts[0].clone()];
-  let carry = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1];
-    const b = pts[i];
-    const L = a.distanceTo(b);
-    let t = step - carry;
-    while (t < L) {
-      out.push(a.clone().lerp(b, t / L));
-      t += step;
-    }
-    carry = L - (t - step);
-  }
-  out.push(pts[pts.length - 1].clone());
-  return out;
-}
-
-/** Araziye oturan yol şeridi (köprüler deniz/nehir üstünde düz geçer). */
-function roadRibbon(roads: THREE.Vector3[][], width = 11, color = 0x9a9284): THREE.Mesh {
-  const pos: number[] = [];
-  const idx: number[] = [];
-  for (const r of roads) {
-    if (r.length < 2) continue;
-    const base = pos.length / 3;
-    for (let i = 0; i < r.length; i++) {
-      const a = r[Math.max(0, i - 1)];
-      const b = r[Math.min(r.length - 1, i + 1)];
-      let dx = b.x - a.x;
-      let dz = b.z - a.z;
-      const l = Math.hypot(dx, dz) || 1;
-      dx /= l;
-      dz /= l;
-      const nx = -dz * width * 0.5;
-      const nz = dx * width * 0.5;
-      for (const s of [-1, 1]) {
-        const x = r[i].x + nx * s;
-        const z = r[i].z + nz * s;
-        const h = terrainHeight(x, z);
-        pos.push(x, h < 1 ? 4 : groundLevel(x, z) + 1.6, z);
-      }
-    }
-    for (let i = 0; i < r.length - 1; i++) {
-      const v = base + i * 2;
-      idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  g.computeBoundingSphere();
-  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
-}
-
-const ROAD_LINE = 0xcdbfa6;
-
-/** Uzak görünümde ince çizgi yollar (harita görünümü). */
-function roadLines(roads: THREE.Vector3[][]): THREE.LineSegments {
-  const pos: number[] = [];
-  for (const r of roads) {
-    for (let i = 0; i < r.length - 1; i += 2) {
-      const a = r[i];
-      const b = r[Math.min(i + 2, r.length - 1)];
-      pos.push(a.x, groundLevel(a.x, a.z) + 30, a.z, b.x, groundLevel(b.x, b.z) + 30, b.z);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  // Harita çizgisi: derinlik sınaması yok (kaba arazi düzeyinin altında kalıp kesik kesik görünmesin)
-  const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: ROAD_LINE, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }));
-  l.renderOrder = 1;
-  return l;
 }

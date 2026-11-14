@@ -85,17 +85,19 @@ export function missionReward(world: World, plan: MissionPlan, stats: Pick<Missi
     case 'diveBomb':
     case 'attack': {
       const s = plan.targetStructureId !== null ? world.structureById(plan.targetStructureId) : undefined;
-      const base = 600 + 0.15 * (s ? STRUCTURE_COST[s.kind] : 3000);
+      // Sabit kısımlar 2026-11-11'de ×2 (yapılar ×3 olunca avcı görevleri parasal olarak anlamsızlaşıyordu); hedefsiz
+      // taarruzda varsayılan hedef değeri 3.000 → 9.000 (yapılar ×3)
+      const base = 1200 + 0.15 * (s ? STRUCTURE_COST[s.kind] : 9000);
       return r50(base * (destroyed ? 1.5 : 1));
     }
     case 'intercept':
-      return r50(400 + 0.05 * stats.targetFlightValue);
+      return r50(800 + 0.05 * stats.targetFlightValue);
     case 'escort':
-      return r50(500 + 0.03 * escortedValue);
+      return r50(1000 + 0.03 * escortedValue);
     case 'cap':
-      return r50(400 + 0.08 * stats.killValue);
+      return r50(800 + 0.08 * stats.killValue);
     case 'sweep':
-      return r50(300 + 0.1 * stats.killValue);
+      return r50(600 + 0.1 * stats.killValue);
     default:
       return 0;
   }
@@ -373,8 +375,8 @@ export function missionOdds(
   } else if (plan.type === 'escort') {
     const f = plan.targetFlightId !== null ? world.flightById(plan.targetFlightId) : undefined;
     rewardText = fmtMoney(missionReward(world, plan, { killValue: 0, targetFlightValue: 0 }, f ? flightValue(f) : 0));
-  } else if (plan.type === 'cap') rewardText = L(`${fmtMoney(400)} + düşürülenlerin değerinin %8'i`, `${fmtMoney(400)} + 8% of the value of kills`);
-  else if (plan.type === 'sweep') rewardText = L(`${fmtMoney(300)} + düşürülenlerin değerinin %10'u`, `${fmtMoney(300)} + 10% of the value of kills`);
-  else rewardText = 'yok (intikal)';
+  } else if (plan.type === 'cap') rewardText = L(`${fmtMoney(800)} + düşürülenlerin değerinin %8'i`, `${fmtMoney(800)} + 8% of the value of kills`);
+  else if (plan.type === 'sweep') rewardText = L(`${fmtMoney(600)} + düşürülenlerin değerinin %10'u`, `${fmtMoney(600)} + 10% of the value of kills`);
+  else rewardText = L('yok (intikal)', 'none (ferry)');
   return { pct, factors, missing: missing.sort((a, b) => b.delta - a.delta), criterion, rewardText };
 }

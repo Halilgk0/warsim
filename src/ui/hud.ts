@@ -62,6 +62,7 @@ export class Hud {
       if (what === 'hangar') game.hangar.toggle();
       else if (what === 'fullscreen') toggleFullscreen();
       else if (what === 'sound') sound.toggleMute();
+      else if (what === 'home') game.goHome();
       else if (what === 'build') game.build.toggle();
       else if (what === 'production') game.modals.toggleFactory();
       else if (what === 'pause') game.pause.open();
@@ -77,7 +78,8 @@ export class Hud {
       const act = (e.target as HTMLElement).closest<HTMLElement>('[data-hint]')?.dataset.hint;
       if (act === 'rotate') game.rotateBuild();
       else if (act === 'place') game.placeBuild();
-      else if (act === 'cancel') game.cancelInteraction();
+      else if (act === 'grid') game.toggleGrid();
+      else if (act === 'cancel') game.cancelStep();
     });
     this.moneyChip.addEventListener('click', () => game.modals.open('market'));
     this.info.addEventListener('click', (e) => {
@@ -175,7 +177,7 @@ export class Hud {
     this.renderMoney();
   }
 
-  /** Hazine: kasa, son bir dakikanın geliri, maden üretimi. */
+  /** Hazine: kasa, son bir dakikanın geliri, maden ve ev geliri. */
   private renderMoney(): void {
     const w = this.game.world;
     this.moneyChip.classList.toggle('hidden', !w.economyEnabled);
@@ -184,7 +186,7 @@ export class Hud {
     const t = w.teams[me];
     const rate = w.incomeRate(me);
     this.moneyChip.innerHTML = `<div class="mc-top"><span class="mc-coin">◈</span><b>${fmtMoney(t.money)}</b></div>
-      <div class="mc-sub"><span class="pos">+${fmtMoney(rate)}/${L('dk', 'min')}</span><span class="muted-ink">${L('maden', 'mines')} ${fmtMoney(w.mineRate(me))}/${L('dk', 'min')}</span></div>`;
+      <div class="mc-sub"><span class="pos">+${fmtMoney(rate)}/${L('dk', 'min')}</span><span class="muted-ink">${L('maden', 'mines')} ${fmtMoney(w.mineRate(me))} · ${L('ev', 'homes')} ${fmtMoney(w.houseRate(me))}</span></div>`;
   }
 
   private renderResearch(): void {
@@ -202,7 +204,7 @@ export class Hud {
     const w = this.game.world;
     const p = w.teams[this.game.playerTeam].personnel;
     const crew = w.personnelEnabled
-      ? `<div class="rc-line" title="${L('Evler personel barındırır (1 ev = 4 kişi). Uçaklar mürettebatı kadar kişiyle kalkar.', 'Houses hold personnel (1 house = 4 people). An aircraft takes off only with its full crew.')}"><span class="muted-ink">${L('Personel', 'Personnel')}</span><span class="${w.crewFree(this.game.playerTeam) <= 0 ? 'bad' : ''}">${w.crewFree(this.game.playerTeam)} ${L('boşta', 'free')} · ${p.people}/${p.capacity}</span></div>`
+      ? `<div class="rc-line" title="${L('Evler personel barındırır (boyuna göre 2–4 kişi). Her uçak 1 bakım personeli ister (üretimde ayrılır); uçaklar ayrıca mürettebatı kadar kişiyle kalkar.', 'Houses hold personnel (2–4 people by size). Every aircraft needs 1 ground crew (assigned when built) and takes off only with its full flight crew on top.')}"><span class="muted-ink">${L('Personel', 'Personnel')}</span><span class="${w.crewFree(this.game.playerTeam) <= 0 ? 'bad' : ''}">${w.crewFree(this.game.playerTeam)} ${L('boşta', 'free')} · ${p.people}/${p.capacity}</span></div>`
       : '';
     this.researchChip.innerHTML = `${line('tech', L('Teknoloji', 'Technology'))}${line('vehicle', L('Araç', 'Aircraft'))}${line('defense', L('Savunma', 'Defence'))}
       <div class="rc-line"><span class="muted-ink">${L('Savaş puanı', 'War points')}</span><span class="${r.boosting ? 'rc-boost' : ''}">${nf.format(r.points)}${r.boosting ? ' · ×2' : ''}</span></div>${crew}`;
@@ -392,7 +394,16 @@ export class Hud {
       const msg = it.ok
         ? (touch ? L('Uygun yer', 'Good spot') : L('Uygun yer — tıkla ve inşa et', 'Good spot — click to build'))
         : it.reason ?? (touch ? L('Yer seçmek için haritaya dokun', 'Tap the map to choose a spot') : L('Yer seç', 'Choose a spot'));
-      html = `<span>${esc(msg)}${touch ? '' : L(' · R: döndür · Sağ tık / Esc: iptal', ' · R: rotate · Right click / Esc: cancel')}</span>${btn('rotate', L('↻ Döndür', '↻ Rotate'))}${btn('place', L('✓ Yerleştir', '✓ Place'), it.ok)}${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
+      const grid = `<button data-hint="grid" class="${this.game.buildGrid ? 'on' : ''}" title="${L('Izgara: açıkken yapı ızgarada gezer, kapalıyken serbest (X)', 'Grid: on, the building moves on the grid; off, it moves freely (X)')}">▦ ${L('Izgara', 'Grid')}</button>`;
+      html = `<span>${esc(msg)}${touch ? '' : L(' · R: döndür · X: ızgara · Sağ tık / Esc: iptal', ' · R: rotate · X: grid · Right click / Esc: cancel')}</span>${btn('rotate', L('↻ Döndür', '↻ Rotate'))}${grid}${btn('place', L('✓ Yerleştir', '✓ Place'), it.ok)}${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
+    } else if (it.mode === 'road') {
+      const grid = `<button data-hint="grid" class="${this.game.buildGrid ? 'on' : ''}" title="${L('Izgara: açıkken yol ızgara noktalarına oturur (X)', 'Grid: on, the road snaps to grid points (X)')}">▦ ${L('Izgara', 'Grid')}</button>`;
+      const where = touch ? L('dokun', 'tap') : L('tıkla', 'click');
+      const msg = !it.start
+        ? (it.ok ? L(`Yol buradan başlar — ${touch ? '“Başlat”a dokun' : 'tıkla'}`, `The road starts here — ${touch ? 'tap “Start”' : 'click'}`) : it.reason ?? L(`Yolun başlayacağı yere ${where} (mevcut bir yolun üstü)`, `${touch ? 'Tap' : 'Click'} where the road starts (on an existing road)`))
+        : it.ok ? `${Math.round(it.length)} m · ${fmtMoney(it.cost)}${touch ? '' : L(' — tıkla ve kur', ' — click to build')}`
+          : it.length < 1 ? L(`Yolun biteceği yere ${where}`, `${touch ? 'Tap' : 'Click'} where the road ends`) : `${it.reason ?? ''}${it.length >= 1 ? ` (${Math.round(it.length)} m)` : ''}`;
+      html = `<span>${esc(msg)}${touch ? '' : L(' · X: ızgara · Sağ tık / Esc: geri', ' · X: grid · Right click / Esc: back')}</span>${grid}${btn('place', it.start ? L('✓ Yolu kur', '✓ Build road') : L('✓ Başlat', '✓ Start'), it.ok)}${btn('cancel', it.start ? L('↩ Baştan', '↩ Restart') : L('✕ Bitir', '✕ Done'))}`;
     } else if (it.mode === 'pickTarget') {
       const pick = this.game.planner.pickHint();
       html = `<span>${esc(touch ? pick.replace(/tıkla/g, 'dokun').replace(/\bclick/g, 'tap').replace(/\bClick/g, 'Tap') : pick)}${touch ? '' : L(' · Sağ tık / Esc: iptal', ' · Right click / Esc: cancel')}</span>${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
@@ -404,8 +415,8 @@ export class Hud {
       html = touch
         ? `<span>${L('Dokun: seç · Sürükle: kaydır · İki parmak: yakınlaş, çevir, eğ · Çift dokun: takip', 'Tap: select · Drag: pan · Two fingers: zoom, rotate, tilt · Double tap: follow')}</span>`
         : `<span>${L(
-          'Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · Tab: sıradaki · Boşluk: duraklat · 1-3: hız · T: araştırma',
-          'Click: select · Drag: pan · Right drag: rotate · Wheel: zoom · F: follow · Tab: next · Space: pause · 1-3: speed · T: research',
+          'Tık: seç · Sürükle: kaydır · Sağ sürükle: döndür · Tekerlek: yakınlaş · F: takip · G: üsse dön · Tab: sıradaki · Boşluk: duraklat · 1-3: hız · T: araştırma',
+          'Click: select · Drag: pan · Right drag: rotate · Wheel: zoom · F: follow · G: back to base · Tab: next · Space: pause · 1-3: speed · T: research',
         )}</span>`;
     }
     // Her karede yeniden yazılırsa düğmeye dokunuş kaçıyor
@@ -413,7 +424,7 @@ export class Hud {
     this.lastHint = html;
     this.hint.innerHTML = html;
     this.hint.classList.toggle('pick', it.mode !== 'none');
-    this.hint.classList.toggle('bad', it.mode === 'build' && !it.ok);
+    this.hint.classList.toggle('bad', (it.mode === 'build' || it.mode === 'road') && !it.ok && (it.mode === 'build' || !!it.reason));
   }
 }
 

@@ -4,6 +4,7 @@
 //   node record.mjs stuka_dive [başka_çekim …]   tam kalite (1080×1920)
 //   node record.mjs --preview stuka_dive          hızlı deneme (540×960) ve kontrol için kare tablosu
 //   node record.mjs --list                        çekimler
+//   node record.mjs --size=1920x1080 --dir=masa çekim   yatay (görüş açısı kendiliğinden daralır)
 //
 // Çıktı: out/<çekim>.mp4 (görüntü + ses), out/<çekim>.wav, denemede out/<çekim>.sheet.jpg
 
@@ -26,6 +27,9 @@ const preview = args.includes('--preview');
 const list = args.includes('--list');
 const scaleArg = args.find((a) => a.startsWith('--scale='));
 const scale = preview ? 0.5 : Number(scaleArg?.slice(8) ?? 1);
+// --size=1920x1080: yatay ya da başka boyut (varsayılan dikey 1080×1920). Yatayda kayıt kipi görüş açısını daraltır.
+const sizeArg = args.find((a) => a.startsWith('--size='));
+const [VW, VH] = sizeArg ? sizeArg.slice(7).split('x').map(Number) : [1080, 1920];
 const ids = args.filter((a) => !a.startsWith('--'));
 
 function run(cmd, argv, opts = {}) {
@@ -65,7 +69,7 @@ async function main() {
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
   });
   try {
-    const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: scale });
+    const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: scale });
     page.on('console', (m) => {
       if (m.type() === 'error' || m.type() === 'warning') console.log(`[sayfa ${m.type()}] ${m.text()}`);
     });

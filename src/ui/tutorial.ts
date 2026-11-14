@@ -10,7 +10,7 @@ import type { Game } from '../game';
 import type { Airbase } from '../sim/structures/airbase';
 import { SPECS } from '../sim/aircraft/specs';
 import { currentAccount, setTutorialPromptOff, tutorialPromptOff } from '../persist';
-import { L } from '../i18n';
+import { L, LOCALE as LANG_LOCALE } from '../i18n';
 import { $, esc } from './dom';
 
 type Chapter = 'menu' | 'map' | 'mission' | 'grow' | 'war';
@@ -83,6 +83,7 @@ const TOPIC_ICON: Record<string, string> = {
   mission: '<path d="M12 2.5v19M4 12.5l8-3 8 3M8.5 20.5 12 19l3.5 1.5"/><path d="M12 2.5c1 1 1.4 2.4 1.4 4"/>',
   money: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5M5 11.5v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5"/>',
   town: '<path d="M2.5 20.5h19M4 20.5V11l4.5-4 4.5 4v9.5M13 20.5v-7l4-3.5 4 3.5v7"/><path d="M7 20.5v-4h3v4"/>',
+  fire: '<path d="M2.5 16.5V10h9l2 3h6v3.5"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/><path d="M4 10 15 4.5M6.5 9l1-2.5M10 7.5l1-2.5"/>',
   factory: '<path d="M2.5 20.5V10l5 3V10l5 3V10l5 3V4h4v16.5z"/><path d="M6 17h2.5M11 17h2.5"/>',
   research: '<path d="M9.5 3h5M10.5 3v6L5 19a1.3 1.3 0 0 0 1.2 2h11.6a1.3 1.3 0 0 0 1.2-2l-5.5-10V3"/><path d="M7.5 15h9"/>',
   war: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5"/>',
@@ -102,6 +103,7 @@ const TOPICS: Topic[] = [
     steps: [
       ['welcome', () => L('Harita ve ülken', 'The map and your nation')],
       ['camera', () => L('Kamerayı kaydırma, yakınlaştırma, döndürme', 'Panning, zooming and rotating')],
+      ['home', () => L('Üsse dönme', 'Back to base')],
       ['time', () => L('Oyun hızı ve süre', 'Game speed and play time')],
       ['mapSpeed', () => L('Hızlandırma', 'Speeding up')],
       ['mapPause', () => L('Duraklatma', 'Pausing')],
@@ -126,26 +128,44 @@ const TOPICS: Topic[] = [
     id: 'money', title: () => L('Para ve hazine', 'Money and treasury'), icon: 'money',
     steps: [
       ['money', () => L('Hazine', 'Treasury')],
-      ['treasury', () => L('Gelirler ve madenler', 'Income and mines')],
+      ['treasury', () => L('Gelirler: maden, kira, görev, düşürme', 'Income: mines, rent, missions, kills')],
+      ['mkMines', () => L('Madenlerin listesi', 'Your mines')],
+      ['mkHero', () => L('Bir madenin hazinesi', 'A mine\'s treasury')],
       ['mineMap', () => L('Haritada madene gitme', 'Finding the mine on the map')],
       ['minePanel', () => L('Maden paneli ve hazineye giriş', 'Mine panel and treasury')],
-      ['moneyEnd', () => L('Hazineye iki giriş', 'Two ways into the treasury')],
+      ['townMap', () => L('Belediye binası', 'Town hall')],
+      ['townPanel', () => L('Belediye paneli', 'Town hall panel')],
+      ['townSum', () => L('Belediye ekranı: özet', 'Town hall screen: summary')],
+      ['townCrew', () => L('Personel dökümü', 'Personnel breakdown')],
+      ['townLedger', () => L('Gelir ve gider defteri', 'Income and spending ledger')],
+      ['moneyEnd', () => L('Hazineye üç giriş', 'Three ways into the treasury')],
     ],
   },
   {
-    id: 'build', title: () => L('İnşa ve personel', 'Building and personnel'), icon: 'town',
+    id: 'town', title: () => L('İnşa, kasaba ve yollar', 'Building, town and roads'), icon: 'town',
     steps: [
-      ['build', () => L('Neler kurulur', 'What you can build')],
       ['bOpen', () => L('İnşa menüsünü açma', 'Opening the Build menu')],
       ['bCity', () => L('Şehir sekmesi', 'City tab')],
-      ['bHomes', () => L('Ev, apartman ve personel', 'Houses, apartments and personnel')],
+      ['bHomes', () => L('Ev çeşitleri ve personel', 'Home types and personnel')],
+      ['bRoad', () => L('Yol çizme', 'Drawing roads')],
+      ['bPark', () => L('Park ve ızgara', 'Parks and the grid')],
+      ['town', () => L('Belediye ve kasaba', 'Town hall and town')],
     ],
   },
   {
-    id: 'factory', title: () => L('Üretim ve uçaksavar', 'Production and anti-aircraft guns'), icon: 'factory',
+    id: 'fire', title: () => L('İtfaiye', 'Fire brigade'), icon: 'fire',
+    steps: [
+      ['fire', () => L('İtfaiye nedir', 'What the fire brigade does')],
+      ['fireCard', () => L('Merkezin kartı ve alanı', 'Station card and area')],
+      ['fireMap', () => L('Haritada merkezine gitme', 'Finding your station')],
+      ['firePanel', () => L('Ekipler, yükseltme, yol bağlantısı', 'Crews, upgrades, road links')],
+    ],
+  },
+  {
+    id: 'factory', title: () => L('Üretim ve bakım personeli', 'Production and ground crew'), icon: 'factory',
     steps: [
       ['prod', () => L('Üretim menüsü', 'Production menu')],
-      ['prodRow', () => L('Uçak üretimi', 'Building aircraft')],
+      ['prodRow', () => L('Uçak üretimi ve bakım personeli', 'Building aircraft and ground crew')],
       ['prodQty', () => L('Toplu üretim', 'Batch production')],
       ['prodBuild', () => L('Üret düğmesi, iptal', 'Build button, cancelling')],
       ['prodRepeat', () => L('Bitince tekrarla', 'Repeat when done')],
@@ -214,6 +234,8 @@ export class Tutorial {
   private flightId = -1;
   /** Araştırma adımı başlarken seçili program. */
   private selAt: string | null = null;
+  /** "Üsse dön" adımı başlarken düğmenin kullanım sayısı. */
+  private homeAt = 0;
   private flightMax = -1;
 
   constructor(private readonly game: Game) {
@@ -240,7 +262,7 @@ export class Tutorial {
         'Pick a topic: that part is shown inside this campaign, then the game carries on where it was.',
       )}</p></div><button class="tt-x" data-tt="close" aria-label="${L('Kapat', 'Close')}">✕</button></div>
       <div class="tt-prog"><span></span><i><b></b></i></div>
-      <label class="tt-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg><input type="search" name="tt-q" autocomplete="off" placeholder="${L('Ara: maden, radar, kalkış…', 'Search: mine, radar, take-off…')}" aria-label="${L('Konularda ara', 'Search topics')}"></label>
+      <label class="tt-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg><input type="search" name="tt-q" autocomplete="off" placeholder="${L('Ara: itfaiye, radar, kalkış…', 'Search: fire, radar, take-off…')}" aria-label="${L('Konularda ara', 'Search topics')}"></label>
       <div class="tt-list"></div>
     </div>`;
     this.topicsEl.addEventListener('click', (e) => this.onTopics(e));
@@ -809,6 +831,18 @@ export class Tutorial {
           : L('Sürükle: kaydır · tekerlek: yakınlaş · sağ tıkla sürükle: döndür. Bir dene.', 'Drag: pan · wheel: zoom · right-drag: rotate. Give it a try.')),
       },
       {
+        id: 'home', ch: 'map',
+        enter: () => {
+          this.homeAt = g.homeCount;
+        },
+        target: () => visible('.top-actions .home-btn'),
+        done: () => g.homeCount > this.homeAt,
+        text: () => L(
+          `Haritada kaybolursan ev düğmesine ${tap()}: kamera nerede olursa olsun üssüne döner${TOUCH ? '' : ' (klavyede G)'}. Şimdi dene.`,
+          `If you get lost on the map, ${tap()} the house button: the camera goes back to your base wherever it is${TOUCH ? '' : ' (G on the keyboard)'}. Try it now.`,
+        ),
+      },
+      {
         id: 'time', ch: 'map',
         target: () => visible('#timebar'),
         text: () => L(
@@ -961,10 +995,30 @@ export class Tutorial {
         enter: () => {
           if (g.modals.openKind !== 'market') g.modals.open('market');
         },
-        target: () => visible('.modal-card.market .mk-sum'),
+        target: () => visible('.modal-card.market .tw-sum'),
         text: () => L(
-          'Gelir madenlerden, düşürülen düşman uçaklarından, yıkılan düşman yapılarından ve pazardaki satışlardan gelir. Bu pencerede hazine, son dakikanın geliri, her madenin damarı, üretimi ve sağlamlığı, altta da pazardaki uçak teklifleri var.',
-          'Income comes from mines, enemy aircraft shot down, enemy buildings destroyed and market sales. This window shows the treasury, last minute\'s income, each mine\'s vein, output and condition, and below that the aircraft offers on the market.',
+          'Gelir madenlerden, evlerin kirasından, görev ödüllerinden, düşürülen düşman uçaklarından ve yıkılan düşman yapılarından gelir. Madenlerin üretimi, evlerin kirası ve son hareketler bu pencerede.',
+          'Income comes from mines, rent from your houses, mission rewards, enemy aircraft shot down and enemy buildings destroyed. Mine output, rent and recent transactions are in this window.',
+        ),
+      },
+      {
+        id: 'mkMines', ch: 'grow', deep: true,
+        enter: () => {
+          if (g.modals.openKind !== 'market') g.modals.open('market');
+        },
+        target: () => visible('.modal-card.market .tr-mine'),
+        done: () => !!visible('.modal-card.market .tr-hero'),
+        text: () => L(
+          `Madenlerin: en çok getiren üçü ve en son kurulan. Her kartta damarın zenginliği, dakikalık üretim ve toplam kazanç var. Bir madene ${tap()}: kamera ona gider, pencere o madenin hazinesine geçer.`,
+          `Your mines: the three best earners and the newest. Each card shows the vein's richness, output per minute and total earned. ${Tap()} a mine: the camera flies to it and the window switches to that mine's treasury.`,
+        ),
+      },
+      {
+        id: 'mkHero', ch: 'grow', deep: true,
+        target: () => visible('.modal-card.market .tr-hero'),
+        text: () => L(
+          'Bu madenin hazinesi: damar, üretim, kazanç, kendini kaç dakikada ödediği ve sağlamlığı. Hasarlı maden az üretir. "‹ Bütün madenler" listeye döner.',
+          'This mine\'s treasury: vein, output, earnings, how long it takes to pay for itself and its condition. A damaged mine produces less. "‹ All mines" goes back to the list.',
         ),
       },
       {
@@ -983,17 +1037,64 @@ export class Tutorial {
         id: 'minePanel', ch: 'grow', deep: true,
         enter: () => g.layout.reveal('left'),
         target: () => visible('#left [data-act="market"]'),
+        done: () => g.modals.openKind === 'market' && !!visible('.modal-card.market .tr-hero'),
+        text: () => L(
+          `Sol panelde madenin damarı, üretimi ve geri ödeme süresi var. Buradaki "Hazine ›"ye ${tap()}: doğrudan bu madenin hazinesi açılır.`,
+          `The left panel shows the mine's vein, output and payback time. ${Tap()} "Treasury ›" here: this mine's treasury opens directly.`,
+        ),
+      },
+      {
+        id: 'townMap', ch: 'grow', deep: true,
+        enter: () => this.flyToOwn('townhall', 520),
+        target: () => {
+          const h = this.own('townhall');
+          return h ? this.worldRect(h.pos, 40) : null;
+        },
+        done: () => !this.own('townhall') || g.selectedStructureId === this.own('townhall')?.id,
+        text: () => this.own('townhall')
+          ? L(`Şehrin hesabı belediyede. Bu senin belediye binan: üstüne ${tap()}.`, `The town's accounts are at the town hall. This is your town hall: ${tap()} it.`)
+          : L('Belediye binan yıkılmış; kasabanın hesabı yine üst çubuktaki hazineden görünür.', 'Your town hall is destroyed; the accounts are still in the treasury on the top bar.'),
+      },
+      {
+        id: 'townPanel', ch: 'grow', deep: true,
+        enter: () => g.layout.reveal('left'),
+        target: () => visible('#left [data-act="town"]'),
+        done: () => g.modals.openKind === 'town',
+        text: () => L(
+          `Belediyenin panelinde kasabanın özeti ve iki giriş var: "Hazine ›" ve "Belediye ekranı ›". "Belediye ekranı"na ${tap()}.`,
+          `The town hall panel sums up your town and has two ways in: "Treasury ›" and "Town hall screen ›". ${Tap()} "Town hall screen".`,
+        ),
+      },
+      {
+        id: 'townSum', ch: 'grow', deep: true,
+        target: () => visible('.modal-card.town .tw-sum'),
+        text: () => L(
+          'Belediye ekranı şehrin defteri. Üstte nüfus ve boştaki kişi, konut, park ve yol, dakikalık kira ve maden geliri, hazine.',
+          'The town hall screen is the town\'s ledger. At the top: population and free people, homes, parks and roads, rent and mine income per minute, treasury.',
+        ),
+      },
+      {
+        id: 'townCrew', ch: 'grow', deep: true,
+        target: () => visible('.modal-card.town table.tw-flow'),
+        text: () => L(
+          'Personel: konuttaki kişiler nerede çalışıyor. Uçuşta olanlar kalkan uçakların mürettebatı, bakımdakiler her uçağın bakımcısı, itfaiyedekiler ekipler. Boşta kimse yoksa uçak kalkmaz ve üretilmez: "Ev kur ›".',
+          'Personnel: where your people work. Flying are the crews of aircraft in the air, ground crew look after every aircraft, the fire brigade has its crews. With nobody free, aircraft neither take off nor get built: "Build homes ›".',
+        ),
+      },
+      {
+        id: 'townLedger', ch: 'grow', deep: true,
+        target: () => visible('.modal-card.town [data-act="town-treasury"]'),
         done: () => g.modals.openKind === 'market',
         text: () => L(
-          `Sol panelde madenin damarı, üretimi, toplam kazancı ve geri ödeme süresi var. Buradaki "Hazine ve pazar ›"a ${tap()}: hazine açılır.`,
-          `The left panel shows the mine's vein, output, total earnings and payback time. ${Tap()} "Treasury and market ›" here: the treasury opens.`,
+          `Altında kalem kalem gelirler ve giderler, sağda süren araştırma, üretim ve inşaatlar. Hazineye buradan da geçilir: "Hazine ve madenler ›"e ${tap()}.`,
+          `Below: income and spending item by item; on the right, research, production and construction under way. You can reach the treasury from here too: ${tap()} "Treasury and mines ›".`,
         ),
       },
       {
         id: 'moneyEnd', ch: 'grow', deep: true,
         text: () => L(
-          'Hazineye iki yoldan girersin: üst çubuktaki para ve maden ocağının paneli. Gelirin çoğu madenlerden gelir; yeni maden İnşa → Ekonomi\'de.',
-          'There are two ways into the treasury: the money on the top bar and a mine\'s panel. Most income comes from mines; new mines are in Build → Economy.',
+          'Hazineye üç yoldan girersin: üst çubuktaki para, maden ocağının paneli ve belediye ekranı. Gelirin çoğu madenlerden gelir; yeni maden İnşa → Ekonomi\'de.',
+          'There are three ways into the treasury: the money on the top bar, a mine\'s panel and the town hall screen. Most income comes from mines; new mines are in Build → Economy.',
         ),
       },
       {
@@ -1001,8 +1102,16 @@ export class Tutorial {
         enter: () => g.modals.close(),
         target: () => visible('.top-actions [data-open="build"]'),
         text: () => L(
-          'İnşa: maden, ev, uçaksavar, radar ve yeni üs kur. Uçaklar ancak yeterli personelle kalkar; her ev 4 kişi barındırır.',
-          'Build: mines, houses, flak, radar and new bases. Aircraft take off only with enough personnel; each house holds 4 people.',
+          'İnşa: maden, ev, park, yol, uçaksavar, radar ve yeni üs kur. Her uçak 1 bakım personeli ister (üretimde ayrılır) ve ancak yeterli mürettebatla kalkar; evler boyuna göre 2, 3 ya da 4 kişi barındırır ve kira getirir, yanındaki park kirayı artırır. Yerleştirirken bina yeşil görünüyorsa kurulabilir, kırmızıysa kurulamaz.',
+          'Build: mines, houses, parks, roads, flak, radar and new bases. Every aircraft needs 1 ground crew (assigned when built) and takes off only with enough flight crew; a house holds 2, 3 or 4 people by size and pays rent, and a park nearby raises the rent. While placing, a green building can be built there, a red one cannot.',
+        ),
+      },
+      {
+        id: 'town', ch: 'grow',
+        target: () => visible('.top-actions [data-open="build"]'),
+        text: () => L(
+          'Kasaban belediye binasıyla başlar; önünden ana cadde çıkar. Evler ancak yolların yanına kurulur: İnşa → Şehir → Yol ile caddeden yeni sokaklar çiz. Yerleştirirken ızgara binayı hizalar ve yola dizer; alttaki Izgara düğmesi serbest yerleşime geçirir. Belediye binasını seçip Belediye ekranını açarsan şehrin gelir ve giderlerini, personelin nerede çalıştığını (uçuşta, bakımda, itfaiyede, boşta) görürsün.',
+          'Your town starts with a town hall; the main street runs from its door. Houses can only be built beside roads: draw new streets from it with Build → City → Road. While placing, the grid lines buildings up along the road; the Grid button at the bottom switches to free placement. Select the town hall and open its screen to see the town\'s income and spending and where your people work (flying, ground crew, fire brigade, free).',
         ),
       },
       {
@@ -1023,11 +1132,70 @@ export class Tutorial {
       },
       {
         id: 'bHomes', ch: 'grow', deep: true,
-        target: () => [...document.querySelectorAll('#buildbar .bcard[data-kind="house"], #buildbar .bcard[data-kind="apartment"]')],
+        target: () => [...document.querySelectorAll('#buildbar .bcard[data-kind="smallhouse"], #buildbar .bcard[data-kind="midhouse"], #buildbar .bcard[data-kind="house"], #buildbar .bcard[data-kind="apartment"]')],
         text: () => L(
-          `Ev 4, apartman 16 kişi barındırır; her kişi bir pilot ya da mürettebat. Uçaklar ancak yeterli boşta personelle kalkar. Kartına ${tapThen()} haritada yer seç; üstteki satırda boştaki personel yazar.`,
-          `A house holds 4 people, an apartment block 16; every person is a pilot or crew member. Aircraft take off only with enough free personnel. ${Tap()} a card, then pick a spot on the map; the line above shows your free personnel.`,
+          'Evler: küçük 2, orta 3, büyük 4 kişi, apartman 16 kişi barındırır ve kira getirir. Her kişi bir pilot, mürettebat ya da bakımcı. Evler ancak bir yolun yanına kurulur; yerleştirirken bina yola dizilir ve ön cephesiyle yola döner.',
+          'Homes: small 2, medium 3, large 4 people, an apartment block 16; they pay rent. Every person is a pilot, crew member or mechanic. Homes go only beside a road; while placing, the building lines up along the road and faces it.',
         ),
+      },
+      {
+        id: 'bRoad', ch: 'grow', deep: true,
+        target: () => visible('#buildbar .bcard[data-kind="road"]'),
+        text: () => L(
+          `Yol: kartına ${tapThen()} mevcut bir yolun üstünden başla, bitiş noktasını seç (metresi 3 kr). Her sokak belediyenin caddesine bağlanır; itfaiye ekipleri de bu yollardan gider.`,
+          `Road: ${tap()} its card, start on an existing road and pick the end point (3 kr per metre). Every street joins the town hall's street; fire crews drive along these roads too.`,
+        ),
+      },
+      {
+        id: 'bPark', ch: 'grow', deep: true,
+        target: () => visible('#buildbar .bcard[data-kind="park"]'),
+        text: () => L(
+          'Park kira getirmez ama 300 m yakınındaki evlerin kirasını %10 artırır. Yerleştirirken alttaki Izgara düğmesi (X) ızgarayı açıp kapatır: kapalıyken bina serbest konur.',
+          'A park pays no rent but raises the rent of homes within 300 m by 10%. While placing, the Grid button at the bottom (X) turns the grid on and off: with it off, buildings go anywhere.',
+        ),
+      },
+      {
+        id: 'fire', ch: 'grow',
+        target: () => visible('.top-actions [data-open="build"]'),
+        text: () => L(
+          'Kasaba büyüyünce İnşa → Şehir\'den yolun yanına itfaiye merkezi kur (4 boşta personel ister). Alanındaki hasarlı ev, apartman ve belediyeye ekip yollardan araçla gider, elle onarımın yarı fiyatına onarır. Maden, batarya ve radara da yol çekersen onları da onarır. Merkez iki kez yükseltilir: alanı ve ekibi büyür.',
+          'As your town grows, build a fire station beside a road from Build → City (needs 4 free personnel). Its crews drive along the roads to damaged houses, apartment blocks and the town hall in range and repair them for half the manual price. Draw a road to a mine, battery or radar and they repair those too. The station can be upgraded twice for a wider area and bigger crews.',
+        ),
+      },
+      {
+        id: 'fireCard', ch: 'grow', deep: true,
+        enter: () => {
+          g.modals.close();
+          g.build.open('city');
+        },
+        target: () => visible('#buildbar .bcard[data-kind="firestation"]'),
+        text: () => L(
+          'İtfaiye merkezinin kartı. Halkası alanını gösterir: alandaki ve aynı yol ağındaki binalara ekip gider. Kurmak için 4 kişi boşta olmalı; kadro uçuşa çıkmaz.',
+          'The fire station card. Its ring shows the area: crews go to buildings in range on the same road network. You need 4 free people to build it; the crew never flies.',
+        ),
+      },
+      {
+        id: 'fireMap', ch: 'grow', deep: true,
+        enter: () => this.flyToOwn('firestation', 520),
+        target: () => {
+          const f = this.own('firestation');
+          return f ? this.worldRect(f.pos, 40) : null;
+        },
+        done: () => !this.own('firestation') || g.selectedStructureId === this.own('firestation')?.id,
+        text: () => this.own('firestation')
+          ? L(`Bu senin itfaiye merkezin: üstüne ${tap()}.`, `This is your fire station: ${tap()} it.`)
+          : L('Henüz itfaiye merkezin yok. Kasaba büyüyünce kur; bir sonraki adımda panelini anlatıyoruz.', 'You have no fire station yet. Build one as your town grows; the next step explains its panel.'),
+      },
+      {
+        id: 'firePanel', ch: 'grow', deep: true,
+        enter: () => {
+          if (this.own('firestation')) g.layout.reveal('left');
+        },
+        target: () => (this.own('firestation') ? visible('#left [data-act="fire-up"]') ?? visible('#left') : null),
+        text: () => (this.own('firestation') ? '' : L('Merkezi kurunca: ', 'Once you build one: ')) + L(
+          'panelde ekiplerin nerede olduğu, alan, kadro ve yükseltme var. Her seviye alanı ve ekibi büyütür (+2 kişi). Hasarlı bina elle onarımın yarı fiyatına onarılır; maden, batarya ve radar ancak bir yolla bağlıysa.',
+          'the panel shows where the crews are, the area, the staff and the upgrade. Each level widens the area and the crew (+2 people). Damaged buildings are repaired at half the manual price; mines, batteries and radars only when a road reaches them.',
+        ).replace(/^./, (c) => (this.own('firestation') ? c.toLocaleUpperCase(LANG_LOCALE) : c)),
       },
       {
         id: 'prod', ch: 'grow',
@@ -1043,8 +1211,8 @@ export class Tutorial {
         enter: () => g.modals.openFactory(null, 'ucak'),
         target: () => visible('.prd-row:not(.locked)'),
         text: () => L(
-          `Her satırda serviste ve bantta kaç tane olduğu görünür. Adedi − ve + ile seç, "Üret"e ${tap()}; biten uçak üssüne gelir. Gri satırlar önce araştırma ister.`,
-          `Each row shows how many are in service and on the line. Choose the number with − and +, then ${tap()} "Build"; finished aircraft go to your base. Grey rows need research first.`,
+          `Her satırda serviste ve bantta kaç tane olduğu görünür. Adedi − ve + ile seç, "Üret"e ${tap()}; biten uçak üssüne gelir. Düğmede fiyatın yanında bakım personeli (kişi simgesi) yazar: boşta kimse yoksa düğme kararır, dokununca nedeni çıkar. Gri satırlar önce araştırma ister.`,
+          `Each row shows how many are in service and on the line. Choose the number with − and +, then ${tap()} "Build"; finished aircraft go to your base. The button shows the ground crew next to the price (person icon): with nobody free it greys out, and tapping it tells you why. Grey rows need research first.`,
         ),
       },
       {
@@ -1054,22 +1222,22 @@ export class Tutorial {
         },
         target: () => visible('.prd-row.ac:not(.locked) [data-act="fab-qty"][data-d="1"]'),
         done: () => Number(visible('.prd-row.ac:not(.locked) .prd-qty b')?.textContent ?? 1) > 1,
-        text: () => L(`Toplu üretim: "+"ya ${tap()}, adet artar; düğmedeki fiyat da o kadar olur.`, `Batch production: ${tap()} "+" to raise the number; the price on the button grows with it.`),
+        text: () => L(`Toplu üretim: "+"ya ${tap()}, adet artar; düğmedeki fiyat ve bakım personeli de o kadar olur.`, `Batch production: ${tap()} "+" to raise the number; the price and ground crew on the button grow with it.`),
       },
       {
         id: 'prodBuild', ch: 'grow', deep: true,
         target: () => visible('.prd-row.ac:not(.locked) [data-act="fab-add"]'),
         text: () => L(
-          'Üret düğmesinde toplam fiyat yazar. Para ya da bant yeri yetmezse düğme kararır. Bantta bekleyen siparişi ✕ ile iptal edersin, parası geri döner.',
-          'The Build button shows the total price. If money or line space runs short, it greys out. Cancel a queued order with ✕ and get the money back.',
+          'Üret düğmesinde toplam fiyat ve kişi simgesiyle bakım personeli yazar. Para, bant yeri ya da boşta kişi yetmezse düğme kararır; dokununca nedeni çıkar. Bantta bekleyen siparişi ✕ ile iptal edersin, parası geri döner.',
+          'The Build button shows the total price and, with the person icon, the ground crew. If money, line space or free people run short, it greys out; tap it to see why. Cancel a queued order with ✕ and get the money back.',
         ),
       },
       {
         id: 'prodRepeat', ch: 'grow', deep: true,
         target: () => visible('.modal-card [data-act="fab-repeat"]')?.closest('label') ?? null,
         text: () => L(
-          '"Bitince tekrarla" açıkken biten uçağın yerine aynısı kendiliğinden sipariş edilir; para bitince durur.',
-          'With "Repeat when done" on, a finished aircraft is reordered automatically; it stops when the money runs out.',
+          '"Bitince tekrarla" açıkken biten uçağın yerine aynısı kendiliğinden sipariş edilir; para ya da personel bitince durur ve olaylara yazılır.',
+          'With "Repeat when done" on, a finished aircraft is reordered automatically; it stops, with a note in the events, when money or personnel run out.',
         ),
       },
       {
@@ -1186,7 +1354,7 @@ export class Tutorial {
       {
         id: 'rChip', ch: 'grow', deep: true,
         enter: () => g.modals.close(),
-        // Telefonda gösterge gizli: araştırma düğmesi gösterilir
+        // Telefonda gösterge gizli: süren işler belediye ekranında
         target: () => visible('#research-chip') ?? visible('.top-actions [data-open="research"]'),
         text: () => (visible('#research-chip')
           ? L(
@@ -1194,8 +1362,8 @@ export class Tutorial {
             'This indicator always shows the three lines: the job under way, the time left or "idle". Tap it to open research.',
           )
           : L(
-            'Süren araştırmaları Araştırma penceresinde görürsün; bir hat boşalınca olaylara yazılır.',
-            'You can see research under way in the Research window; an idle line is noted in the events.',
+            'Süren araştırmaları Araştırma penceresinde ve belediye ekranının sağ sütununda görürsün; bir hat boşalınca olaylara yazılır.',
+            'You can see research under way in the Research window and in the right column of the town hall screen; an idle line is noted in the events.',
           )),
       },
       {
@@ -1248,8 +1416,8 @@ export class Tutorial {
       {
         id: 'end', ch: 'war',
         text: () => L(
-          'Hava üssü kalmayan ülkenin yenisini kurmak için 5 dakikası var; kuramazsa elenir. Son kalan kazanır. Menü\'den kaydedebilirsin. İyi uçuşlar Komutan!',
-          'A nation that loses all its airbases has 5 minutes to build a new one, or it is eliminated. The last one standing wins. You can save from the Menu. Good hunting, Commander!',
+          'Hava üssü kalmayan ülkenin yenisini kurmak için 5 dakikası var; yeni üs yarı fiyatına kurulur, kuramazsa elenir. Son kalan kazanır. Menü\'den kaydedebilirsin. İyi uçuşlar Komutan!',
+          'A nation that loses all its airbases has 5 minutes to build a new one, at half price, or it is eliminated. The last one standing wins. You can save from the Menu. Good hunting, Commander!',
         ),
       },
     ];

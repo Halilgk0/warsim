@@ -48,40 +48,64 @@ export const DISC = new THREE.CylinderGeometry(1, 1, 1, 16).translate(0, 0.5, 0)
 /** Kemer çatı (yarım silindir), uzunluk Z ekseninde. */
 export const ARCH = new THREE.CylinderGeometry(1, 1, 1, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
 
-const TRUNK = new THREE.Color(0x9b8470);
+const TRUNK = new THREE.Color(0x7a6552);
 
-/** İğne yapraklı ağaç (birim yükseklik), köşe renkli. */
-export function coniferGeo(crown: number): THREE.BufferGeometry {
-  const c = new THREE.Color(crown);
+/**
+ * Taç parçası: köşe rengi yüksekliğe göre (dipte gölge, tepede ışık) ve yüz başına hafif oynar; düz renkli biçim gibi
+ * durmaz. Ton 0,7–1,12 arasıdır (gövde rengi bunun altında kalır: cityModels.ts tacı tondan ayırır). y0, y1: tacın alt
+ * ve üst yüksekliği.
+ */
+function crown(g: THREE.BufferGeometry, color: THREE.Color, y0: number, y1: number, seed: number): THREE.BufferGeometry {
+  const out = clean(g);
+  const p = out.getAttribute('position');
+  const arr = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const t = Math.min(1, Math.max(0, (p.getY(i) - y0) / (y1 - y0)));
+    const face = Math.floor(i / 3);
+    const jit = (Math.abs(Math.sin((face + seed) * 12.9898) * 43758.5453) % 1) * 0.1 - 0.05;
+    const v = 0.72 + 0.38 * t * t * (3 - 2 * t) + jit;
+    arr[i * 3] = color.r * v;
+    arr[i * 3 + 1] = color.g * v;
+    arr[i * 3 + 2] = color.b * v;
+  }
+  out.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return out;
+}
+
+/** İğne yapraklı ağaç (birim yükseklik), köşe renkli: dört kademe dal, her kademe bir öncekine göre dönük. */
+export function coniferGeo(crownColor: number): THREE.BufferGeometry {
+  const c = new THREE.Color(crownColor);
+  const parts = [clean(new THREE.CylinderGeometry(0.035, 0.055, 0.3, 4, 1, true).translate(0, 0.15, 0), TRUNK)];
+  const tiers: [number, number, number][] = [[0.33, 0.34, 0.33], [0.27, 0.32, 0.51], [0.2, 0.3, 0.69], [0.13, 0.28, 0.86]];
+  tiers.forEach(([r, h, y], i) => {
+    parts.push(crown(new THREE.ConeGeometry(r, h, 6, 1, true).rotateY(i * 0.5).translate(0, y, 0), c, y - h / 2, y + h / 2, i * 7));
+  });
+  return mergeGeometries(parts)!;
+}
+
+/** Yapraklı ağaç (birim yükseklik), köşe renkli: ana taç ve iki yan öbek (düzgün top gibi durmaz). */
+export function broadleafGeo(crownColor: number): THREE.BufferGeometry {
+  const c = new THREE.Color(crownColor);
   const parts = [
-    clean(new THREE.CylinderGeometry(0.045, 0.06, 0.25, 4, 1, true).translate(0, 0.125, 0), TRUNK),
-    clean(new THREE.ConeGeometry(0.3, 0.6, 5, 1, true).translate(0, 0.48, 0), c),
-    clean(new THREE.ConeGeometry(0.2, 0.45, 5, 1, true).translate(0, 0.77, 0), c.clone().multiplyScalar(1.08)),
+    clean(new THREE.CylinderGeometry(0.04, 0.07, 0.46, 4, 1, true).translate(0, 0.23, 0), TRUNK),
+    crown(new THREE.IcosahedronGeometry(0.36, 0).scale(1, 0.85, 1).translate(0, 0.66, 0), c, 0.36, 0.97, 1),
+    crown(new THREE.IcosahedronGeometry(0.23, 0).scale(1, 0.8, 1).rotateY(0.6).translate(0.21, 0.55, 0.09), c, 0.36, 0.97, 5),
+    crown(new THREE.IcosahedronGeometry(0.2, 0).scale(1, 0.85, 1).rotateY(1.9).translate(-0.18, 0.6, -0.15), c, 0.36, 0.97, 9),
   ];
   return mergeGeometries(parts)!;
 }
 
-/** Yapraklı ağaç (birim yükseklik), köşe renkli. */
-export function broadleafGeo(crown: number): THREE.BufferGeometry {
-  const c = new THREE.Color(crown);
-  const parts = [
-    clean(new THREE.CylinderGeometry(0.05, 0.07, 0.4, 4, 1, true).translate(0, 0.2, 0), TRUNK),
-    clean(new THREE.IcosahedronGeometry(0.36, 0).scale(1, 0.85, 1).translate(0, 0.66, 0), c),
-  ];
-  return mergeGeometries(parts)!;
+/** Uzak yapraklı ağaç: yakın modelin ana tacı, gövdesiz ve yan öbeksiz (1,3 km ötede ayrıntı görünmez). */
+export function broadleafFarGeo(crownColor: number): THREE.BufferGeometry {
+  return crown(new THREE.IcosahedronGeometry(0.36, 0).scale(1, 0.85, 1).translate(0, 0.66, 0), new THREE.Color(crownColor), 0.36, 0.97, 1);
 }
 
-/** Uzak yapraklı ağaç: yakın modelin tacı, gövdesiz (geçişte biçim değişmesin; 1,3 km ötede gövde görünmez). */
-export function broadleafFarGeo(crown: number): THREE.BufferGeometry {
-  return clean(new THREE.IcosahedronGeometry(0.36, 0).scale(1, 0.85, 1).translate(0, 0.66, 0), new THREE.Color(crown));
-}
-
-/** Uzak iğne yapraklı ağaç: yakın modelin iki konisi, gövdesiz. */
-export function coniferFarGeo(crown: number): THREE.BufferGeometry {
-  const c = new THREE.Color(crown);
+/** Uzak iğne yapraklı ağaç: yakın modelin dış çizgisinde iki koni, gövdesiz. */
+export function coniferFarGeo(crownColor: number): THREE.BufferGeometry {
+  const c = new THREE.Color(crownColor);
   return mergeGeometries([
-    clean(new THREE.ConeGeometry(0.3, 0.6, 5, 1, true).translate(0, 0.48, 0), c),
-    clean(new THREE.ConeGeometry(0.2, 0.45, 5, 1, true).translate(0, 0.77, 0), c.clone().multiplyScalar(1.08)),
+    crown(new THREE.ConeGeometry(0.33, 0.6, 5, 1, true).translate(0, 0.46, 0), c, 0.16, 0.76, 2),
+    crown(new THREE.ConeGeometry(0.2, 0.46, 5, 1, true).translate(0, 0.77, 0), c, 0.5, 1.0, 4),
   ])!;
 }
 

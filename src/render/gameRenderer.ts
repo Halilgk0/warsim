@@ -1,7 +1,11 @@
 import * as THREE from 'three';
+import { BuildGrid, FootprintGhost, RangeRing, RoadGhost, RoadLayer, type GridFrame } from './roads';
 import type { World } from '../sim/world';
 import type { Aircraft } from '../sim/aircraft/aircraft';
 import { STRUCTURE_DEFS, STRUCT_GLYPH, type Structure, type StructureKind } from '../sim/structures/structure';
+import { FIRE_RADIUS } from '../sim/structures/fireStation';
+import { fireVehicle } from './fireVehicles';
+import { Traffic } from './traffic';
 import { AA_WEAPONS, AASite } from '../sim/structures/airDefense';
 import { detectProbabilityAt } from '../sim/structures/radar';
 import { RUNWAY_HALF, corridorMargin } from '../sim/structures/airbase';
@@ -14,6 +18,7 @@ import { TerrainView, waterU } from './terrain';
 import { StructureView } from './structures';
 import { buildAircraftModel, buildStoreMeshes, propU, type AircraftModel } from './models';
 import { Scenery } from './scenery';
+import { DecorLayer } from './decor';
 import { computeLandcover, setClearings } from './landcover';
 import { Debris, Effects, ParachuteViews, RocketViews, Tracers } from './effects';
 import { PALETTE } from './palette';
@@ -73,6 +78,15 @@ const RUNWAY_TOP = 1.2;
  */
 const FINE_PX = 10;
 
+/** Kurulacak yolun önizlemesi: b yoksa yalnız başlangıç işareti. */
+export interface RoadPreview {
+  ax: number;
+  az: number;
+  bx?: number;
+  bz?: number;
+  ok: boolean;
+}
+
 export interface Ghost {
   kind: StructureKind;
   x: number;
@@ -102,6 +116,9 @@ export class GameRenderer {
   /** Görev planlayıcı önizlemesi. */
   plannerRoute: THREE.Vector3[] | null = null;
   ghost: Ghost | null = null;
+  /** Yol önizlemesi ve yerleşim ızgarası (inşa kipinde Game doldurur). */
+  roadGhost: RoadPreview | null = null;
+  gridFrame: GridFrame | null = null;
   playerTeam = 0;
   /** Yapıların takım halkaları (sinematik kayıtta kapalı). */
   rings = true;
@@ -128,6 +145,8 @@ export class GameRenderer {
   /** Günün saatine eklenen kaydırma (saat; kayıt kipi çekimin saatini ayarlar). */
   clockShift = 0;
   private scenery: Scenery;
+  /** Harekâtın süsleri: köyler, tek evler, yıkıklar, terk edilmiş madenler (decor.ts). */
+  private decor: DecorLayer;
   private clearKey = '';
   private views = new Map<number, AircraftView>();
   /** Uçak modeli ayrıntısı (kalite ayarı: 0 low-poly, 1 yüksek çözünürlük). */
@@ -155,8 +174,15 @@ export class GameRenderer {
   private plannerLine: THREE.Line;
   private missionCircle: THREE.LineLoop;
   private ghostGroup = new THREE.Group();
-  private ghostKey = '';
-  private ghostMat = new THREE.MeshBasicMaterial({ color: PALETTE.good, transparent: true, opacity: 0.4, depthWrite: false, depthTest: false });
+  private roadLayer = new RoadLayer();
+  private roadGhostView = new RoadGhost();
+  private buildGrid = new BuildGrid();
+  /** Yerleşim işareti (yapının tabanı; silüet yok), itfaiye kapsama halkası ve yoldaki itfaiye araçları. */
+  private footprint = new FootprintGhost();
+  private fireRing = new RangeRing();
+  private fireViews = new Map<string, THREE.Mesh>();
+  /** Yollardaki sivil araçlar (yalnız görüntü). */
+  private traffic = new Traffic();
   private corridorMat = new THREE.LineBasicMaterial({ color: 0x4a4857, transparent: true, opacity: 0.6 });
   private coverage: THREE.InstancedMesh | null = null;
   private coverageKey = '';
@@ -188,7 +214,9 @@ export class GameRenderer {
     computeLandcover();
     this.terrain = new TerrainView(this.scene);
     this.scenery = new Scenery(this.scene);
+    this.decor = new DecorLayer(this.scene, this.labelLayer);
     this.scene.add(this.structGroup, this.effects.mesh, this.tracers.mesh, this.rockets.mesh, this.ghostGroup, this.aaRings);
+    this.scene.add(this.roadLayer.mesh, this.roadGhostView.mesh, this.buildGrid.mesh, this.footprint.mesh, this.fireRing.line, this.traffic.group);
     this.scene.add(this.debris.mesh, this.chutes.group, this.contrails.mesh);
     // Ok biçimli simge: burun +Z, XZ düzleminde
     const arrow = new THREE.Shape();
@@ -332,6 +360,8 @@ export class GameRenderer {
     this.bombViews.clear();
     for (const sv of this.structViews.values()) this.scene.remove(sv.ring);
     this.structViews.clear();
+    for (const m of this.fireViews.values()) this.scene.remove(m);
+    this.fireViews.clear();
     for (const l of this.structLabels.values()) l.remove();
     this.structLabels.clear();
     this.structGroup.clear();
@@ -372,6 +402,7 @@ export class GameRenderer {
     this.terrain.update(this.camera);
     this.scenery.rebuild();
     this.scenery.update(this.rig.distance, settings.map.scenery, this.camera.position);
+    this.decor.sync(w, this.camera.position, this.rig.distance, settings.map.scenery);
     const vis = this.rig.fxScale;
     const ms = this.rig.modelScale;
     // Gün döngüsü: dünya zamanından saat (ayar kapalıysa hep gündüz)
@@ -395,6 +426,9 @@ export class GameRenderer {
       .add(_glow.copy(this.atmosphere.cloudGlow).multiplyScalar(1.3));
 
     this.syncStructures(w, simDt);
+    this.roadLayer.update(w, this.rig.distance);
+    this.syncFire(w);
+    this.traffic.update(w, simDt, this.rig.distance);
     this.syncAircraft(w, simDt, vis, ms);
     this.syncIcons(w);
     this.syncBombs(w, ms);
@@ -413,13 +447,20 @@ export class GameRenderer {
 
   /** Yapı tabanlarını süs katmanına bildir (ağaç, ev, tarla temizlenir). */
   private updateClearings(w: World): void {
-    let key = '';
+    let key = `${w.roadVersion}:`;
     for (const s of w.structures) if (!s.destroyed) key += `${s.id},`;
     if (key === this.clearKey) return;
     this.clearKey = key;
-    setClearings(w.structures.filter((s) => !s.destroyed).map((s) => ({
+    const list = w.structures.filter((s) => !s.destroyed).map((s) => ({
       x: s.pos.x, z: s.pos.z, r: s.kind === 'airbase' ? 1500 : Math.hypot(s.def.halfW, s.def.halfL) + 25,
-    })));
+    }));
+    // Yollar: şerit boyunca küçük daireler (yolda ağaç kalmasın)
+    for (const r of w.roads) {
+      const len = Math.hypot(r.bx - r.ax, r.bz - r.az);
+      const n = Math.max(1, Math.ceil(len / 20));
+      for (let i = 0; i <= n; i++) list.push({ x: r.ax + ((r.bx - r.ax) * i) / n, z: r.az + ((r.bz - r.az) * i) / n, r: 12 });
+    }
+    setClearings(list);
   }
 
   /** Savaş sisi: oyuncu bu düşmanı biliyor mu. */
@@ -500,16 +541,30 @@ export class GameRenderer {
   private syncStructures(w: World, simDt: number): void {
     for (const s of w.structures) {
       let v = this.structViews.get(s.id);
+      if (v && s.fire && v.fireLevel !== s.fire.level) {
+        // İtfaiye merkezi seviye atladı: yeni seviyenin modeli
+        this.structGroup.remove(v.group);
+        this.scene.remove(v.ring);
+        this.structViews.delete(s.id);
+        v = undefined;
+      }
       if (!v) {
+        // Yeni yapının düzleştirmesi yakındaki yapıların arazisini değiştirmiş olabilir: onları yeniden oturt
+        const reach = Math.hypot(s.def.halfW, s.def.halfL) + 600;
+        for (const o of this.structViews.values()) {
+          if (Math.hypot(o.s.pos.x - s.pos.x, o.s.pos.z - s.pos.z) < reach + Math.hypot(o.s.def.halfW, o.s.def.halfL)) o.reground();
+        }
         v = new StructureView(s);
         this.structViews.set(s.id, v);
         this.structGroup.add(v.group);
         this.scene.add(v.ring);
-        const lbl = document.createElement('div');
-        lbl.className = `slabel t${s.team}`;
-        lbl.textContent = s.name;
-        this.labelLayer.appendChild(lbl);
-        this.structLabels.set(s.id, lbl);
+        if (!this.structLabels.has(s.id)) {
+          const lbl = document.createElement('div');
+          lbl.className = `slabel t${s.team}`;
+          lbl.textContent = s.name;
+          this.labelLayer.appendChild(lbl);
+          this.structLabels.set(s.id, lbl);
+        }
       }
       v.sync(simDt);
       v.ring.visible = this.rings;
@@ -891,6 +946,8 @@ export class GameRenderer {
       const c = ac.team !== this.playerTeam ? intel.contacts.get(ac.id) : undefined;
       v.label.classList.toggle('radar', !!c && settings.map.contacts && w.time - c.lastRadar < 8);
     }
+    // Süslerin sönük işaretleri (decor.ts)
+    this.decor.updateLabels(this.camera, r, settings.map.labels, this.rig.distance);
     // Yakında ad, uzakta yalnız yapı simgesi
     const named = this.rig.distance < 45000;
     for (const [id, lbl] of this.structLabels) {
@@ -974,33 +1031,63 @@ export class GameRenderer {
     this.syncAARings(w);
   }
 
+  /** Yoldaki itfaiye araçları: her ekibin aracı yol üstünde, gidiş yönüne dönük. */
+  private syncFire(w: World): void {
+    const seen = new Set<string>();
+    for (const s of w.structures) {
+      if (!s.fire) continue;
+      for (const c of s.fire.crews) {
+        if (c.wait > 0) continue;
+        const key = `${s.id}:${c.id}`;
+        seen.add(key);
+        let m = this.fireViews.get(key);
+        if (!m) {
+          m = fireVehicle(c.big);
+          this.fireViews.set(key, m);
+          this.scene.add(m);
+        }
+        // Yolun sağından gider (karşıdan gelenle üst üste binmez)
+        const ox = c.x - Math.cos(c.heading) * 1.75;
+        const oz = c.z + Math.sin(c.heading) * 1.75;
+        m.position.set(ox, groundLevel(ox, oz) + 0.45, oz);
+        m.rotation.y = c.heading;
+      }
+    }
+    for (const [k, m] of this.fireViews) {
+      if (seen.has(k)) continue;
+      this.scene.remove(m);
+      this.fireViews.delete(k);
+    }
+  }
+
   private syncGhost(): void {
+    this.roadGhostView.set(this.roadGhost);
+    this.buildGrid.set(this.gridFrame);
     const g = this.ghost;
+    // Yerleşim işareti: yalnız taban (hangi tasarımın geleceği görünmez; kurulunca belli olur)
+    const def = g ? STRUCTURE_DEFS[g.kind] : null;
+    this.footprint.set(g && def ? { x: g.x, z: g.z, heading: g.kind === 'aa' ? 0 : g.heading, halfW: def.halfW, halfL: def.halfL, ok: g.ok, axis: g.kind === 'airbase' } : null);
+    // İtfaiye kapsama alanı: merkezi yerleştirirken ve kendi merkezin seçiliyken
+    const sel = this.world?.structures.find((x) => x.id === this.selectedStructureId && x.fire && x.team === this.playerTeam && !x.destroyed);
+    this.fireRing.set(g?.kind === 'firestation' ? { x: g.x, z: g.z, r: FIRE_RADIUS[1] } : sel?.fire ? { x: sel.pos.x, z: sel.pos.z, r: sel.fire.radius } : null);
     if (!g) {
       this.ghostGroup.visible = false;
       return;
     }
-    this.ghostGroup.visible = true;
-    const def = STRUCTURE_DEFS[g.kind];
-    const key = `${g.kind}`;
-    if (key !== this.ghostKey) {
-      this.ghostKey = key;
-      this.ghostGroup.clear();
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(def.halfW * 2, 14, def.halfL * 2).translate(0, 7, 0), this.ghostMat);
-      this.ghostGroup.add(foot);
-      if (g.kind === 'airbase') {
-        const lineGeo = new THREE.BufferGeometry();
-        lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6 * 3), 3));
-        const corridor = new THREE.LineSegments(lineGeo, this.corridorMat);
-        corridor.name = 'corridor';
-        corridor.frustumCulled = false;
-        this.ghostGroup.add(corridor);
-      }
+    // Hava üssü: yaklaşma koridoru çizgileri
+    this.ghostGroup.visible = g.kind === 'airbase';
+    if (g.kind === 'airbase' && !this.ghostGroup.getObjectByName('corridor')) {
+      const lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6 * 3), 3));
+      const corridor = new THREE.LineSegments(lineGeo, this.corridorMat);
+      corridor.name = 'corridor';
+      corridor.frustumCulled = false;
+      this.ghostGroup.add(corridor);
     }
-    this.ghostMat.color.setHex(g.ok ? PALETTE.good : PALETTE.bad);
     const y = groundLevel(g.x, g.z);
     this.ghostGroup.position.set(g.x, y, g.z);
-    this.ghostGroup.rotation.y = Math.PI - g.heading;
+    // Uçaksavar yuvaları dünya ekseninde (StructureView gibi döndürülmez)
+    this.ghostGroup.rotation.y = g.kind === 'aa' ? 0 : Math.PI - g.heading;
     const corridor = this.ghostGroup.getObjectByName('corridor') as THREE.LineSegments | undefined;
     if (corridor) {
       // Her iki yöndeki yaklaşma koridoru (yerel koordinatta, pist ekseni +Z). Tepeye çarpan koridor kırmızı.

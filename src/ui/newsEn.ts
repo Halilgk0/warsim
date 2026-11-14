@@ -15,6 +15,53 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'kasaba-itfaiye': {
+    title: 'A town takes shape: roads, fire crews and ground staff',
+    summary: 'Each side now starts a campaign with a town hall and a main street. Homes provide residents; aircraft need ground crew, and fire crews reach damaged buildings by road.',
+    cover: 'kasaba-kapak.webp',
+    files: ['kasaba.webp', 'itfaiye.webp'],
+    captions: [
+      'New town roads and homes built alongside them.',
+      'The fire station upgraded to level three.',
+    ],
+    sections: [
+      {
+        heading: 'Roads and towns',
+        bullets: [
+          'Each side starts a campaign with a town hall and the main street running from it. Homes must now be built beside a road; you can extend existing roads to make new streets.',
+          'As the town grows, houses and apartment blocks provide residents. The town screen shows income and a breakdown of your personnel.',
+        ],
+      },
+      {
+        heading: 'Aircraft ground crew',
+        bullets: [
+          'Each aircraft needs one ground crew member. They are separate from flight crews and come from your homes; a ground crew member is assigned when an aircraft enters production.',
+          'You cannot order another aircraft when ground crew are short. Older saves receive the homes they need for free so you can keep using your existing aircraft.',
+        ],
+      },
+      {
+        heading: 'Fire crews on the road',
+        bullets: [
+          'The fire station is staffed by residents. Its crews travel to and repair damaged buildings they can reach by road.',
+          'Fire crews repair buildings for half the cost of manual repairs. You can upgrade the station as your town grows.',
+        ],
+      },
+      {
+        heading: 'More detail on the map',
+        bullets: [
+          'Campaign maps now have small villages, farmhouses, ruined homes and abandoned mines. These are visual details and do not affect the game economy.',
+        ],
+      },
+      {
+        heading: 'City update video',
+        video: {
+          src: img('city-update.mp4'),
+          poster: img('city-update-poster.webp'),
+          caption: 'Towns, roads and fire stations (in-game footage).',
+        },
+      },
+    ],
+  },
   'ogretici-konular': {
     title: 'The tutorial now comes in topics',
     summary: 'Open any topic from inside the game and watch just that part. The steps now fly the camera to your own buildings and wait for you to tap.',
