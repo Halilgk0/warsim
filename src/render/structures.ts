@@ -18,7 +18,11 @@ import { ArchBatch, SURF, archMaterial, setArchDamage, type Surf } from './arch'
 import { GABLE } from './props';
 import { LAMP, LampSet } from './lamps';
 import { groundStructure } from './ground';
+import { bodyInfo, buildScaffold } from './construction';
 import { parkedParts } from './models';
+import { autoParts } from './vehicleParts';
+import { aircraftTractor, ambulance, refueller, starterTrolley } from './airfieldVehicles';
+import { fireVehicle } from './fireVehicles';
 import type { AircraftSpec } from '../sim/aircraft/specs';
 
 /** İçe bakan kopya (üçgen sırası ve normaller ters): kabuğun içi kapıdan bakınca görünsün. */
@@ -758,12 +762,20 @@ function airfieldGrounds(b: B): void {
   // Cephanelik: toprak örtülü kemer sığınaklar, beton ön duvarlar
   for (const [x, z] of [[-600, -1110], [-640, -1110], [-600, -1200], [-640, -1200]]) {
     A(b, ARCH, 6, 4, 14, x, 0, z, COL.turf, SURF.grass);
-    A(b, BOX, 12.4, 4.1, 0.5, x, 0, z + 7.2, COL.concrete, SURF.concrete);
+    // Kemer biçimli beton ön duvar (kutu duvarın köşeleri toprak örtünün dışında havada kalıyordu), çelik kapı
+    b.push(archWall(6.3, 4.25, 0.5), COL.concrete, SURF.concrete, 0, x, 0, z + 7.05);
+    A(b, BOX, 3.2, 2.7, 0.1, x, 0, z + 7.33, 0x4a4e44, SURF.metal);
+    // Önünde römorklarda bombalar
+    bombTrolley(b, x + 2.5, z + 12, 0.15, x % 80 === 0 ? 3 : 2);
   }
   // Harekât binası (tuğla, düz keçe çatı) ve su kulesi
   A(b, BOX, 26, 4.5, 12, -405, 0, 728, COL.brick, SURF.brickWin);
-  for (const [dx, dz] of [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]]) A(b, BOX, 0.4, 16, 0.4, -580 + dx, 0, 520 + dz, COL.steelLight, SURF.metal);
-  A(b, CYL, 4.2, 5, 4.2, -580, 16, 520, 0x7d8279, SURF.metal);
+  A(b, BOX, 26.6, 0.7, 12.6, -405, 4.5, 728, COL.concrete, SURF.concrete);
+  A(b, BOX, 4, 3, 2.2, -405, 0, 735, COL.concrete, SURF.concrete);
+  sandWall(b, 9, 1.4, -413, 735.5, 0);
+  sandWall(b, 9, 1.4, -397, 735.5, 0);
+  for (const dx of [-8, 8]) A(b, CYL, 0.05, 6, 0.05, -405 + dx, 5.2, 724, COL.steel, SURF.metal);
+  waterTower(b, -580, 520, 16, 4.2);
   // İşaret alanı: siyah kare üstünde beyaz çarpı (iniş yönü işareti)
   A(b, BOX, 12, 0.25, 12, -250, 0, 690, 0x2a2b2d, SURF.plain);
   A(b, BOX, 9, 0.3, 1.2, -250, 0, 690, COL.white, SURF.plain);
@@ -808,7 +820,10 @@ function airfieldCamp(b: B, rng: () => number): void {
   for (const z of [-140, -215, -290]) {
     A(b, BOX, 22, 2, 46, -646, 0, z, COL.brick, SURF.brick);
     A(b, ARCH, 11, 6, 46, -646, 2, z, COL.galvanized, SURF.corrugated);
-    A(b, BOX, 7, 4, 0.3, -646, 0, z + 23.2, 0x5e6058, SURF.hangarDoor);
+    // Kemerin uçları kemer biçimli tuğla duvar (kutu duvar kemerin dışına taşıyordu); kapı duvar yüzünde
+    for (const e of [-1, 1]) b.push(archWall(10.95, 5.95, 0.3), COL.brick, SURF.brick, 0, -646, 2, z + e * 22.95);
+    A(b, BOX, 7, 4, 0.14, -646, 0, z + 23.11, 0x5e6058, SURF.hangarDoor);
+    A(b, BOX, 7.8, 0.35, 0.2, -646, 4.0, z + 23.12, COL.concrete, SURF.concrete);
   }
   A(b, BOX, 56, 0.2, 96, -566, 0, -215, COL.turf, SURF.grass);
   for (const z of [-262, -168]) A(b, BOX, 56, 0.25, 0.5, -566, 0, z, COL.white, SURF.plain);
@@ -884,6 +899,9 @@ function airfieldExtras(b: B, l: LampSet): Bay[] {
   l.lamp(-256.8, 3.2, 470, LAMP.warm, 0.25, 1.0);
   for (const z of [-400, -430, -460, -490]) {
     A(b, ARCH, 5, 3.4, 16, -330, 0, z, 0x6f746a, SURF.corrugated, Math.PI / 2);
+    // Tuğla alın duvarları (bacalı uçta baca duvara gömülü), doğu ucunda kapı
+    for (const e of [-1, 1]) b.push(archWall(4.95, 3.35, 0.3), COL.brick, SURF.brick, Math.PI / 2, -330 + e * 7.95, 0, z);
+    A(b, BOX, 1.1, 2.0, 0.1, -321.85, 0, z, 0x3a3428, SURF.wood, Math.PI / 2);
     A(b, BOX, 0.7, 4.6, 0.7, -337.5, 0, z, COL.brickDark, SURF.brick);
   }
   A(b, BOX, 30, 4, 10, -265, 0, -420, COL.wood, SURF.wood);
@@ -896,11 +914,12 @@ function airfieldExtras(b: B, l: LampSet): Bay[] {
   for (const x of [-390, -270]) A(b, BOX, 0.3, 5.2, 20, x, 0, -1255, COL.wood, SURF.wood);
   for (let x = -390; x <= -270; x += 12) A(b, BOX, 0.3, 5.2, 0.3, x, 0, -1245.2, COL.wood, SURF.wood);
   A(b, GABLE, 21, 1.6, 121, -330, 5.2, -1255, COL.felt, SURF.felt, Math.PI / 2);
-  const veh = [0x4f5638, 0x5c6142, 0x3d4232, 0x6b6f63];
+  let vs = 7;
+  const vr = (): number => ((vs = (vs * 16807) % 2147483647) - 1) / 2147483646;
   for (let i = 0; i < 8; i++) {
-    const x = -382 + i * 15;
-    A(b, BOX, 2.4, 2.4, 5, x, 0.3, -1257, veh[i % 4], SURF.canvas);
-    A(b, BOX, 2.3, 2.0, 2.2, x, 0.3, -1252.6, veh[(i + 1) % 4], SURF.metal);
+    // Araç hangarının betonu 0,3 m: araçlar onun üstünde
+    if (i % 4 === 3) refueller(b, -382 + i * 15, -1254, 0, 0.3);
+    else P.truck(b, vr, -382 + i * 15, -1254, 0, 0.3);
   }
   // Pusula ayar pisti: beton daire, beyaz derece çemberi ve yön çizgileri
   b.push(new THREE.CylinderGeometry(18, 18, 0.5, 40).translate(-265, 0.25, -1000), COL.concrete, SURF.concrete);
@@ -916,7 +935,7 @@ function airfieldExtras(b: B, l: LampSet): Bay[] {
     }
   }
   // Apron sıralarının yanında çalıştırma arabaları
-  for (const p of APRON_BAYS) A(b, BOX, 1.0, 0.9, 1.7, p.x - 6, 0.9, p.z + 9, 0x3c4436, SURF.metal);
+  for (const p of APRON_BAYS) starterTrolley(b, p.x - 6, p.z + 9, 0.3, p.y);
   return bays;
 }
 
@@ -940,7 +959,7 @@ function airfieldLights(l: LampSet): void {
     for (const z of [-800, 0, 800]) l.row(-136, z + s * 12, -38, z + s * 12, 33, 1.2, LAMP.blue, 0.16, 1.1);
     for (const e of [-1, 1]) l.row(-136, e * 1170 + s * 10, 80, e * 1170 + s * 10, 54, 1.2, LAMP.blue, 0.16, 1.1);
   }
-  l.lamp(-330, 16.4, 700, LAMP.green, 0.45, 1.7, 1.6, 0);
+  l.lamp(-330, 11.7, 699.5, LAMP.green, 0.45, 1.7, 1.6, 0);
   l.lamp(-360, 32.4, 720, LAMP.red, 0.35, 1.4, 2.0, 0.1);
   l.lamp(-580, 21.6, 520, LAMP.red, 0.35, 1.3, 2.6, 0.5);
   for (const z of [900, -900]) l.lamp(70, 7.7, z, LAMP.warm, 0.25, 1.0);
@@ -1001,6 +1020,215 @@ function fenceRing(b: B, rx: number, rz: number): void {
 // ------------------------------------------------------------------ uçaksavar bataryası ve radar mevzisi (2026-11-13)
 // Gerçekçi renkler (pastel değil): feldgrau ve zeytin boyalı çelik, ham beton, eskimiş ahşap, kum torbası, ezilmiş çim ve
 // toprak. Yalnız bu iki yapının parçaları; hava üssü ve fabrika COL'u kullanmaya devam eder.
+// ------------------------------------------------------------------ üs ve fabrika ayrıntıları (2026-11-17)
+// Eskiden kutu olan araçlar, kule, itfaiye, yakıt tankları, rüzgâr tulumları ve telsiz direği gerçek örneklerine
+// yakın biçimlerde: 1940'lar yakıt tankeri (Bedford/Albion), uçak çekicisi (David Brown), çalıştırma arabası, RAF tipi
+// harekât kulesi (watch office), kafes telsiz direği, bantlı rüzgâr tulumu.
+
+/** Yerel (lx, lz) → ry dönmüş, (x, z)'ye kaymış (three.js rotateY ile aynı). */
+function loc(x: number, z: number, ry: number, lx: number, lz: number): [number, number] {
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  return [x + lx * c + lz * s, z - lx * s + lz * c];
+}
+
+/** Teker: ekseni x boyunca (ölçek: genişlik, yarıçap, yarıçap), merkezde. */
+const WHEEL = new THREE.CylinderGeometry(1, 1, 1, 10).rotateZ(Math.PI / 2);
+
+/** Araç tekerleri: (lx, lz) yerel noktalarında, yarıçap r. */
+function wheels(b: B, x: number, z: number, ry: number, pts: [number, number][], r: number, w = 0.3): void {
+  for (const [lx, lz] of pts) {
+    const [px, pz] = loc(x, z, ry, lx, lz);
+    A(b, WHEEL, w, r, r, px, r, pz, 0x1b1c1e, SURF.plain, ry);
+    // Göbek yalnız büyük tekerde (küçük tekerde görünmez, üçgen boşa gider)
+    if (r >= 0.3) A(b, WHEEL, w + 0.02, r * 0.5, r * 0.5, px, r, pz, 0x4a4e44, SURF.metal, ry);
+  }
+}
+
+/** Rüzgâr tulumu: direk, döner çember, rüzgâra doğru hafif sarkan, beş bantlı (turuncu ve beyaz) daralan kumaş. */
+function windsock(b: B, x: number, z: number, aim: number): void {
+  A(b, CYL, 0.12, 7.2, 0.12, x, 0, z, COL.steelLight, SURF.metal);
+  A(b, CYL, 0.5, 0.3, 0.5, x, 0, z, COL.concrete, SURF.concrete);
+  const c = Math.sin(aim);
+  const s = Math.cos(aim);
+  // Kumaş: rüzgâr yönüne (aim) uzanır, uca doğru daralır ve biraz sarkar; dilimler kendi ekseninde döndürülür
+  let r = 0.45;
+  for (let k = 0; k < 5; k++) {
+    const r2 = r * 0.88;
+    const g = new THREE.CylinderGeometry(r, r2, 0.74, 12, 1, true).rotateX(Math.PI / 2 + 0.06 + k * 0.03);
+    b.push(g, k % 2 ? COL.white : 0xe2702c, SURF.canvas, aim, x + c * (0.42 + k * 0.72), 6.95 - k * 0.07, z + s * (0.42 + k * 0.72));
+    r = r2;
+  }
+  A(b, CYL, 0.47, 0.06, 0.47, x, 6.95, z, COL.steel, SURF.metal);
+  A(b, BOX, 0.05, 0.05, 0.9, x + c * 0.3, 6.95, z + s * 0.3, COL.steel, SURF.metal, aim);
+}
+
+/** Kafes telsiz direği: üçgen kesitli, kat kirişleri ve çaprazlar, gergi telleri ve beton kazıklar, tepede anten çubuğu. */
+function latticeMast(b: B, x: number, z: number, h: number): void {
+  const r = 0.9;
+  const legs = [0, 1, 2].map((k) => [x + Math.cos((k * 2 * Math.PI) / 3) * r, z + Math.sin((k * 2 * Math.PI) / 3) * r]);
+  for (const [lx, lz] of legs) A(b, BOX, 0.14, h, 0.14, lx, 0, lz, COL.steelLight, SURF.metal);
+  for (let y = 0; y < h; y += 3) {
+    for (let k = 0; k < 3; k++) {
+      const [ax, az] = legs[k];
+      const [bx, bz] = legs[(k + 1) % 3];
+      beam(b, ax, y, az, bx, y, bz, 0.06);
+      beam(b, ax, y, az, bx, Math.min(h, y + 3), bz, 0.05);
+    }
+  }
+  A(b, CYL, 0.05, 4, 0.05, x, h, z, COL.steelLight, SURF.metal);
+  for (let k = 0; k < 3; k++) {
+    const a = (k * 2 * Math.PI) / 3 + 0.5;
+    const gx = x + Math.cos(a) * h * 0.55;
+    const gz = z + Math.sin(a) * h * 0.55;
+    A(b, BOX, 1.0, 0.4, 1.0, gx, 0, gz, COL.concrete, SURF.concrete);
+    for (const f of [0.55, 0.95]) beam(b, x, h * f, z, gx, 0.4, gz, 0.025, 0x3a3a3a);
+  }
+}
+
+/**
+ * Harekât kulesi (RAF watch office benzeri): iki katlı sıvalı bina, ön cephede geniş pencereler, birinci kat çatısında
+ * korkuluklu çevre balkonu, üstte köşe dikmeli cam kontrol odası ve saçaklı çatı, yanda dış merdiven ve sahanlık,
+ * tepede anemometre ve sinyal direği (seren ve işaret topları), önde meteoroloji kafesi.
+ */
+function watchOffice(b: B, x: number, z: number): void {
+  const W = 16;
+  const D = 11;
+  A(b, BOX, W + 0.6, 0.5, D + 0.6, x, 0, z, COL.concrete, SURF.concrete);
+  A(b, BOX, W, 7.0, D, x, 0.5, z, COL.plaster, SURF.plasterWin);
+  A(b, BOX, W + 0.2, 0.35, D + 0.2, x, 3.8, z, 0xd2ccbe, SURF.concrete);
+  A(b, BOX, W + 1.6, 0.3, D + 1.6, x, 7.5, z, COL.concrete, SURF.concrete);
+  // Balkon korkuluğu: dikmeler ve iki kuşak
+  for (const [dx, dz, lx, lz] of [[0, D / 2 + 0.75, W + 1.6, 0.06], [0, -D / 2 - 0.75, W + 1.6, 0.06], [W / 2 + 0.75, 0, 0.06, D + 1.6], [-W / 2 - 0.75, 0, 0.06, D + 1.6]]) {
+    for (const y of [8.25, 8.75]) A(b, BOX, lx, 0.06, lz, x + dx, y, z + dz, COL.white, SURF.metal);
+    const n = Math.round(Math.max(lx, lz) / 1.6);
+    for (let i = 0; i <= n; i++) {
+      const t = -0.5 + i / n;
+      A(b, BOX, 0.06, 1.0, 0.06, x + dx + (lx > 1 ? t * lx : 0), 7.8, z + dz + (lz > 1 ? t * lz : 0), COL.white, SURF.metal);
+    }
+  }
+  // Kontrol odası: cam, köşe dikmeleri, saçaklı düz çatı
+  A(b, BOX, 9, 3.2, 7, x, 7.8, z - 0.5, COL.glass, SURF.curtain);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) A(b, BOX, 0.25, 3.2, 0.25, x + sx * 4.5, 7.8, z - 0.5 + sz * 3.5, COL.white, SURF.metal);
+  A(b, BOX, 9.2, 0.6, 7.2, x, 7.8, z - 0.5, COL.plaster, SURF.plaster);
+  A(b, BOX, 10.4, 0.35, 8.4, x, 11.0, z - 0.5, COL.felt, SURF.felt);
+  // Dış merdiven (doğu yanında, sahanlıkla balkona)
+  for (let i = 0; i < 14; i++) A(b, BOX, 1.2, 0.18, 0.3, x + W / 2 + 1.4, 0.5 + i * 0.52, z + D / 2 - 0.6 - i * 0.55, COL.concrete, SURF.concrete);
+  beam(b, x + W / 2 + 2.0, 1.0, z + D / 2 - 0.4, x + W / 2 + 2.0, 8.6, z + D / 2 - 8.0, 0.06, COL.white);
+  // Anemometre ve sinyal direği (seren, işaret topları)
+  A(b, CYL, 0.05, 2.4, 0.05, x - 3.5, 11.35, z - 2.5, COL.steel, SURF.metal);
+  for (let k = 0; k < 3; k++) A(b, BOX, 0.5, 0.04, 0.04, x - 3.5, 13.7, z - 2.5, COL.steel, SURF.metal, (k * Math.PI) / 3);
+  const mx = x + W / 2 + 7;
+  const mz = z - D / 2 - 3;
+  A(b, CYL, 0.14, 15, 0.14, mx, 0, mz, COL.white, SURF.metal);
+  A(b, BOX, 6.0, 0.14, 0.14, mx, 11.5, mz, COL.white, SURF.metal);
+  for (const s of [-1, 1]) {
+    beam(b, mx, 15, mz, mx + s * 3, 11.5, mz, 0.02, 0x3a3a3a);
+    b.push(new THREE.SphereGeometry(0.4, 8, 6), 0x1c1d1f, SURF.plain, 0, mx + s * 2.5, 10.6, mz);
+  }
+  // Meteoroloji kafesi (Stevenson): ayaklar üstünde panjurlu beyaz kutu, yanında yağmur ölçer
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) A(b, BOX, 0.08, 1.1, 0.08, x - W / 2 - 4 + sx * 0.4, 0, z + D / 2 + 4 + sz * 0.3, COL.white, SURF.wood);
+  A(b, BOX, 1.0, 0.7, 0.8, x - W / 2 - 4, 1.1, z + D / 2 + 4, COL.white, SURF.wood);
+  A(b, CYL, 0.15, 0.4, 0.15, x - W / 2 - 2.5, 0, z + D / 2 + 4, 0x7a7e82, SURF.metal);
+}
+
+/**
+ * Üssün itfaiyesi: tuğla bina, üç sürgülü kapı (önde rampa), kapıların üstünde saçak, yanda hortum kurutma kulesi;
+ * önünde araçlar (fireVehicle ile ayrı eklenir).
+ */
+function airfieldFire(b: B, x: number, z: number): void {
+  A(b, BOX, 26, 0.4, 16, x, 0, z, COL.concrete, SURF.concrete);
+  A(b, BOX, 24, 6.5, 14, x, 0.4, z, COL.brick, SURF.brickWin);
+  P.gableRoof(b, 14, 24, 3.2, x, 6.9, z, Math.PI / 2, COL.brick, SURF.brick, COL.tile, SURF.tile, 0.5);
+  for (let i = -1; i <= 1; i++) {
+    A(b, BOX, 6, 4.6, 0.3, x + i * 7.6, 0.4, z - 7.05, 0x8e2a22, SURF.hangarDoor);
+    A(b, BOX, 7, 0.4, 0.4, x + i * 7.6, 5.0, z - 7.2, COL.concrete, SURF.concrete);
+  }
+  A(b, BOX, 26, 0.3, 10, x, 0, z - 12, COL.concrete, SURF.concrete);
+  A(b, BOX, 4, 15, 4, x + 14, 0, z + 3, COL.brickDark, SURF.brickWin);
+  A(b, BOX, 4.6, 0.4, 4.6, x + 14, 15, z + 3, COL.felt, SURF.felt);
+  b.push(CONE.clone().scale(3.4, 1.8, 3.4), COL.tile, SURF.tile, Math.PI / 4, x + 14, 15.4, z + 3);
+  A(b, CYL, 0.6, 2.2, 0.6, x - 12.5, 0, z - 10, 0x8e2a22, SURF.metal);
+}
+
+/**
+ * Yakıt deposu: beton set içinde dikey tanklar (merdiven, tepede korkuluk, alt boru bağlantıları), toplama borusu ve
+ * dolum kulübesi (pompa); setin önünde yakıt tankeri dolum yeri.
+ */
+function fuelFarm(b: B, x: number, z: number, n: number): void {
+  const len = n * 16 + 6;
+  for (const s of [-1, 1]) A(b, BOX, 0.5, 1.4, len, x + s * 9, 0, z + (n - 1) * 8, COL.concrete, SURF.concrete);
+  for (const e of [-1, 1]) A(b, BOX, 18.5, 1.4, 0.5, x, 0, z + (n - 1) * 8 + e * (len / 2), COL.concrete, SURF.concrete);
+  A(b, BOX, 18, 0.15, len, x, 0, z + (n - 1) * 8, 0x7a7466, SURF.earth);
+  for (let i = 0; i < n; i++) {
+    const tz = z + i * 16;
+    A(b, CYL, 6.2, 0.4, 6.2, x, 0, tz, COL.concreteDark, SURF.concrete);
+    A(b, CYL, 6, 7, 6, x, 0.4, tz, 0x7e8476, SURF.metal);
+    b.push(CONE.clone().scale(6.2, 1.2, 6.2).translate(x, 7.4, tz), 0x737a6c, SURF.metal);
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      A(b, BOX, 0.05, 0.9, 0.05, x + Math.cos(a) * 5.8, 7.6, tz + Math.sin(a) * 5.8, COL.white, SURF.metal);
+    }
+    for (let k = 0; k < 14; k++) A(b, BOX, 0.5, 0.05, 0.05, x - 6.25, 0.8 + k * 0.5, tz, COL.steel, SURF.metal, Math.PI / 2);
+    for (const s of [-1, 1]) A(b, BOX, 0.05, 7.2, 0.05, x - 6.25, 0.4, tz + s * 0.25, COL.steel, SURF.metal);
+    A(b, BOX, 3, 0.3, 0.3, x + 7, 0.8, tz, COL.steel, SURF.metal);
+  }
+  A(b, BOX, 0.35, 0.35, len, x + 8.5, 0.8, z + (n - 1) * 8, COL.steel, SURF.metal);
+  A(b, BOX, 5, 3, 4, x + 13, 0, z + (n - 1) * 8, COL.brick, SURF.brickWin);
+  A(b, BOX, 5.6, 0.3, 4.6, x + 13, 3, z + (n - 1) * 8, COL.felt, SURF.felt);
+  A(b, BOX, 10, 0.25, 6, x + 21, 0, z + (n - 1) * 8, COL.concrete, SURF.concrete);
+}
+
+/** Bomba (yerde ya da römorkta): zeytin yeşili gövde, sarı bant, kanatçık kutusu; ekseni x boyunca. */
+function groundBomb(b: B, x: number, y: number, z: number, ry: number, len: number): void {
+  const r = len * 0.13;
+  b.push(new THREE.CylinderGeometry(r, r, len * 0.62, 10).rotateZ(Math.PI / 2), 0x5e6448, SURF.metal, ry, x, y + r, z);
+  const [nx, nz] = loc(x, z, ry, len * 0.38, 0);
+  b.push(new THREE.ConeGeometry(r, len * 0.16, 10).rotateZ(-Math.PI / 2), 0x5e6448, SURF.metal, ry, nx, y + r, nz);
+  const [tx, tz] = loc(x, z, ry, -len * 0.42, 0);
+  b.push(new THREE.ConeGeometry(r, len * 0.2, 10).rotateZ(Math.PI / 2), 0x4a503a, SURF.metal, ry, tx, y + r, tz);
+  const [fx, fz] = loc(x, z, ry, -len * 0.5, 0);
+  A(b, BOX, len * 0.12, r * 2.4, r * 2.4, fx, y + r - r * 1.2, fz, 0x3e4232, SURF.metal, ry);
+  const [bx, bz] = loc(x, z, ry, len * 0.12, 0);
+  b.push(new THREE.CylinderGeometry(r * 1.02, r * 1.02, len * 0.04, 10).rotateZ(Math.PI / 2), 0xc9a43a, SURF.plain, ry, bx, y + r, bz);
+}
+
+/** Bomba römorku: alçak çelik şasi, dört teker, çeki demiri; üstünde iki-üç bomba. */
+function bombTrolley(b: B, x: number, z: number, ry: number, n: number): void {
+  let [px, pz] = loc(x, z, ry, 0, 0);
+  A(b, BOX, 3.4, 0.12, 1.3, px, 0.45, pz, 0x3c4436, SURF.metal, ry);
+  wheels(b, x, z, ry, [[-1.2, 0.6], [1.2, 0.6], [-1.2, -0.6], [1.2, -0.6]].map(([a, c]) => [c, a]) as [number, number][], 0.25, 0.15);
+  [px, pz] = loc(x, z, ry, 2.2, 0);
+  A(b, BOX, 1.4, 0.08, 0.08, px, 0.5, pz, 0x2a2a2a, SURF.metal, ry);
+  for (let i = 0; i < n; i++) {
+    const [qx, qz] = loc(x, z, ry, 0, (i - (n - 1) / 2) * 0.45);
+    groundBomb(b, qx, 0.57, qz, ry, 2.2);
+  }
+}
+
+/** Su kulesi: dört ayak, kat kirişleri ve çaprazlar, merdiven, depo ve konik çatı, tepede çevre iskelesi. */
+function waterTower(b: B, x: number, z: number, h: number, r: number): void {
+  const d = r * 0.7;
+  const legs = [[-d, -d], [d, -d], [d, d], [-d, d]];
+  for (const [dx, dz] of legs) A(b, BOX, 0.5, h, 0.5, x + dx, 0, z + dz, COL.steelLight, SURF.metal);
+  for (let y = 0; y < h - 1; y += h / 4) {
+    for (let k = 0; k < 4; k++) {
+      const [ax, az] = legs[k];
+      const [bx, bz] = legs[(k + 1) % 4];
+      beam(b, x + ax, y + h / 4, z + az, x + bx, y + h / 4, z + bz, 0.12);
+      beam(b, x + ax, y, z + az, x + bx, y + h / 4, z + bz, 0.08);
+    }
+  }
+  for (let k = 0; k < Math.floor(h / 0.5); k++) A(b, BOX, 0.5, 0.05, 0.05, x - d - 0.6, k * 0.5, z, COL.steel, SURF.metal, Math.PI / 2);
+  A(b, CYL, r, r * 1.3, r, x, h, z, 0x7d8279, SURF.metal);
+  A(b, CYL, r + 0.6, 0.12, r + 0.6, x, h, z, COL.steel, SURF.metal);
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2;
+    A(b, BOX, 0.05, 1.0, 0.05, x + Math.cos(a) * (r + 0.55), h, z + Math.sin(a) * (r + 0.55), COL.steel, SURF.metal);
+  }
+  b.push(CONE.clone().scale(r * 1.05, r * 0.4, r * 1.05).translate(x, h + r * 1.3, z), 0x6d7268, SURF.metal);
+}
+
 const MIL = {
   earth: 0x4f4232,
   trodden: 0x5a4c3a,
@@ -1239,6 +1467,10 @@ export class StructureView {
   private upgradeGroup = new THREE.Group();
   private upgradeSig = '';
   private scaffold: THREE.Mesh | null = null;
+  /** İnşaatta yükselme: kırpma düzlemi ve yapının yerden yüksekliği (m). */
+  private clip: THREE.Plane | null = null;
+  private clipTop = 0;
+  private clipMain = 0;
   readonly ring: THREE.Mesh;
   private built = false;
   /** İtfaiye merkezinin çizildiği seviye (seviye atlayınca görünüm yeniden kurulur: gameRenderer syncStructures). */
@@ -1348,57 +1580,57 @@ export class StructureView {
     airfieldCamp(b, rng);
     bays.push(...airfieldExtras(b, lamps));
     this.bays = bays;
-    // Kule: iki katlı sıvalı bina, cam kabin, keçe çatı; ikinci kat çatısında korkuluklu balkon, dış merdiven
-    A(b, BOX, 12, 9, 12, -330, 0, 700, COL.plaster, SURF.plasterWin);
-    A(b, BOX, 9, 4, 9, -330, 9, 700, COL.plaster, SURF.plasterWin);
-    A(b, BOX, 10, 2.6, 10, -330, 13, 700, COL.glass, SURF.curtain);
-    A(b, BOX, 11, 0.4, 11, -330, 15.6, 700, COL.felt, SURF.felt);
-    A(b, BOX, 12.4, 0.3, 12.4, -330, 9, 700, COL.concrete, SURF.concrete);
-    for (const s of [-1, 1]) {
-      A(b, BOX, 12.4, 0.08, 0.08, -330, 10.2, 700 + s * 6.15, COL.white, SURF.metal);
-      A(b, BOX, 0.08, 0.08, 12.4, -330 + s * 6.15, 10.2, 700, COL.white, SURF.metal);
-    }
-    beam(b, -336.8, 0.3, 707.5, -336.8, 9.1, 697.5, 0.9, COL.concrete);
+    // Harekât kulesi (watch office): balkon, cam kontrol odası, dış merdiven, sinyal direği, meteoroloji kafesi
+    watchOffice(b, -330, 700);
     // İtfaiye (tuğla, kapılar) ve önünde iki itfaiye aracı, barakalar (ahşap, keçe beşik çatı), yakıt tankları,
     // rüzgâr tulumları
-    A(b, BOX, 20, 6, 14, -300, 0, 760, COL.brick, SURF.brickWin);
-    A(b, BOX, 20.6, 0.5, 14.6, -300, 6, 760, COL.felt, SURF.felt);
-    for (const x of [-305, -295]) {
-      A(b, BOX, 2.5, 2.4, 7.5, x, 0.3, 744, 0x8e2a22, SURF.metal);
-      A(b, BOX, 2.3, 0.5, 5, x, 2.7, 743, COL.steelLight, SURF.metal);
+    airfieldFire(b, -300, 760);
+    for (const dx of [-7.6, 7.6]) {
+      const v = fireVehicle(dx > 0);
+      v.position.set(-300 + dx, 0.35, 744);
+      v.rotation.y = Math.PI;
+      g.add(v);
     }
-    for (let i = 0; i < 4; i++) {
-      A(b, BOX, 9, 4, 42, -500, 0, 180 + i * 90, COL.wood, SURF.wood);
-      A(b, GABLE, 9.8, 2.2, 42.8, -500, 4, 180 + i * 90, COL.felt, SURF.felt);
-    }
-    for (let i = 0; i < 3; i++) {
-      A(b, CYL, 6, 7, 6, -470, 0, -720 + i * 16, 0x7e8476, SURF.metal);
-      b.push(CONE.clone().scale(6.2, 1.2, 6.2).translate(-470, 7, -720 + i * 16), 0x737a6c, SURF.metal);
-    }
-    for (const z of [900, -900]) {
-      A(b, CYL, 0.25, 7, 0.25, 70, 0, z, COL.steelLight, SURF.metal);
-      A(b, CYLZ, 0.6, 0.6, 3, 70, 6.6, z, 0xe2702c, SURF.plain);
-    }
-    // Telsiz direği, takım bayrağı
-    A(b, CYL, 0.35, 32, 0.35, -360, 0, 720, COL.steelLight, SURF.metal);
-    for (const y of [10, 20, 30]) A(b, BOX, 4, 0.2, 0.2, -360, y, 720, COL.steelLight, SURF.metal);
+    for (let i = 0; i < 4; i++) barrack(b, -500, 180 + i * 90, 42, 9, Math.PI / 2);
+    fuelFarm(b, -470, -720, 3);
+    for (const z of [900, -900]) windsock(b, 70, z, 0.7);
+    // Telsiz direği (kafes, gergili), takım bayrağı
+    latticeMast(b, -360, 720, 32);
     A(b, CYL, 0.12, 12, 0.12, -310, 0, 690, COL.white, SURF.metal);
     A(b, BOX, 0.1, 1.6, 2.6, -310, 10.2, 691.4, PALETTE.team[this.s.team], SURF.plain);
-    // Apron araçları: yakıt tankerleri (zeytin yeşili), çekiciler, personel arabaları (hangar ağızlarının önü boş)
-    const veh = [0x4f5638, 0x5c6142, 0x2d2e30, 0x6b6f63];
+    // Apron araçları (airfieldVehicles.ts): yakıt tankerleri, uçak çekicileri, bir binek araç ve ambulans; apron
+    // betonunun üstünde (0,9 m; eskiden içine gömülüydü). Hangar ağızlarının önü boş
+    const AY = 0.9;
     const vz = [-245, -190, -130, -70, 60, 120, 180, 240];
     for (let i = 0; i < vz.length; i++) {
       const z = vz[i] + rng() * 8;
-      const big = i % 3 === 0;
       const x = -350 + rng() * 14;
-      A(b, BOX, big ? 2.6 : 1.9, big ? 2.8 : 1.6, big ? 8 : 4, x, 0.4, z, veh[i % veh.length], SURF.metal);
-      if (big) A(b, CYLZ, 1.1, 1.1, 5, x, 2.1, z - 3, 0x5a6140, SURF.metal);
+      const ry = (rng() < 0.5 ? 0 : Math.PI) + (rng() - 0.5) * 0.3;
+      if (i % 3 === 0) refueller(b, x, z, ry, AY);
+      else if (i === 4) autoParts(b, 'sedan', 0x4a4e3a, x, z, ry, AY);
+      else if (i === 7) ambulance(b, x, z, ry, AY);
+      else aircraftTractor(b, x, z, ry, AY);
     }
     // Nissen kulübeleri (oluklu sac) ve dağıtım kulübeleri (ahşap)
-    for (let i = 0; i < 6; i++) A(b, ARCH, 5, 3.4, 14, -540, 0, -900 + i * 40, 0x6f746a, SURF.corrugated);
+    for (let i = 0; i < 6; i++) {
+      const z = -900 + i * 40;
+      A(b, ARCH, 5, 3.4, 14, -540, 0, z, 0x6f746a, SURF.corrugated);
+      // Kemer biçimli tuğla alın duvarları (kutu duvar kemerin dışına taşıyordu), duvar yüzünde kapı ve iki pencere
+      for (const e of [-1, 1]) b.push(archWall(4.95, 3.35, 0.3), COL.brick, SURF.brick, 0, -540, 0, z + e * 7.05);
+      A(b, BOX, 1.1, 2.0, 0.1, -540, 0, z + 7.25, 0x3a3428, SURF.wood);
+      for (const dx of [-2.5, 2.5]) {
+        A(b, BOX, 1.0, 0.85, 0.06, -540 + dx, 1.0, z + 7.22, 0x2f3a40, SURF.curtain);
+        A(b, BOX, 1.15, 0.08, 0.14, -540 + dx, 0.94, z + 7.24, COL.concrete, SURF.concrete);
+      }
+      // Soba borusu çatıdan çıkar (eskiden çatının 1 m üstünde havada duruyordu)
+      A(b, CYL, 0.12, 1.4, 0.12, -538, 2.95, z - 4, COL.steel, SURF.metal);
+    }
     for (let i = 0; i < 4; i++) {
-      A(b, BOX, 7, 3.6, 7, -100, 0, -1100 + i * 30, COL.wood, SURF.wood);
-      A(b, GABLE, 7.6, 1.6, 7.6, -100, 3.6, -1100 + i * 30, COL.felt, SURF.felt);
+      const z = -1100 + i * 30;
+      A(b, BOX, 7, 3.6, 7, -100, 0, z, COL.wood, SURF.wood);
+      A(b, GABLE, 7.6, 1.6, 7.6, -100, 3.6, z, COL.felt, SURF.felt);
+      A(b, BOX, 1.0, 2.0, 0.1, -101.5, 0, z + 3.55, 0x3a3428, SURF.wood);
+      A(b, BOX, 1.2, 0.9, 0.08, -98.6, 1.4, z + 3.55, 0x2f3a40, SURF.curtain);
     }
     airfieldLights(lamps);
     lamps.build(g);
@@ -1593,38 +1825,119 @@ export class StructureView {
       const x = -150 + h * 150;
       const z = -40 + (rng() - 0.5) * 30;
       const len = 120 + rng() * 40;
-      A(b, BOX, 70, 14, len, x, 0, z, h === 1 ? COL.brickDark : COL.brick, SURF.brickWin);
+      const brick = h === 1 ? COL.brickDark : COL.brick;
+      A(b, BOX, 70, 14, len, x, 0, z, brick, SURF.brickWin);
       sawtoothRoof(b, 70, len, x, 14, z);
+      // Beton kaide, saçak kuşağı, uzun duvarlarda tuğla payandalar, köşelerde yağmur boruları
+      A(b, BOX, 70.6, 1.0, len + 0.6, x, 0, z, COL.concreteDark, SURF.concrete);
+      A(b, BOX, 70.8, 0.6, len + 0.8, x, 13.4, z, COL.concrete, SURF.concrete);
+      for (const sx of [-1, 1]) {
+        for (let pz = z - len / 2 + 6; pz < z + len / 2 - 3; pz += 9) A(b, BOX, 0.9, 13.4, 1.2, x + sx * 35.3, 0, pz, COL.brickDark, SURF.brick);
+        for (const sz of [-1, 1]) A(b, CYL, 0.14, 13.6, 0.14, x + sx * 35.5, 0, z + sz * (len / 2 + 0.2), COL.steel, SURF.metal);
+      }
       const fz = z + len / 2;
-      for (const dx of [-17, 17]) A(b, BOX, 22, 11, 0.4, x + dx, 0, fz + 0.1, 0x5e6058, SURF.hangarDoor);
+      // Ön cephe: iki büyük kapı (ortadaki holde biri yarı açık: içeride montaj tezgâhında gövde), beton lento, iki
+      // personel kapısı ve üstte firma levhası
+      for (const dx of [-17, 17]) {
+        const open = h === 1 && dx < 0;
+        if (open) {
+          // Açıklık duvarın önünde (aynı düzlemde kıpırdardı); gövde montaj tezgâhında kapıdan çıkarılıyor
+          A(b, BOX, 21.6, 10.8, 0.2, x + dx, 0, fz + 0.12, 0x16181a, SURF.plain);
+          A(b, BOX, 11, 11, 0.4, x + dx + 11.5, 0, fz + 0.6, 0x5e6058, SURF.hangarDoor);
+          A(b, CYLZ, 1.2, 1.4, 9, x + dx, 2.4, fz + 0.4, 0xb4b8bb, SURF.metal);
+          for (const jz of [2.5, 6.5]) {
+            A(b, BOX, 0.25, 3.6, 0.25, x + dx - 1.6, 0, fz + jz, 0x8a6a2e, SURF.metal);
+            A(b, BOX, 0.25, 3.6, 0.25, x + dx + 1.6, 0, fz + jz, 0x8a6a2e, SURF.metal);
+            A(b, BOX, 3.6, 0.25, 0.25, x + dx, 3.6, fz + jz, 0x8a6a2e, SURF.metal);
+          }
+        } else A(b, BOX, 22, 11, 0.4, x + dx, 0, fz + 0.1, 0x5e6058, SURF.hangarDoor);
+        A(b, BOX, 23.5, 1.2, 0.8, x + dx, 11, fz + 0.2, COL.concrete, SURF.concrete);
+      }
+      for (const dx of [-31, 31]) A(b, BOX, 1.4, 2.4, 0.3, x + dx, 0, fz + 0.15, 0x3a3428, SURF.wood);
+      A(b, BOX, 30, 2.2, 0.3, x, 11.6, fz + 0.45, 0x2e3a2e, SURF.plain);
+      A(b, BOX, 30.6, 0.2, 0.4, x, 11.5, fz + 0.45, COL.white, SURF.metal);
+      // Çatıda havalandırma bacaları
+      for (let k = 0; k < 4; k++) A(b, CYL, 0.6, 2.2, 0.6, x - 24 + k * 16, 14, z - len * 0.2 + (k % 2) * 20, COL.galvanized, SURF.metal);
       A(b, BOX, 70, 1.2, 5, x, 0, fz + 2.6, COL.concrete, SURF.concrete);
       A(b, BOX, 12, 5, len * 0.5, x + 41, 0, z - len * 0.15, COL.brickDark, SURF.brickWin);
       A(b, BOX, 12.4, 0.4, len * 0.5 + 0.4, x + 41, 5, z - len * 0.15, COL.felt, SURF.felt);
       P.truck(b, rng, x + (rng() - 0.5) * 30, fz + 12, Math.PI + (rng() - 0.5) * 0.4);
+      // Hol önünde: arabada çıplak alüminyum gövde ve sehpalarda kanat
+      const ax = x + 22;
+      A(b, BOX, 2.4, 0.5, 8, ax, 0.4, fz + 14, 0x3c4436, SURF.metal);
+      A(b, CYLZ, 0.85, 1.0, 9.5, ax, 1.9, fz + 9.5, 0xb9bdc0, SURF.metal);
+      for (const sz of [-1, 1]) A(b, BOX, 1.6, 1.3, 0.3, ax - 7, 0, fz + 14 + sz * 2.4, 0x6e5238, SURF.wood);
+      A(b, BOX, 9, 0.25, 2.2, ax - 7, 1.3, fz + 14, 0xaab0b3, SURF.metal);
     }
     // Kazan dairesi bacaların dibinde, yanında kömür yığını
     A(b, BOX, 64, 15, 22, 82, 0, -126, COL.brick, SURF.brickWin);
     P.gableRoof(b, 22, 64, 6, 82, 15, -126, Math.PI / 2, COL.brick, SURF.brick, COL.felt, SURF.tile, 0.5);
     b.push(CONE.clone().scale(16, 9, 12).translate(140, 0, -150), 0x2c2a28, SURF.earth);
+    beam(b, 132, 1.5, -147, 104, 15.5, -131, 1.4, 0x5c5850);
+    for (const t of [0.3, 0.65]) A(b, BOX, 0.4, 1.5 + 14 * t, 0.4, 132 - 28 * t, 0, -147 + 16 * t, COL.steelLight, SURF.metal);
+    // Boru köprüsü: kazan dairesinden hollere buhar boruları (dikmeler ve iki boru)
+    for (let px = 50; px >= -150; px -= 20) {
+      A(b, BOX, 0.5, 6, 0.5, px, 0, -112, COL.steelLight, SURF.metal);
+      A(b, BOX, 0.4, 0.4, 3, px, 6, -112, COL.steelLight, SURF.metal);
+    }
+    for (const dz of [-0.7, 0.7]) b.push(new THREE.CylinderGeometry(0.35, 0.35, 200, 8).rotateZ(Math.PI / 2), 0x9a958a, SURF.metal, 0, -50, 6.75, -112 + dz);
     // Yönetim binası: sıvalı üç kat, pencereli; kiremit çatı
     A(b, BOX, 60, 12, 22, -40, 0, 140, COL.plasterCream, SURF.plasterWin);
     A(b, GABLE, 23, 5, 61, -40, 12, 140, COL.tile, SURF.tile, Math.PI / 2);
+    // Kat silmesi, sütunlu giriş (basamaklar, alınlık), cephede saat, bacalar, bayrak direği
+    A(b, BOX, 60.6, 0.5, 22.6, -40, 4.1, 140, 0xcfc6ae, SURF.concrete);
+    A(b, BOX, 14, 0.6, 5, -40, 0, 153.5, COL.concrete, SURF.concrete);
+    for (let k = 0; k < 3; k++) A(b, BOX, 14, 0.2, 5 - k * 1.1, -40, 0.6 + k * 0.2, 152.9 - k * 0.55, COL.concrete, SURF.concrete);
+    for (let k = 0; k < 4; k++) A(b, CYL, 0.45, 7.5, 0.45, -45.4 + k * 3.6, 0.6, 155, 0xe6e0d0, SURF.concrete);
+    A(b, BOX, 13, 1.2, 4, -40, 8.1, 154, 0xe6e0d0, SURF.concrete);
+    A(b, GABLE, 13.4, 1.8, 4.4, -40, 9.3, 154, COL.tile, SURF.tile, Math.PI / 2);
+    b.push(new THREE.CylinderGeometry(1.1, 1.1, 0.15, 20).rotateX(Math.PI / 2), 0xe8e4d8, SURF.plain, 0, -40, 14.6, 151.4);
+    for (const dx of [-24, -8, 8, 24]) P.chimney(b, -40 + dx, 12, 136, 5.5, COL.brickDark);
+    A(b, CYL, 0.12, 13, 0.12, -40, 0, 163, COL.white, SURF.metal);
+    A(b, BOX, 0.08, 1.6, 2.6, -40, 11.2, 164.4, 0x8e2a22, SURF.plain);
     // Ambarlar (oluklu sac kemer), bacalar (tuğla, kurum karası ağız), su kulesi, test apronu, çit
-    for (let i = 0; i < 3; i++) A(b, ARCH, 14, 10, 40, 170, 0, 90 + i * 34, COL.galvanized, SURF.corrugated);
+    // Üç ayrı ambar, aralarında 10 m geçit (eskiden 40 m'lik kemerler 34 m arayla iç içe geçip tek uzun tünel gibi
+    // duruyordu, aradaki alın duvarları komşu kemerin içinden çıkıyordu)
+    for (let i = 0; i < 3; i++) {
+      const az = 88 + i * 40;
+      A(b, ARCH, 14, 10, 30, 170, 0, az, COL.galvanized, SURF.corrugated);
+      // Kemer biçimli tuğla alın duvarları (24×7 m kutu duvar kemerin dışına taşıyordu); kapı ve lento duvar yüzünde
+      for (const e of [-1, 1]) b.push(archWall(13.95, 9.95, 0.4), COL.brick, SURF.brick, 0, 170, 0, az + e * 14.9);
+      A(b, BOX, 6, 5, 0.12, 170, 0, az + 15.16, 0x5e6058, SURF.hangarDoor);
+      A(b, BOX, 6.8, 0.4, 0.22, 170, 5.0, az + 15.2, COL.concrete, SURF.concrete);
+      for (const dx of [-7.5, 7.5]) {
+        A(b, BOX, 1.8, 1.4, 0.06, 170 + dx, 3.0, az + 15.13, 0x2f3a40, SURF.curtain);
+        A(b, BOX, 2.0, 0.1, 0.18, 170 + dx, 2.92, az + 15.18, COL.concrete, SURF.concrete);
+      }
+      // Kapı önünde beton rampa, kemer dibinde beton kaide şeridi
+      A(b, BOX, 10, 0.18, 4, 170, 0, az + 17.1, COL.concrete, SURF.concrete);
+      for (const sx of [-1, 1]) A(b, BOX, 0.5, 0.35, 30, 170 + sx * 13.9, 0, az, COL.concrete, SURF.concrete);
+      for (let k = 0; k < 3; k++) drum(b, 160 + k * 0.7, az + 18.5, [0x5a4a38, 0x4a5a4e, 0x8e2a22][(i + k) % 3]);
+      crates(b, 181, az + 18.5, 6, 0);
+    }
     for (let i = 0; i < 3; i++) {
       const r = 3.5 - i * 0.4;
       const hh = 45 + i * 8;
       A(b, CYL, r, hh, r, 60 + i * 22, 0, -150, COL.brickDark, SURF.brick);
       A(b, CYL, r * 1.12, 1.6, r * 1.12, 60 + i * 22, hh - 1.6, -150, 0x2c2826, SURF.metal);
+      for (const f of [0.35, 0.7]) A(b, CYL, r * 1.04, 1.2, r * 1.04, 60 + i * 22, hh * f, -150, 0xb0a490, SURF.brick);
+      A(b, CYL, 0.05, 3, 0.05, 60 + i * 22 + r * 0.8, hh, -150, COL.steel, SURF.metal);
     }
-    for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) A(b, BOX, 0.6, 22, 0.6, -230 + dx, 0, 110 + dz, COL.steelLight, SURF.metal);
-    A(b, CYL, 6, 8, 6, -230, 22, 110, 0x7d8279, SURF.metal);
-    b.push(CONE.clone().scale(6.3, 1.6, 6.3).translate(-230, 30, 110), 0x6d7268, SURF.metal);
+    waterTower(b, -230, 110, 22, 6);
     A(b, BOX, 180, 0.8, 70, 30, 0, 215, COL.concrete, SURF.runway);
     fenceRing(b, 300, 270);
     // Demiryolu bağlantısı (balast, raylar) ve vagonlar, işçi otoparkı ve arabalar
     A(b, BOX, 4, 0.5, 520, 240, 0, -10, 0x6f665a, SURF.earth);
+    for (let tz = -268; tz < 250; tz += 2.4) A(b, BOX, 2.5, 0.55, 0.26, 240, 0, tz, 0x4a3a2c, SURF.wood);
     for (const dx of [-0.72, 0.72]) A(b, BOX, 0.12, 0.65, 520, 240 + dx, 0, -10, COL.steel, SURF.metal);
+    // Manevra lokomotifi: şasi, kazan, duman bacası, kubbe, kabin, tekerler
+    A(b, BOX, 2.8, 1.0, 9, 240, 0.65, -205, 0x1c1d1e, SURF.metal);
+    A(b, CYLZ, 1.1, 1.1, 5.5, 240, 2.75, -205.5, 0x2a3a2c, SURF.metal);
+    A(b, CYL, 0.35, 1.3, 0.35, 240, 3.8, -201.2, 0x1c1d1e, SURF.metal);
+    A(b, CYL, 0.5, 0.6, 0.5, 240, 3.8, -203.3, 0x2a3a2c, SURF.metal);
+    A(b, BOX, 2.9, 2.6, 2.6, 240, 1.65, -208.4, 0x2a3a2c, SURF.metal);
+    A(b, BOX, 3.1, 0.2, 3.0, 240, 4.25, -208.4, 0x1c1d1e, SURF.metal);
+    for (let k = 0; k < 3; k++) for (const s2 of [-1, 1]) A(b, WHEEL, 0.15, 0.6, 0.6, 240 + s2 * 0.75, 0.6, -202.5 - k * 1.6, 0x26282a, SURF.metal);
     for (let i = 0; i < 7; i++) {
       const col = [0x6e4a35, 0x5c5f56, 0x7a5a42][i % 3];
       A(b, BOX, 3, 3.6, 13, 240, 0.6, -180 + i * 15, col, SURF.wood);
@@ -1647,6 +1960,21 @@ export class StructureView {
     for (const s of [-1, 1]) A(b, BOX, 1.2, 6, 18, -250 + s * 8, 0, -150, COL.concrete, SURF.concrete);
     A(b, BOX, 17, 6, 1.2, -250, 0, -159, COL.concrete, SURF.concrete);
     A(b, BOX, 6, 3, 5, -270, 0, -140, COL.concreteDark, SURF.concrete);
+    for (const dx of [-0.8, 0.8]) A(b, BOX, 0.3, 2.4, 0.3, -250 + dx, 0, -150, COL.steelLight, SURF.metal);
+    A(b, CYLZ, 0.7, 0.7, 2.2, -250, 2.6, -150.5, 0x3c3e41, SURF.metal);
+    b.push(new THREE.CylinderGeometry(1.7, 1.7, 0.05, 24).rotateX(Math.PI / 2), 0x9a9688, SURF.metal, 0, -250, 2.6, -148.1);
+    b.push(new THREE.BoxGeometry(0.08, 3.4, 0.25).rotateZ(0.6), 0x2a2a2a, SURF.metal, 0, -250, 2.6, -148.0);
+    // Kapıda bariyer kolu (kırmızı-beyaz), trafo istasyonu ve dışarı giden elektrik hattı, yönetim binası yanında sığınak
+    for (let k = 0; k < 6; k++) A(b, BOX, 1.4, 0.16, 0.16, -101 - k * 1.4, 1.15, 270, k % 2 ? COL.white : 0xb02a24, SURF.plain);
+    A(b, BOX, 22, 0.3, 16, -150, 0, -190, COL.concrete, SURF.concrete);
+    for (let k = 0; k < 3; k++) {
+      A(b, BOX, 2.6, 2.8, 1.8, -158 + k * 8, 0.3, -190, 0x5a5e58, SURF.metal);
+      for (const dx of [-0.8, 0, 0.8]) A(b, CYL, 0.12, 1.1, 0.12, -158 + k * 8 + dx, 3.1, -190, 0x8a6a4a, SURF.concrete);
+    }
+    fenceLine(b, -162, -199, -138, -199);
+    phoneLine(b, [[-150, -200], [-150, -240], [-150, -300], [-180, -330]], 8);
+    b.push(CONE.clone().scale(9, 3, 6), COL.turf, SURF.grass, 0, -110, 0, 120);
+    A(b, BOX, 3, 2.4, 2.2, -102, 0, 120, COL.concrete, SURF.concrete);
     // Yönetim binası ve otopark çevresinde ağaçlar, yol boyunca lambalar
     for (let i = 0; i < 8; i++) P.tree(b, rng, -82 + i * 12, 158 + (rng() - 0.5) * 3, 8 + rng() * 3, false);
     for (let i = 0; i < 5; i++) P.tree(b, rng, -236 + i * 18, 218, 7 + rng() * 3, false);
@@ -1672,29 +2000,36 @@ export class StructureView {
   sync(simDt: number): void {
     const s = this.s;
     const mt = this.mat;
-    // İnşaat
+    // İnşaat (2026-11-17): bina yerden yukarı yükselir (kırpma düzlemi; temel ve zemin baştan görünür), çevresinde
+    // ahşap iskele, büyük yapıda vinç ve malzeme yığınları (construction.ts). Eskiden yarı saydam bina ve tel kafes kutu.
     if (s.build < 1) {
-      if (!mt.transparent) {
-        mt.transparent = true;
+      if (!this.clip) {
+        this.group.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(this.group);
+        this.clipTop = Math.max(1, bb.max.y - this.group.matrixWorld.elements[13]);
+        const info = bodyInfo(this.group);
+        this.clipMain = Math.min(this.clipTop, info?.mainTop ?? this.clipTop);
+        this.clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+        mt.clippingPlanes = [this.clip];
+        mt.clipShadows = true;
         mt.needsUpdate = true;
+        this.scaffold = buildScaffold(s.kind, s.id * 7919 + 17, info);
+        if (this.scaffold) this.group.add(this.scaffold);
       }
-      mt.opacity = 0.25 + s.build * 0.5;
-      if (!this.scaffold) {
-        const r = s.kind === 'airbase' ? 300 : s.def.radius * 1.2;
-        this.scaffold = new THREE.Mesh(
-          new THREE.BoxGeometry(r * 2, Math.max(20, r * 0.3), r * 2),
-          new THREE.MeshBasicMaterial({ color: 0xc9b68f, wireframe: true, transparent: true, opacity: 0.5 }),
-        );
-        this.scaffold.position.y = Math.max(10, r * 0.15);
-        this.group.add(this.scaffold);
-      }
+      // Ana gövde inşaatın %90'ında tamamlanır, baca ve kuleler son %10'da; alt 0,5 m (temel) baştan görünür
+      const k = s.build;
+      const h = k < 0.9 ? this.clipMain * (k / 0.9) : this.clipMain + (this.clipTop - this.clipMain) * ((k - 0.9) / 0.1);
+      this.clip.constant = this.group.matrixWorld.elements[13] + 0.5 + h;
     } else if (!this.built) {
       this.built = true;
-      mt.opacity = 1;
-      mt.transparent = false;
-      mt.needsUpdate = true;
+      if (this.clip) {
+        mt.clippingPlanes = null;
+        mt.needsUpdate = true;
+        this.clip = null;
+      }
       if (this.scaffold) {
         this.group.remove(this.scaffold);
+        this.scaffold.geometry.dispose();
         this.scaffold = null;
       }
     }

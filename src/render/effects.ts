@@ -15,6 +15,7 @@ import { PALETTE } from './palette';
 import { groundLevel } from '../sim/terrain';
 import { G, rand, smoothstep } from '../core/math';
 import { WIND, linkAtmosphere } from './atmosphere';
+import { canopyGeometry, jumperGeometry, rocketGeometry } from './munitions';
 
 interface Puff {
   pos: THREE.Vector3;
@@ -641,14 +642,14 @@ export class Tracers {
   }
 }
 
-/** Roketler: küçük gövde + duman izi. */
+/** Roketler: RP-3 gövdesi (munitions.ts) + duman izi. */
 export class RocketViews {
   readonly mesh: THREE.InstancedMesh;
 
   constructor(private readonly max = 400) {
     this.mesh = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.12, 0.12, 1.8, 6).rotateX(Math.PI / 2),
-      new THREE.MeshLambertMaterial({ color: PALETTE.bomb, flatShading: true }),
+      rocketGeometry(),
+      new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.2, roughness: 0.6 }),
       max,
     );
     this.mesh.count = 0;
@@ -801,11 +802,12 @@ export class ParachuteViews {
 
   constructor(private readonly max = 120) {
     this.canopy = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(1, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.55, 1),
-      new THREE.MeshLambertMaterial({ color: 0xf6f3ec, flatShading: true, side: THREE.DoubleSide }),
+      // Askı ipleri kubbe biriminde: etekten pilotun omuzlarına (kubbe pilotun 5,5 m üstünde, yarıçapı 4,2 m)
+      canopyGeometry(0.8),
+      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
       max,
     );
-    this.pilot = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 1.6, 0.4), new THREE.MeshLambertMaterial({ color: 0x6b6570 }), max);
+    this.pilot = new THREE.InstancedMesh(jumperGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), max);
     for (const m of [this.canopy, this.pilot]) {
       m.count = 0;
       m.frustumCulled = false;

@@ -73,6 +73,7 @@ export class RoadLayer {
   private world: World | null = null;
 
   constructor() {
+    this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
   }

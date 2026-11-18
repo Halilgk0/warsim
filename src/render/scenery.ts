@@ -15,8 +15,9 @@ const fbmGrove = makeFbm(6151, 3);
 
 /** Ağaç konmayacak yerler ızgarası: yollar, köyler, çiftlikler, şehirler (KEEP_CELL m'lik hücreler). */
 const KEEP_CELL = 40;
-import { BOX, CYL, GABLE, broadleafFarGeo, broadleafGeo, coniferFarGeo, coniferGeo, freeze, rockGeo } from './props';
+import { broadleafFarGeo, broadleafGeo, coniferFarGeo, coniferGeo, freeze, rockGeos } from './props';
 import { linkAtmosphere } from './atmosphere';
+import type { FarmSpot } from './farms';
 import { linkCloudShadow } from './clouds';
 import { groundU } from './groundTex';
 
@@ -44,8 +45,38 @@ function leafy(shader: TreeShader): void {
     .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix( vec3( 1.0 ), texture2D( terrGrass, vLeafUv ).rgb * 2.0, 0.65 );');
 }
 
+/**
+ * Taş dokusu (kayalar, 2026-11-17): zemin dokusunun parlaklığı dünya konumundan okunur; yüz yukarı bakıyorsa üstten, yana
+ * bakıyorsa yandan izdüşürülür (dikey yüzde çizgi çizgi uzamaz). İki ölçek: tane ve leke. Renk değil, yalnız parlaklık.
+ */
+function stony(shader: TreeShader): void {
+  Object.assign(shader.uniforms, groundU);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vRockW;')
+    .replace('#include <project_vertex>', [
+      '#ifdef USE_INSTANCING',
+      '  vRockW = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;',
+      '#else',
+      '  vRockW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;',
+      '#endif',
+      '#include <project_vertex>',
+    ].join('\n'));
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nuniform sampler2D terrGrass;\nvarying vec3 vRockW;')
+    .replace('#include <color_fragment>', [
+      '#include <color_fragment>',
+      '{',
+      '  vec3 wn = normalize( cross( dFdx( vRockW ), dFdy( vRockW ) ) );',
+      '  vec2 uv = abs( wn.y ) > 0.6 ? vRockW.xz : vec2( vRockW.x + vRockW.z, vRockW.y * 1.6 );',
+      '  float fine = dot( texture2D( terrGrass, uv / 2.5 ).rgb, vec3( 0.3, 0.59, 0.11 ) ) * 2.0;',
+      '  float blot = dot( texture2D( terrGrass, uv / 19.0 + 0.37 ).rgb, vec3( 0.3, 0.59, 0.11 ) ) * 2.0;',
+      '  diffuseColor.rgb *= mix( 1.0, fine, 0.7 ) * mix( 1.0, blot, 0.55 );',
+      '}',
+    ].join('\n'));
+}
+
 /** Bulut gölgesi alan düz Lambert malzemesi (ağaç, kaya, köy evleri). */
-function shadedLambert(o: THREE.MeshLambertMaterialParameters, key: string): THREE.MeshLambertMaterial {
+export function shadedLambert(o: THREE.MeshLambertMaterialParameters, key: string): THREE.MeshLambertMaterial {
   const m = new THREE.MeshLambertMaterial(o);
   m.onBeforeCompile = (shader) => {
     linkAtmosphere(shader);
@@ -59,12 +90,10 @@ function shadedLambert(o: THREE.MeshLambertMaterialParameters, key: string): THR
 let CHUNK = 64 * TERRAIN_CELL;
 let NC = TERRAIN_N / 64;
 
-// Gerçekçi tonlar: sıva (beyaz, krem, aşı boyası), kiremit ve arduvaz çatı, koyu yaz yeşili ağaçlar, gri kaya
-const WALLS = [0xe8e2d4, 0xdccfb2, 0xc9a77e, 0xcfcbc2, 0xe1d3a6, 0xd6c3b0, 0xece6da];
-const ROOFS = [0xa45838, 0x8e4a32, 0xb06844, 0x5a5e66, 0x6a5a50, 0x9a5a3e];
+// Gerçekçi tonlar: koyu yaz yeşili ağaçlar, gri kaya
 const TREES_B = [0x5e8c44, 0x54803e, 0x69964c, 0x4c7a3a, 0x709c50];
 const TREES_C = [0x3f6a46, 0x38623f, 0x4a7650];
-const ROCKS = [0x8f8a84, 0x847f7a, 0x9a948c, 0x7a7672];
+const ROCKS = [0x8f8a84, 0x847f7a, 0x9a948c, 0x7a7672, 0x86837c, 0x7e8082, 0x8e8a82];
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -126,21 +155,6 @@ interface TreeBlock {
 /** Yerleşim blokları (m): yalnız kameranın yakınındaki bloklar çizilir (Yüksek kalitede 10 km) (eskiden bütün haritanın köy ve
  * şehirleri birlikte çiziliyordu: kamera 20 km'den yakınken 1,4–1,7 milyon üçgen). */
 let SETTLE_BLOCK = CHUNK;
-/** Blok sayısı (kenar): parça sayısıyla aynı. */
-let SETTLE_NB = NC;
-
-/** Konuma göre bloklara dağıtan örnek listesi (InstList ile aynı ekleme). */
-class BlockedList {
-  readonly blocks = new Map<number, InstList>();
-  push(x: number, y: number, z: number, sx: number, sy: number, sz: number, yaw: number, color: number): void {
-    const bx = clamp(Math.floor((x + HALF) / SETTLE_BLOCK), 0, SETTLE_NB - 1);
-    const bz = clamp(Math.floor((z + HALF) / SETTLE_BLOCK), 0, SETTLE_NB - 1);
-    const k = bz * SETTLE_NB + bx;
-    let l = this.blocks.get(k);
-    if (!l) this.blocks.set(k, (l = new InstList()));
-    l.push(x, y, z, sx, sy, sz, yaw, color);
-  }
-}
 
 interface SettleBlock {
   group: THREE.Group;
@@ -196,10 +210,21 @@ function farBlocks(
 
 export class Scenery {
   readonly group = new THREE.Group();
-  private readonly vegMat = shadedLambert({ vertexColors: true, flatShading: true }, 'vegCloud');
+  /** Kayalar: yüz yüz ton (köşe rengi) ve taş dokusu. */
+  private readonly vegMat = ((): THREE.MeshLambertMaterial => {
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    m.onBeforeCompile = (shader) => {
+      linkAtmosphere(shader);
+      linkCloudShadow(shader);
+      stony(shader);
+    };
+    m.customProgramCacheKey = () => 'rockStone';
+    return m;
+  })();
   /** Yakın ağaçlar: yaprak dokulu (kayalar vegMat'te kalır). */
   private readonly treeNearMat = ((): THREE.MeshLambertMaterial => {
-    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    // Yumuşak gölgelenme: taç normalleri öbek merkezinden (props.ts roundNormals); köşeli yüz görünmesin
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true });
     m.onBeforeCompile = (shader) => {
       linkAtmosphere(shader);
       linkCloudShadow(shader);
@@ -208,11 +233,11 @@ export class Scenery {
     m.customProgramCacheKey = () => 'treeNearLeaf';
     return m;
   })();
-  private readonly bldMat = shadedLambert({ flatShading: true }, 'bldCloud');
   private readonly treeB = broadleafGeo(0xffffff);
   private readonly treeC = coniferGeo(0xffffff);
   private readonly treeFar = [broadleafFarGeo(0xffffff), coniferFarGeo(0xffffff)];
-  private readonly rock = rockGeo(0xffffff);
+  /** Kaya biçimleri: yuvarlak, yassı, sivri (props.ts rockGeos). */
+  private readonly rocks = rockGeos();
   /** Basit taç malzemeleri: seyrek ve sık (sık olan sık taç yarıçapı ötesinde atılır). Paylaşılan değerler. */
   private readonly treeU = {
     treeNear: { value: new THREE.Vector3(0, -1e9, 0) },
@@ -232,6 +257,9 @@ export class Scenery {
   private settle: THREE.Group = new THREE.Group();
   private settleBlocks: SettleBlock[] = [];
   private settleVersion = 0;
+  /** Çiftliklerin yerleri (farms.ts çizer) ve listenin sürümü. */
+  farmSpots: FarmSpot[] = [];
+  farmVersion = 0;
   /** Ağaç konmayacak hücreler (çiftlikler); yerleşimlerle birlikte kurulur. Süs köyleri ve yapılar açıklık listesinde (cleared). */
   private keepOut = new Set<number>();
 
@@ -283,7 +311,7 @@ export class Scenery {
    * sık taç yarıçapı ötesinde atılır; hepsi sönme aralığında küçülerek söner. Atılan örnek sıfır boyuta iner (üçgeni çizilmez).
    */
   private treeMaterial(dense: boolean): THREE.MeshLambertMaterial {
-    const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    const m = new THREE.MeshLambertMaterial({ vertexColors: true });
     m.onBeforeCompile = (shader) => {
       linkAtmosphere(shader);
       linkCloudShadow(shader);
@@ -373,7 +401,7 @@ export class Scenery {
     // Harita büyüklüğü değişmiş olabilir: parça boyu ve sayısı yeniden (arazi parçalarıyla aynı)
     const cells = chunkCells();
     CHUNK = SETTLE_BLOCK = cells * TERRAIN_CELL;
-    NC = SETTLE_NB = TERRAIN_N / cells;
+    NC = TERRAIN_N / cells;
     for (const ch of this.chunks) {
       if (ch.group) {
         this.chunkGroup.remove(ch.group);
@@ -477,7 +505,7 @@ export class Scenery {
     const g = new THREE.Group();
     const tb = new InstList();
     const tc = new InstList();
-    const rk = new InstList();
+    const rk = [new InstList(), new InstList(), new InstList()];
     const x0 = -HALF + ci * CHUNK;
     const z0 = -HALF + cj * CHUNK;
     // 4 geçiş: her geçiş 84 m ızgara, kaydırmalı → ilk geçiş tek başına düzgün seyrek bir orman
@@ -533,7 +561,9 @@ export class Scenery {
           const qx = px + (rng() - 0.5) * 50;
           const qz = pz + (rng() - 0.5) * 50;
           const sc = (h > 1400 ? 10 : 5) + rng() * (h > 1400 ? 22 : 12);
-          rk.push(qx, groundLevel(qx, qz) - sc * 0.22, qz, sc * (0.8 + rng() * 0.5), sc * (0.6 + rng() * 0.5), sc, rng() * 6.28, ROCKS[Math.floor(rng() * ROCKS.length)]);
+          // Biçim konumdan (rastgele akışı değiştirmez): dağda sivri kaya daha sık
+          const form = Math.floor(Math.abs(Math.sin(qx * 0.013 + qz * 0.029) * 1000)) % (h > 1400 ? 4 : 3);
+          rk[Math.min(2, form)].push(qx, groundLevel(qx, qz) - sc * 0.22, qz, sc * (0.8 + rng() * 0.5), sc * (0.6 + rng() * 0.5), sc, rng() * 6.28, ROCKS[Math.floor(rng() * ROCKS.length)]);
         }
       }
     }
@@ -549,36 +579,23 @@ export class Scenery {
         g.add(t.mesh);
       }
     });
-    const rocks = rk.mesh(this.rock, this.vegMat);
-    if (rocks) g.add(rocks);
+    rk.forEach((l, i) => {
+      const rocks = l.mesh(this.rocks[i], this.vegMat);
+      if (rocks) g.add(rocks);
+    });
     return g;
   }
 
   // ------------------------------------------------------------------ yerleşimler
 
-  /** Çiftlikler (ahır, silo, ev, ağaç). Haritanın şehirleri ve yol boyu köyleri 2026-11-13'te kaldırıldı. */
+  /**
+   * Çiftliklerin yerleri: tarla bölgelerinde, açıklıklardan (süs, yapı) uzak; ağaç konmaz. Modelleri farms.ts çizer
+   * (2026-11-17; eskiden burada renkli kutular). Haritanın şehirleri ve yol boyu köyleri 2026-11-13'te kaldırıldı.
+   */
   private buildSettlements(): void {
-    const walls = new BlockedList();
-    const roofs = new BlockedList();
-    const silos = new BlockedList();
-    const trees = new BlockedList();
     const rng = mulberry32(4242);
-    const house = (x: number, z: number, yaw: number, s = 1) => {
-      const w = (8 + rng() * 4) * s;
-      const d = (9 + rng() * 4) * s;
-      const h = rng() < 0.35 ? 6.4 : 3.8;
-      const y = groundLevel(x, z) - 0.6;
-      walls.push(x, y, z, w, h + 0.6, d, yaw, WALLS[Math.floor(rng() * WALLS.length)]);
-      roofs.push(x, y + h + 0.6, z, w + 1, 2.6 + rng() * 1.2, d + 1, yaw + (rng() < 0.5 ? 0 : Math.PI / 2), ROOFS[Math.floor(rng() * ROOFS.length)]);
-    };
-    const tree = (x: number, z: number, s = 1) => {
-      const size = (9 + rng() * 6) * s;
-      trees.push(x, groundLevel(x, z) - 0.4, z, size, size, size, rng() * 6.28, TREES_B[Math.floor(rng() * TREES_B.length)]);
-    };
-    // Ağaç konmayacak yerler: çiftlikler aşağıda kurulurken eklenir
     this.keepOut.clear();
-
-    // Çiftlikler: tarla bölgelerinde ahır + silo + birkaç ağaç
+    const spots: FarmSpot[] = [];
     // Çiftlik denemeleri harita alanıyla orantılı
     const farmTries = Math.round(1800 * (MAP_SIZE / 150000) ** 2);
     for (let i = 0; i < farmTries; i++) {
@@ -586,33 +603,12 @@ export class Scenery {
       const z = (rng() - 0.5) * MAP_SIZE * 0.9;
       if (sampleGrid(fieldGrid, x, z) < 0.45 || rng() > 0.18) continue;
       if (cleared(x, z, 300)) continue;
-      const yaw = rng() * Math.PI;
-      const y = groundLevel(x, z) - 0.5;
-      this.keepCircle(x, z, 50);
-      walls.push(x, y, z, 14, 7.5, 26, yaw, 0x8e3e2e);
-      roofs.push(x, y + 7.5, z, 15, 5, 27, yaw, 0x5a5e66);
-      house(x + 28 * Math.cos(yaw), z - 28 * Math.sin(yaw), yaw);
-      silos.push(x - 14 * Math.cos(yaw) + 10 * Math.sin(yaw), y, z + 14 * Math.sin(yaw) + 10 * Math.cos(yaw), 3.4, 15, 3.4, 0, 0xaaa69d);
-      for (let k = 0; k < 4; k++) tree(x + (rng() - 0.5) * 70, z + (rng() - 0.5) * 70);
+      const yaw = rng() * Math.PI * 2;
+      this.keepCircle(x, z, 75);
+      spots.push({ x, z, yaw, seed: Math.imul(i + 1, 2654435761) >>> 0 });
     }
-
-    const near = (m: THREE.Object3D | null) => {
-      if (m) m.userData.near = true;
-      return m;
-    };
-    const keys = new Set<number>();
-    for (const l of [walls, roofs, silos, trees]) for (const k of l.blocks.keys()) keys.add(k);
-    for (const k of keys) {
-      const g = new THREE.Group();
-      const mk = (l: BlockedList, geo: THREE.BufferGeometry, mat: THREE.Material) => l.blocks.get(k)?.mesh(geo, mat) ?? null;
-      for (const m of [
-        mk(walls, BOX, this.bldMat), mk(roofs, GABLE, this.bldMat),
-        near(mk(silos, CYL, this.bldMat)), mk(trees, this.treeB, this.treeNearMat),
-      ]) if (m) g.add(m);
-      this.settle.add(g);
-      freeze(g);
-      this.settleBlocks.push({ group: g, x0: -HALF + (k % SETTLE_NB) * SETTLE_BLOCK, z0: -HALF + Math.floor(k / SETTLE_NB) * SETTLE_BLOCK });
-    }
+    this.farmSpots = spots;
+    this.farmVersion++;
   }
 }
 

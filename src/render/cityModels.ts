@@ -46,7 +46,7 @@ const C = {
   flowers: [0xb8483c, 0xd8b440, 0xc86a8a, 0xe8e0d0],
 };
 
-const TREE_B = broadleafGeo(0xffffff);
+const TREE_B = broadleafGeo(0xffffff, true);
 const TREE_C = coniferGeo(0xffffff);
 const CONE = new THREE.ConeGeometry(1, 1, 12).translate(0, 0.5, 0);
 
@@ -224,7 +224,7 @@ function tree(b: ArchBatch, rng: Rng, x: number, z: number, h = 7 + rng() * 5, c
   g.scale(h * (conifer ? 0.75 : 1), h, h * (conifer ? 0.75 : 1));
   g.rotateY(rng() * 6.28);
   g.translate(x, 0, z);
-  b.push(g, null, SURF.plain);
+  b.push(g, null, SURF.leaf);
 }
 
 /** 1940'lar otomobili (park hâlinde): tekerlekli, çamurluklu binek araç; bazen kamyonet (vehicleParts.ts). */
@@ -234,19 +234,19 @@ function car(b: ArchBatch, rng: Rng, x: number, z: number, ry = 0): void {
 }
 
 /** Kamyon (Opel Blitz benzeri): tekerlek bloğu, kaput, kabin, ahşap kasa ve branda. */
-function truck(b: ArchBatch, rng: Rng, x: number, z: number, ry = 0): void {
+function truck(b: ArchBatch, rng: Rng, x: number, z: number, ry = 0, y0 = 0): void {
   const col = pick(rng, C.truck);
   const dx = Math.sin(ry);
   const dz = Math.cos(ry);
   const at = (f: number): [number, number] => [x + dx * f, z + dz * f];
-  A(b, BOX, 2.1, 0.8, 5.4, x, 0, z, ry, 0x1c1d1e, SURF.metal);
+  A(b, BOX, 2.1, 0.8, 5.4, x, y0, z, ry, 0x1c1d1e, SURF.metal);
   let [px, pz] = at(2.15);
-  A(b, BOX, 1.3, 0.85, 1.3, px, 0.75, pz, ry, col, SURF.metal);
+  A(b, BOX, 1.3, 0.85, 1.3, px, y0 + 0.75, pz, ry, col, SURF.metal);
   [px, pz] = at(0.9);
-  A(b, BOX, 2.1, 1.55, 1.4, px, 0.75, pz, ry, col, SURF.metal);
+  A(b, BOX, 2.1, 1.55, 1.4, px, y0 + 0.75, pz, ry, col, SURF.metal);
   [px, pz] = at(-1.25);
-  A(b, BOX, 2.3, 0.6, 3.4, px, 0.85, pz, ry, 0x7a6248, SURF.wood);
-  A(b, ARCH, 1.15, 1.1, 3.4, px, 1.45, pz, ry, pick(rng, C.canvas), SURF.canvas);
+  A(b, BOX, 2.3, 0.6, 3.4, px, y0 + 0.85, pz, ry, 0x7a6248, SURF.wood);
+  A(b, ARCH, 1.15, 1.1, 3.4, px, y0 + 1.45, pz, ry, pick(rng, C.canvas), SURF.canvas);
 }
 
 /** Sokak lambası: dökme demir kaide ve direk, kol, camlı fener. */
@@ -1097,7 +1097,7 @@ function townhall(b: ArchBatch, rng: Rng): void {
   for (const s of [-1, 1]) {
     A(b, BOX, 22.5, 0.04, 0.04, s * 18.75, TOP + 0.6, 26.2, 0, 0x2f3236, SURF.metal);
     A(b, BOX, 1.5, 0.75, 1.5, s * 6.2, TOP, -0.5, 0, 0xb8b0a2, SURF.concrete);
-    A(b, BOX, 1.25, 0.35, 1.25, s * 6.2, TOP + 0.75, -0.5, 0, pick(rng, C.flowers), SURF.grass);
+    A(b, BOX, 1.25, 0.35, 1.25, s * 6.2, TOP + 0.75, -0.5, 0, pick(rng, C.flowers), SURF.flowers);
     A(b, BOX, 0.3, 0.5, 0.3, s * 30.5, TOP, 23, 0, C.dark, SURF.metal);
     A(b, CYL, 0.09, 4.4, 0.09, s * 30.5, TOP + 0.5, 23, 0, C.dark, SURF.metal);
     A(b, BOX, 1.5, 0.07, 0.07, s * 30.5, TOP + 4.6, 23, 0, C.dark, SURF.metal);
@@ -1154,7 +1154,7 @@ function townhallBaroque(b: ArchBatch, rng: Rng): void {
     // Çiçek tarhı: toprak zemin üstünde alçak çiçek öbekleri
     flat(b, 9, 9, s * 18, 10, C.earth, SURF.earth, 0, 0.2);
     for (let i = 0; i < 9; i++) {
-      A(b, BOX, 1.9, 0.3 + rng() * 0.2, 1.9, s * 18 + ((i % 3) - 1) * 2.8, TOP + 0.1, 10 + (Math.floor(i / 3) - 1) * 2.8, 0, i % 2 ? pick(rng, C.flowers) : C.hedge, SURF.grass);
+      A(b, BOX, 1.9, 0.3 + rng() * 0.2, 1.9, s * 18 + ((i % 3) - 1) * 2.8, TOP + 0.1, 10 + (Math.floor(i / 3) - 1) * 2.8, 0, i % 2 ? pick(rng, C.flowers) : C.hedge, i % 2 ? SURF.flowers : SURF.grass);
     }
     for (const z of [0, 20]) tree(b, rng, s * 28.5, z, 8 + rng() * 2, false);
     tree(b, rng, s * 28.5, 10, 8 + rng() * 2, false);
@@ -1455,8 +1455,9 @@ function depot(b: ArchBatch, rng: Rng): void {
     A(b, BOX, 26, 5, 70, x, 0, -10, 0, br, SURF.brick);
     A(b, ARCH, 13, 7, 70, x, 5, -10, 0, pick(rng, [0x8a8f8c, 0x7a8272, 0x9a9890]), SURF.corrugated);
     for (const e of [-1, 1]) {
-      A(b, ARCH, 12.9, 6.9, 0.5, x, 5, -10 + e * 35.1, 0, br, SURF.brick);
-      A(b, BOX, 8, 4.4, 0.3, x, 0, -10 + e * 35.25, 0, 0x5e6058, SURF.hangarDoor);
+      // Alın duvarı ve kapı tuğla gövdenin yüzünde (kapı 0,4 m dışarı taşıyordu)
+      A(b, ARCH, 12.9, 6.9, 0.4, x, 5, -10 + e * 34.95, 0, br, SURF.brick);
+      A(b, BOX, 8, 4.4, 0.12, x, 0, -10 + e * 35.06, 0, 0x5e6058, SURF.hangarDoor);
     }
     A(b, BOX, 2.6, 1.2, 66, x + 14.3, 0, -10, 0, C.concrete, SURF.concrete);
   }
@@ -1567,7 +1568,7 @@ function park(b: ArchBatch, rng: Rng): void {
       if (type !== 3) {
         A(b, BOX, 3.2, 0.22, 1.5, sx * 5.6, TOP, sz * 3.4, 0, 0xa8a296, SURF.concrete);
         A(b, BOX, 2.9, 0.26, 1.2, sx * 5.6, TOP, sz * 3.4, 0, C.earth, SURF.earth);
-        for (let i = 0; i < 4; i++) A(b, BOX, 0.55, 0.22 + rng() * 0.2, 0.9, sx * (4.55 + i * 0.7), TOP + 0.2, sz * 3.4, 0, i % 2 ? pick(rng, C.flowers) : 0x567340, SURF.grass);
+        for (let i = 0; i < 4; i++) A(b, BOX, 0.55, 0.22 + rng() * 0.2, 0.9, sx * (4.55 + i * 0.7), TOP + 0.2, sz * 3.4, 0, i % 2 ? pick(rng, C.flowers) : 0x567340, i % 2 ? SURF.flowers : SURF.grass);
       }
       tree(b, rng, sx * (8 + rng() * 2), sz * (8 + rng() * 2), 6.5 + rng() * 3, rng() < 0.2);
       if (rng() < 0.55) tree(b, rng, sx * (4.5 + rng() * 2), sz * (10 + rng()), 4.5 + rng() * 2, false);
@@ -2039,8 +2040,313 @@ function oldMine(b: ArchBatch, rng: Rng, W: ArchBatch = b): void {
   }
 }
 
-/** Süs modelleri (decor.ts). */
-export type DecorModel = 'ruin' | 'barn' | 'well' | 'oldmine';
+// ------------------------------------------------------------------ çiftlik (2026-11-17)
+// Haritanın tarlalarındaki çiftlikler (farms.ts): avlu, büyük ahır, silo, kümes, inekli otlak, sebze bahçesi ve meyvelik.
+// Çiftlik evi şehir evlerinden (buildCityModel). Parçalar ayrı modeller; farms.ts bunları setOrigin ile yerine koyar.
+
+/** Kubbe (silo tepesi): yarım küre, taban y=0. */
+const DOME = new THREE.SphereGeometry(1, 14, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+/** Teker: ekseni x boyunca, merkezde (ölçek: genişlik, yarıçap, yarıçap). */
+const WHEEL = new THREE.CylinderGeometry(1, 1, 1, 14).rotateZ(Math.PI / 2);
+/** Odun ve kütük: ekseni x boyunca. */
+const LOG = new THREE.CylinderGeometry(1, 1, 1, 7).rotateZ(Math.PI / 2);
+/** Piramit çatı (kare taban, birim). */
+const PYR = new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0);
+const STRAW = [0xc8b06a, 0xbfa660, 0xd2bc78, 0xb89e58];
+const BARN_WOOD = [0x7a3428, 0x6e3a2c, 0x5e4a36, 0x6a5038, 0x5a5a52];
+
+/** Yerel (lx, lz) noktası, ry dönmüş ve (x, z)'ye kaymış (three.js rotateY ile aynı yön). */
+function local(x: number, z: number, ry: number, lx: number, lz: number): [number, number] {
+  const c = Math.cos(ry);
+  const s = Math.sin(ry);
+  return [x + lx * c + lz * s, z - lx * s + lz * c];
+}
+
+/** Tel ve direk çiti: direkler ve iki kuşak (otlak ve kümes); boyu len, ortası (x, z), yönü ry. */
+function railFence(b: ArchBatch, len: number, x: number, z: number, ry: number, col: number): void {
+  for (const y of [0.55, 1.0]) A(b, BOX, len, 0.1, 0.06, x, y, z, ry, col, SURF.wood);
+  const n = Math.max(1, Math.round(len / 2.8));
+  for (let i = 0; i <= n; i++) {
+    const [px, pz] = local(x, z, ry, -len / 2 + (i * len) / n, 0);
+    A(b, BOX, 0.14, 1.25, 0.14, px, 0, pz, ry + (i % 3) * 0.2, col, SURF.wood);
+  }
+}
+
+/** Dikdörtgen çit: w × d, ortası (x, z); gap: ön (+z) kenarda kapı boşluğu (m). */
+function fenceRect(b: ArchBatch, w: number, d: number, x: number, z: number, col: number, gap = 0): void {
+  railFence(b, w, x, z - d / 2, 0, col);
+  railFence(b, d, x - w / 2, z, Math.PI / 2, col);
+  railFence(b, d, x + w / 2, z, Math.PI / 2, col);
+  if (gap > 0) {
+    const s = (w - gap) / 2;
+    railFence(b, s, x - w / 2 + s / 2, z + d / 2, 0, col);
+    railFence(b, s, x + w / 2 - s / 2, z + d / 2, 0, col);
+  } else railFence(b, w, x, z + d / 2, 0, col);
+}
+
+/** 1940'lar traktörü (Lanz, Fordson benzeri): uzun motor kaputu, büyük arka tekerler ve çamurluklar, açık sürücü yeri. */
+function tractor(b: ArchBatch, rng: Rng, x: number, z: number, ry: number): void {
+  const col = pick(rng, [0x4f6a3e, 0x8a3a2a, 0x4a5664, 0x7a6a3a]);
+  const iron = 0x2c2d2e;
+  const P = (lx: number, lz: number) => local(x, z, ry, lx, lz);
+  let [px, pz] = P(0, 0.75);
+  A(b, BOX, 0.78, 0.72, 2.0, px, 0.72, pz, ry, col, SURF.metal);
+  [px, pz] = P(0, 1.78);
+  A(b, BOX, 0.72, 0.8, 0.12, px, 0.7, pz, ry, iron, SURF.metal);
+  [px, pz] = P(0, -0.65);
+  A(b, BOX, 0.95, 0.62, 1.0, px, 0.62, pz, ry, iron, SURF.metal);
+  // Yakıt deposu, egzoz, direksiyon, koltuk
+  [px, pz] = P(0, 0.2);
+  A(b, BOX, 0.6, 0.3, 0.9, px, 1.44, pz, ry, col, SURF.metal);
+  [px, pz] = P(0.22, 1.35);
+  A(b, CYL, 0.05, 0.75, 0.05, px, 1.44, pz, 0, iron, SURF.metal);
+  [px, pz] = P(0, -0.25);
+  A(b, BOX, 0.06, 0.55, 0.06, px, 1.4, pz, ry, iron, SURF.metal);
+  A(b, CYL, 0.2, 0.04, 0.2, px, 1.95, pz, ry, iron, SURF.metal);
+  [px, pz] = P(0, -0.95);
+  A(b, BOX, 0.5, 0.09, 0.42, px, 1.5, pz, ry, iron, SURF.metal);
+  [px, pz] = P(0, -1.16);
+  A(b, BOX, 0.5, 0.42, 0.06, px, 1.55, pz, ry, iron, SURF.metal);
+  // Tekerler: arkada büyük (yarıçap 0,68), önde küçük (0,36); göbekler gövde renginde
+  for (const s of [-1, 1]) {
+    [px, pz] = P(s * 0.78, -0.8);
+    A(b, WHEEL, 0.36, 0.68, 0.68, px, 0.68, pz, ry, 0x1c1d1e, SURF.plain);
+    A(b, WHEEL, 0.38, 0.36, 0.36, px, 0.68, pz, ry, col, SURF.metal);
+    A(b, BOX, 0.46, 0.06, 1.3, px, 1.42, pz, ry, col, SURF.metal);
+    [px, pz] = P(s * 0.55, 1.42);
+    A(b, WHEEL, 0.18, 0.36, 0.36, px, 0.36, pz, ry, 0x1c1d1e, SURF.plain);
+    A(b, WHEEL, 0.2, 0.18, 0.18, px, 0.36, pz, ry, col, SURF.metal);
+  }
+}
+
+/** Saman arabası: ahşap kasa ve parmaklıklı yanlar, dört tahta teker, ok; dolu olanın üstünde saman. */
+function wagon(b: ArchBatch, rng: Rng, x: number, z: number, ry: number, load: boolean): void {
+  const wood = pick(rng, [0x6e5238, 0x7a5a3c, 0x5a4632, 0x6a4e3a]);
+  const P = (lx: number, lz: number) => local(x, z, ry, lx, lz);
+  let [px, pz] = P(0, 0);
+  A(b, BOX, 1.8, 0.14, 3.8, px, 0.95, pz, ry, wood, SURF.wood);
+  for (const s of [-1, 1]) {
+    [px, pz] = P(s * 0.88, 0);
+    A(b, BOX, 0.07, 0.5, 3.8, px, 1.09, pz, ry, wood, SURF.wood);
+    [px, pz] = P(0, s * 1.88);
+    A(b, BOX, 1.8, 0.5, 0.07, px, 1.09, pz, ry, wood, SURF.wood);
+    for (const f of [-1, 1]) {
+      [px, pz] = P(s * 0.98, f * 1.25);
+      const r = f > 0 ? 0.46 : 0.55;
+      A(b, WHEEL, 0.1, r, r, px, r, pz, ry, 0x4a3a2a, SURF.wood);
+      A(b, WHEEL, 0.16, 0.12, 0.12, px, r, pz, ry, 0x2c2d2e, SURF.metal);
+    }
+  }
+  // Ok: önden yere iner
+  const [ax, az] = P(0, 1.9);
+  const [ex, ez] = P(0, 4.1);
+  b.push(beam(ax, 0.9, az, ex, 0.15, ez, 0.12), wood, SURF.wood);
+  if (load) {
+    [px, pz] = P(0, 0);
+    A(b, BOX, 1.75, 0.9, 3.7, px, 1.09, pz, ry, pick(rng, STRAW), SURF.plain);
+    A(b, BOX, 1.4, 0.4, 3.2, px, 1.99, pz, ry, pick(rng, STRAW), SURF.plain);
+  }
+}
+
+/** İnek: gövde, baş (bazen otlarken eğik), bacaklar, kuyruk; alacalı olanın beyaz lekeleri. */
+function cow(b: ArchBatch, rng: Rng, x: number, z: number, ry: number): void {
+  const body = pick(rng, [0x5a3e2a, 0x7a5638, 0x2e2a28, 0x8a6a4a, 0x2e2a28]);
+  const spotted = body === 0x2e2a28 && rng() < 0.7;
+  const P = (lx: number, lz: number) => local(x, z, ry, lx, lz);
+  let [px, pz] = P(0, 0);
+  A(b, BOX, 0.74, 0.72, 1.85, px, 0.74, pz, ry, body, SURF.plain);
+  if (spotted) {
+    [px, pz] = P(0, 0.35);
+    A(b, BOX, 0.76, 0.5, 0.55, px, 0.86, pz, ry, 0xe2dccc, SURF.plain);
+    [px, pz] = P(0, -0.55);
+    A(b, BOX, 0.76, 0.42, 0.4, px, 0.8, pz, ry, 0xe2dccc, SURF.plain);
+  }
+  const grazing = rng() < 0.5;
+  [px, pz] = P(0, grazing ? 1.18 : 1.1);
+  A(b, BOX, 0.36, 0.42, 0.6, px, grazing ? 0.3 : 1.05, pz, ry, rng() < 0.3 ? 0xe2dccc : body, SURF.plain);
+  [px, pz] = P(0, grazing ? 0.98 : 0.94);
+  A(b, BOX, 0.3, 0.32, 0.34, px, grazing ? 0.55 : 1.15, pz, ry, body, SURF.plain);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    [px, pz] = P(sx * 0.24, sz * 0.68);
+    A(b, BOX, 0.15, 0.76, 0.15, px, 0, pz, ry, body, SURF.plain);
+  }
+  [px, pz] = P(0, -0.95);
+  A(b, BOX, 0.06, 0.62, 0.06, px, 0.62, pz, ry, body, SURF.plain);
+}
+
+/** Balya yığını: dikdörtgen saman balyaları, kademeli. */
+function bales(b: ArchBatch, rng: Rng, x: number, z: number, ry: number): void {
+  const rows = 2 + Math.floor(rng() * 2);
+  for (let r = 0; r < rows; r++) {
+    const n = rows + 1 - r;
+    for (let i = 0; i < n; i++) {
+      const [px, pz] = local(x, z, ry, (i - (n - 1) / 2) * 1.25, 0);
+      A(b, BOX, 1.15, 0.5, 0.8, px, r * 0.5, pz, ry + (rng() - 0.5) * 0.08, pick(rng, STRAW), SURF.plain);
+    }
+  }
+}
+
+/** Odun yığını: üst üste kütükler (ekseni z boyunca). */
+function woodpile(b: ArchBatch, rng: Rng, x: number, z: number, ry: number, len: number): void {
+  for (let r = 0; r < 3; r++) {
+    const n = 5 - r;
+    for (let i = 0; i < n; i++) {
+      const [px, pz] = local(x, z, ry, (i - (n - 1) / 2) * 0.34, 0);
+      A(b, LOG, len, 0.16, 0.16, px, 0.16 + r * 0.29, pz, ry + Math.PI / 2, pick(rng, [0x8a6a48, 0x7a5c3e, 0x9a7a52]), SURF.wood);
+    }
+  }
+}
+
+/**
+ * Büyük çiftlik ahırı (13×22 m): moloz taş kaide, dikey tahta kaplama, köşe dikmeleri ve saçak kuşağı, iki kanatlı sürgülü
+ * kapı (çapraz kuşaklı, üstte ray), tepede saman kapağı ve kancalı kiriş, yanlarda küçük pencereler, mahyada piramit
+ * çatılı havalandırma kulesi ve rüzgârgülü, bir yanda direkli sundurma ve altında odun. Ön cephe +z.
+ */
+function farmBarn(b: ArchBatch, rng: Rng): void {
+  const W = 13;
+  const D = 22;
+  const H = 5.4;
+  const B = 0.9;
+  const wood = pick(rng, BARN_WOOD);
+  const roof = pick(rng, [0x5a5e66, 0x7c422c, 0x4a4b50, 0x8e4a30]);
+  const trim = pick(rng, [0xd8d0bc, 0xcfc6b0, 0x3a2e24]);
+  const dark = 0x2e2620;
+  A(b, BOX, W + 0.35, B, D + 0.35, 0, 0, 0, 0, pick(rng, C.stone), SURF.stone);
+  A(b, BOX, W, H, D, 0, B, 0, 0, wood, SURF.wood);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) A(b, BOX, 0.32, H, 0.32, sx * (W / 2), B, sz * (D / 2), 0, trim, SURF.wood);
+  for (const sz of [-1, 1]) A(b, BOX, W + 0.3, 0.24, 0.28, 0, B + H - 0.24, sz * (D / 2), 0, trim, SURF.wood);
+  for (const sx of [-1, 1]) A(b, BOX, 0.28, 0.24, D + 0.3, sx * (W / 2), B + H - 0.24, 0, 0, trim, SURF.wood);
+  const rh = 5.0;
+  gableRoof(b, W, D, rh, 0, B + H, 0, 0, wood, SURF.wood, roof, SURF.tile, 0.8);
+  // Ön: iki kanatlı kapı, çapraz kuşaklar, çerçeve ve ray
+  const fz = D / 2 + 0.1;
+  for (const s of [-1, 1]) {
+    const x = s * 1.3;
+    A(b, BOX, 2.5, 4.1, 0.16, x, B - 0.1, fz, 0, dark, SURF.wood);
+    for (const y of [B + 0.05, B + 3.85]) A(b, BOX, 2.5, 0.16, 0.1, x, y, fz + 0.1, 0, trim, SURF.wood);
+    b.push(beam(x - 1.15, B + 0.2, fz + 0.12, x + 1.15, B + 3.85, fz + 0.12, 0.14, 0.06), trim, SURF.wood);
+  }
+  A(b, BOX, 5.6, 0.26, 0.22, 0, B + 4.05, fz, 0, trim, SURF.wood);
+  A(b, BOX, 6.4, 0.12, 0.12, 0, B + 4.38, fz + 0.18, 0, 0x2a2a2a, SURF.metal);
+  // Saman kapağı ve kancalı kiriş
+  A(b, BOX, 2.0, 1.8, 0.14, 0, B + H + 0.5, D / 2 + 0.06, 0, dark, SURF.wood);
+  A(b, BOX, 2.3, 0.16, 0.12, 0, B + H + 2.3, D / 2 + 0.1, 0, trim, SURF.wood);
+  A(b, BOX, 0.24, 0.28, 2.0, 0, B + H + 3.5, D / 2 + 0.9, 0, C.wood, SURF.wood);
+  A(b, BOX, 0.05, 0.6, 0.05, 0, B + H + 2.9, D / 2 + 1.75, 0, 0x2a2a2a, SURF.metal);
+  // Arka kapı ve yanlarda pencereler
+  A(b, BOX, 2.8, 3.0, 0.14, 0, B, -D / 2 - 0.08, 0, dark, SURF.wood);
+  for (const sx of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const z = -D / 2 + 3 + i * 5.3;
+      A(b, BOX, 0.12, 1.1, 1.3, sx * (W / 2 + 0.03), B + 2.4, z, 0, trim, SURF.wood);
+      A(b, BOX, 0.14, 0.8, 1.0, sx * (W / 2 + 0.05), B + 2.55, z, 0, 0x26282a, SURF.plain);
+    }
+  }
+  // Havalandırma kulesi ve rüzgârgülü
+  const ry0 = B + H + rh;
+  A(b, BOX, 1.7, 1.5, 1.7, 0, ry0 - 0.7, 0, 0, trim, SURF.wood);
+  A(b, BOX, 1.74, 0.7, 1.74, 0, ry0 - 0.1, 0, 0, 0x3a3430, SURF.wood);
+  A(b, PYR, 2.3, 1.2, 2.3, 0, ry0 + 0.8, 0, 0, roof, SURF.tile);
+  A(b, BOX, 0.05, 1.1, 0.05, 0, ry0 + 2.0, 0, 0, 0x2a2a2a, SURF.metal);
+  A(b, BOX, 0.06, 0.3, 0.9, 0, ry0 + 2.7, 0, 0.6, 0x2a2a2a, SURF.metal);
+  // Sundurma (−x yanı): direkler ve dışa eğik oluklu sac, altında odun ve araba
+  const sw = 4.6;
+  const hi = B + H - 0.5;
+  const lo = 3.0;
+  for (let i = 0; i < 4; i++) A(b, BOX, 0.22, lo, 0.22, -W / 2 - sw + 0.35, 0, -D / 2 + 2 + i * ((D - 4) / 3), 0, C.wood, SURF.wood);
+  const ang = Math.atan2(hi - lo, sw);
+  const slab = new THREE.BoxGeometry(Math.hypot(sw, hi - lo) + 0.7, 0.12, D - 1).rotateZ(ang);
+  b.push(slab, pick(rng, [0x7a7e82, 0x6e6a64, 0x5a5e66]), SURF.corrugated, 0, -W / 2 - sw / 2, (hi + lo) / 2 + 0.05, 0);
+  woodpile(b, rng, -W / 2 - 1.4, -D / 2 + 6, 0, 2.6);
+  if (rng() < 0.6) wagon(b, rng, -W / 2 - 2.6, 4, Math.PI, rng() < 0.5);
+}
+
+/**
+ * Silo: beton kaide, harçlı beton ya da tuğla gövde (14–17 m), çelik kuşaklar, metal kubbe ve tepesinde havalandırma, yanda
+ * doldurma bacası ve dış merdiven.
+ */
+function silo(b: ArchBatch, rng: Rng): void {
+  const r = 2.6 + rng() * 0.4;
+  const h = 13.5 + rng() * 3;
+  const brick = rng() < 0.3;
+  const col = brick ? pick(rng, C.brick) : pick(rng, [0xb4ad9e, 0xa8a294, 0xb9b2a2]);
+  A(b, CYL, r + 0.4, 0.7, r + 0.4, 0, 0, 0, 0, 0x8a8378, SURF.concrete);
+  A(b, CYL, r, h, r, 0, 0.7, 0, 0, col, brick ? SURF.brick : SURF.concrete);
+  for (let i = 1; i <= 5; i++) A(b, CYL, r + 0.06, 0.16, r + 0.06, 0, 0.7 + (i * h) / 6, 0, 0, 0x4a4844, SURF.metal);
+  const cap = pick(rng, [0x7a7e82, 0x5f8f7a, 0x6e6a64]);
+  A(b, DOME, r + 0.12, r * 0.65, r + 0.12, 0, 0.7 + h, 0, 0, cap, SURF.metal);
+  A(b, CYL, 0.35, 0.6, 0.35, 0, 0.7 + h + r * 0.6, 0, 0, cap, SURF.metal);
+  // Doldurma bacası (dikey kutu) ve merdiven
+  A(b, BOX, 0.55, h + 0.4, 0.55, r + 0.22, 0.7, 0, 0, 0x8a8680, SURF.metal);
+  for (const s of [-1, 1]) A(b, BOX, 0.06, h, 0.06, -0.2 + s * 0.22, 0.7, -r - 0.18, 0, 0x2a2a2a, SURF.metal);
+  for (let y = 1.5; y < h; y += 1.6) A(b, BOX, 0.5, 0.05, 0.05, -0.2, y, -r - 0.18, 0, 0x2a2a2a, SURF.metal);
+}
+
+/** Kümes ve alet kulübesi: kısa direkler üstünde tahta kulübe, eğik sac çatı, rampa; önünde tel çitli kümes bahçesi. */
+function coop(b: ArchBatch, rng: Rng): void {
+  const wood = pick(rng, [0x6e5238, 0x7a5a3c, 0x8a6a4a, 0x5e4a36]);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) A(b, BOX, 0.18, 0.5, 0.18, sx * 2.0, 0, sz * 1.4, 0, C.wood, SURF.wood);
+  A(b, BOX, 4.4, 2.1, 3.2, 0, 0.5, 0, 0, wood, SURF.wood);
+  const slab = new THREE.BoxGeometry(5.0, 0.12, 4.0).rotateX(0.2);
+  b.push(slab, pick(rng, [0x7a7e82, 0x5a5e66, 0x8e4a30]), SURF.corrugated, 0, 0, 2.95, 0);
+  A(b, BOX, 0.8, 1.0, 0.1, 1.2, 0.8, 1.64, 0, 0x2e2620, SURF.wood);
+  b.push(beam(-1, 0.55, 1.65, -1, 0.05, 3.0, 0.5, 0.05), C.wood, SURF.wood);
+  fenceRect(b, 7, 5, 0, 4.2, 0x8a7a60, 0);
+  // Tavuklar
+  for (let i = 0; i < 5; i++) {
+    const x = (rng() - 0.5) * 5.6;
+    const z = 3 + rng() * 3.6;
+    A(b, BOX, 0.22, 0.24, 0.32, x, 0, z, rng() * 6.28, rng() < 0.6 ? 0xe8e2d4 : 0x8a4a2a, SURF.plain);
+  }
+}
+
+/** Çiftlik avlusu: sıkışmış toprak, girişte toprak yol, saman yığınları ve balyalar, traktör, araba, gübre yığını, fıçılar. */
+function farmyard(b: ArchBatch, rng: Rng): void {
+  pad(b, 46, 40, pick(rng, [0x7a6a50, 0x6e604c, 0x75684e]), SURF.earth, [C.grass, SURF.grass]);
+  // Giriş yolu (+z kenarından dışarı), avluda tekerlek izi
+  for (let z = 20; z < 70; z += 20) flat(b, 4, 20.2, -10, z + 10, 0x6e604c, SURF.earth, 0, 0.1);
+  flat(b, 3.2, 26, -10, 6, 0x655a46, SURF.earth, 0, 0.1);
+  heap(b, rng, 15, 13, 2.8, 3.6, pick(rng, STRAW), TOP);
+  heap(b, rng, 19.5, 9, 2.3, 3.1, pick(rng, STRAW), TOP);
+  bales(b, rng, 9, 16.5, 0.1);
+  heap(b, rng, -18, -15, 2.4, 1.3, 0x4a3a2a, TOP);
+  tractor(b, rng, 2, 3, -0.7 + rng() * 0.4);
+  wagon(b, rng, 9, -9, 0.4 + rng() * 0.4, true);
+  for (let i = 0; i < 3; i++) A(b, CYL, 0.34, 0.9, 0.34, -16 + i * 0.8, TOP, 12 + (i % 2) * 0.6, 0, pick(rng, [0x5a4a38, 0x4a5a4e, 0x6e5238]), SURF.wood);
+  // Avlunun önü çitli, giriş açık
+  const fc = pick(rng, [0x6e5a44, 0x7a6a50, 0x5a4a38]);
+  railFence(b, 10, -18, 20, 0, fc);
+  railFence(b, 26, 10, 20, 0, fc);
+}
+
+/** İnekli otlak (34×24): koyu çimen, yalak çevresinde çamur, tel çit ve kapı, 3–5 inek, gölgelik ağaç. */
+function paddock(b: ArchBatch, rng: Rng): void {
+  const W = 34;
+  const D = 24;
+  flat(b, W, D, 0, 0, 0x5c7838, SURF.grass, 0, 0.05);
+  flat(b, 7, 5, -W / 2 + 4.5, -D / 2 + 3.5, 0x5e4e38, SURF.earth, 0, 0.07);
+  fenceRect(b, W, D, 0, 0, pick(rng, [0x6e5a44, 0x7a6a50]), 0);
+  A(b, BOX, 3.2, 0.6, 0.8, -W / 2 + 4.5, TOP, -D / 2 + 3, 0, 0x7a7670, SURF.concrete);
+  A(b, BOX, 3.0, 0.05, 0.6, -W / 2 + 4.5, TOP + 0.5, -D / 2 + 3, 0, C.water, SURF.water);
+  const n = 3 + Math.floor(rng() * 3);
+  for (let i = 0; i < n; i++) cow(b, rng, (rng() - 0.5) * (W - 6), (rng() - 0.5) * (D - 6), rng() * 6.28);
+  tree(b, rng, W / 2 - 4, D / 2 - 4, 9 + rng() * 4, false);
+}
+
+/** Sebze bahçesi ve meyvelik: sıra sıra tarhlar, korkuluk, meyve ağaçları, çevresinde çit. */
+function orchard(b: ArchBatch, rng: Rng): void {
+  flat(b, 14, 16, -8, 0, 0x5e4a34, SURF.earth, 0, 0.06);
+  for (let i = 0; i < 7; i++) flat(b, 12.5, 0.8, -8, -6.6 + i * 2.2, pick(rng, [0x58783a, 0x4e6e34, 0x6a8a44]), SURF.grass, 0, 0.18);
+  // Korkuluk
+  A(b, BOX, 0.08, 1.6, 0.08, -8, TOP, 7, 0, C.wood, SURF.wood);
+  A(b, BOX, 1.2, 0.08, 0.08, -8, TOP + 1.25, 7, 0, C.wood, SURF.wood);
+  A(b, BOX, 0.4, 0.55, 0.3, -8, TOP + 0.8, 7, 0, 0x6a5a48, SURF.canvas);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) tree(b, rng, 5 + c * 6 + (rng() - 0.5), -6 + r * 6 + (rng() - 0.5), 4 + rng() * 2, false);
+  fenceRect(b, 32, 20, -1, 0, pick(rng, [0x6e5a44, 0x7a6a50]), 0);
+}
+
+/** Süs modelleri (decor.ts, farms.ts). */
+export type DecorModel = 'ruin' | 'barn' | 'well' | 'oldmine' | 'farmbarn' | 'silo' | 'coop' | 'farmyard' | 'paddock' | 'orchard';
 
 /** worn: yıkık ve terk edilmiş yapıların yıpranmış parçaları (hasar gölgelendiricili malzeme); zemin ve bitki b'de kalır. */
 export function buildDecorModel(kind: DecorModel, rng: Rng, b: ArchBatch, worn: ArchBatch = b): void {
@@ -2049,6 +2355,12 @@ export function buildDecorModel(kind: DecorModel, rng: Rng, b: ArchBatch, worn: 
     case 'barn': barn(b, rng); break;
     case 'well': well(b, rng); break;
     case 'oldmine': oldMine(b, rng, worn); break;
+    case 'farmbarn': farmBarn(b, rng); break;
+    case 'silo': silo(b, rng); break;
+    case 'coop': coop(b, rng); break;
+    case 'farmyard': farmyard(b, rng); break;
+    case 'paddock': paddock(b, rng); break;
+    case 'orchard': orchard(b, rng); break;
   }
 }
 

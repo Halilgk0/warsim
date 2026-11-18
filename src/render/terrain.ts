@@ -443,6 +443,7 @@ export class TerrainView {
   private makeMesh(c: Chunk, level: number): THREE.Mesh {
     if (level < 2) ensureFine(c.ci, c.cj);
     const m = new THREE.Mesh(this.chunkGeometry(c.ci, c.cj, level), level === 0 ? this.material : this.materialFar);
+    m.receiveShadow = true;
     m.position.set(c.cx, 0, c.cz);
     m.visible = false;
     this.group.add(m);
@@ -554,6 +555,7 @@ export class TerrainView {
     for (const q of parts) q.dispose();
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, this.materialFar);
+    m.receiveShadow = true;
     m.position.set(sx, 0, sz);
     m.visible = false;
     this.group.add(m);

@@ -280,6 +280,8 @@ export class Atmosphere {
   readonly sunDir = new THREE.Vector3();
   /** Ayın yönü (gece ışığı buradan). */
   readonly moonDir = new THREE.Vector3();
+  /** Yönlü ışığın geldiği yön (gündüz güneş, gece ay); ışığın konumu gölge alanına göre bundan kurulur (shadows.ts). */
+  readonly lightDir = new THREE.Vector3(0, 1, 0);
   /** Gece oranı (0 gündüz, 1 tam gece). */
   night = 0;
   /** Gökyüzü aydınlığı 0..1 (ışıktan etkilenmeyen beyaz şeyler, ör. yoğuşma izi, buna göre kararır). */
@@ -355,10 +357,12 @@ export class Atmosphere {
       mix(this.sun.color, a.light, b.light);
       this.sun.intensity = sunI;
       this.sun.position.copy(this.sunDir);
+      this.lightDir.copy(this.sunDir);
     } else {
       this.sun.color.setHex(0xa8bbea);
       this.sun.intensity = moonI;
       this.sun.position.copy(this.moonDir);
+      this.lightDir.copy(this.moonDir);
     }
     this.night = smooth(-4, -12, e);
     (this.domeMat.uniforms.night as THREE.IUniform<number>).value = this.night;
@@ -376,6 +380,7 @@ export class Atmosphere {
     this.sunDir.set(Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)).normalize();
     shared.atmoSunDir.value.copy(this.sunDir);
     this.sun.position.copy(this.sunDir);
+    this.lightDir.copy(this.sunDir);
   }
 
   /** Her kare: kubbe kameranın merkezinde; sis güvenlik rampası kameranın uzak düzleminden önce kapanır. */

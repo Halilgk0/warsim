@@ -19,10 +19,13 @@ import { StructureView } from './structures';
 import { buildAircraftModel, buildStoreMeshes, propU, type AircraftModel } from './models';
 import { Scenery } from './scenery';
 import { DecorLayer } from './decor';
+import { FarmLayer } from './farms';
+import { bombGeometry } from './munitions';
 import { computeLandcover, setClearings } from './landcover';
 import { Debris, Effects, ParachuteViews, RocketViews, Tracers } from './effects';
 import { PALETTE } from './palette';
 import { Atmosphere, FIXED_HOUR, dayHour } from './atmosphere';
+import { ShadowRig } from './shadows';
 import { Contrails, contrailAmount } from './contrails';
 import { Clouds } from './clouds';
 import { archU } from './arch';
@@ -129,6 +132,8 @@ export class GameRenderer {
   private alpha = 1;
   private terrain: TerrainView;
   readonly atmosphere: Atmosphere;
+  /** Güneş gölgesi (yalnız Yüksek kalite). */
+  readonly shadows: ShadowRig;
   readonly clouds: Clouds;
   /** Cihazın piksel oranı (en çok 2); çözünürlük ayarı bunun katı. */
   /**
@@ -147,6 +152,8 @@ export class GameRenderer {
   private scenery: Scenery;
   /** Harekâtın süsleri: köyler, tek evler, yıkıklar, terk edilmiş madenler (decor.ts). */
   private decor: DecorLayer;
+  /** Haritanın çiftlikleri: yakında ayrıntılı model, uzakta kutular (yerleri scenery.ts seçer). */
+  private farms: FarmLayer;
   private clearKey = '';
   private views = new Map<number, AircraftView>();
   /** Uçak modeli ayrıntısı (kalite ayarı: 0 low-poly, 1 yüksek çözünürlük). */
@@ -191,7 +198,7 @@ export class GameRenderer {
   private shadowGeo = new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2);
   private shadowMat = new THREE.MeshBasicMaterial({ color: 0x3a3542, transparent: true, opacity: 0.13, depthWrite: false });
   private bombGeo: THREE.BufferGeometry;
-  private bombMat = new THREE.MeshLambertMaterial({ color: PALETTE.bomb, flatShading: true });
+  private bombMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.2, roughness: 0.6 });
   private trailMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
   private teamColors = PALETTE.teamTrail.map((c) => new THREE.Color(c));
   private iconColors = PALETTE.team.map((c) => new THREE.Color(c));
@@ -202,6 +209,8 @@ export class GameRenderer {
     if (!terrainMap.key) loadMap(MAPS[0].id);
     // Ölçek 40 m'den 90 km'ye kadar değiştiği için logaritmik derinlik (uzakta z-fighting olmasın)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer });
+    // İnşaattaki yapı yerden yükselir: malzemenin kendi kırpma düzlemi (structures.ts)
+    this.renderer.localClippingEnabled = true;
     this.renderer.setPixelRatio(this.baseRatio);
     container.appendChild(this.renderer.domElement);
 
@@ -209,12 +218,14 @@ export class GameRenderer {
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1;
     this.atmosphere = new Atmosphere(this.scene);
+    this.shadows = new ShadowRig(this.renderer, this.atmosphere.sun, this.scene);
     this.clouds = new Clouds(this.scene);
 
     computeLandcover();
     this.terrain = new TerrainView(this.scene);
     this.scenery = new Scenery(this.scene);
     this.decor = new DecorLayer(this.scene, this.labelLayer);
+    this.farms = new FarmLayer(this.scene);
     this.scene.add(this.structGroup, this.effects.mesh, this.tracers.mesh, this.rockets.mesh, this.ghostGroup, this.aaRings);
     this.scene.add(this.roadLayer.mesh, this.roadGhostView.mesh, this.buildGrid.mesh, this.footprint.mesh, this.fireRing.line, this.traffic.group);
     this.scene.add(this.debris.mesh, this.chutes.group, this.contrails.mesh);
@@ -282,10 +293,8 @@ export class GameRenderer {
     this.missionCircle.visible = false;
     this.scene.add(this.missionCircle);
 
-    const bombPts = [[1.2, 0], [0.9, 0.22], [0.1, 0.28], [-0.8, 0.22], [-1.1, 0.06]].map(
-      ([z, r]) => new THREE.Vector2(Math.max(r, 0.001), z),
-    );
-    this.bombGeo = new THREE.LatheGeometry(bombPts, 6).rotateX(Math.PI / 2);
+    // Genel amaçlı bomba: bantlar, tapa, kanatçık kutusu (munitions.ts)
+    this.bombGeo = bombGeometry();
 
     this.rig = new CameraRig(this.camera, this.renderer.domElement);
     window.addEventListener('resize', () => this.resize());
@@ -301,6 +310,7 @@ export class GameRenderer {
     this.scenery.setQuality(q.treeNear, q.treeThin, q.treeFade, q.settle);
     this.effects.setLimit(q.puffs);
     this.clouds.setDensity(settings.graphics.clouds ? q.clouds : 0);
+    this.shadows.setEnabled(settings.graphics.shadows && q.shadows);
     waterU.waterQ.value = q.water ? 1 : 0;
     waterU.terrDetail.value = q.ground;
     // Model ayrıntısı değişince uçaklar yeniden kurulur (sonraki karede yeni ayrıntıyla)
@@ -403,6 +413,7 @@ export class GameRenderer {
     this.scenery.rebuild();
     this.scenery.update(this.rig.distance, settings.map.scenery, this.camera.position);
     this.decor.sync(w, this.camera.position, this.rig.distance, settings.map.scenery);
+    this.farms.sync(this.scenery.farmSpots, this.scenery.farmVersion, this.camera.position, this.rig.distance, settings.map.scenery);
     const vis = this.rig.fxScale;
     const ms = this.rig.modelScale;
     // Gün döngüsü: dünya zamanından saat (ayar kapalıysa hep gündüz)
@@ -442,6 +453,7 @@ export class GameRenderer {
     this.effects.update(simDt, this.camera);
     this.syncOverlays(w);
     this.updateLabels(ms);
+    this.shadows.update(this.rig.target, this.camera, this.rig.distance, this.atmosphere.lightDir, realDt, [this.structGroup, this.farms.group, this.decor.group]);
     this.renderer.render(this.scene, this.camera);
   }
 

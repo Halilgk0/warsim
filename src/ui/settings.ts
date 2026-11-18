@@ -85,12 +85,14 @@ export interface QualityPreset {
    * süresinin %30–60'ı (2026-10-27 ölçümü); Orta bu yüzden kapalı.
    */
   ground: number;
+  /** Güneş gölgesi (yapılar, çiftlikler, park eden uçaklar; render/shadows.ts). */
+  shadows: boolean;
 }
 
 export const QUALITY: Record<GraphicsQuality, QualityPreset> = {
-  low: { name: L('Düşük', 'Low'), treeNear: 500, treeThin: 1200, treeFade: [2500, 4500], settle: 6000, puffs: 1500, clouds: 0, water: false, models: 0, ground: 0 },
-  medium: { name: L('Orta', 'Medium'), treeNear: 800, treeThin: 1600, treeFade: [3500, 5500], settle: 7000, puffs: 2500, clouds: 0.5, water: true, models: 1, ground: 0 },
-  high: { name: L('Yüksek', 'High'), treeNear: 1300, treeThin: 2500, treeFade: [5500, 8500], settle: 10000, puffs: 5000, clouds: 1, water: true, models: 1, ground: 1 },
+  low: { name: L('Düşük', 'Low'), treeNear: 500, treeThin: 1200, treeFade: [2500, 4500], settle: 6000, puffs: 1500, clouds: 0, water: false, models: 0, ground: 0, shadows: false },
+  medium: { name: L('Orta', 'Medium'), treeNear: 800, treeThin: 1600, treeFade: [3500, 5500], settle: 7000, puffs: 2500, clouds: 0.5, water: true, models: 1, ground: 0, shadows: false },
+  high: { name: L('Yüksek', 'High'), treeNear: 1300, treeThin: 2500, treeFade: [5500, 8500], settle: 10000, puffs: 5000, clouds: 1, water: true, models: 1, ground: 1, shadows: true },
 };
 
 export const RESOLUTIONS: { id: Resolution; name: string }[] = [
@@ -120,7 +122,7 @@ export interface Settings {
   /** İz mermisi kalınlık çarpanı. */
   tracerScale: number;
   /** Grafik kalitesi ve çözünürlük. */
-  graphics: { quality: GraphicsQuality; resolution: Resolution; dayCycle: boolean; clouds: boolean };
+  graphics: { quality: GraphicsQuality; resolution: Resolution; dayCycle: boolean; clouds: boolean; shadows: boolean };
   /** Oyun: boş yolda otomatik 2× (autoFast.ts). */
   game: { autoFast: boolean };
 }
@@ -140,7 +142,7 @@ function defaults(): Settings {
     radarAgl: 300,
     tracerScale: 1,
     // Varsayılan düşük kalite: zayıf telefonda da akıcı açılır; güçlü cihazda oyuncu Yüksek'e alır
-    graphics: { quality: 'low', resolution: 'auto', dayCycle: true, clouds: true },
+    graphics: { quality: 'low', resolution: 'auto', dayCycle: true, clouds: true, shadows: true },
     game: { autoFast: true },
   };
 }
@@ -163,6 +165,7 @@ function load(): Settings {
         resolution: RESOLUTIONS.some((r) => r.id === s.graphics?.resolution) ? s.graphics!.resolution : d.graphics.resolution,
         dayCycle: typeof s.graphics?.dayCycle === 'boolean' ? s.graphics.dayCycle : d.graphics.dayCycle,
         clouds: typeof s.graphics?.clouds === 'boolean' ? s.graphics.clouds : d.graphics.clouds,
+        shadows: typeof s.graphics?.shadows === 'boolean' ? s.graphics.shadows : d.graphics.shadows,
       },
       game: { autoFast: typeof s.game?.autoFast === 'boolean' ? s.game.autoFast : d.game.autoFast },
     };

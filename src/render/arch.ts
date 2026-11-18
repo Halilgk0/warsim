@@ -52,6 +52,10 @@ export const SURF = {
   stone: 28,
   /** Kasaba evi cephesi: kat silmeleri, pencere söveleri; zemin katta pencere yok (vitrin ayrı parça). */
   town: 29,
+  /** Ağaç: yeşil taçta yaprak öbekleri, kahverengi gövdede kabuk (köşe rengi kırmızıya yakınsa gövde). */
+  leaf: 30,
+  /** Çiçek öbeği: yeşil yaprak zemininde köşe rengindeki çiçek benekleri (düz renkli küp gibi durmaz). */
+  flowers: 31,
 } as const;
 export type Surf = (typeof SURF)[keyof typeof SURF];
 
@@ -212,8 +216,12 @@ const COLOR = /* glsl */ `
       vec2 bf = fract( bq );
       float mortar = max( 1.0 - smoothstep( 0.0, 0.08, bf.y ), 1.0 - smoothstep( 0.0, 0.04, min( bf.x, 1.0 - bf.x ) ) );
       float tone = 0.86 + 0.26 * aHash2( floor( bq ) );
-      c = mix( base, mix( base * tone, vec3( 0.55, 0.52, 0.48 ), mortar * 0.75 ), f );
-      c *= 0.94 + 0.08 * aNoise( vAP * 0.35 );
+      // Uzakta tuğlalar piksel altı: düz taban rengi yerine harçla karışık, biraz soluk ortalama ton (gerçek tuğla duvar
+      // uzaktan böyle görünür; 2026-11-17, doygun turuncu "oyuncak" görünümüydü). Orta mesafede sıra kuşakları
+      vec3 far = mix( base * 0.93, vec3( 0.55, 0.52, 0.48 ), 0.2 );
+      far *= 1.0 - 0.05 * aLine( uv.y, 0.077 * 4.0, 0.03 ) * aFade( vec2( uv.y ), 0.3 );
+      c = mix( far, mix( base * tone, vec3( 0.55, 0.52, 0.48 ), mortar * 0.75 ), f );
+      c *= 0.94 + 0.08 * aNoise( vAP * 0.35 ) + 0.05 * ( aNoise( vAP * 1.7 ) - 0.5 );
       if ( s == 2 && side ) win = aWindows( uv, faceW, faceH, 4.2, 2.6, min( 3.6, faceH * 0.35 ), min( 2.2, faceH * 0.22 ), max( 5.0, faceH * 0.45 ), 2.0 );
     } else if ( s == 3 || s == 4 || s == 22 ) {
       // Sıva: hafif leke ve dalga, dipte toprak sıçraması
@@ -241,7 +249,8 @@ const COLOR = /* glsl */ `
       float fs = aFade( vec2( cc, vPL.y ), 0.9 );
       vec2 sheet = floor( vec2( cc / 0.9, vPL.y / 2.4 ) );
       float sh = aHash2( sheet + 3.0 );
-      c *= 1.0 + ( sh - 0.5 ) * 0.14 * fs + step( 0.94, sh ) * 0.12 * fs;
+      // Levha tonu hafif (2026-11-17: %14'lük fark kemerlerde iri, bloklu şeritler gibi duruyordu)
+      c *= 1.0 + ( sh - 0.5 ) * 0.06 * fs + step( 0.94, sh ) * 0.05 * fs;
       float rust = smoothstep( 0.62, 0.85, aNoise( vec3( cc * 1.3, vAP.y * 0.12, 7.0 ) ) );
       // Akıntı: levha üst kenarındaki vida sırasından aşağı incelen pas izi
       float drip = smoothstep( 0.55, 0.85, aNoise( vec3( cc * 2.2, floor( vPL.y / 2.4 ), 11.0 ) ) ) * ( 1.0 - fract( vPL.y / 2.4 ) );
@@ -300,11 +309,15 @@ const COLOR = /* glsl */ `
         c = mix( c, gh > 0.994 ? vec3( 0.85, 0.8, 0.35 ) : vec3( 0.86, 0.86, 0.8 ), step( 0.988, gh ) * 0.8 * fgr );
       }
     } else if ( s == 13 ) {
-      // Kaldırım taşı: 0,6 m plakalar
+      // Kaldırım taşı: 0,6 m plakalar. Derzler ince ve uzakta söner (2026-11-17: koyu ve her mesafede keskin derzler
+      // çizim programı ızgarası gibi duruyordu); plaka tonu, geniş aşınma ve kir lekeleri, kenarlara doğru koyulaşma
       float f = aFade( vPL.xz, 0.6 );
       vec2 pq = floor( vPL.xz / 0.6 );
       c = base * mix( 1.0, 0.9 + 0.16 * aHash2( pq ), f );
-      c *= 1.0 - 0.22 * max( aLine( vPL.x, 0.6, 0.012 ), aLine( vPL.z, 0.6, 0.012 ) );
+      c *= 1.0 - 0.14 * max( aLine( vPL.x, 0.6, 0.012 ), aLine( vPL.z, 0.6, 0.012 ) ) * aFade( vPL.xz, 0.25 );
+      c *= 0.9 + 0.14 * aNoise( vAP * 0.12 + 4.0 );
+      c = mix( c, c * vec3( 0.82, 0.8, 0.74 ), smoothstep( 0.6, 0.85, aNoise( vAP * 0.3 + 11.0 ) ) * 0.4 );
+      c *= 1.0 - 0.1 * ( 1.0 - smoothstep( 0.0, 2.5, min( min( vPL.x, vPS.x - vPL.x ), min( vPL.z, vPS.z - vPL.z ) ) ) );
     } else if ( s == 14 ) {
       // Asfalt: koyu, büyük açık-koyu alanlar, dikdörtgen onarım yamaları (taze katran koyu, eski yama soluk), katranla
       // doldurulmuş çatlaklar, yakında agrega taneleri
@@ -492,6 +505,35 @@ const COLOR = /* glsl */ `
         wq = vec4( 3.0, 1.4, 2.2, 1.4 );
         wr = vec2( 3.6, 1.5 );
       }
+    } else if ( s == 30 ) {
+      if ( base.r > base.g ) {
+        // Gövde: dikey kabuk çatlakları
+        c = base * ( 0.8 + 0.3 * aNoise( vec3( vAP.x * 6.0, vAP.y * 0.8, vAP.z * 6.0 ) ) );
+      } else {
+        // Taç: iri yaprak öbekleri (ışık ve gölge benekleri), ince yaprak dokusu, içe doğru koyulaşma; öbek kabartması
+        // ışığı kırar (düz boyalı top gibi durmaz)
+        float lb = aNoise( vAP * 0.9 );
+        float lf = aNoise( vAP * 3.3 + 2.0 );
+        c = base * ( 0.72 + 0.42 * lb ) * ( 0.88 + 0.22 * lf );
+        c = mix( c, c * vec3( 0.92, 0.98, 0.78 ), smoothstep( 0.55, 0.85, aNoise( vAP * 0.35 + 9.0 ) ) * 0.5 );
+        float fl = aFade( vAP.xz, 0.4 );
+        vec3 q = vAP * 1.6;
+        aBump += ( vec3( aNoise( q ), aNoise( q + 5.1 ), aNoise( q + 9.7 ) ) - 0.5 ) * ( 0.5 + 0.4 * fl );
+        float lum = dot( c, vec3( 0.299, 0.587, 0.114 ) );
+        c = mix( vec3( lum ), c, 0.85 );
+      }
+    } else if ( s == 31 ) {
+      // Çiçek öbeği: koyu yeşil yaprak zemini, üstünde ve yanların üst yarısında köşe rengindeki çiçek benekleri
+      // (8 cm'lik hücreler, renk tonu hücre başına); uzakta yaprak ve çiçeğin karışık tonu. Kabartma ışığı kırar
+      vec3 green = vec3( 0.2, 0.31, 0.14 ) * ( 0.7 + 0.5 * aNoise( vAP * 4.0 ) );
+      vec3 cell = floor( vAP * 12.0 );
+      float hb = aHash( cell );
+      float fl = aFade( vAP.xz, 0.08 );
+      float bloom = step( 0.55, hb ) * ( side ? smoothstep( 0.25, 0.85, vPL.y / max( vPS.y, 0.01 ) ) : 1.0 );
+      vec3 petal = base * ( 0.8 + 0.35 * aHash( cell + 3.0 ) );
+      c = mix( mix( green, base, side ? 0.2 : 0.4 ), mix( green, petal, bloom ), fl );
+      vec3 q = vAP * 9.0;
+      aBump += ( vec3( aNoise( q ), aNoise( q + 3.3 ), aNoise( q + 7.1 ) ) - 0.5 ) * 0.6 * fl;
     } else if ( s == 29 ) {
       // Kasaba evi: sıva, her katta silme, pencerelerin çevresinde açık söve; zemin kat (vitrin katı) biraz koyu
       c = base * ( 0.93 + 0.1 * aNoise( vAP * 0.6 ) ) * ( 0.97 + 0.05 * aNoise( vAP * 3.1 ) );
@@ -575,6 +617,39 @@ const COLOR = /* glsl */ `
         float lit = step( 0.72, aHash( vec3( win.z, floor( vAP.x / 50.0 ), floor( vAP.z / 50.0 ) ) ) ) * glassOk;
         aEmit = vec3( 1.0, 0.72, 0.4 ) * 0.9 * lit * archNight * archLit * win.x;
       }
+    }
+    // Yıpranma (2026-11-17; üçgen maliyeti yok): yere değen duvarın dibinde nem ve sıçrama kiri (1,4 m'ye doğru söner),
+    // duvarın üst kenarından (saçak, pencere denizliği gibi) aşağı inen düzensiz yağmur izleri, dikey köşelerde hafif
+    // gölgelenme. Geniş çatılarda büyük ölçekli ton ve leke oynaması (yosun, solma): düz renkli büyük çatılar canlanır
+    if ( side && ( wallSurf || s == 7 || s == 18 || s == 21 ) ) {
+      float baseY = vAP.y - vPL.y;
+      if ( baseY < 0.8 ) {
+        float g = 1.0 - smoothstep( 0.0, 1.4, vPL.y + 0.25 * aNoise( vec3( uv.x * 1.3, 0.0, baseY ) ) );
+        c *= 1.0 - 0.38 * g;
+        c = mix( c, vec3( 0.32, 0.29, 0.24 ) * dot( c, vec3( 0.33 ) ) * 2.2, 0.18 * g );
+      }
+      float streak = pow( aNoise( vec3( uv.x * 2.1, 3.0, floor( vAP.x * 0.05 ) + floor( vAP.z * 0.05 ) ) ), 3.0 );
+      float fromTop = 1.0 - smoothstep( 0.0, 3.5 + 2.0 * streak, faceH - vPL.y );
+      c *= 1.0 - 0.32 * streak * fromTop;
+      float edge = min( uv.x, faceW - uv.x );
+      c *= mix( 0.85, 1.0, smoothstep( 0.0, 0.9, edge ) );
+    } else if ( !side && ( s == 7 || s == 8 || s == 9 || s == 10 || s == 18 ) ) {
+      float blot = aNoise( vAP * 0.07 ) * 0.65 + aNoise( vAP * 0.23 ) * 0.35;
+      c *= 0.84 + 0.3 * blot;
+      if ( s == 8 ) c = mix( c, vec3( 0.28, 0.33, 0.2 ), 0.22 * smoothstep( 0.62, 0.85, aNoise( vAP * 0.15 + 7.0 ) ) );
+    }
+    // Kenarlar (2026-11-17): kutu kenarı ışığı yakalar ve boyası aşınır (ince açık şerit), köşenin dibi koyulaşır; yalnız
+    // yakında (piksel ölçüsüne göre söner). Kesin çizgili "oyuncak" kutu görünümünü kırar. Çim, su, ağaç ve camda yok
+    bool solid = s >= 1 && s != 12 && s != 19 && s != 30 && s != 31 && win.x < 0.5;
+    if ( solid ) {
+      vec3 ed = min( vPL, vPS - vPL );
+      float eh = side ? min( ed.y, xFace ? ed.z : ed.x ) : min( ed.x, ed.z );
+      float fe = aFade( side ? uv : vPL.xz, 0.12 );
+      float lip = 1.0 - smoothstep( 0.0, 0.05, eh );
+      c *= 1.0 + 0.12 * lip * fe * ( 0.6 + 0.4 * aNoise( vAP * 5.0 ) );
+      // Renk: doygunluk biraz düşük (parlak, oyuncak renkler yerine yaşlanmış malzeme)
+      float lum = dot( c, vec3( 0.299, 0.587, 0.114 ) );
+      c = mix( vec3( lum ), c, 0.86 );
     }
     // Hasar: kurum ve yanık lekeleri, hasar arttıkça yayılır
     if ( archDamage > 0.01 ) {
@@ -706,6 +781,8 @@ export class ArchBatch {
   private readonly parts: THREE.BufferGeometry[] = [];
   /** Parça başına köşe sayısı ve son konumdaki sınır kutusu (n, x0, y0, z0, x1, y1, z1): araziye oturtma için (ground.ts). */
   private readonly meta: number[] = [];
+  /** Parça başına yüzey türü (inşaat iskelesi bina gövdesini bundan bulur: construction.ts). */
+  private readonly surfs: number[] = [];
   /** Sonraki parçaların yerleşimi (setOrigin): Y dönüşü ve yatay kayma. Birkaç yapı tek ağa toplanır (süs köyleri). */
   private oyaw = 0;
   private ox = 0;
@@ -777,6 +854,7 @@ export class ArchBatch {
     g.computeBoundingBox();
     const fb = g.boundingBox!;
     this.meta.push(n, fb.min.x, fb.min.y, fb.min.z, fb.max.x, fb.max.y, fb.max.z);
+    this.surfs.push(surf);
     const own = g.getAttribute('color');
     let col: Float32Array;
     if (color === null && own) col = Float32Array.from(own.array as Float32Array);
@@ -807,10 +885,13 @@ export class ArchBatch {
     this.parts.length = 0;
     const meta = Float32Array.from(this.meta);
     this.meta.length = 0;
+    const surfs = Uint8Array.from(this.surfs);
+    this.surfs.length = 0;
     if (!m) return null;
     m.computeBoundingSphere();
     const mesh = new THREE.Mesh(m, mat);
     mesh.userData.parts = meta;
+    mesh.userData.surfs = surfs;
     into.add(mesh);
     return mesh;
   }

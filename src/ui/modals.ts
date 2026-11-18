@@ -276,9 +276,10 @@ export class Modals {
             `<option value="${r.id}" ${r.id === settings.graphics.resolution ? 'selected' : ''}>${r.name}</option>`).join('')}</select></div>
           <label class="check"><input type="checkbox" data-set="dayCycle" ${settings.graphics.dayCycle ? 'checked' : ''}> ${L('Gün döngüsü', 'Day cycle')} <span class="muted small">— ${L('oyunda 48 dakikada bir gün; kapalıyken hep gündüz', 'one day every 48 minutes in game; always daytime when off')}</span></label>
           <label class="check"><input type="checkbox" data-set="clouds" ${settings.graphics.clouds ? 'checked' : ''}> ${L('Bulutlar', 'Clouds')} <span class="muted small">— ${L('düşük kalitede yok; uzaktan bakınca söner', 'none on low quality; they fade when zoomed out')}</span></label>
+          <label class="check"><input type="checkbox" data-set="shadows" ${settings.graphics.shadows ? 'checked' : ''}> ${L('Güneş gölgesi', 'Sun shadows')} <span class="muted small">— ${L('yalnız yüksek kalitede; binalar ve park eden uçaklar yere gölge düşürür', 'high quality only; buildings and parked aircraft cast shadows on the ground')}</span></label>
           <p class="muted small">${L(
-            'Telefon ısınır ya da takılırsa kaliteyi düşür. Düşük: sade uçaklar, bulut yok. Orta: ayrıntılı uçaklar, az bulut. Yüksek: ayrıca yakın arazi ayrıntısı, tam bulut, daha uzaktaki ağaç ve köyler. Otomatik çözünürlük kare hızı düşünce görüntüyü biraz yumuşatır.',
-            'If your phone gets hot or stutters, lower the quality. Low: simple aircraft, no clouds. Medium: detailed aircraft, a few clouds. High: also close-up ground detail, full clouds, trees and villages farther out. Auto resolution softens the image slightly when the frame rate drops.',
+            'Telefon ısınır ya da takılırsa kaliteyi düşür. Düşük: sade uçaklar, bulut yok. Orta: ayrıntılı uçaklar, az bulut. Yüksek: ayrıca yakın arazi ayrıntısı, binaların güneş gölgesi, tam bulut, daha uzaktaki ağaç ve köyler. Otomatik çözünürlük kare hızı düşünce görüntüyü biraz yumuşatır.',
+            'If your phone gets hot or stutters, lower the quality. Low: simple aircraft, no clouds. Medium: detailed aircraft, a few clouds. High: also close-up ground detail, sun shadows from buildings, full clouds, trees and villages farther out. Auto resolution softens the image slightly when the frame rate drops.',
           )}</p>
         </div>
         <div><h3>${L('Oyun', 'Game')}</h3>
@@ -498,6 +499,7 @@ export class Modals {
     else if (set === 'resolution') settings.graphics.resolution = el.value as Resolution;
     else if (set === 'dayCycle') settings.graphics.dayCycle = (el as HTMLInputElement).checked;
     else if (set === 'clouds') settings.graphics.clouds = (el as HTMLInputElement).checked;
+    else if (set === 'shadows') settings.graphics.shadows = (el as HTMLInputElement).checked;
     else if (set === 'autoFast') settings.game.autoFast = (el as HTMLInputElement).checked;
     else if (set === 'muted') settings.sound.muted = (el as HTMLInputElement).checked;
     else if (set === 'sound') {

@@ -221,9 +221,41 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `groundTex.ts` (2026-11-13): açılışta üretilen 256 px'lik karo doku. Arazi iki ölçekte okur (her kalitede: ucuz;
     yordamsal arazi dokusu yalnız Yüksek'te kalır), ağaç taçları bir kez (`scenery.ts` `leafy`). Ağaç geometrileri
     `props.ts`: taç köşeleri ton taşır (alt koyu, üst açık); yakın yapraklı ağaç 68, iğne yapraklı 32 üçgen.
+    - Taç normalleri öbek merkezinden dışa (`roundNormals`; ağaç malzemelerinde `flatShading` yok): köşeli taç "oyuncak"
+      gibi duruyordu (2026-11-17). Yapıların ağaçları (şehir, çiftlik, üs; az sayıda) `broadleafGeo(renk, true)`: ince
+      bölünmüş, gürültüyle bozulmuş öbekler ve dallar; arch yüzeyi `SURF.leaf` (gövde köşe rengi kırmızıya yakın olduğu
+      için ayrılır). Çiçek tarhları `SURF.flowers` (yaprak zemininde çiçek benekleri; düz renkli küp değil).
   - **Boş arazi ağaçlı** (2026-11-10): `landcoverGen.ts` ormanın dışındaki açık araziye de seyrek ağaç ve koru yazar
     (`open`, tarla, şehir, üs yeri, ağaç sınırı ve uçurum hariç). Yakın ağaçlar `scenery.ts`'te çiftlik ve süs (`decor.ts`)
     çevresine dikilmez (`keepOut`, 40 m hücre; `buildSettlements` doldurur). Yalnız görüntü: sim arazisi değişmez.
+  - **Çiftlikler** (2026-11-17, `farms.ts`): yerleri `scenery.ts` seçer (`farmSpots`, `farmVersion`; üstüne yapı kurulunca
+    liste yenilenir). Kameradan 3,2 km'ye kadar ayrıntılı model (`cityModels.ts` `farmyard`, `farmBarn`, `silo`, `coop`,
+    `paddock`, `orchard`; çiftlik evi şehir evi), ötesinde örneklenmiş kutular. Model görününce o çiftliğin kutuları
+    gizlenir. Kurulum kare başına dilimle, ~8.500 üçgen, tek kurulum ~15 ms.
+  - Kayalar `props.ts` `rockGeos`: üç biçim (yuvarlak, yassı, sivri), 36 üçgen (on iki yüzlü). Binlerce kaya var: 80 üçgen
+    ekranı ~130 bin üçgen ağırlaştırıyordu. Taş dokusu `scenery.ts` `stony`.
+  - Bomba, roket, paraşüt `munitions.ts` (köşe renkli tek geometri).
+  - **İnşaat görünümü** (`construction.ts`, `structures.ts` `sync`): bina yerel kırpma düzlemiyle yerden yükselir
+    (`renderer.localClippingEnabled`). Ana gövde inşaatın %90'ında tamamlanır, baca ve kuleler son %10'da. Her binanın
+    çevresinde ahşap iskele, büyük yapıda vinç ve malzeme yığını; hava üssünde iskele yok.
+    - Bina gövdesi `ArchBatch`'in parça başına yüzey türünden bulunur (`userData.surfs`).
+  - Hava üssü ve fabrika ayrıntıları (`structures.ts`): `watchOffice`, `airfieldFire`, `fuelFarm`, `fuelBowser`,
+    `aircraftTractor`, `starterTrolley`, `windsock`, `latticeMast`, `waterTower`, `bombTrolley`.
+    - Üs ~89 bin (araçlarla), fabrika ~36 bin üçgen (öncesi 50 ve 23 bin).
+    - Üs araçları `airfieldVehicles.ts`: tanker, çekici, ambulans, akü arabası. `y` zeminin kotudur: apron betonu
+      0,9 m, araç hangarı 0,3 m; eskiden y=0'dı, araçlar betona gömülüyordu.
+  - Yıpranma `arch.ts` (`COLOR`, hasarın önünde; üçgen maliyeti yok): duvar dibinde kir, üst kenardan yağmur izleri,
+    köşe gölgesi, geniş çatılarda leke. Bütün yapılara uygulanır.
+  - Kemer çatılı yapıların (ambar, Nissen, cephanelik) alın duvarı `archWall` ile kemer biçiminde, kapı duvar yüzünde:
+    kutu duvar kemerin dışına taşıyordu (2026-11-17). Fabrikanın üç ambarı ayrı (30 m, 40 m arayla; eskiden iç içeydi).
+  - **Güneş gölgesi** (2026-11-17, `shadows.ts`): yalnız Yüksek kalitede, Ayarlar → Grafik → Güneş gölgesi
+    (`graphics.shadows`). Gölge düşüren ve alan bayrakları yeniden çizimde konur (`mark`: yapılar, çiftlikler, süsler;
+    opak Lambert/Standard düşürür, arch malzemesi alır); arazi parçaları ve yollar hep alır. Gölge haritası her karede
+    çizilmez: kamera kayınca, yakınlaşınca, ışık dönünce, en geç saniyede bir. Işık her kare gölge alanının ortasına
+    taşınır, yön `atmosphere.lightDir`'dedir (`sun.position` artık yön değil). İnşaat kırpması gölgede de geçerli
+    (`clipShadows`). Yalnız yakınlaşınca açık (kamera 2,2 km'den yakın, 2,6 km'de kapanır; `NEAR_ON`/`NEAR_OFF`): asıl
+    maliyet gölge alan her pikselin 16 örneği. Telefon çözünürlüğünde (2532×1170, masaüstü ekran kartı) 1,5 km'de +1,5 ms,
+    700 m'de ~+0,7 ms; strateji görünümünde (her yere gölge alırken) 4,6 → 8,6 ms idi.
   - Efekt ve model büyütmesi kamera uzaklığına bağlı (`rig.fxScale`, `rig.modelScale`).
 - **`src/audio/`:**
   - `sound.ts`: Web Audio, kanallar, örnek bankası.
