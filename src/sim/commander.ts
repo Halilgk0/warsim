@@ -16,11 +16,18 @@ import { FIRE_STAFF, FIRE_UPGRADE_COST, roadLinked } from './structures/fireStat
 import { ROAD_MAX, ROAD_MIN, nearestRoad } from './roads';
 import { L } from '../i18n';
 
-/** Botun bataryaları: hafif, orta ve ağır; sınıfta açık olan ilk top. */
+/**
+ * Botun bataryaları: hafif, orta ve ağır, iki grupta; sınıfta açık olan ilk top. A grubu Alman, İsveç ve ABD topları; B grubu
+ * 2026-11-18'de eklenen toplar (M45, 61-K, 52-K, 3,7 inç, 10,5 cm). B, kendi topu açılana dek aradaki topu atlar: botlar bir topu
+ * kurup sonra benzer güçteki ötekine çevirmekle para harcamasın (61-K Bofors'tan sonra açılır, B'nin orta bataryası 37 mm'de bekler).
+ */
 const BOT_GUNS: AAWeaponId[][] = [
   ['aa20q', 'oerlikon', 'aa20', 'mg'],
   ['aa40', 'aa37', 'aa20', 'mg'],
-  ['aa128', 'aa41', 'aa90', 'aa88', 'aa40', 'aa37', 'aa20', 'mg'],
+  ['aa128', 'aa41', 'aa90', 'aa88', 'aa85', 'aa40', 'aa37', 'aa20', 'mg'],
+  ['mg4', 'oerlikon', 'aa20', 'mg'],
+  ['aa61k', 'aa37', 'aa20', 'mg'],
+  ['aa105', 'aa94', 'aa85', 'aa88', 'aa40', 'aa37', 'aa20', 'mg'],
 ];
 
 /** Bataryanın istediği top: kimliğinden sınıf, sınıfta açık olan ilk top. */
@@ -31,8 +38,9 @@ const botGun = (id: number, r: Research): AAWeaponId => BOT_GUNS[id % BOT_GUNS.l
  * çoğu botta radar yoktu). Botlar 150 dakikada ancak altı yedi iş bitiriyor.
  */
 const DEFENSE_PRIORITY = [
-  'hd_20', 'observer', 'hd_rangefinder', 'radar_ew1', 'radio', 'hd_37', 'hd_88', 'hd_fort1', 'gci', 'hd_20q', 'hd_fort2', 'hd_predictor', 'hd_40',
-  'hd_oerlikon', 'hd_90', 'hd_crew', 'hd_ammo', 'radar_ew2', 'hd_camo', 'hd_gunradar', 'hd_vt', 'hd_flak41', 'hd_128', 'hd_fort3',
+  'hd_20', 'observer', 'hd_rangefinder', 'radar_ew1', 'radio', 'hd_37', 'hd_52k', 'hd_88', 'hd_fort1', 'gci', 'hd_20q', 'hd_37in', 'hd_oerlikon',
+  'hd_m45', 'hd_fort2', 'hd_predictor', 'hd_40', 'hd_61k', 'hd_90', 'hd_crew', 'hd_ammo', 'radar_ew2', 'hd_camo', 'hd_gunradar', 'hd_vt',
+  'hd_flak41', 'hd_105', 'hd_128', 'hd_fort3',
 ];
 
 const TECH_PRIORITY = [

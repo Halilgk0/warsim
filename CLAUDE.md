@@ -102,6 +102,32 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
+    - Avcı hedef dağıtımı (2026-11-18, `flightGroup.ts` `assignTargets`), sırayla:
+      1. Oyuncunun emri (`brain.order`).
+      2. Bağlılık: saldırı evresindeki avcı 2,5 km'den (`COMMIT_RANGE`) yakın hedefini tutar; atış mesafesindeki (700 m içi)
+         hedef hiç bırakılmaz. Eskiden her saniye baştan seçiliyor, 225–600 m'de bile bırakılıyordu. Geçişten sonra
+         uzaklaşan ya da tırmanan dal-vur avcısı bağlı değildir (sıradaki dalışı için serbestçe seçer).
+      3. Puan: uzaklık önceliklerle orantılı kısalır (bombardıman, görev hedefi, dosta saldıran); sabit metre indirimi
+         uzaktakini yanı başındakinin önüne geçiriyordu.
+
+      Kovalanan düşman devriye ya da eskort bölgesinden çıksa da aday kalır. Ölçüm: scratchpad `gorev/hedef.ts` (eski kod
+      worktree'si `taban_gorev`); kanat adamının lidere saldıranı kovalaması (kapak doktrini) hedef değişiminin çoğudur,
+      hata değildir.
+    - Oyuncu emri: seçili avcının panelinde "Hedef ver" (`game.beginAirOrder`, etkileşim `pickAir`, sonra düşmana dokunuş
+      `orderTarget`); "Emri kaldır". Hedef düşünce, kol dönüşe geçince, uçak kopunca ya da mühimmat bitince kalkar. Kayda
+      yazılmaz. İşlem düğmeleri bilgi panelinde durum satırının hemen altında (telefonda kaydırmadan erişilir).
+    - Pilot alışkanlıkları (`habit.ts`, uçak kimliğinden; ortak `Math.random`'a dokunmaz): formasyon istasyonu yavaşça
+      salınır (savaş kutusunda az), kanat adamı liderin dönüşüne kendi gecikmesiyle uyar (`brain.follow`, `holdFormation`
+      `fwd`), çatışmanın başında kendi tepki süresiyle formasyondan kopar (`engageAt`; dövüşün içindeki hedef
+      değişiminde beklemez). Taarruzda elemanlar farklı yönlerden girer
+      (`attackYawOf`, `holdPoint` `yaw`), çift hâlinde ve düzensiz aralıkla (`mayStartAttack`). Il-2 taarruzunda uçaksavar
+      kaybı 1,9 → 1,2, verilen hasar aynı; 240 dk bot ölçümünde denge değişmedi.
+    - Avcı karnesi (`sim:bench`, 4'e 4) çok gürültülü: aynı kodda 24 koşuluk parçalar ±10 puan oynar. Değişiklik
+      kararı için en az ~200 koşu (ör. 8 süreç × 24) ve eski kodla aynı anda; 16–96 koşu iki kez yanılttı (2026-11-18).
+    - Jet ve ağır savunmalı bombardıman kutusu (`combat.ts` `slashTarget`): taretleri ateş eden B-17 jet için "savunmasız"
+      sayılmaz, jet dalıp geçme saldırısını kutunun 3,2 km arkasından başlatır. Eskiden 1,5 km'de, arka uçakların
+      nişancı menzilinde dönüp ateş edemeden ağır hasar alıyordu: 4 Me 262 / 9 B-17'de düşen B-17 0,83 → 3,2, mermi
+      19 → 46 (jet kaybı ~2,5 aynı). Ölçüm scratchpad `gorev/jet.ts`.
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
     - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
       alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana
@@ -131,6 +157,15 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Para kalemleri: `world.pay` / `earn` kalem alır (`economy.ts` `MoneyCat`), toplamlar `Team.flow`'da; belediye
       ekranı (`ui/town.ts`) bunları gösterir. Belediye ekranında personel dökümü de var (uçuşta, bakımda, itfaiyede, boşta, yerine gelen). Yeni ödeme ya da gelir eklerken kalemini ver.
     - `airDefense.ts`: silahlar gerçek sistemlerdir (kaynaklar dosyanın başında). Silah kimlikleri (`mg`, `aa88`…) kayıtlara yazılır, değişmez.
+      15 top (2026-11-18'de M45 `mg4`, 61-K `aa61k`, 52-K `aa85`, QF 3,7 inç `aa94`, 10,5 cm Flak 38 `aa105` eklendi; kaynaklar ve
+      tahmin edilen değerler tanımlarının üstünde). Kaynakların ayrıştığı değer (52-K atış hızı) pratik hızdan seçildi.
+      Botların bataryaları iki grupta (`commander.ts` `BOT_GUNS`, batarya kimliğine göre): A eski toplar, B yeni beşi; B kendi topu
+      açılana dek aradaki topu atlar (botlar benzer güçteki topa çevirmekle para harcamasın). 52-K 8,8 cm ile aynı önkoşulda, bot
+      onu önce araştırır. 240 dk ölçümünde denge değişmedi; 4 saatte botlar 52-K, M45 ve 3,7 inçi takıyor, gerisi daha uzun oyunda.
+      - Boya (`structures.ts` `GUN_PAINT`): ordusunun belgeli rengi: Alman koyu gri (RAL 7021), Flak 41 kum sarısı (RAL 7028), ABD
+        ve Bofors zeytin yeşili, Sovyet 4BO yeşil, 3,7 inç Khaki Green No. 3, Oerlikon gemi grisi. Ayrıntılar yalnız gerçekte
+        olanlar: halka nişangâhlar, kalkanlar, veri alıcı kadranları, M2'nin su kabı, mevzide hazır mermi (pirinç kovan; mermi
+        boyası belirsiz olduğu için koyu çelik). Top başına 600–1.750 üçgen.
       Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
   - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
     `scenarios.ts` (oyuncuya görünmez; test, video kayıt ve ölçüm için koddan `game.loadScenario`), `campaign.ts`, `commander.ts` (rakip yapay zekâ).

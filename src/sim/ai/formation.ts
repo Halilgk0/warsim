@@ -80,9 +80,10 @@ const _slot = new Vector3();
 const _aim = new Vector3();
 const _tmp = new Vector3();
 
-/** Formasyon noktasının dünya konumu. */
-export function slotWorld(leader: Aircraft, off: SlotOffset, out: Vector3): Vector3 {
-  _fh.set(leader.fwd.x, 0, leader.fwd.z);
+/** Formasyon noktasının dünya konumu. fwd: liderin yönü yerine kullanılacak yatay yön (kanat adamının gecikmeli algısı). */
+export function slotWorld(leader: Aircraft, off: SlotOffset, out: Vector3, fwd?: Vector3): Vector3 {
+  const f = fwd ?? leader.fwd;
+  _fh.set(f.x, 0, f.z);
   if (_fh.lengthSq() < 1e-4) _fh.set(0, 0, -1);
   _fh.normalize();
   _rh.set(-_fh.z, 0, _fh.x);
@@ -136,8 +137,8 @@ function limitClimb(ac: Aircraft, dir: Vector3): void {
   if (dir.y > max) dir.y = max;
 }
 
-export function holdFormation(ac: Aircraft, leader: Aircraft, off: SlotOffset, cmd: FlyCommand, minAgl?: number): number {
-  slotWorld(leader, off, _slot);
+export function holdFormation(ac: Aircraft, leader: Aircraft, off: SlotOffset, cmd: FlyCommand, minAgl?: number, fwd?: Vector3): number {
+  slotWorld(leader, off, _slot, fwd);
   const dist = _slot.distanceTo(ac.pos);
   const s = ac.spec;
   if (dist > 2500) {

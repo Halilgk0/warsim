@@ -5,7 +5,8 @@
 import type { Caliber } from '../aircraft/specs';
 import { L } from '../../i18n';
 
-export type AAWeaponId = 'mg' | 'aa20' | 'oerlikon' | 'aa20q' | 'aa37' | 'aa40' | 'aa88' | 'aa90' | 'aa41' | 'aa128';
+export type AAWeaponId = 'mg' | 'aa20' | 'oerlikon' | 'aa20q' | 'aa37' | 'aa40' | 'aa88' | 'aa90' | 'aa41' | 'aa128'
+  | 'mg4' | 'aa61k' | 'aa85' | 'aa94' | 'aa105';
 
 /** Hangardaki sınıf. */
 export type AAClass = 'hafif' | 'orta' | 'agir';
@@ -13,7 +14,7 @@ export type AAClass = 'hafif' | 'orta' | 'agir';
 export const AA_CLASS_NAMES: Record<AAClass, { name: string; sub: string }> = {
   hafif: { name: L('Hafif', 'Light'), sub: L('makineli, 20 mm', 'machine gun, 20 mm') },
   orta: { name: L('Orta', 'Medium'), sub: '37–40 mm' },
-  agir: { name: L('Ağır', 'Heavy'), sub: '88–128 mm' },
+  agir: { name: L('Ağır', 'Heavy'), sub: '85–128 mm' },
 };
 
 export const AA_CLASS_ORDER: AAClass[] = ['hafif', 'orta', 'agir'];
@@ -108,6 +109,17 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
     rate: 30, muzzleVel: 900, damage: 6, dispersion: 0.012, kind: 'tracer', burstRadius: 0, caliber: 'cannon',
     installTime: 40, rank: 3, medium: false, cost: 2400, slew: 40,
   },
+  // M45 Quadmount (Maxson): dört M2 Browning (her biri dakikada 450–575), 200'lük mermi kutuları, iki 6 V aküyle elektrikli taret;
+  // 1943'te hizmete girdi. Etkili uçaksavar menzili 1,5 km, yatay 1,8 km; nişancı ve iki doldurucu. Kutuların değişim süresi (dördü
+  // 12 sn) ve taretin dönüş hızı (~60°/sn, ikincil kaynak) tahmin
+  mg4: {
+    id: 'mg4', name: L('M45 Quadmount 4×12,7 mm', 'M45 Quadmount 4×12.7 mm'), short: L('4×12,7 mm', '4×12.7 mm'), requires: 'hd_m45', range: 1800, ceiling: 1800, cls: 'hafif', barrels: 4,
+    desc: L('Dört M2 Browning’i elektrikli bir taretin iki yanına yerleştiren Amerikan uçaksavarı. Akülerle çalışan taret çok çabuk döner, dört namlu dakikada 2.000’den fazla mermi atar; ama 12,7 mm mermi küçük, menzili kısadır.',
+      'An American mount carrying four M2 Brownings on the sides of an electrically driven turret. The battery-powered turret swings very fast and the four barrels fire more than 2,000 rounds a minute, but the 12.7 mm bullet is small and short-ranged.'),
+    origin: 'ABD', year: 1943, bore: 12.7, shellKg: 0.046, dragC: 0.17, mag: 800, reload: 12, crew: 3,
+    rate: 35, muzzleVel: 890, damage: 1.4, dispersion: 0.013, kind: 'tracer', burstRadius: 0, caliber: 'heavy',
+    installTime: 30, rank: 2.2, medium: false, cost: 1700, slew: 60,
+  },
   // 3,7 cm Flak 36: dakikada 150–160 seri; kaynaklar pratikte 60–120 diyor (burada ~90); 6'lık tarak; 14 sn'lik izli 4.200 m'de imha
   aa37: {
     id: 'aa37', name: L('3,7 cm Flak 36', '3.7 cm Flak 36'), short: '37 mm', requires: 'hd_37', range: 4200, ceiling: 4200, cls: 'orta', clip: true,
@@ -126,6 +138,17 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
     rate: 2, muzzleVel: 880, damage: 30, dispersion: 0.007, kind: 'tracer', burstRadius: 11, caliber: 'cannon',
     installTime: 50, rank: 5, medium: true, cost: 3750, slew: 50,
   },
+  // 37 mm 61-K (M1939): Bofors'tan türetilen Sovyet orta topu; dakikada 160–170 seri, 80 pratik; 5'lik tarak; 0,73 kg parçalı-izli
+  // mermi, 880 m/sn; etkili menzil 4 km; mürettebat 8; ~20.000 adet. Kendini imha uzaklığı kaynakta yok: etkili menzil alındı.
+  // Elle çevrilir; dönüş hızı tahmin
+  aa61k: {
+    id: 'aa61k', name: L('37 mm 61-K', '37 mm 61-K'), short: L('37 mm (61-K)', '37 mm (61-K)'), requires: 'hd_61k', range: 4000, ceiling: 4000, cls: 'orta', clip: true,
+    desc: L('Bofors tasarımından geliştirilen Sovyet orta uçaksavar topu; savaş boyunca Kızıl Ordu’nun ana orta topu oldu, 20.000 kadar üretildi. 5’lik taraklarla beslenir, dakikada 80 kadar nişanlı atış yapar.',
+      'A Soviet medium anti-aircraft gun developed from the Bofors design. It was the Red Army’s main medium gun throughout the war, with about 20,000 built. Fed with 5-round clips, it fires about 80 aimed rounds a minute.'),
+    origin: 'Sovyetler Birliği', year: 1939, bore: 37, shellKg: 0.73, mag: 5, reload: 1.9, crew: 8,
+    rate: 2.75, muzzleVel: 880, damage: 26, dispersion: 0.008, kind: 'tracer', burstRadius: 10, caliber: 'cannon',
+    installTime: 45, rank: 4.5, medium: true, cost: 3000, slew: 35,
+  },
   // 8,8 cm Flak 36: dakikada 15–20; en büyük tapa ayarı (30 sn) 9.900 m, etkili tavan 8.000 m
   aa88: {
     id: 'aa88', name: L('8,8 cm Flak 36', '8.8 cm Flak 36'), short: '88 mm', requires: 'hd_88', range: 9900, ceiling: 8000, cls: 'agir',
@@ -134,6 +157,28 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
     origin: 'Almanya', year: 1936, bore: 88, shellKg: 9.2, mag: 0, reload: 0, crew: 10, aim: 0.87,
     rate: 0.29, muzzleVel: 820, damage: 55, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
     installTime: 60, rank: 6, medium: true, cost: 5000, slew: 12,
+  },
+  // 85 mm 52-K (M1939): 1939'da kabul edildi; 9,2 kg mermi, 792 m/sn; dakikada pratikte 10–12, en çok 15–20 (kaynaklar ayrışıyor;
+  // burada 13); dikey menzil 10,5 km, etkili tavan aynı kuralla ~8.700 m; mürettebat 7; dört tekerlekli, açılır kollu lafet. 8,8 cm'den
+  // yavaş ateş ettiği için ucuz
+  aa85: {
+    id: 'aa85', name: L('85 mm 52-K', '85 mm 52-K'), short: '85 mm', requires: 'hd_52k', range: 10500, ceiling: 8700, cls: 'agir',
+    desc: L('Sovyetlerin savaş boyunca kullandığı ağır uçaksavar topu. Mermisi 8,8 cm’lik Alman topununki kadar ağır, ama daha yavaş ateş eder: pratikte dakikada 10–12 atış. Dört tekerlekli lafeti açılan kollarla yere oturur.',
+      'The Soviet heavy anti-aircraft gun used throughout the war. Its shell is as heavy as the German 8.8 cm’s, but it fires more slowly: 10–12 aimed rounds a minute in practice. Its four-wheeled carriage settles on folding outriggers.'),
+    origin: 'Sovyetler Birliği', year: 1939, bore: 85, shellKg: 9.2, mag: 0, reload: 0, crew: 7, aim: 0.87,
+    rate: 0.21, muzzleVel: 792, damage: 55, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
+    installTime: 60, rank: 5.8, medium: true, cost: 3900, slew: 12,
+  },
+  // QF 3,7 inç (94 mm), Mk I–III: 1937'de üretime girdi; 12,7 kg (28 lb) mermi, 792 m/sn; dakikada 10–20 (1942'deki otomatik tapa
+  // ayarlayıcısıyla 20, burada 15); en yüksek tavan 9.000 m (30.000 ft), etkili ~7.200 m (kaynaktaki 23.500 ft); mürettebat 7.
+  // Mk VI (1944, 1.044 m/sn) ayrı top sayılmadı
+  aa94: {
+    id: 'aa94', name: L('QF 3,7 inç', 'QF 3.7-inch'), short: '94 mm', requires: 'hd_37in', range: 9000, ceiling: 7200, cls: 'agir',
+    desc: L('Britanya’nın ağır uçaksavar topu; 1940’ta Londra’yı savunan bataryaların çoğunda bu vardı. 12,7 kg’lık mermisi 8,8 cm’inkinden ağırdır; 1942’de gelen otomatik tapa ayarlayıcısıyla dakikada 20 atışa çıktı.',
+      'Britain’s heavy anti-aircraft gun; most of the batteries defending London in 1940 had it. Its 12.7 kg shell is heavier than the 8.8 cm’s, and the automatic fuze setter of 1942 raised it to 20 rounds a minute.'),
+    origin: 'Birleşik Krallık', year: 1937, bore: 94, shellKg: 12.7, mag: 0, reload: 0, crew: 7, aim: 0.87,
+    rate: 0.25, muzzleVel: 792, damage: 64, dispersion: 0, kind: 'flak', burstRadius: 24, caliber: 'cannon',
+    installTime: 65, rank: 6.1, medium: true, cost: 5400, slew: 15,
   },
   // 90 mm M1: 21 Mart 1940'ta kabul edildi. M1A1 dakikada 20 atış, 10,56 kg mermi, en yüksek tavan 13.300 m (etkili aynı kuralla ~11.500 m)
   aa90: {
@@ -152,6 +197,16 @@ export const AA_WEAPONS: Record<AAWeaponId, AAWeaponDef> = {
     origin: 'Almanya', year: 1943, bore: 88, shellKg: 9.4, mag: 0, reload: 0, aim: 0.87,
     rate: 0.375, muzzleVel: 1000, damage: 56, dispersion: 0, kind: 'flak', burstRadius: 22, caliber: 'cannon',
     installTime: 75, rank: 6.6, medium: true, cost: 7200, slew: 14,
+  },
+  // 10,5 cm Flak 38: 1937; 15,1 kg mermi, 881 m/sn; dakikada en çok 15 (pratikte 10–15, burada 13); en yüksek tavan 11.400 m, etkili
+  // 9.450 m (Flak 39'un değerleri, aynı top); elektrikli nişan ve doldurma; mürettebat 10; Flak 38 ve 39 birlikte ~4.200 adet
+  aa105: {
+    id: 'aa105', name: L('10,5 cm Flak 38', '10.5 cm Flak 38'), short: '105 mm', requires: 'hd_105', range: 11400, ceiling: 9450, cls: 'agir',
+    desc: L('8,8 cm ile 12,8 cm arasındaki Alman ağır topu. Elektrikli nişan ve doldurma düzeniyle 15 kg’lık mermiyi 9,5 km’ye kadar etkili atar. Almanya’yı savunan sabit bataryaların çoğunda bulunurdu.',
+      'The German heavy gun between the 8.8 cm and the 12.8 cm. With electric laying and loading it fires its 15 kg shell effectively up to 9.5 km. Many of the fixed batteries defending Germany had it.'),
+    origin: 'Almanya', year: 1937, bore: 105, shellKg: 15.1, mag: 0, reload: 0, crew: 10, aim: 0.87,
+    rate: 0.22, muzzleVel: 881, damage: 70, dispersion: 0, kind: 'flak', burstRadius: 26, caliber: 'cannon',
+    installTime: 80, rank: 6.8, medium: true, cost: 7600, slew: 10,
   },
   // 12,8 cm Flak 40: dakikada 10–12; en yüksek tavan 14.800 m, etkili tavan aynı kuralla ~13.000 m
   aa128: {
@@ -200,4 +255,6 @@ export function flightTime(w: AAWeaponDef, s: number): number {
   return (Math.exp(k * s) - 1) / (k * w.muzzleVel);
 }
 
-export const AA_WEAPON_ORDER: AAWeaponId[] = ['mg', 'aa20', 'oerlikon', 'aa20q', 'aa37', 'aa40', 'aa88', 'aa90', 'aa41', 'aa128'];
+export const AA_WEAPON_ORDER: AAWeaponId[] = [
+  'mg', 'aa20', 'oerlikon', 'mg4', 'aa20q', 'aa37', 'aa61k', 'aa40', 'aa85', 'aa88', 'aa94', 'aa90', 'aa41', 'aa105', 'aa128',
+];

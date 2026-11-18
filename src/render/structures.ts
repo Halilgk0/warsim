@@ -209,14 +209,73 @@ function jack(b: B, x: number, z: number, r = 0.2, h = 0.3, color = COL.gun): vo
 function tripodBase(b: B, len: number, w: number, y: number, color = COL.gun): void {
   for (const a of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
     A(b, BOXC, w, 0.12, len, Math.sin(a) * len * 0.5, y, Math.cos(a) * len * 0.5, color, SURF.metal, a);
-    jack(b, Math.sin(a) * len, Math.cos(a) * len);
+    jack(b, Math.sin(a) * len, Math.cos(a) * len, 0.2, 0.3, color);
   }
 }
 /** Nişancı koltuğu: döner tablaya bağlayan kol, ayak ve oturak. */
-function gunSeat(b: B, x: number, y: number, z: number, h: number): void {
+function gunSeat(b: B, x: number, y: number, z: number, h: number, color = COL.gun): void {
   beam(b, x * 0.3, y + 0.03, z * 0.3, x, y + h * 0.45, z, 0.05, COL.steel);
   A(b, BOX, 0.05, h * 0.55, 0.05, x, y + h * 0.45, z, COL.steel, SURF.metal);
-  A(b, CYL8, 0.17, 0.04, 0.17, x, y + h, z, COL.gun, SURF.metal);
+  A(b, CYL8, 0.17, 0.04, 0.17, x, y + h, z, color, SURF.metal);
+}
+
+/**
+ * Topların boyası: ordusunun belgeli rengi (oyun ışığında okunsun diye gerçek tondan bir derece açık). Alman topları 1943'e dek
+ * koyu gri (RAL 7021 Dunkelgrau), 1943'te çıkan Flak 41 kum sarısı (RAL 7028 Dunkelgelb); ABD topları zeytin yeşili (Olive Drab;
+ * Bofors da ABD üretimi M1 gibi); Sovyet topları 4BO koruma yeşili; İngiliz 3,7 inç haki yeşil (Khaki Green No. 3); donanma topu
+ * Oerlikon gemi grisi (Haze Gray). Namlular ve mekanizma koyu çelik.
+ */
+const GUN_PAINT: Record<AAWeaponId, number> = (() => {
+  const ger = 0x4a4f51;
+  const od = 0x5a5c38;
+  const sov = 0x4e5b33;
+  return {
+    mg: od, mg4: od, aa90: od, aa40: od,
+    aa20: ger, aa20q: ger, aa37: ger, aa88: ger, aa105: ger, aa128: ger,
+    aa41: 0xa89668,
+    oerlikon: 0x7c8487,
+    aa61k: sov, aa85: sov,
+    aa94: 0x5e5e3e,
+  };
+})();
+/** Halka nişangâh (uçaksavar "araba tekerleği" nişangâhı): dikme üstünde ileriye bakan halka. */
+function ringSight(b: B, x: number, y: number, z: number, r: number, post = 0.12): void {
+  A(b, BOXC, 0.015, post, 0.015, x, y - post / 2, z, COL.steel, SURF.metal);
+  b.push(new THREE.TorusGeometry(r, Math.max(0.006, r * 0.08), 4, 14).translate(x, y + r * 0.2, z), COL.steel, SURF.metal);
+  A(b, BOXC, r * 0.25, 0.01, 0.01, x, y + r * 0.2, z, COL.steel, SURF.metal);
+  A(b, BOXC, 0.01, r * 0.25, 0.01, x, y + r * 0.2, z, COL.steel, SURF.metal);
+}
+/** Mevzide hazır mermi: üst üste ahşap sandıklar (yer, yön). */
+function ammoCrates(b: B, x: number, y: number, z: number, ry: number, n = 3, w = 0.6, h = 0.26, d = 0.38): void {
+  for (let k = 0; k < n; k++) {
+    const row = k % 2;
+    const lev = Math.floor(k / 2);
+    A(b, BOX, w, h, d, x + Math.cos(ry) * row * (w + 0.04), y + lev * h, z - Math.sin(ry) * row * (w + 0.04), 0x6b5a3c, SURF.wood, ry);
+    A(b, BOX, w + 0.02, 0.03, 0.04, x + Math.cos(ry) * row * (w + 0.04), y + lev * h + h * 0.5, z - Math.sin(ry) * row * (w + 0.04), COL.steel, SURF.metal, ry);
+  }
+}
+/** Ağır top mermi rafı: alçak çerçeve, dik duran fişekler (pirinç kovan, koyu çelik mermi). */
+function shellRack(b: B, x: number, y: number, z: number, ry: number, n: number, r: number, len: number): void {
+  const c = Math.cos(ry);
+  const sn = Math.sin(ry);
+  const step = r * 2.4;
+  A(b, BOX, n * step + 0.1, 0.06, r * 3, x, y, z, 0x6b5a3c, SURF.wood, ry);
+  A(b, BOX, n * step + 0.1, 0.05, 0.05, x - sn * r * 1.3, y + len * 0.45, z - c * r * 1.3, 0x6b5a3c, SURF.wood, ry);
+  for (const e of [-1, 1]) A(b, BOX, 0.05, len * 0.5, 0.05, x + c * e * (n * step) / 2 - sn * r * 1.3, y, z - sn * e * (n * step) / 2 - c * r * 1.3, 0x6b5a3c, SURF.wood, ry);
+  for (let k = 0; k < n; k++) {
+    const o = (k - (n - 1) / 2) * step;
+    const px = x + c * o;
+    const pz = z - sn * o;
+    A(b, CYL8, r, len * 0.62, r, px, y + 0.06, pz, 0xb58a3c, SURF.metal);
+    b.push(new THREE.CylinderGeometry(r * 0.25, r * 0.95, len * 0.38, 8).translate(px, y + 0.06 + len * 0.81, pz), 0x3a3d3f, SURF.metal);
+  }
+}
+/** Veri alıcısı: çerçeveli kutu ve beyaz kadranlar (komuta aletinden gelen yön ve yükseliş). */
+function dials(b: B, x: number, y: number, z: number, side: number, n = 2): void {
+  A(b, BOX, 0.08, 0.34, 0.2 + 0.2 * n, x, y, z, 0x2e3133, SURF.metal);
+  for (let k = 0; k < n; k++) {
+    b.push(new THREE.CylinderGeometry(0.075, 0.075, 0.02, 12).rotateZ(Math.PI / 2).translate(x + side * 0.05, y + 0.17, z + (k - (n - 1) / 2) * 0.2), 0xe8e4d8, SURF.plain);
+  }
 }
 
 /**
@@ -239,7 +298,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
   const tip = new THREE.Vector3();
   let recoilLen = 0;
   let recoilBack = 0.1;
-  const P = COL.gun;
+  const P = GUN_PAINT[w];
   const D = COL.steel;
   const M = SURF.metal;
   switch (w) {
@@ -257,19 +316,26 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       A(pb, BOXC, 0.16, 0.2, 0.62, 0, 0, -0.15, P, M);
       A(pb, BOXC, 0.2, 0.28, 0.32, -0.2, -0.04, -0.12, 0x4d5a3c, M);
       for (const s of [-1, 1]) A(pb, BOXC, 0.03, 0.14, 0.12, s * 0.07, 0, -0.5, D, M);
+      ringSight(pb, 0, 0.17, 0.95, 0.09, 0.1);
+      A(pb, BOXC, 0.02, 0.06, 0.02, 0, 0.16, -0.32, D, M);
+      pb.push(new THREE.CylinderGeometry(0.085, 0.085, 0.04, 10).rotateX(Math.PI / 2).translate(0, 0.02, 1.11), D, M);
+      taper(pb, 0.026, 0.036, 0.08, 0, 0.02, 1.68);
+      A(yb, CYL8, 0.14, 0.42, 0.14, 0.42, 0.06, 0.25, P, M);
+      A(yb, CYL8, 0.04, 0.05, 0.04, 0.42, 0.48, 0.25, D, M);
+      beam(yb, 0.42, 0.5, 0.25, 0.06, 1.05, 0.12, 0.025, 0x2a2b2c);
       tip.set(0, 0.02, 1.72);
       break;
     }
     case 'aa20': {
       // 2 cm Flak 38: üç kollu alçak platform, döner tabla, iki yan yanak, kalkansız açık top yeri, yükseliş yayı, koltuk,
       // el çarkları; gövde, yanda 20'lik şarjör, üstte nişangâh, daralan namlu ve alev gizleyici
-      tripodBase(base, 1.35, 0.26, 0.14);
+      tripodBase(base, 1.35, 0.26, 0.14, P);
       A(base, CYL, 0.55, 0.1, 0.55, 0, 0.14, 0, P, M);
       A(yb, CYL, 0.46, 0.07, 0.46, 0, 0.24, 0, D, M);
       A(yb, CYL, 0.15, 0.5, 0.15, 0, 0.3, 0, D, M);
       for (const s of [-1, 1]) A(yb, BOX, 0.06, 0.68, 0.5, s * 0.19, 0.34, 0, P, M);
       yb.push(new THREE.TorusGeometry(0.36, 0.022, 6, 18).rotateY(Math.PI / 2).translate(0.3, 0.8, 0), D, M);
-      gunSeat(yb, -0.45, 0.3, -0.55, 0.4);
+      gunSeat(yb, -0.45, 0.3, -0.55, 0.4, P);
       handwheel(yb, 0.28, 0.6, -0.22, 0.12);
       handwheel(yb, -0.28, 0.6, -0.22, 0.12);
       pitchG.position.y = 1.0;
@@ -280,6 +346,10 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       taper(pb, 0.055, 0.042, 0.5, 0, 0.02, 0.45);
       barrel(pb, 0.75, 0.03, 0, 0.02, 0.92);
       taper(pb, 0.032, 0.052, 0.16, 0, 0.02, 1.67);
+      ringSight(pb, -0.06, 0.34, 0.38, 0.1, 0.22);
+      A(pb, BOXC, 0.02, 0.1, 0.02, -0.06, 0.17, -0.3, D, M);
+      for (const sx of [-1, 1]) A(yb, BOXC, 0.03, 0.03, 0.12, sx * 0.31, 0.72, -0.22, D, M);
+      ammoCrates(base, 0.95, 0, -0.95, 0.5, 3, 0.42, 0.2, 0.3);
       tip.set(0, 0.02, 1.85);
       break;
     }
@@ -305,6 +375,9 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       pb.push(new THREE.TorusGeometry(0.09, 0.012, 5, 12).translate(0, 0.33, 0.26), D, M);
       taper(pb, 0.045, 0.035, 0.42, 0, 0.01, 0.34);
       barrel(pb, 0.75, 0.024, 0, 0.01, 0.74);
+      pb.push(new THREE.CylinderGeometry(0.11, 0.06, 0.32, 8).translate(0, -0.27, -0.2), 0x6f6a55, SURF.canvas);
+      A(base, BOX, 0.55, 0.65, 0.4, 0.75, 0, -0.55, P, M);
+      A(base, BOX, 0.5, 0.02, 0.04, 0.75, 0.45, -0.34, D, M);
       tip.set(0, 0.01, 1.5);
       break;
     }
@@ -314,7 +387,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       A(base, BOXC, 8.2, 0.16, 0.34, 0, 0.14, 0, P, M);
       A(base, BOXC, 0.34, 0.16, 7.0, 0, 0.14, 0, P, M);
       A(base, CYL, 1.55, 0.12, 1.55, 0, 0.12, 0, P, M);
-      for (const [x, z] of [[4.05, 0], [-4.05, 0], [0, 3.45], [0, -3.45]]) jack(base, x, z, 0.2, 0.22);
+      for (const [x, z] of [[4.05, 0], [-4.05, 0], [0, 3.45], [0, -3.45]]) jack(base, x, z, 0.2, 0.22, P);
       // Yana açılmış iki tekerlek ve dingil, arka kola bağlı
       A(base, BOXC, 3.5, 0.12, 0.14, 0, 0.46, -1.9, D, M);
       for (const s of [-1, 1]) xDrum(base, 0.46, 0.3, s * 1.75, 0.46, -1.9, 0x2a2b2c);
@@ -324,7 +397,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
         A(yb, BOX, 0.1, 1.05, 1.35, s * 0.42, 0.75, -0.05, P, M);
         A(yb, BOX, 0.28, 0.38, 0.42, s * 0.66, 0.95, -0.25, D, M);
         handwheel(yb, s * 0.84, 1.15, -0.25, 0.17);
-        gunSeat(yb, s * 1.05, 0.3, -0.5, 0.65);
+        gunSeat(yb, s * 1.05, 0.3, -0.5, 0.65, P);
       }
       pitchG.position.y = 1.72;
       A(pb, BOXC, 0.55, 0.52, 2.3, 0, 0, -0.2, D, M);
@@ -334,6 +407,11 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       taper(rb, 0.14, 0.12, 1.9, 0, 0.04, -1.15);
       taper(rb, 0.1, 0.08, 3.5, 0, 0.04, 0.75);
       barrel(rb, 0.12, 0.09, 0, 0.04, 4.2);
+      A(pb, BOXC, 0.36, 0.42, 1.15, -0.5, 0.05, -1.5, D, M);
+      A(pb, BOXC, 0.3, 0.06, 0.9, -0.5, 0.3, -1.45, P, M);
+      xDrum(pb, 0.08, 0.1, -0.72, 0.05, -1.2);
+      for (const sx of [-1, 1]) dials(yb, sx * 0.82, 1.04, -0.25, sx, 1);
+      shellRack(base, 2.4, 0, 1.8, 0.7, 5, 0.06, 0.95);
       tip.set(0, 0.04, 4.35);
       recoilLen = 0.75;
       recoilBack = 0.5;
@@ -344,7 +422,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       // alçak muylu. Beşik ve üstte geri getirici; geri tepen kalın kılıf, uzun namlu, kama
       A(base, BOXC, 6.4, 0.2, 0.6, 0, 0.2, 0, P, M);
       A(base, BOXC, 0.6, 0.2, 6.4, 0, 0.2, 0, P, M);
-      for (const [x, z] of [[3.1, 0], [-3.1, 0]]) jack(base, x, z, 0.3, 0.26);
+      for (const [x, z] of [[3.1, 0], [-3.1, 0]]) jack(base, x, z, 0.3, 0.26, P);
       for (const z of [-2.95, 2.95]) {
         // İki uçta birer dingil: iki tekerlek, çamurluk ve dingil kolu
         for (const s of [-1, 1]) {
@@ -361,7 +439,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
         A(yb, BOX, 0.06, 1.85, 2.7, s * 1.28, 0.44, -0.1, P, M);
         A(yb, BOX, 0.95, 1.85, 0.06, s * 0.8, 0.44, 1.22, P, M);
         handwheel(yb, s * 0.62, 1.0, -0.55, 0.18);
-        gunSeat(yb, s * 0.85, 0.44, -0.75, 0.45);
+        gunSeat(yb, s * 0.85, 0.44, -0.75, 0.45, P);
       }
       A(yb, BOX, 0.66, 0.5, 0.06, 0, 0.44, 1.22, P, M);
       pitchG.position.y = 1.36;
@@ -371,6 +449,10 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       taper(rb, 0.18, 0.155, 2.8, 0, 0.02, -1.2, P);
       taper(rb, 0.115, 0.085, 3.8, 0, 0.02, 1.6);
       barrel(rb, 0.15, 0.1, 0, 0.02, 5.35);
+      for (const sx of [-1, 1]) dials(yb, sx * 1.2, 1.55, 0.2, -sx);
+      A(yb, BOX, 0.4, 0.5, 0.45, 0.85, 0.44, -0.9, D, M);
+      A(pb, BOXC, 0.34, 0.1, 0.75, 0, -0.08, -1.95, P, M);
+      shellRack(base, -2.2, 0, 1.5, 0.4, 5, 0.056, 1.0);
       tip.set(0, 0.02, 5.55);
       recoilLen = 0.9;
       recoilBack = 0.6;
@@ -381,7 +463,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       // koltuk; beşikte dişli yayı, dört Flak 38 gövdesi, dış yanlarda şarjörler, üstte nişangâh kolu
       A(base, BOX, 1.25, 0.16, 2.8, 0, 0.1, 0, P, M);
       A(base, BOX, 2.5, 0.14, 0.34, 0, 0.1, 0.9, P, M);
-      for (const [x, z] of [[-1.1, 0.9], [1.1, 0.9], [-0.55, -1.25], [0.55, -1.25]]) jack(base, x, z, 0.2, 0.2);
+      for (const [x, z] of [[-1.1, 0.9], [1.1, 0.9], [-0.55, -1.25], [0.55, -1.25]]) jack(base, x, z, 0.2, 0.2, P);
       A(yb, CYL, 0.72, 0.1, 0.72, 0, 0.26, 0, D, M);
       A(yb, BOX, 0.9, 0.45, 0.75, 0, 0.36, 0.05, P, M);
       for (const s of [-1, 1]) A(yb, BOX, 0.07, 0.72, 0.85, s * 0.56, 0.36, 0, P, M);
@@ -389,7 +471,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       handwheel(yb, -0.68, 0.72, -0.2, 0.15);
       for (const k of [0, 1, 2, 3]) A(yb, BOXC, 0.05, 0.3, 0.42, -0.24 + k * 0.16, 0.56, -0.8, D, M);
       A(yb, BOX, 0.95, 0.06, 0.55, 0, 0.36, -0.8, P, M);
-      gunSeat(yb, 0, 0.36, -1.2, 0.5);
+      gunSeat(yb, 0, 0.36, -1.2, 0.5, P);
       pitchG.position.y = 1.15;
       A(pb, BOXC, 0.5, 0.42, 0.75, 0, 0, -0.08, D, M);
       xDrum(pb, 0.42, 0.06, 0.34, 0, -0.1, P);
@@ -402,6 +484,12 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
         barrel(pb, 0.72, 0.028, x, y, 0.74);
         taper(pb, 0.03, 0.048, 0.15, x, y, 1.46);
       }
+      for (const sx of [-1, 1]) {
+        A(yb, BOX, 0.55, 0.85, 0.05, sx * 0.62, 0.45, 0.58, P, M);
+        A(yb, BOX, 0.05, 0.85, 0.35, sx * 0.9, 0.45, 0.42, P, M, sx * -0.4);
+      }
+      A(yb, BOX, 0.7, 0.3, 0.05, 0, 0.45, 0.58, P, M);
+      ammoCrates(base, -1.35, 0, -0.4, 0.3, 4, 0.45, 0.2, 0.32);
       tip.set(0, 0, 1.62);
       break;
     }
@@ -413,7 +501,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       yb.push(new THREE.CylinderGeometry(0.34, 0.56, 0.6, 14).translate(0, 0.68, 0), P, M);
       for (const s of [-1, 1]) {
         A(yb, BOX, 0.09, 0.95, 0.85, s * 0.34, 0.45, 0, P, M);
-        gunSeat(yb, s * 0.95, 0.39, -0.4, 0.55);
+        gunSeat(yb, s * 0.95, 0.39, -0.4, 0.55, P);
         A(yb, BOX, 0.2, 0.28, 0.32, s * 0.68, 1.02, 0.05, D, M);
         A(yb, BOX, 0.5, 0.05, 0.14, s * 0.62, 0.92, -0.12, P, M);
         handwheel(yb, s * 0.68, 0.85, -0.28, 0.16);
@@ -428,6 +516,9 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       barrel(rb, 0.95, 0.125, 0, 0.04, 0.5);
       taper(rb, 0.085, 0.06, 2.2, 0, 0.04, 1.42);
       taper(rb, 0.065, 0.16, 0.5, 0, 0.04, 3.6);
+      for (const sx of [-1, 1]) ringSight(pb, sx * 0.24, 0.5, 0.4, 0.12, 0.24);
+      ammoCrates(base, -1.75, 0, 0.6, 1.2, 4, 0.5, 0.22, 0.34);
+      ammoCrates(base, 1.55, 0, -1.0, -0.4, 3, 0.5, 0.22, 0.34);
       tip.set(0, 0.04, 4.15);
       recoilLen = 0.2;
       recoilBack = 0.15;
@@ -440,7 +531,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       A(base, BOX, 5.4, 0.42, 1.5, 0, 0.15, 0, P, M);
       A(base, BOX, 1.5, 0.42, 5.4, 0, 0.15, 0, P, M);
       A(base, BOX, 2.6, 0.45, 2.6, 0, 0.15, 0, P, M);
-      for (const [x, z] of [[2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6]]) jack(base, x, z, 0.5, 0.42);
+      for (const [x, z] of [[2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6]]) jack(base, x, z, 0.5, 0.42, P);
       yb.push(new THREE.CylinderGeometry(0.85, 1.15, 0.85, 16).translate(0, 1.0, 0), P, M);
       A(yb, CYL, 1.3, 0.1, 1.3, 0, 0.58, 0, D, M);
       for (const s of [-1, 1]) {
@@ -449,7 +540,7 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
         xDrum(yb, 0.34, 0.5, s * 1.08, 1.85, -0.6);
         handwheel(yb, s * 1.38, 1.85, -0.6, 0.28);
         handwheel(yb, s * 1.26, 1.45, 0.45, 0.26);
-        gunSeat(yb, s * 1.5, 0.57, -0.1, 0.65);
+        gunSeat(yb, s * 1.5, 0.57, -0.1, 0.65, P);
         A(yb, BOX, 0.3, 0.3, 0.42, s * 1.0, 2.2, 0.55, 0x4a4d4f, M);
       }
       pitchG.position.set(0, 2.7, 0.2);
@@ -461,22 +552,213 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       taper(rb, 0.27, 0.23, 3.4, 0, 0, -1.3, P);
       taper(rb, 0.17, 0.135, 5.0, 0, 0, 2.05);
       barrel(rb, 0.22, 0.155, 0, 0, 7.0);
+      for (const sx of [-1, 1]) dials(yb, sx * 1.22, 2.2, 0.55, sx);
+      for (let k = 0; k < 3; k++) A(base, BOX, 0.7, 0.14, 0.32, 0, 0.0 + k * 0.14, -3.2 + k * 0.3, D, M);
+      shellRack(base, 3.0, 0.0, 2.4, 0.6, 5, 0.075, 1.2);
       tip.set(0, 0, 7.3);
       recoilLen = 1.1;
       recoilBack = 0.8;
       break;
     }
+    case 'mg4': {
+      // M45 Quadmount, M55 römorkunda: dikdörtgen römork tabanı, iki tekerlek ve dört köşe ayağı. Dönen tarette alçak kaide,
+      // nişancının önünde eğik zırh kalkanı ve koltuk, arkada iki akü kutusu. Beşikte iki yanda üst üste ikişer M2 Browning
+      // (gövde, delikli namlu desteği, ağır namlu), dış yanlarda 200'lük mermi kutuları, ortada yansıtmalı nişangâh
+      A(base, BOX, 1.7, 0.14, 2.6, 0, 0.42, 0, P, M);
+      A(base, BOXC, 0.12, 0.12, 3.3, 0, 0.42, 0.2, D, M);
+      A(base, BOXC, 0.4, 0.06, 0.06, 0, 0.5, 1.85, D, M);
+      for (const s of [-1, 1]) {
+        xDrum(base, 0.36, 0.22, s * 0.98, 0.36, -0.2, 0x2a2b2c);
+        A(base, BOX, 0.32, 0.05, 0.85, s * 0.98, 0.76, -0.2, P, M);
+      }
+      for (const [x, z] of [[0.75, 1.15], [-0.75, 1.15], [0.75, -1.15], [-0.75, -1.15]]) {
+        A(base, BOX, 0.08, 0.42, 0.08, x, 0.05, z, D, M);
+        jack(base, x, z, 0.16, 0.1, P);
+      }
+      A(yb, CYL, 0.62, 0.1, 0.62, 0, 0.56, 0, D, M);
+      A(yb, BOX, 0.9, 0.38, 0.9, 0, 0.66, -0.05, P, M);
+      for (const s of [-1, 1]) A(yb, BOX, 0.22, 0.24, 0.3, s * 0.3, 1.04, -0.52, 0x3c3e36, M);
+      gunSeat(yb, 0, 0.66, -0.2, 0.62, P);
+      // Zırh kalkanı: ön pano geriye eğik, iki yanda kanat
+      A(yb, BOX, 0.62, 0.62, 0.05, 0, 1.0, 0.36, P, M, 0);
+      for (const s of [-1, 1]) A(yb, BOX, 0.05, 0.5, 0.4, s * 0.31, 1.0, 0.18, P, M);
+      pitchG.position.set(0, 1.42, 0.05);
+      A(pb, BOXC, 0.5, 0.12, 0.22, 0, 0, -0.05, D, M);
+      for (const s of [-1, 1]) {
+        A(pb, BOXC, 0.1, 0.5, 0.42, s * 0.36, 0, -0.08, P, M);
+        for (const y of [0.13, -0.13]) {
+          A(pb, BOXC, 0.13, 0.17, 0.66, s * 0.5, y, -0.12, D, M);
+          barrel(pb, 0.2, 0.042, s * 0.5, y, 0.21, D);
+          barrel(pb, 0.95, 0.024, s * 0.5, y, 0.41);
+          barrel(pb, 0.05, 0.03, s * 0.5, y, 1.33, D);
+        }
+        A(pb, BOXC, 0.13, 0.44, 0.34, s * 0.68, 0, -0.18, 0x4d5a3c, M);
+      }
+      A(pb, BOXC, 0.06, 0.2, 0.06, 0, 0.16, 0.0, D, M);
+      A(pb, BOXC, 0.16, 0.12, 0.04, 0, 0.3, 0.0, 0x8fa4a8, M);
+      for (const sx of [-1, 1]) {
+        A(yb, BOX, 0.03, 0.22, 0.03, sx * 0.12, 1.02, 0.12, D, M);
+        A(yb, BOXC, 0.05, 0.05, 0.08, sx * 0.12, 1.26, 0.12, 0x2a2b2c, M);
+        beam(pb, sx * 0.68, 0.18, -0.12, sx * 0.55, 0.22, -0.02, 0.06, 0x3c3e36);
+        beam(pb, sx * 0.68, -0.18, -0.12, sx * 0.55, -0.05, -0.02, 0.06, 0x3c3e36);
+        xDrum(base, 0.12, 0.25, sx * 1.1, 0.36, -0.2);
+      }
+      tip.set(0, 0, 1.38);
+      break;
+    }
+    case 'aa61k': {
+      // 37 mm 61-K, dört tekerlekli lafet açılmış: uzun gövde, iki yana açılan kollar ve dört tesviye ayağı, iki dingil ve tekerlekler.
+      // Döner tabla, koni ayak, iki yan yanak; iki yanda koltuk, nişangâh kutusu, el çarkları; küçük düz kalkan. Beşikte gövde, üstte
+      // 5'lik tarak kılavuzu; geri tepen namlu yay kılıfı, ince namlu, koni alev gizleyici
+      A(base, BOXC, 0.5, 0.2, 4.2, 0, 0.28, 0, P, M);
+      A(base, BOXC, 3.2, 0.16, 0.36, 0, 0.26, 0, P, M);
+      for (const [x, z] of [[1.55, 0], [-1.55, 0], [0, 2.0], [0, -2.0]]) jack(base, x, z, 0.2, 0.18, P);
+      for (const z of [-1.45, 1.45]) {
+        A(base, BOXC, 1.35, 0.1, 0.12, 0, 0.42, z, D, M);
+        for (const s of [-1, 1]) xDrum(base, 0.36, 0.2, s * 0.72, 0.42, z, 0x2a2b2c);
+      }
+      A(base, CYL, 0.62, 0.14, 0.62, 0, 0.36, 0, P, M);
+      A(yb, CYL, 0.56, 0.08, 0.56, 0, 0.5, 0, D, M);
+      yb.push(new THREE.CylinderGeometry(0.28, 0.42, 0.45, 12).translate(0, 0.78, 0), P, M);
+      for (const s of [-1, 1]) {
+        A(yb, BOX, 0.08, 0.85, 0.75, s * 0.3, 0.6, 0, P, M);
+        gunSeat(yb, s * 0.82, 0.52, -0.38, 0.5, P);
+        A(yb, BOX, 0.18, 0.24, 0.28, s * 0.6, 1.2, 0.05, D, M);
+        handwheel(yb, s * 0.6, 0.98, -0.25, 0.15);
+        A(yb, BOX, 0.4, 0.62, 0.04, s * 0.42, 1.05, 0.55, P, M);
+      }
+      A(yb, BOX, 0.44, 0.24, 0.04, 0, 1.05, 0.55, P, M);
+      pitchG.position.y = 1.55;
+      A(pb, BOXC, 0.3, 0.38, 1.3, 0, 0, -0.1, D, M);
+      A(pb, BOXC, 0.2, 0.46, 0.4, 0, 0.4, -0.22, P, M);
+      for (const k of [-2, -1, 0, 1, 2]) barrel(pb, 0.3, 0.024, k * 0.046, 0.72, -0.38, 0x8a7a44);
+      barrel(rb, 0.8, 0.095, 0, 0.03, 0.5);
+      taper(rb, 0.062, 0.046, 1.65, 0, 0.03, 1.3);
+      taper(rb, 0.05, 0.11, 0.4, 0, 0.03, 2.95);
+      for (const sx of [-1, 1]) ringSight(pb, sx * 0.17, 0.4, 0.4, 0.11, 0.22);
+      ammoCrates(base, -1.5, 0, 1.2, 0.9, 4, 0.5, 0.2, 0.34);
+      tip.set(0, 0.03, 3.4);
+      recoilLen = 0.18;
+      recoilBack = 0.14;
+      break;
+    }
+    case 'aa85': {
+      // 85 mm 52-K yere oturmuş: artı biçimli platform ve dört tesviye ayağı, ön ve arka dingil kalkık tekerleklerle. Koni ayak,
+      // büyük yan yanaklar, koltuklar ve el çarkları, tapa ayar kutusu. Beşikte üstte geri getirici, altta fren silindiri; geri tepen
+      // namlu: kılıf, uzun namlu, çok bölmeli ağız freni, kama
+      for (const a of [0, Math.PI / 2]) A(base, BOXC, 5.6, 0.22, 0.48, 0, 0.18, 0, P, M, a);
+      A(base, CYL, 1.05, 0.18, 1.05, 0, 0.1, 0, P, M);
+      for (const [x, z] of [[2.7, 0], [-2.7, 0], [0, 2.7], [0, -2.7]]) jack(base, x, z, 0.34, 0.3, P);
+      for (const z of [-2.2, 2.2]) {
+        A(base, BOXC, 1.7, 0.12, 0.14, 0, 0.55, z, D, M);
+        for (const s of [-1, 1]) xDrum(base, 0.45, 0.24, s * 0.85, 0.55, z, 0x2a2b2c);
+      }
+      yb.push(new THREE.CylinderGeometry(0.4, 0.66, 0.8, 16).translate(0, 0.7, 0), P, M);
+      A(yb, CYL, 0.78, 0.08, 0.78, 0, 0.28, 0, D, M);
+      for (const s of [-1, 1]) {
+        A(yb, BOX, 0.1, 1.1, 1.6, s * 0.44, 0.9, -0.05, P, M);
+        gunSeat(yb, s * 0.98, 0.28, -0.3, 0.7, P);
+        handwheel(yb, s * 0.64, 1.4, -0.35, 0.18);
+        handwheel(yb, s * 0.64, 1.08, 0.25, 0.16);
+      }
+      A(yb, BOX, 0.4, 0.46, 0.46, -0.78, 0.95, 0.42, D, M);
+      pitchG.position.y = 1.82;
+      A(pb, BOXC, 0.58, 0.52, 2.2, 0, 0, -0.2, D, M);
+      barrel(pb, 2.4, 0.085, 0, 0.4, -0.5, P);
+      barrel(pb, 2.1, 0.08, 0, -0.36, -0.3, D);
+      A(pb, BOXC, 0.32, 0.1, 0.65, 0, -0.08, -1.75, P, M);
+      A(rb, BOXC, 0.46, 0.46, 0.55, 0, 0.03, -1.45, D, M);
+      taper(rb, 0.16, 0.14, 2.1, 0, 0.03, -1.15, P);
+      taper(rb, 0.105, 0.08, 3.5, 0, 0.03, 0.95);
+      // Ağız freni: kalın gövde ve yan delikler (koyu bantlar)
+      barrel(rb, 0.42, 0.14, 0, 0.03, 4.45, D);
+      for (const z of [4.55, 4.7]) A(rb, BOXC, 0.3, 0.06, 0.06, 0, 0.03, z, 0x1c1d1e, M);
+      for (const sx of [-1, 1]) dials(yb, sx * 0.53, 1.55, 0.35, sx, 1);
+      shellRack(base, -2.0, 0, -1.7, 0.7, 5, 0.055, 0.95);
+      tip.set(0, 0.03, 4.9);
+      recoilLen = 0.85;
+      recoilBack = 0.6;
+      break;
+    }
+    case 'aa94': {
+      // QF 3,7 inç Mk I seyyar: dört tekerlekli platform yere indirilmiş, dört açılır kol ve tesviye ayakları; iki dingil. Alçak
+      // döner tabla, büyük yan yanaklar; solda doldurucu basamağı ve büyük tapa ayar makinesi, sağda nişancı koltuğu ve çarklar.
+      // Beşikte altta çift fren ve geri getirici; geri tepen namlu: kılıf, uzun ince namlu (ağız freni yok), kama
+      A(base, BOXC, 1.6, 0.24, 5.4, 0, 0.3, 0, P, M);
+      for (const s of [-1, 1]) A(base, BOXC, 2.6, 0.16, 0.36, s * 1.9, 0.24, 0.6, P, M);
+      for (const [x, z] of [[3.1, 0.6], [-3.1, 0.6], [0, 2.75], [0, -2.75]]) jack(base, x, z, 0.3, 0.26, P);
+      for (const z of [-2.0, 2.0]) {
+        A(base, BOXC, 2.1, 0.12, 0.14, 0, 0.55, z, D, M);
+        for (const s of [-1, 1]) xDrum(base, 0.46, 0.26, s * 1.05, 0.55, z, 0x2a2b2c);
+      }
+      A(yb, CYL, 0.95, 0.1, 0.95, 0, 0.42, 0, D, M);
+      yb.push(new THREE.CylinderGeometry(0.45, 0.7, 0.55, 16).translate(0, 0.78, 0), P, M);
+      for (const s of [-1, 1]) A(yb, BOX, 0.12, 1.15, 1.75, s * 0.48, 0.95, -0.1, P, M);
+      A(yb, BOX, 0.62, 0.7, 0.8, -1.0, 0.95, -0.55, D, M);
+      A(yb, BOX, 0.8, 0.06, 0.8, -1.0, 0.52, -0.55, P, M);
+      xDrum(yb, 0.22, 0.12, -1.33, 1.3, -0.55);
+      gunSeat(yb, 1.05, 0.42, -0.25, 0.7, P);
+      handwheel(yb, 0.7, 1.45, -0.4, 0.2);
+      handwheel(yb, 0.7, 1.1, 0.3, 0.17);
+      pitchG.position.y = 2.0;
+      A(pb, BOXC, 0.62, 0.58, 2.5, 0, 0, -0.25, D, M);
+      for (const s of [-1, 1]) barrel(pb, 2.3, 0.09, s * 0.17, -0.4, -0.4, P);
+      A(pb, BOXC, 0.36, 0.1, 0.8, 0, -0.08, -1.95, P, M);
+      A(rb, BOXC, 0.5, 0.5, 0.62, 0, 0.03, -1.6, D, M);
+      taper(rb, 0.17, 0.15, 2.3, 0, 0.03, -1.3, P);
+      taper(rb, 0.11, 0.08, 3.9, 0, 0.03, 1.0);
+      barrel(rb, 0.14, 0.095, 0, 0.03, 4.9);
+      A(pb, BOXC, 0.3, 0.06, 0.9, -0.15, 0.3, -1.75, P, M);
+      shellRack(base, 2.3, 0, -1.6, -0.5, 5, 0.06, 1.0);
+      tip.set(0, 0.03, 5.1);
+      recoilLen = 0.95;
+      recoilBack = 0.6;
+      break;
+    }
+    case 'aa105': {
+      // 10,5 cm Flak 38 sabit mevzide: artı biçimli çelik platform ve dört büyük tesviye ayağı, koni ayak, iki büyük yan yanak; yanlarda
+      // elektrikli nişan kutuları ve gösterge panoları, el çarkları, koltuklar; arkada doldurma kızağı. Beşikte üstte çift geri
+      // getirici; geri tepen namlu: kalın kılıf, 6,6 m daralan namlu, kama
+      A(base, BOX, 5.0, 0.38, 1.3, 0, 0.12, 0, P, M);
+      A(base, BOX, 1.3, 0.38, 5.0, 0, 0.12, 0, P, M);
+      A(base, BOX, 2.3, 0.4, 2.3, 0, 0.12, 0, P, M);
+      for (const [x, z] of [[2.4, 0], [-2.4, 0], [0, 2.4], [0, -2.4]]) jack(base, x, z, 0.44, 0.38, P);
+      yb.push(new THREE.CylinderGeometry(0.72, 1.0, 0.8, 16).translate(0, 0.92, 0), P, M);
+      A(yb, CYL, 1.15, 0.1, 1.15, 0, 0.52, 0, D, M);
+      for (const s of [-1, 1]) {
+        A(yb, BOX, 0.16, 1.55, 2.8, s * 0.64, 1.2, 0.05, P, M);
+        A(yb, BOX, 0.4, 0.62, 0.7, s * 0.95, 1.35, 0.55, 0x4a4d4f, M);
+        A(yb, BOX, 0.06, 0.32, 0.42, s * 1.16, 1.55, 0.55, 0xd8d4c4, SURF.plain);
+        handwheel(yb, s * 1.2, 1.75, -0.5, 0.24);
+        gunSeat(yb, s * 1.38, 0.52, -0.2, 0.62, P);
+      }
+      A(yb, BOX, 0.5, 0.12, 1.2, 0, 1.25, -1.65, P, M);
+      pitchG.position.set(0, 2.45, 0.15);
+      A(pb, BOXC, 0.8, 0.72, 3.0, 0, 0, -0.1, D, M);
+      for (const x of [-0.3, 0.3]) barrel(pb, 3.3, 0.17, x, 0.6, -0.85, P);
+      A(pb, BOXC, 0.95, 0.36, 0.18, 0, 0.45, 2.3, P, M);
+      A(rb, BOXC, 0.74, 0.74, 0.9, 0, 0, -1.7, D, M);
+      taper(rb, 0.23, 0.2, 3.0, 0, 0, -1.2, P);
+      taper(rb, 0.14, 0.11, 4.6, 0, 0, 1.8);
+      barrel(rb, 0.2, 0.125, 0, 0, 6.35);
+      for (let k = 0; k < 3; k++) A(base, BOX, 0.6, 0.13, 0.3, 0, k * 0.13, -2.85 + k * 0.28, D, M);
+      shellRack(base, 2.4, 0.0, 2.1, 0.6, 5, 0.07, 1.1);
+      tip.set(0, 0, 6.6);
+      recoilLen = 1.0;
+      recoilBack = 0.7;
+      break;
+    }
     case 'aa37': {
       // 3,7 cm Flak 36: üç kollu platform, döner tabla, yan yanaklar, namluya açıklığı olan küçük kalkan, koltuklar ve el çarkları.
       // Beşikte gövde, üstte 6'lık tarak kılavuzu; geri tepen namlu yay kılıfı ve alev gizleyici
-      tripodBase(base, 2.0, 0.34, 0.2);
+      tripodBase(base, 2.0, 0.34, 0.2, P);
       A(base, CYL, 0.8, 0.14, 0.8, 0, 0.18, 0, P, M);
       A(yb, CYL, 0.68, 0.08, 0.68, 0, 0.32, 0, D, M);
       A(yb, CYL, 0.24, 0.55, 0.24, 0, 0.38, 0, D, M);
       for (const s of [-1, 1]) {
         A(yb, BOX, 0.07, 0.85, 0.7, s * 0.26, 0.4, 0, P, M);
         A(yb, BOX, 0.46, 0.68, 0.05, s * 0.45, 0.92, 0.55, P, M);
-        gunSeat(yb, s * 0.68, 0.38, -0.55, 0.42);
+        gunSeat(yb, s * 0.68, 0.38, -0.55, 0.42, P);
         handwheel(yb, s * 0.42, 0.78, -0.25, 0.15);
       }
       A(yb, BOX, 0.46, 0.22, 0.05, 0, 0.92, 0.55, P, M);
@@ -487,6 +769,10 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       barrel(rb, 0.72, 0.085, 0, 0.03, 0.5);
       taper(rb, 0.06, 0.045, 1.5, 0, 0.03, 1.2);
       taper(rb, 0.048, 0.08, 0.28, 0, 0.03, 2.68);
+      beam(pb, 0, -0.2, -0.45, 0, -0.5, -0.85, 0.1, D);
+      A(pb, BOXC, 0.12, 0.2, 0.26, -0.22, 0.24, 0.02, D, M);
+      A(pb, BOXC, 0.05, 0.05, 0.1, -0.22, 0.28, -0.16, D, M);
+      ammoCrates(base, 1.2, 0, 1.0, 0.8, 3, 0.5, 0.2, 0.34);
       tip.set(0, 0.03, 3.0);
       recoilLen = 0.15;
       recoilBack = 0.12;
@@ -498,13 +784,13 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       // namlu: kılıf, daralan namlu, ince ağız halkası, kama
       for (const a of [0, Math.PI / 2]) A(base, BOXC, 5.8, 0.22, 0.5, 0, 0.17, 0, P, M, a);
       A(base, CYL, 1.15, 0.18, 1.15, 0, 0.1, 0, P, M);
-      for (const [x, z] of [[2.8, 0], [-2.8, 0], [0, 2.8], [0, -2.8]]) jack(base, x, z, 0.36, 0.3);
+      for (const [x, z] of [[2.8, 0], [-2.8, 0], [0, 2.8], [0, -2.8]]) jack(base, x, z, 0.36, 0.3, P);
       for (const [x, z] of [[-1.6, -1.9], [-2.1, -1.5]]) A(base, BOX, 0.5, 0.35, 0.9, x, 0, z, 0x5a5440, SURF.wood, 0.6);
       yb.push(new THREE.CylinderGeometry(0.42, 0.72, 0.85, 16).translate(0, 0.72, 0), P, M);
       A(yb, CYL, 0.82, 0.08, 0.82, 0, 0.28, 0, D, M);
       for (const s of [-1, 1]) {
         A(yb, BOX, 0.11, 1.15, 1.7, s * 0.46, 0.95, -0.05, P, M);
-        gunSeat(yb, s * 1.0, 0.28, -0.25, 0.75);
+        gunSeat(yb, s * 1.0, 0.28, -0.25, 0.75, P);
         handwheel(yb, s * 0.68, 1.45, -0.4);
         handwheel(yb, s * 0.68, 1.1, 0.25, 0.17);
       }
@@ -520,6 +806,13 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       taper(rb, 0.17, 0.15, 2.3, 0, 0.03, -1.2, P);
       taper(rb, 0.115, 0.085, 3.7, 0, 0.03, 1.1);
       barrel(rb, 0.15, 0.1, 0, 0.03, 4.8);
+      for (const sx of [-1, 1]) {
+        A(yb, BOX, 0.95, 1.45, 0.06, sx * 0.72, 0.62, 1.05, P, M);
+        A(yb, BOX, 0.06, 1.45, 0.6, sx * 1.18, 0.62, 0.78, P, M, sx * -0.35);
+        dials(yb, sx * 0.53, 1.62, -0.2, sx);
+      }
+      A(yb, BOX, 0.5, 0.5, 0.06, 0, 0.62, 1.05, P, M);
+      shellRack(base, 1.9, 0.0, -1.6, -0.8, 5, 0.055, 0.95);
       tip.set(0, 0.03, 5.0);
       recoilLen = 0.9;
       recoilBack = 0.6;

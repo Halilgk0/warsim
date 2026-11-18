@@ -21,6 +21,7 @@ import { avoidAA, flakWeave } from './aaEvade';
 import { speedFor } from './missions';
 import type { FlightContact, FlightGroup } from './flightGroup';
 import { clamp } from '../../core/math';
+import { habitOf, stationDrift } from './habit';
 import { L } from '../../i18n';
 
 export type AttackPhase =
@@ -68,12 +69,18 @@ export interface AttackState {
 }
 
 const _p = new Vector3();
+const _lf = new Vector3();
 
 export class Brain {
   /** Arayüzde gösterilen anlık davranış. */
   status = L('Hazır', 'Ready');
   target: Aircraft | null = null;
   threat: Aircraft | null = null;
+  /**
+   * Oyuncunun verdiği hava hedefi (düşman uçağın kimliği; null = kol kendisi seçer). Kol bu avcıya o hedefi atar;
+   * hedef düşünce, inince, uçak koptuğunda ya da kol dönüşe geçince kalkar (flightGroup.ts assignTargets).
+   */
+  order: number | null = null;
   fireGuns = false;
   /** Hava hedefine ateşte hedef uzaklığı (m; 0 = hava hedefi yok): kısa cephaneli top yakına saklanır. */
   aimRange = 0;
@@ -101,6 +108,14 @@ export class Brain {
   private perceiveTimer = Math.random() * 0.5;
   private emergencyTimer = Math.random();
   private lastTarget: Aircraft | null = null;
+  /** Hedef atanınca formasyondan kopma zamanı (pilotun tepki süresi; habit.ts). */
+  private engageAt = 0;
+  /** Son çatışma anı (hedef ya da tehdit vardı). */
+  private lastFight = -1e9;
+  /** Kanat adamının algıladığı lider yönü (dönüşe gecikmeyle uyar) ve son formasyon tutuşu. */
+  private readonly lagFwd = new Vector3();
+  private lagLeader = -1;
+  private lagTime = -1e9;
 
   beginTakeoff(base: Airbase): void {
     this.ops.mode = 'takeoff';
@@ -122,6 +137,7 @@ export class Brain {
   detach(ac: Aircraft, world: World, reason: string): void {
     if (this.detached) return;
     this.detached = true;
+    this.order = null;
     this.detachReason = reason;
     world.log(L(`${ac.callsign}: ${reason}, koldan ayrılıp üsse dönüyor`, `${ac.callsign}: ${reason}, leaving the flight for base`), ac.team, 'combat');
   }
@@ -168,9 +184,15 @@ export class Brain {
     if (this.target !== this.lastTarget) {
       this.combat.phase = 'attack';
       this.combat.phaseTime = 0;
-      if (this.target && !this.lastTarget) world.logEngagement(ac, this.target);
+      if (this.target && !this.lastTarget) {
+        world.logEngagement(ac, this.target);
+        // Tepki süresi yalnız çatışmanın başında, formasyondan kopuşta: dövüşün içinde her yeni hedefte beklemek dal-vur
+        // avcısını zayıflatıyordu
+        if (world.time - this.lastFight > 20) this.engageAt = world.time + habitOf(ac).react / Math.max(0.6, ac.skill);
+      }
       this.lastTarget = this.target;
     }
+    if (this.target || this.threat) this.lastFight = world.time;
 
     if (ac.hasTank && (this.threat || (fl?.engaged && isFighter))) {
       ac.jettisonTanks();
@@ -196,11 +218,13 @@ export class Brain {
       }
     }
 
+    // Hedef atanan pilot formasyondan kendi tepki süresiyle kopar (kolun hepsi aynı anda kırılmasın)
+    const ready = world.time >= this.engageAt;
     if (threatened) {
       combatCommand(ac, this, world, dt, cmd);
-    } else if (isFighter && armed && fl && fl.engaged && !this.detached && fl.plan.doctrine === 'cover' && fl.wingLeaderOf(ac)) {
+    } else if (ready && isFighter && armed && fl && fl.engaged && !this.detached && fl.plan.doctrine === 'cover' && fl.wingLeaderOf(ac)) {
       coverCommand(ac, this, fl.wingLeaderOf(ac)!, world, dt, cmd);
-    } else if (isFighter && armed && this.target && !this.detached) {
+    } else if (ready && isFighter && armed && this.target && !this.detached) {
       combatCommand(ac, this, world, dt, cmd);
     } else if (this.detached || !fl) {
       this.soloRtb(ac, world, cmd);
@@ -297,10 +321,23 @@ export class Brain {
     this.status = `${this.detachReason ? this.detachReason[0].toUpperCase() + this.detachReason.slice(1) : L('Dönüş', 'Returning')}: ${base.s.name} (${(d / 1000).toFixed(1)} km)`;
   }
 
-  private follow(ac: Aircraft, fl: FlightGroup, leader: Aircraft | null, cmd: FlyCommand): boolean {
+  /**
+   * Formasyonda yer tutma. İstasyon yavaşça salınır (savaş kutusunda az) ve kanat adamı liderin dönüşüne kendi
+   * gecikmesiyle uyar (habit.ts): kol liderin her hareketini aynı anda, milimetrik kopyalamaz.
+   */
+  private follow(ac: Aircraft, fl: FlightGroup, leader: Aircraft | null, cmd: FlyCommand, world: World, dt: number): boolean {
     if (!leader || leader === ac) return false;
     const idx = Math.max(fl.formationIndex(ac), 1);
-    holdFormation(ac, leader, slotOffset(fl.plan.formation, idx, fl.spacing(ac)), cmd);
+    const off = slotOffset(fl.plan.formation, idx, fl.spacing(ac));
+    stationDrift(ac, world.time, fl.spacing(ac), fl.plan.formation === 'box' ? 0.45 : 1, off);
+    _lf.set(leader.fwd.x, 0, leader.fwd.z);
+    if (_lf.lengthSq() < 1e-6) _lf.set(0, 0, -1);
+    _lf.normalize();
+    if (this.lagLeader !== leader.id || world.time - this.lagTime > 0.5) this.lagFwd.copy(_lf);
+    else this.lagFwd.lerp(_lf, 1 - Math.exp(-dt / habitOf(ac).lag)).normalize();
+    this.lagLeader = leader.id;
+    this.lagTime = world.time;
+    holdFormation(ac, leader, off, cmd, undefined, this.lagFwd);
     if (fl.plan.lowLevel && (fl.phase === 'enroute' || fl.phase === 'action')) cmd.minAlt = fl.plan.agl * 0.6;
     this.status = `${L('Formasyonda', 'In formation')}: ${FORMATION_NAMES[fl.plan.formation]} (${leader.callsign})`;
     return true;
@@ -319,13 +356,13 @@ export class Brain {
           cmd.maxG = 2.2;
           this.status = L('Toplanma noktasında kolu bekliyor', 'Waiting for the flight at the rally point');
         } else {
-          this.follow(ac, fl, leader, cmd);
+          this.follow(ac, fl, leader, cmd, world, dt);
           this.status = `${L('Kola katılıyor', 'Joining up')} (${leader.callsign})`;
         }
         break;
       case 'enroute':
         if (isLeader) this.navRoute(ac, fl, cmd, world);
-        else this.follow(ac, fl, leader, cmd);
+        else this.follow(ac, fl, leader, cmd, world, dt);
         break;
       case 'action':
         this.missionAction(ac, fl, leader, isLeader, world, dt, cmd);
@@ -333,7 +370,7 @@ export class Brain {
       case 'egress':
       case 'rtb':
         if (isLeader) this.navHome(ac, fl, world, cmd);
-        else this.follow(ac, fl, leader, cmd);
+        else this.follow(ac, fl, leader, cmd, world, dt);
         break;
       case 'landing':
       case 'done': {
@@ -411,7 +448,7 @@ export class Brain {
       case 'cap':
       case 'sweep': {
         if (!isLeader) {
-          this.follow(ac, fl, leader, cmd);
+          this.follow(ac, fl, leader, cmd, world, dt);
           break;
         }
         const center = p.targetPos ?? ac.pos;
@@ -430,7 +467,7 @@ export class Brain {
       }
       case 'intercept': {
         if (!isLeader) {
-          this.follow(ac, fl, leader, cmd);
+          this.follow(ac, fl, leader, cmd, world, dt);
           break;
         }
         const tgt = p.targetAircraftId !== null ? world.aircraftById(p.targetAircraftId) : undefined;
@@ -463,7 +500,7 @@ export class Brain {
         const el = esc?.leader();
         if (!el) {
           if (isLeader) orbitDir(cmd.dir, ac, ac.pos, 2000, ac.pos.y);
-          else this.follow(ac, fl, leader, cmd);
+          else this.follow(ac, fl, leader, cmd, world, dt);
           break;
         }
         // Her üye kendi formasyon yerini korunan kola göre tutar ve kolla birlikte zikzak çizer
@@ -475,7 +512,7 @@ export class Brain {
       }
       case 'levelBomb':
         if (isLeader) bombRunLeader(ac, this, world, cmd);
-        else this.follow(ac, fl, leader, cmd);
+        else this.follow(ac, fl, leader, cmd, world, dt);
         stickDrop(ac, this, world.time);
         break;
       case 'diveBomb':
@@ -486,7 +523,7 @@ export class Brain {
         break;
       case 'ferry':
         if (isLeader) this.navRoute(ac, fl, cmd, world);
-        else this.follow(ac, fl, leader, cmd);
+        else this.follow(ac, fl, leader, cmd, world, dt);
         break;
     }
   }

@@ -71,6 +71,11 @@ export const AA_ENCYCLOPEDIA: Record<string, string> = {
   aa90: '90-mm-m1',
   aa41: '8-8-cm-flak-41',
   aa128: '12-8-cm-flak-40',
+  mg4: 'm45-quadmount',
+  aa61k: '37-mm-61-k',
+  aa85: '85-mm-52-k',
+  aa94: 'qf-3-7-inc',
+  aa105: '10-5-cm-flak-38',
 };
 
 export const ENC_AA_TR = '/ansiklopedi/hava-savunmasi/';

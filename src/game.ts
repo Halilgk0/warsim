@@ -64,6 +64,8 @@ export type Interaction =
   | { mode: 'none' }
   | { mode: 'pickTarget' }
   | { mode: 'pickWaypoint' }
+  /** Avcıya hava hedefi verme: sıradaki dokunuş düşman uçağını seçer. */
+  | { mode: 'pickAir'; acId: number }
   /** heading: oyuncunun R ile verdiği yön; face: kurulacak yön (yola dizilince yol belirler). px, pz: imlecin yerdeki yeri. */
   | { mode: 'build'; kind: StructureKind; heading: number; face: number; x: number; z: number; px: number; pz: number; ok: boolean; reason?: string }
   /** Yol çizimi: önce başlangıç (mevcut yolun üstünde), sonra uç; kurulunca uçtan devam eder. ux, uz: ızgaranın doğrultusu. */
@@ -625,6 +627,33 @@ export class Game {
     else if (fl.phase === 'egress') fl.setPhase('rtb', this.world);
   }
 
+  /** Avcı kendi kolunda emir alabilir mi: havada, silahlı, kopmamış, kolu görevde. */
+  canOrder(ac: Aircraft): boolean {
+    const fl = ac.flight;
+    return ac.team === this.playerTeam && ac.spec.role === 'fighter' && ac.status === 'flying' && ac.airborne && ac.armed &&
+      !ac.brain.detached && !!fl && (fl.phase === 'formup' || fl.phase === 'enroute' || fl.phase === 'action');
+  }
+
+  /** Hedef verme: oyuncu sıradaki dokunuşla düşman uçağını seçer. */
+  beginAirOrder(acId: number): void {
+    this.planner.close();
+    this.interaction = { mode: 'pickAir', acId };
+  }
+
+  /** Avcıya hava hedefi ver (kol o avcıya bu hedefi atar; hedef düşünce kol yeniden seçer). */
+  orderTarget(ac: Aircraft, e: Aircraft): void {
+    ac.brain.order = e.id;
+    const msg = L(`${ac.callsign}: emir alındı, ${e.callsign} (${e.spec.abbr}) hedefine yöneliyor`, `${ac.callsign}: order received, going after ${e.callsign} (${e.spec.abbr})`);
+    this.world.log(msg, ac.team, 'combat');
+    this.toast(msg);
+  }
+
+  clearOrder(ac: Aircraft): void {
+    if (ac.brain.order === null) return;
+    ac.brain.order = null;
+    this.world.log(L(`${ac.callsign}: emir kaldırıldı, hedefini kol seçecek`, `${ac.callsign}: order cancelled, the flight picks targets again`), ac.team, 'combat');
+  }
+
   toggleFollow(): void {
     const rig = this.renderer.rig;
     if (rig.following) rig.release();
@@ -866,6 +895,19 @@ export class Game {
     }
     if (it.mode === 'pickTarget' || it.mode === 'pickWaypoint') {
       this.planner.handleMapClick(x, y, it.mode);
+      return;
+    }
+    if (it.mode === 'pickAir') {
+      const ac = this.world.aircraftById(it.acId);
+      const hit = this.renderer.pick(x, y);
+      if (!ac || !this.canOrder(ac)) {
+        this.cancelInteraction();
+        return;
+      }
+      if (hit?.kind === 'aircraft' && hit.ac.team !== ac.team && hit.ac.airborne && hit.ac.status === 'flying') {
+        this.orderTarget(ac, hit.ac);
+        this.cancelInteraction();
+      } else this.toast(this.renderer.rig.lastTouch ? L('Düşman uçağına dokun', 'Tap an enemy aircraft') : L('Düşman uçağına tıkla', 'Click an enemy aircraft'));
       return;
     }
     const hit = this.renderer.pick(x, y);

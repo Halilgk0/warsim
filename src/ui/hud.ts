@@ -89,6 +89,8 @@ export class Hud {
       const act = b.dataset.act;
       if (act === 'follow') game.toggleFollow();
       else if (act === 'rtb' && ac?.flight) game.recallFlight(ac.flight);
+      else if (act === 'order' && ac) game.beginAirOrder(ac.id);
+      else if (act === 'unorder' && ac) game.clearOrder(ac);
       else if (act === 'route' && ac?.flight) game.renderer.routeFlightId = ac.flight.id;
     });
     this.missions.addEventListener('click', (e) => {
@@ -266,14 +268,26 @@ export class Hud {
     const task = fl?.plan.task && fl.plan.task !== 'auto' ? ` (${TASK_NAMES[fl.plan.task]})` : '';
     let missionTxt = fl ? `${MISSION_NAMES[fl.plan.type]}${task} · ${PHASE_NAMES[fl.phase]}` : '—';
     if (ac.brain.ops.mode === 'landing') missionTxt += ` · ${STAGE_NAMES[ac.brain.ops.stage]}`;
+    const ordered = ac.brain.order !== null ? this.game.world.aircraftById(ac.brain.order) : undefined;
+    if (own && ordered) missionTxt += ` · ${L('emir', 'order')}: ${ordered.callsign} ${ordered.spec.abbr}`;
     if (ac.onGround && ac.brain.ops.mode === 'takeoff') missionTxt += ` · ${L('kalkış', 'takeoff')}`;
     const pilot = `${skillName(ac.skill)}${d.pilot === 1 ? L(', yaralı', ', wounded') : ''}${ac.fatigue > 0.25 ? `, ${L('yorgun', 'fatigue')} ${pct(ac.fatigue)}` : ''}`;
     const following = this.game.renderer.rig.following;
 
+    // İşlem düğmeleri durumun hemen altında: telefonda panel kaydırılmadan erişilir (eskiden en alttaydı)
     this.info.innerHTML = `
       <div class="info-title"><span class="dot" style="background:${PALETTE.teamCss[ac.team]}"></span>${esc(ac.callsign)}<span class="abbr">${s.abbr}</span></div>
       <div class="badges"><span class="badge">${esc(s.name)}</span><span class="badge">${gen.label}</span><span class="badge">${ROLE_NAMES[s.role]}</span>${own ? '' : `<span class="badge enemy">${L('düşman', 'enemy')}</span>`}</div>
       ${settings.info.status ? `<div class="status">${esc(status)}${warn}</div>` : ''}
+      <div class="btn-row">
+        <button class="${following ? 'active' : ''}" data-act="follow">${following ? L('Takibi bırak', 'Stop following') : L('Takip et', 'Follow')}<span class="kbd"> (F)</span></button>
+        ${own && fl && fl.phase !== 'landing' && fl.phase !== 'rtb' ? `<button data-act="rtb">${L('Kolu geri çağır', 'Recall flight')}</button>` : ''}
+        ${this.game.canOrder(ac)
+    ? ordered
+      ? `<button data-act="unorder" title="${L('Hedefini yeniden kol seçsin', 'Let the flight pick its target again')}">${L('Emri kaldır', 'Cancel order')}</button>`
+      : `<button data-act="order" title="${L('Bu avcıya saldıracağı düşman uçağını sen seç', 'Choose the enemy aircraft this fighter attacks')}">${L('Hedef ver', 'Assign target')}</button>`
+    : ''}
+      </div>
       <div class="kv">
         ${this.row('flight', L('Kol', 'Flight'), esc(flightTxt))}
         ${this.row('mission', L('Görev', 'Mission'), esc(missionTxt))}
@@ -292,11 +306,7 @@ export class Hud {
         ${this.row('pilot', L('Pilot', 'Pilot'), pilot)}
         ${this.row('kills', L('Düşürülen', 'Kills'), String(ac.kills + (ac.airframe?.kills ?? 0)))}
       </div>
-      <div class="hp"><span>${L('Gövde sağlamlığı', 'Airframe integrity')}</span>${bar(hpPct, hpColor(hpPct))}</div>
-      <div class="btn-row">
-        <button class="${following ? 'active' : ''}" data-act="follow">${following ? L('Takibi bırak', 'Stop following') : L('Takip et', 'Follow')}<span class="kbd"> (F)</span></button>
-        ${own && fl && fl.phase !== 'landing' && fl.phase !== 'rtb' ? `<button data-act="rtb">${L('Kolu geri çağır', 'Recall flight')}</button>` : ''}
-      </div>`;
+      <div class="hp"><span>${L('Gövde sağlamlığı', 'Airframe integrity')}</span>${bar(hpPct, hpColor(hpPct))}</div>`;
   }
 
   private visibleLog(): typeof this.game.world.logs {
@@ -407,6 +417,10 @@ export class Hud {
     } else if (it.mode === 'pickTarget') {
       const pick = this.game.planner.pickHint();
       html = `<span>${esc(touch ? pick.replace(/tıkla/g, 'dokun').replace(/\bclick/g, 'tap').replace(/\bClick/g, 'Tap') : pick)}${touch ? '' : L(' · Sağ tık / Esc: iptal', ' · Right click / Esc: cancel')}</span>${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
+    } else if (it.mode === 'pickAir') {
+      const ac = this.game.world.aircraftById(it.acId);
+      const who = ac ? `${ac.callsign}: ` : '';
+      html = `<span>${esc(who)}${touch ? L('saldıracağı düşman uçağına dokun', 'tap the enemy aircraft to attack') : L('saldıracağı düşman uçağına tıkla · Sağ tık / Esc: iptal', 'click the enemy aircraft to attack · Right click / Esc: cancel')}</span>${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
     } else if (it.mode === 'pickWaypoint') {
       html = `<span>${touch
         ? L('Ara nokta eklemek için haritaya dokun (birden çok eklenebilir)', 'Tap the map to add waypoints (you can add several)')

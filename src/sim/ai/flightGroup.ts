@@ -32,6 +32,9 @@ export interface FlightContact {
 
 const _slot = new Vector3();
 const _est = new Vector3();
+const _to = new Vector3();
+/** Bağlılık uzaklığı: bu kadar yakındaki hedef düşürülmeden bırakılmaz (yukarıdaki sebepler dışında). */
+const COMMIT_RANGE = 2500;
 
 let nextId = 1;
 
@@ -509,9 +512,29 @@ export class FlightGroup {
             ok = threatening;
         }
       }
+      // Kovalanan düşman bölgeden çıkıyor diye yarıda bırakılmaz: avcılarımızdan biri 2,5 km içinde onunla dövüşüyorsa
+      // aday kalır (eskortta korunan kol 7 km içindeyken). Devriye bölgesinin dışına dönüp kaçan düşmanı bırakıp
+      // bölgedeki uzak düşmana gidiyordu
+      if (!ok && offensivePhase && p.roe !== 'avoid' && p.roe !== 'defensive' &&
+        alive.some((m) => m.brain.target === e && m.pos.distanceTo(e.pos) < COMMIT_RANGE) &&
+        (p.type !== 'escort' || escortees.length === 0 || distToAny(e, escortees) < 7000)) ok = true;
       if (ok) candidates.push(e);
     }
-    this.engaged = candidates.length > 0;
+    // Oyuncunun emri: hedef havadaysa kol angajmana girer, emirli avcı o hedefe gider. Kol dönüşe geçince (yakıt,
+    // mühimmat, geri çağırma) ya da mühimmat azalınca emir kalkar
+    const ordered = new Map<Aircraft, Aircraft>();
+    const ending = this.phase === 'egress' || this.phase === 'rtb' || this.phase === 'landing' || this.phase === 'done';
+    for (const m of this.members) {
+      const oid = m.brain.order;
+      if (oid === null) continue;
+      const e = world.aircraftById(oid);
+      if (!e || !e.airborne || e.team === this.team || ending || m.status !== 'flying' || m.brain.detached || m.ammoFrac <= 0.05) {
+        m.brain.order = null;
+        continue;
+      }
+      if (m.airborne) ordered.set(m, e);
+    }
+    this.engaged = candidates.length > 0 || ordered.size > 0;
     if (this.engaged) this.lastEngage = t;
     if (!this.engaged) return;
 
@@ -527,38 +550,69 @@ export class FlightGroup {
       return autoSplit ? (Math.floor(m.slot / 2) === 0 ? 'fighters' : 'bombers') : 'auto';
     };
     const counts = new Map<number, number>();
-    for (const m of alive) {
-      if (m.spec.role !== 'fighter' || !m.armed) continue;
-      if (p.doctrine === 'cover' && this.wingLeaderOf(m)) continue;
+    const give = (m: Aircraft, e: Aircraft) => {
+      this.assigned.set(m.id, e.id);
+      counts.set(e.id, (counts.get(e.id) ?? 0) + 1);
+    };
+    const shooters = alive.filter((m) => m.spec.role === 'fighter' && m.armed && !(p.doctrine === 'cover' && this.wingLeaderOf(m)));
+    // 1. Oyuncunun emri
+    for (const [m, e] of ordered) if (shooters.includes(m)) give(m, e);
+    // 2. Bağlılık (2026-11-18): yakın dövüşteki avcı hedefini düşürmeden bırakmaz. Eskiden her saniye baştan seçiliyor,
+    // mevcut hedefe yalnız 900 m öncelik veriliyordu: düşman dönüp açılınca ya da ikinci bir dost aynı hedefe yönelince
+    // pilot yarım bıraktığı düşmanı bırakıp uzaktakine gidiyordu. Bırakmanın sebepleri: hedef 2,5 km'den uzaklaştı,
+    // aynı hedefte zaten iki dost var, ya da kurtarma (aşağıda). Atış mesafesindeki hedef (700 m içi) hiç bırakılmaz:
+    // eskiden 225–600 m'de, tam ateş edecekken bırakılıyordu
+    const attacking = (e: Aircraft) => !!e.brain.target && protect.includes(e.brain.target) && e.pos.distanceTo(e.brain.target.pos) < 1200;
+    for (const m of shooters) {
+      if (this.assigned.has(m.id)) continue;
+      const cur = m.brain.target;
+      if (!cur || !candidates.includes(cur)) continue;
+      const d = m.pos.distanceTo(cur.pos);
+      // Dal-vur avcısı geçişten sonra uzaklaşırken ya da tırmanırken bağlı değildir: sıradaki dalışı için hedefini
+      // serbestçe seçer (bağlılık onu uyanmış aynı hedefe döndürüyordu; Bf 109 E – Hurricane 4'e 4 payı %58 → %46)
+      if (d > 700 && m.brain.combat.phase !== 'attack') continue;
+      if (d > COMMIT_RANGE || (counts.get(cur.id) ?? 0) >= 2) continue;
+      // Kurtarma: kendi hedefi atış mesafesinde değil (700 m ötesi) ve kimseye saldırmıyorken, bir dosta saldıran düşman
+      // çok yakında (1,2 km içi) ve kendi hedefinden belirgin yakınsa
+      if (d > 700 && !attacking(cur) && candidates.some((e) => e !== cur && attacking(e) && e.pos.distanceTo(m.pos) < Math.min(1200, d - 300))) continue;
+      give(m, cur);
+    }
+    // 3. Diğerleri: uzaklık, önceliklerle orantılı kısalır (sabit metre indirimi uzaktaki bombardıman ya da görev
+    // hedefini yanı başındaki düşmanın önüne geçiriyordu); arkada kalan düşmana dönmenin bedeli eklenir
+    for (const m of shooters) {
+      if (this.assigned.has(m.id)) continue;
       const task = taskOf(m);
       let best: Aircraft | null = null;
       let bestScore = Infinity;
       for (const e of candidates) {
-        let score = m.pos.distanceTo(e.pos);
+        const d = m.pos.distanceTo(e.pos);
+        let k = 1;
+        let add = 0;
         // Hasarlı düşmanı bitir
-        if (isCrippled(e)) score -= 900;
+        if (isCrippled(e)) k *= 0.8;
         const bomber = e.spec.role !== 'fighter';
         if (task === 'bombers') {
           // Bombardımana giden: avcıyla yalnız kendisine saldıranla çatışır
-          if (bomber) score -= 4000;
-          else if (!(e.brain.target === m && m.pos.distanceTo(e.pos) < 1500)) score += 4000;
+          if (bomber) k *= 0.5;
+          else if (!(e.brain.target === m && d < 1500)) add += 4000;
         } else if (task === 'fighters') {
           // Eskortlarla uğraşan: önce avcılar; bombardımana ancak avcı kalmayınca
-          score += bomber ? 3000 : -1500;
-        } else if (bomber) score -= p.type === 'escort' ? 300 : 1500;
-        if (e.brain.target && protect.includes(e.brain.target)) score -= 1200;
-        if (e.id === p.targetAircraftId) score -= 2500;
-        if (m.brain.target === e) score -= 900;
-        score += (counts.get(e.id) ?? 0) * 1300;
+          if (bomber) add += 3000;
+          else k *= 0.7;
+        } else if (bomber) k *= p.type === 'escort' ? 0.9 : 0.65;
+        if (e.brain.target && protect.includes(e.brain.target)) k *= attacking(e) ? 0.55 : 0.75;
+        if (e.id === p.targetAircraftId) k *= 0.55;
+        if (m.brain.target === e) k *= 0.75;
+        _to.subVectors(e.pos, m.pos).divideScalar(Math.max(d, 1));
+        add += (1 - m.fwd.dot(_to)) * 350;
+        add += (counts.get(e.id) ?? 0) * 1300;
+        const score = d * k + add;
         if (score < bestScore) {
           bestScore = score;
           best = e;
         }
       }
-      if (best) {
-        this.assigned.set(m.id, best.id);
-        counts.set(best.id, (counts.get(best.id) ?? 0) + 1);
-      }
+      if (best) give(m, best);
     }
   }
 }

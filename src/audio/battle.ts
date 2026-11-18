@@ -380,11 +380,12 @@ export class BattleSound {
         const wd = AA_WEAPONS[m.weapon];
         const fresh = m.lastFire > since && m.lastFire <= w.time;
         if (wd.kind === 'flak') {
-          if (fresh) sound.play('aa_heavy', 'world', { gain: h.gain * (m.weapon === 'aa128' ? 1 : 0.85), rate: m.weapon === 'aa128' ? 0.85 : 0.95 + Math.random() * 0.1, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb, when: now + h.delay * 0.5, important: true });
+          if (fresh) sound.play('aa_heavy', 'world', { gain: h.gain * (m.weapon === 'aa128' ? 1 : 0.85), rate: m.weapon === 'aa128' ? 0.85 : m.weapon === 'aa105' ? 0.9 : 0.95 + Math.random() * 0.1, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb, when: now + h.delay * 0.5, important: true });
         } else if (wd.medium) {
           if (fresh) sound.play('aa_pom', 'world', { gain: h.gain, rate: m.weapon === 'aa40' ? 1 : 1.06, lowpass: h.lowpass, pan: h.pan, reverb: h.reverb });
         } else if (w.time - m.lastFire < 0.35) {
           const snd: GunSound = m.weapon === 'mg' ? { id: 'gun_hmg1', gain: 1, tail: 'tail_mg' }
+            : m.weapon === 'mg4' ? { id: 'gun_hmg4', gain: 1, tail: 'tail_mg' }
             : m.weapon === 'aa20q' ? { id: 'gun_c20x4', gain: 1, tail: 'tail_can' } : { id: 'gun_c20x1', gain: 1, tail: 'tail_can' };
           firing.push({ key: `aa:${s.id}:${i}`, snd, h });
         }

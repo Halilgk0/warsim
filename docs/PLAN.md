@@ -366,7 +366,8 @@ Aşamalar (her biri tek başına yayınlanabilir):
      yıl ekseni seçilmedi çünkü açılış sırası tarih sırası değil (8,8 cm 1936, Flak 38 1939). Radar sekmesi panoya katıldı. Tek tip batarya:
      ayrı alan yok, kayıttaki yuvalardan okunur (`uniformGun`); `all:<top>` işi bütün yuvaları çevirir, değişen toplar bu sırada ateş edemez.
      Karışık kurmak panelde "Farklı top ekle". Botlar `BOT_GUNS`: batarya kimliğine göre hafif, orta ya da ağır, karıştırmaz.
-   - **3B:** Yeni silahlar küçük gruplarla. İlk grup (yapıldı): Oerlikon 20 mm, 90 mm M1, 8,8 cm Flak 41. Sırada: M45, 61-K, QF 3.7 inç, 85 mm 52-K, 10,5 cm Flak 38.
+   - **3B:** Yeni silahlar küçük gruplarla. İlk grup (yapıldı): Oerlikon 20 mm, 90 mm M1, 8,8 cm Flak 41. İkinci grup (2026-11-18, yerelde):
+     M45 Quadmount, 37 mm 61-K, 85 mm 52-K, QF 3,7 inç, 10,5 cm Flak 38. Botlar ikinci grubu kullanmaz (karar kullanıcıda).
      Oerlikon'un kaynaktaki etkili menzili ~900 m; oyundaki menzil izli mermi ölçütünde, Flak 38 ile aynı oranda (~1.900 m). 90 mm'nin etkili tavanı tapa kuralıyla ~11.500 m.
      Yeni ağır toplarda dönüş hızı, hasar ve parçacık yarıçapı oyun dengesi. 8 toplu ölçüm (60 koşu, 8 He 111): 90 mm ~12.000, Flak 41 ~5.900 mermi/düşürme; B-17'ye 7.200–7.800 (az düşürme, sapma büyük).
 4. **Modeller:** Her sistem çizim ve fotoğraftan; telefon kare hızı ölçülür. Mevcut 7 top 2026-11-05'te fotoğraflara bakılarak elden geçirildi: düz

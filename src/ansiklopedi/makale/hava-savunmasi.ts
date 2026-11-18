@@ -192,6 +192,56 @@ export const GUN_ARTICLES: GunArticle[] = [
     ],
   },
   {
+    id: 'mg4',
+    name: t('M45 Quadmount', 'M45 Quadmount'),
+    summary: t(
+      'Dört M2 Browning’i elektrikli bir tarette birleştiren Amerikan uçaksavarı: kısa menzilde yoğun bir ateş perdesi.',
+      'An American mount that joined four M2 Brownings in an electric turret: a dense curtain of fire at short range.',
+    ),
+    lead: t(
+      'M45 Quadmount, ABD ordusunun İkinci Dünya Savaşı’ndaki dört namlulu ağır makineli uçaksavarıdır. Maxson şirketinin geliştirdiği elektrikli tarette iki yanda ikişer M2 Browning bulunur; nişancı ortada oturur. 1943’te hizmete girdi, M16 yarı paletli aracında ve römork lafetlerde kullanıldı. Alçaktan gelen uçaklara ve yer hedeflerine karşı etkiliydi; Kore Savaşı’nda da hizmet verdi.',
+      'The M45 Quadmount was the US Army’s four-barrelled heavy machine gun anti-aircraft mount of the Second World War. The electric turret developed by the Maxson company carries two M2 Brownings on each side, with the gunner sitting in the middle. It entered service in 1943 on the M16 half-track and on towed trailer mounts. It was effective against low-flying aircraft and ground targets, and also served in the Korean War.',
+    ),
+    facts: [
+      { k: K.country, v: t('ABD', 'USA') },
+      { k: K.service, v: t('1943', '1943') },
+      { k: K.round, v: t('12,7 × 99 mm (.50 BMG)', '12.7 × 99 mm (.50 BMG)') },
+      { k: K.rate, v: t('Namlu başına dakikada 450–575', '450–575 rounds per minute per barrel') },
+      { k: K.feed, v: t('Her topa 200’lük mermi kutusu', 'A 200-round chest for each gun') },
+      { k: K.crew, v: t('Nişancı ve iki doldurucu', 'A gunner and two loaders') },
+    ],
+    sections: [
+      {
+        h: t('Elektrikli taret', 'An electric turret'),
+        p: [
+          t(
+            'Taret iki adet 6 voltluk aküyle çalışan elektrik motorlarıyla döner ve yükselir. Nişancı iki tutamakla kumanda eder ve yansıtmalı nişangâhla nişan alır; taret tam tur döner, namlular dikey konuma kadar kalkar. Elle çevrilen topların izleyemediği hızlı ve alçak uçaklara bu sayede yetişebiliyordu.',
+            'The turret is traversed and elevated by electric motors running from two 6-volt batteries. The gunner controls it with two handles and aims through a reflector sight; the turret turns through a full circle and the barrels rise to the vertical. This let it keep up with fast, low aircraft that hand-cranked guns could not follow.',
+          ),
+          t(
+            'Dört makineli birlikte dakikada 2.000’i aşan mermi atar. Her topun yanında 200 mermilik bir kutu durur; kutular boşalınca iki doldurucu onları değiştirir.',
+            'Together the four guns fire well over 2,000 rounds a minute. Each gun has a 200-round chest beside it; when the chests run dry the two loaders change them.',
+          ),
+        ],
+      },
+      {
+        h: t('Hızlı ama kısa menzilli', 'Fast but short-ranged'),
+        p: [
+          t(
+            '12,7 mm’lik mermi küçüktür: etkili uçaksavar menzili yaklaşık 1,5 km’dir. Bu yüzden M45, yüksekten geçen bombardıman uçaklarına değil, alçaktan saldıran avcı-bombardıman ve taarruz uçaklarına karşı kullanıldı. Ateş gücü yer hedeflerine karşı da çok etkili olduğu için piyadeyi desteklemekte de kullanıldı.',
+            'The 12.7 mm bullet is small: its effective anti-aircraft range is about 1.5 km. So the M45 was used not against bombers passing high overhead but against fighter-bombers and attack aircraft coming in low. Its firepower was also very effective against ground targets, so it was used to support infantry too.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda dört namlu birlikte, kesintisiz kayışla ateş eder; 800 mermi bitince doldurucular kutuları değiştirir. Taret çok çabuk döndüğü için alçaktan geçen uçağı iyi izler, ama mermisi küçük ve menzili kısadır: zırhlı taarruz uçağına 20 mm kadar işlemez.',
+        'In the game the four barrels fire together from belts; when the 800 rounds are spent the loaders change the chests. The turret swings very quickly, so it follows a low pass well, but its bullet is small and its range short: it does far less to an armoured attack aircraft than a 20 mm.',
+      ),
+    ],
+  },
+  {
     id: 'aa20q',
     name: t('2 cm Flakvierling 38', '2 cm Flakvierling 38'),
     summary: t(
@@ -288,6 +338,58 @@ export const GUN_ARTICLES: GunArticle[] = [
       t(
         'Oyunda 6’lık taraklarla elle beslenir. İzli mermisi 4,2 km’de kendini imha eder ve patladığı yerde parça saçar. Orta top olduğu için atış hesaplayıcıdan ve yakınlık tapasından da yararlanır.',
         'In the game it is hand-fed in 6-round clips. Its tracer self-destructs at 4.2 km and scatters splinters where it bursts. As a medium gun it also benefits from the predictor and the proximity fuze.',
+      ),
+    ],
+  },
+  {
+    id: 'aa61k',
+    name: t('37 mm 61-K', '37 mm 61-K'),
+    summary: t(
+      'Bofors’tan türetilen Sovyet orta uçaksavar topu: Kızıl Ordu’nun savaş boyunca en çok kullandığı uçaksavar topu.',
+      'A Soviet medium anti-aircraft gun derived from the Bofors: the Red Army’s most widely used anti-aircraft gun of the war.',
+    ),
+    lead: t(
+      '37 mm’lik 61-K (resmî adıyla M1939 37 mm otomatik uçaksavar topu), İsveç’in Bofors 40 mm topu örnek alınarak geliştirilen Sovyet orta uçaksavar topudur. 1939’da kabul edildi ve Sovyetler Birliği’nde 20.000 kadar üretildi. Savaş boyunca Kızıl Ordu’nun ana orta uçaksavarıydı; savaştan sonra da Kore ve Vietnam’da kullanıldı.',
+      'The 37 mm 61-K (officially the 37 mm automatic air defense gun M1939) is a Soviet medium anti-aircraft gun developed from Sweden’s Bofors 40 mm. It was adopted in 1939 and about 20,000 were built in the Soviet Union. It was the Red Army’s main medium anti-aircraft gun throughout the war, and was used after the war in Korea and Vietnam.',
+    ),
+    facts: [
+      { k: K.country, v: t('Sovyetler Birliği', 'Soviet Union') },
+      { k: K.service, v: t('1939’da kabul edildi', 'Adopted in 1939') },
+      { k: K.shell, v: t('Yaklaşık 0,73 kg parçalı-izli', 'About 0.73 kg fragmentation-tracer') },
+      { k: K.mv, v: t('Yaklaşık 880 m/sn', 'About 880 m/s') },
+      { k: K.rate, v: t('Dakikada 160–170 seri, pratikte 80', '160–170 rounds per minute cyclic, 80 in practice') },
+      { k: K.feed, v: t('5’lik tarak', '5-round clips') },
+      { k: K.crew, v: t('8', '8') },
+      { k: K.built, v: t('Yaklaşık 20.000 (SSCB)', 'About 20,000 (USSR)') },
+    ],
+    sections: [
+      {
+        h: t('Bofors’un izinde', 'Following the Bofors'),
+        p: [
+          t(
+            'Sovyet ordusu 1930’larda hızlı ateş eden bir orta uçaksavar topu arıyordu. Bofors 40 mm’nin başarısı görülünce onun düzeni temel alındı ve kalibre 37 mm’ye indirildi. Top dört tekerlekli bir lafete oturur; mevziye girince lafet yere indirilir ve iki yana açılan kollarla dengelenir.',
+            'In the 1930s the Soviet army wanted a fast-firing medium anti-aircraft gun. Seeing the success of the Bofors 40 mm, it took that layout as the basis and reduced the calibre to 37 mm. The gun sits on a four-wheeled carriage; in action the carriage is lowered and steadied by outriggers folded out to the sides.',
+          ),
+          t(
+            'Mermiler 5’lik taraklarla üstten doldurulur. Seri hızı dakikada 160–170 olsa da tarak değiştirme ve nişan düzeltme yüzünden pratik hız dakikada 80 civarındaydı.',
+            'Rounds are loaded from above in 5-round clips. Its cyclic rate is 160–170 a minute, but with clip changes and aim corrections the practical rate was about 80 a minute.',
+          ),
+        ],
+      },
+      {
+        h: t('Savaşın yükü', 'The weight of the war'),
+        p: [
+          t(
+            'Alman pike ve taarruz uçakları cephe hattına alçaktan saldırdığından 61-K bu uçaklara karşı en önemli silahlardan biri oldu. Gerektiğinde yer hedeflerine ve hafif zırhlı araçlara karşı da kullanıldı.',
+            'Because German dive bombers and attack aircraft struck the front line from low altitude, the 61-K became one of the most important weapons against them. When needed it was also used against ground targets and lightly armoured vehicles.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda 5’lik taraklarla atar; dakikada 80 kadar pratik atış yapar ve izli mermisi 4 km’ye kadar etkilidir. Bofors’a yakın bir orta toptur: biraz daha hafif mermi atar, namlusu biraz daha yavaş döner.',
+        'In the game it fires 5-round clips at a practical rate of about 80 a minute, and its tracer is effective up to 4 km. It is a medium gun close to the Bofors: its shell is a little lighter and its barrel swings a little more slowly.',
       ),
     ],
   },
@@ -412,6 +514,100 @@ export const GUN_ARTICLES: GunArticle[] = [
     ],
   },
   {
+    id: 'aa85',
+    name: t('85 mm 52-K', '85 mm 52-K'),
+    summary: t(
+      'Sovyetlerin savaş boyunca kullandığı ağır uçaksavar topu; tank topu olarak da ünlendi.',
+      'The Soviet heavy anti-aircraft gun used throughout the war, also famous as the basis of a tank gun.',
+    ),
+    lead: t(
+      '85 mm’lik 52-K (resmî adıyla M1939 85 mm uçaksavar topu), Sovyetler Birliği’nin İkinci Dünya Savaşı’ndaki ağır uçaksavar topudur. 76 mm’lik uçaksavar topunun lafeti üzerine daha büyük bir namlu konarak geliştirildi ve 1939’da kabul edildi. 1941–1942’de Alman tanklarına karşı da kullanıldı; aynı mermiyi kullanan 85 mm tank topları T-34-85’e girdi.',
+      'The 85 mm 52-K (officially the 85 mm air defense gun M1939) was the Soviet Union’s heavy anti-aircraft gun of the Second World War. It was developed by fitting a larger barrel to the carriage of the 76 mm anti-aircraft gun, and was adopted in 1939. In 1941–1942 it was also used against German tanks, and 85 mm tank guns using the same ammunition went into the T-34-85.',
+    ),
+    facts: [
+      { k: K.country, v: t('Sovyetler Birliği', 'Soviet Union') },
+      { k: K.service, v: t('1939’da kabul edildi', 'Adopted in 1939') },
+      { k: K.shell, v: t('Yaklaşık 9,2 kg', 'About 9.2 kg') },
+      { k: K.mv, v: t('Yaklaşık 790 m/sn', 'About 790 m/s') },
+      { k: K.rate, v: t('Pratikte dakikada 10–12, en çok 15–20 (kaynaklar ayrışıyor)', '10–12 aimed rounds per minute, 15–20 at most (sources differ)') },
+      { k: K.ceiling, v: t('Dikey menzil yaklaşık 10,5 km', 'Vertical range about 10.5 km') },
+      { k: K.crew, v: t('7', '7') },
+    ],
+    sections: [
+      {
+        h: t('Daha büyük bir namlu', 'A bigger barrel'),
+        p: [
+          t(
+            '1930’ların sonunda bombardıman uçakları daha yükseğe ve hızlı uçmaya başlayınca 76 mm’lik Sovyet uçaksavar topu yetersiz kaldı. Çözüm olarak aynı lafete 85 mm’lik bir namlu kondu. Top dört tekerlekli lafetiyle çekilir; mevzide tekerlekler kaldırılır ve top artı biçimli kolların üstünde durur.',
+            'When bombers began flying higher and faster in the late 1930s, the Soviet 76 mm anti-aircraft gun was no longer enough. The answer was to fit an 85 mm barrel to the same carriage. The gun is towed on its four-wheeled carriage; in position the wheels are lifted and the gun rests on cross-shaped outriggers.',
+          ),
+        ],
+      },
+      {
+        h: t('Uçaksavardan tanksavara', 'From anti-aircraft to anti-tank'),
+        p: [
+          t(
+            'Yüksek namlu hızı ve ağır mermisi 52-K’yı 1941’de en güçlü Sovyet tanksavar silahlarından biri yaptı; tankların durdurulması gereken yerlerde doğrudan atışla kullanıldı. Aynı balistikle geliştirilen 85 mm tank topları 1944’te T-34-85 tankına ve SU-85 tank avcısına girdi.',
+            'Its high muzzle velocity and heavy shell made the 52-K one of the strongest Soviet anti-tank weapons in 1941, used in direct fire wherever tanks had to be stopped. The 85 mm tank guns developed with the same ballistics went into the T-34-85 tank and the SU-85 tank destroyer in 1944.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda zaman tapalı mermiyle 8,7 km’ye kadar etkili ateş eder. Mermisi 8,8 cm Flak 36’nınki kadar ağırdır ama dakikada 13 atış yapar; daha ucuzdur.',
+        'In the game it fires time-fuzed shells effectively up to 8.7 km. Its shell is as heavy as the 8.8 cm Flak 36’s, but it fires 13 rounds a minute; it is cheaper.',
+      ),
+    ],
+  },
+  {
+    id: 'aa94',
+    name: t('QF 3,7 inç', 'QF 3.7-inch'),
+    summary: t(
+      'Britanya’nın ağır uçaksavar topu: Blitz’te Londra’yı, 1944’te V-1 uçan bombalarına karşı güney kıyısını savundu.',
+      'Britain’s heavy anti-aircraft gun: it defended London in the Blitz and the south coast against V-1 flying bombs in 1944.',
+    ),
+    lead: t(
+      'QF 3,7 inç (94 mm), İngiliz ordusunun İkinci Dünya Savaşı’ndaki ağır uçaksavar topudur. 1937’de üretime girdi; hem dört tekerlekli seyyar lafette hem sabit kaidede kullanıldı. 1940–1941’de Blitz sırasında Londra’yı savunan bataryaların çoğunda bu top vardı. 1944’te radar ve yakınlık tapasıyla birlikte V-1 uçan bombalarına karşı büyük başarı gösterdi.',
+      'The QF 3.7-inch (94 mm) was the British Army’s heavy anti-aircraft gun of the Second World War. It went into production in 1937 and was used both on a four-wheeled mobile carriage and on static mountings. Most of the batteries defending London during the Blitz of 1940–1941 had it. In 1944, with radar and the proximity fuze, it had great success against V-1 flying bombs.',
+    ),
+    facts: [
+      { k: K.country, v: t('Birleşik Krallık', 'United Kingdom') },
+      { k: K.service, v: t('1937’de üretime girdi', 'Entered production in 1937') },
+      { k: K.shell, v: t('28 libre (yaklaşık 12,7 kg)', '28 lb (about 12.7 kg)') },
+      { k: K.mv, v: t('Mk I: yaklaşık 790 m/sn; Mk VI: yaklaşık 1.040 m/sn', 'Mk I: about 790 m/s; Mk VI: about 1,040 m/s') },
+      { k: K.rate, v: t('Dakikada 10–20 (otomatik tapa ayarlayıcıyla 20)', '10–20 rounds per minute (20 with the automatic fuze setter)') },
+      { k: K.ceiling, v: t('Mk I: en çok yaklaşık 9 km', 'Mk I: about 9 km at most') },
+      { k: K.crew, v: t('7', '7') },
+    ],
+    sections: [
+      {
+        h: t('Blitz’in topu', 'The gun of the Blitz'),
+        p: [
+          t(
+            '3,7 inç, 1930’ların ortasında eski 3 inçlik topun yerine geliştirildi. Ağır ve karmaşık bulunsa da yüksek tavanı ve güçlü mermisiyle Britanya’nın ağır uçaksavar savunmasının temeli oldu. 1942’de gelen otomatik tapa ayarlayıcısı mermiyi doldurmadan hemen önce ayarlayarak atış hızını dakikada 20’ye çıkardı.',
+            'The 3.7-inch was developed in the mid-1930s to replace the old 3-inch gun. Although it was thought heavy and complicated, its high ceiling and powerful shell made it the backbone of Britain’s heavy anti-aircraft defence. The automatic fuze setter that came in 1942 set the fuze just before loading and raised the rate of fire to 20 rounds a minute.',
+          ),
+        ],
+      },
+      {
+        h: t('V-1’e karşı', 'Against the V-1'),
+        p: [
+          t(
+            '1944 yazında V-1 uçan bombaları Londra’ya yöneldiğinde ağır uçaksavar topları güney kıyısına taşındı. Amerikan SCR-584 radarı, elektrikli atış hesaplayıcıları ve yakınlık tapasıyla 3,7 inçlik ve 90 mm’lik bataryalar uçan bombaların büyük bölümünü kıyıyı geçmeden düşürdü. Savaşın sonuna doğru gelen daha uzun namlulu Mk VI çok daha yükseğe atabiliyordu.',
+            'When V-1 flying bombs were aimed at London in the summer of 1944, the heavy anti-aircraft guns were moved to the south coast. With the American SCR-584 radar, electrical predictors and the proximity fuze, the 3.7-inch and 90 mm batteries brought down a large share of the flying bombs before they crossed the coast. The longer-barrelled Mk VI that arrived late in the war could fire much higher.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda Mk I–III biçimiyle yer alır: zaman tapalı mermiyle 7,2 km’ye kadar etkili ateş eder, dakikada 15 atış yapar. Mermisi ağırdır, parça yarıçapı 8,8 cm’den biraz geniştir.',
+        'In the game it appears in its Mk I–III form: it fires time-fuzed shells effectively up to 7.2 km at 15 rounds a minute. Its shell is heavy and its splinter radius a little wider than the 8.8 cm’s.',
+      ),
+    ],
+  },
+  {
     id: 'aa90',
     name: t('90 mm M1', '90 mm M1'),
     summary: t(
@@ -512,6 +708,54 @@ export const GUN_ARTICLES: GunArticle[] = [
       t(
         'Oyunda 1.000 m/sn’lik namlu hızıyla mermisi tavana Flak 36’nınkinden çok daha çabuk çıkar; etkili tavanı 11,3 km’dir. Gerçekte olduğu gibi pahalı bir toptur ve araştırma ağacının sonlarında açılır.',
         'In the game its 1,000 m/s muzzle velocity gets the shell to altitude much sooner than the Flak 36, and its effective ceiling is 11.3 km. As in reality it is an expensive gun, unlocked late in the research tree.',
+      ),
+    ],
+  },
+  {
+    id: 'aa105',
+    name: t('10,5 cm Flak 38', '10.5 cm Flak 38'),
+    summary: t(
+      'Almanya’yı savunan sabit bataryaların ağır topu: 8,8 cm ile 12,8 cm arasında, elektrikli nişan ve doldurma düzenli.',
+      'The heavy gun of the fixed batteries defending Germany: between the 8.8 cm and the 12.8 cm, with electric laying and loading.',
+    ),
+    lead: t(
+      '10,5 cm Flak 38, Alman hava kuvvetlerinin ağır uçaksavar topudur. 1930’ların başında 8,8 cm’in yerini alacak daha güçlü bir top için Rheinmetall ve Krupp tasarımları denendi; Rheinmetall’in topu 1937’de Flak 38 olarak hizmete girdi. Geliştirilmiş biçimi Flak 39 ile birlikte 4.200 kadar üretildi. Çoğu Almanya’daki sabit mevzilerde ve demiryolu flak trenlerinde kullanıldı.',
+      'The 10.5 cm Flak 38 was the German air force’s heavy anti-aircraft gun. In the early 1930s Rheinmetall and Krupp designs were tried for a more powerful gun to replace the 8.8 cm; Rheinmetall’s gun entered service in 1937 as the Flak 38. Together with its improved form, the Flak 39, about 4,200 were built. Most were used in fixed positions in Germany and on railway flak trains.',
+    ),
+    facts: [
+      { k: K.country, v: t('Almanya', 'Germany') },
+      { k: K.service, v: t('1937', '1937') },
+      { k: K.shell, v: t('Yaklaşık 15,1 kg', 'About 15.1 kg') },
+      { k: K.mv, v: t('Yaklaşık 880 m/sn', 'About 880 m/s') },
+      { k: K.rate, v: t('Dakikada 10–15', '10–15 rounds per minute') },
+      { k: K.ceiling, v: t('Etkili yaklaşık 9,5 km, en çok 11,4 km', 'About 9.5 km effective, 11.4 km at most') },
+      { k: K.crew, v: t('10', '10') },
+      { k: K.built, v: t('Yaklaşık 4.200 (Flak 38 ve 39)', 'About 4,200 (Flak 38 and 39)') },
+    ],
+    sections: [
+      {
+        h: t('Ağır ve elektrikli', 'Heavy and electric'),
+        p: [
+          t(
+            'Top 15 kg’lık mermisiyle 8,8 cm’den daha yükseğe ve daha güçlü ateş eder. Ağırlığı 10 tonu bulduğu için elle kolay yönlendirilemezdi: Flak 38’de nişan ve doldurma elektrikle yapılır, atış hesaplayıcısından gelen bilgiyle top yönlendirilirdi. Flak 39’da elektrik ve nişan düzeni yeniden düzenlendi.',
+            'With its 15 kg shell the gun fires higher and harder than the 8.8 cm. At around 10 tonnes it could not easily be laid by hand: on the Flak 38 laying and loading were electric, and the gun was laid from the predictor’s data. On the Flak 39 the electrical and laying arrangements were reworked.',
+          ),
+        ],
+      },
+      {
+        h: t('Reich savunmasında', 'In the defence of the Reich'),
+        p: [
+          t(
+            'Ağırlığı yüzünden cephede az kullanıldı; asıl görevi Alman şehirlerini ve sanayi bölgelerini gece ve gündüz bombardımanlarına karşı savunmaktı. Bir kısmı demiryolu vagonlarına kondu ve tehdit altındaki bölgeye trenle taşındı.',
+            'Because of its weight it saw little use at the front; its main task was defending German cities and industrial areas against night and day bombing. Some were mounted on railway wagons and moved by train to threatened areas.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda 8,8 cm ile 12,8 cm arasında bir ağır toptur: zaman tapalı mermiyle 9,5 km’ye kadar etkili ateş eder, dakikada 13 atış yapar. Ağır mermisi geniş bir alana parça saçar; pahalıdır ve namlusu yavaş döner.',
+        'In the game it is a heavy gun between the 8.8 cm and the 12.8 cm: it fires time-fuzed shells effectively up to 9.5 km at 13 rounds a minute. Its heavy shell scatters splinters over a wide area; it is expensive and its barrel turns slowly.',
       ),
     ],
   },

@@ -12,6 +12,7 @@ import { DEG, angleBetween, clamp } from '../../core/math';
 import { headingWithAlt, orbitDir, terrainFollow } from './nav';
 import { flakTarget, holdPoint, mayStartAttack, predictImpact, rally } from './strike';
 import { aaJink, avoidAA } from './aaEvade';
+import { attackYawOf } from './habit';
 import { L } from '../../i18n';
 
 const _to = new Vector3();
@@ -81,7 +82,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       st.phase = 'approach';
       startPass(ac, brain);
     } else {
-      holdPoint(ac, gt.pos, 7000, _p);
+      holdPoint(ac, gt.pos, 7000, _p, attackYawOf(ac));
       if (low) {
         const dx = _p.x - ac.pos.x;
         const dz = _p.z - ac.pos.z;

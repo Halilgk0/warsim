@@ -37,11 +37,18 @@ const CASES: Case[] = [
   { id: 'taarruz20', guns: 'aa20', sensors: [], spec: 'il2m3', n: 8, type: 'attack', alt: 110, secs: 300, low: true },
   { id: 'taarruz4x', guns: 'aa20q', sensors: [], spec: 'il2m3', n: 8, type: 'attack', alt: 110, secs: 300, low: true },
   { id: 'taarruz127', guns: 'mg', sensors: [], spec: 'il2m3', n: 8, type: 'attack', alt: 110, secs: 300, low: true },
+  { id: 'taarruzM45', guns: 'mg4', sensors: [], spec: 'il2m3', n: 8, type: 'attack', alt: 110, secs: 300, low: true },
+  { id: 'pike61k', guns: 'aa61k', sensors: ['rangefinder'], spec: 'ju87b', n: 8, type: 'diveBomb', alt: 3600, secs: 480 },
+  { id: 'agir85', guns: 'aa85', sensors: ['rangefinder', 'predictor'], spec: 'b17g', n: 12, type: 'levelBomb', alt: 6500, secs: 420 },
+  { id: 'agir94', guns: 'aa94', sensors: ['rangefinder', 'predictor'], spec: 'b17g', n: 12, type: 'levelBomb', alt: 6500, secs: 420 },
+  { id: 'agir105', guns: 'aa105', sensors: ['rangefinder', 'predictor'], spec: 'b17g', n: 12, type: 'levelBomb', alt: 6500, secs: 420 },
+  { id: 'he85', guns: 'aa85', sensors: ['rangefinder'], spec: 'he111', n: 8, type: 'levelBomb', alt: 4000, secs: 420 },
+  { id: 'he94', guns: 'aa94', sensors: ['rangefinder'], spec: 'he111', n: 8, type: 'levelBomb', alt: 4000, secs: 420 },
 ];
 
 const runs = Number(process.argv[2] ?? 6);
 const only = process.argv[3]?.split(',');
-const TECH = ['hd_oerlikon', 'hd_90', 'hd_flak41', 'hd_20', 'hd_20q', 'hd_37', 'hd_40', 'hd_88', 'hd_128', 'hd_rangefinder', 'hd_predictor', 'hd_gunradar', 'hd_vt', 'hd_fort1', 'hd_fort2', 'hd_fort3', 'radar_ew1'];
+const TECH = ['hd_m45', 'hd_61k', 'hd_52k', 'hd_37in', 'hd_105', 'hd_oerlikon', 'hd_90', 'hd_flak41', 'hd_20', 'hd_20q', 'hd_37', 'hd_40', 'hd_88', 'hd_128', 'hd_rangefinder', 'hd_predictor', 'hd_gunradar', 'hd_vt', 'hd_fort1', 'hd_fort2', 'hd_fort3', 'radar_ew1'];
 
 console.log(`durum        silah    hedef      koşu  mermi/koşu  isabet/koşu  hasarlı/koşu  düşen/koşu  mermi/düşürme  bomba bırakan`);
 for (const c of CASES) {

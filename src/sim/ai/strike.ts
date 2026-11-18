@@ -15,6 +15,7 @@ import { DEG, G, angleBetween, gauss } from '../../core/math';
 import { headingWithAlt, orbitDir } from './nav';
 import { aaJink, avoidAA } from './aaEvade';
 import { groundLevel } from '../terrain';
+import { habitOf } from './habit';
 import { L } from '../../i18n';
 
 const _err = new Vector3();
@@ -58,10 +59,15 @@ export function rallyPoint(ac: Aircraft, target: Vector3, out: Vector3): Vector3
 }
 
 /** Saldırı öncesi bekleme noktası: hedefin bu tarafında. */
-export function holdPoint(ac: Aircraft, target: Vector3, dist: number, out: Vector3): Vector3 {
+export function holdPoint(ac: Aircraft, target: Vector3, dist: number, out: Vector3, yaw = 0): Vector3 {
   const a = ac.flight?.approachDir;
-  const ax = a ? a.x : 1;
-  const az = a ? a.z : 0;
+  const a0 = a ? a.x : 1;
+  const b0 = a ? a.z : 0;
+  // yaw: bu uçağın yaklaşma yönü sapması (habit.ts; taarruzda elemanlar farklı yönlerden girer)
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const ax = a0 * c - b0 * s;
+  const az = a0 * s + b0 * c;
   return out.set(target.x - ax * dist, 0, target.z - az * dist);
 }
 
@@ -75,7 +81,10 @@ export function mayStartAttack(ac: Aircraft, world: World, interval: number): bo
   const startedCount = order.filter((m) => m.brain.attack.started).length;
   if (myIndex !== startedCount && myIndex > startedCount) return false;
   if (world.time < fl.nextAttackTime) return false;
-  fl.nextAttackTime = world.time + interval;
+  // Aralık düzensiz (pilotun hazır olması); eleman liderinin kanat adamı hemen ardından, çift hâlinde girer
+  const next = order[myIndex + 1];
+  const pair = !!next && ac.slot % 2 === 0 && next.slot === ac.slot + 1;
+  fl.nextAttackTime = world.time + (pair ? Math.min(1.6, interval * 0.35) : interval * habitOf(ac).attackGap);
   return true;
 }
 
@@ -109,7 +118,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       const err = (28 / ac.skill) * ac.mods.diveAimMul * ac.mods.strikeAimMul;
       st.aimPoint.set(gt.pos.x + (Math.random() - 0.5) * r + gauss() * err, gt.pos.y, gt.pos.z + (Math.random() - 0.5) * r + gauss() * err);
     } else {
-      holdPoint(ac, gt.pos, 6000, _p);
+      holdPoint(ac, gt.pos, 6000, _p, habitOf(ac).attackYaw);
       orbitDir(cmd.dir, ac, _p, 1600, cruiseAlt);
       cmd.speed = ac.spec.cruiseSpeed * 0.9;
       brain.status = L('Dalış sırasını bekliyor', 'Waiting for dive turn');

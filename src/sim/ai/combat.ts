@@ -388,8 +388,13 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
   // Tırmanışın tepesinde yavaşlamış ama üstte olan hedef savunmasız değildir.
   const tactic = tacticVs(ac, tgt);
   // Enerji avcısı için de: dalışlara kırılarak hızını tüketmiş, aşağıda kalmış hedef artık kaçamaz
-  const helpless = isCrippled(tgt) || !tgt.armed || (tactic !== 'energy' && tgt.speed < ac.speed * 0.6 && eAdv > 300) ||
-    (tgt.speed < stallSpeed(tgt) * 1.5 && eAdv > 600);
+  // Taretleri ateş eden ağır savunmalı bombardıman uçağı jet için savunmasız değildir (2026-11-18): avcı silahı yok diye
+  // savunmasız sayılınca Me 262 dalıp geçme saldırısını hiç yapmıyor, kutunun arkasında yavaşlayıp kuyruk nişancılarının
+  // önünde oturuyordu (4 jet 9 B-17'ye koşu başına 19 mermi atıp 2,4 jet kaybediyordu)
+  const slashTarget = s.engine.kind === 'jet' && tgt.spec.role === 'bomber' && defensiveFire(tgt.spec) >= 60 && !isCrippled(tgt) &&
+    tgt.turrets.some((t) => t.ammo > 0);
+  const helpless = !slashTarget && (isCrippled(tgt) || !tgt.armed || (tactic !== 'energy' && tgt.speed < ac.speed * 0.6 && eAdv > 300) ||
+    (tgt.speed < stallSpeed(tgt) * 1.5 && eAdv > 600));
   const prefersEnergy = tactic === 'energy' || s.vMax > tgt.spec.vMax * 1.15;
   const outturned = tgt.spec.turnTime < s.turnTime * 0.92;
   // Ağır savunmalı bombardıman kutusuna önden saldırı (Luftwaffe, 1943 sonrası): arkadan giren avcıyı kutunun onlarca
@@ -541,12 +546,14 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
       cmd.maxG = Math.min(cmd.maxG, energyG(ac));
       cmd.liftUse = 0.85;
       brain.status = `${L('Bombardıman kutusu: karşıdan saldırıya dönüyor', 'Bomber box: turning in for a head-on attack')} (${tgt.callsign})`;
-    } else if (energyFighter && eAdv > 250 && R > 1500 && tailAspect < 0.35) {
-      // Dal-vur için arkaya dönüş: hedefin 1,5 km arkasına, irtifayı koruyarak
+    } else if (energyFighter && eAdv > 250 && R > (slashTarget ? 2800 : 1500) && tailAspect < 0.35) {
+      // Dal-vur için arkaya dönüş: hedefin 1,5 km arkasına, irtifayı koruyarak. Jet bombardıman kutusuna 3,2 km arkadan
+      // girer: 1,5 km'de dönerken kutunun arka uçaklarının nişancı menzilindeydi, ateş edemeden ağır
+      // hasar alıp dönüyordu
       _tmp.set(tgt.fwd.x, 0, tgt.fwd.z);
       if (_tmp.lengthSq() < 1e-4) _tmp.set(0, 0, 1);
       _tmp.normalize();
-      _aim.copy(tgt.pos).addScaledVector(_tmp, -1500);
+      _aim.copy(tgt.pos).addScaledVector(_tmp, slashTarget ? -3200 : -1500);
       cmd.dir.set(_aim.x - ac.pos.x, 0, _aim.z - ac.pos.z).normalize();
       // İrtifa üstünlüğü yetmiyorsa giderken hızı koruyarak tırman (dalış için yükseklik)
       if (dh < 800) {
