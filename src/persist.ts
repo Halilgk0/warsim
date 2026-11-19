@@ -9,6 +9,7 @@ import type { SaveData } from './sim/save';
 import { L, LANG } from './i18n';
 import { ApiError, api, authToken, clientHash, gunzip, gzip, storeAuth, storedAccount } from './net/api';
 import { NAME_MAX, cleanName, nameKey, nameProblem } from './net/shared';
+import { dropAccountStats } from './net/statsOutbox';
 
 export { NAME_MAX, cleanName, nameKey };
 
@@ -162,13 +163,39 @@ export interface Profile {
   accepted: boolean;
   /** Skorlar herkese açık tabloda görünür mü. */
   scorePublic: boolean;
+  /** Bağlantı yok: son bilinen profil (bu cihazda saklanan) gösteriliyor. */
+  offline?: boolean;
 }
 
+/** Son açılan profil (internetsizken gösterilir). */
+const PROFILE_KEY = 'warsim.profile.v1';
+
 export async function fetchProfile(): Promise<Profile> {
-  const p = await api<Profile>('GET', '/profile');
-  session = p.account;
-  storeAuth(authToken(), p.account);
-  return p;
+  try {
+    const p = await api<Profile>('GET', '/profile');
+    session = p.account;
+    storeAuth(authToken(), p.account);
+    try {
+      // E-posta saklanmaz (internetsizken gösterilmez)
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...p, email: null }));
+    } catch {
+      /* depolama kapalı */
+    }
+    return p;
+  } catch (e) {
+    const acc = currentAccount();
+    if (!(e instanceof ApiError && e.code === 'offline') || !acc) throw e;
+    // İnternetsiz: bu hesabın son bilinen profili; hiç açılmadıysa boş skorlarla
+    let cached: Profile | null = null;
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      cached = raw ? (JSON.parse(raw) as Profile) : null;
+    } catch {
+      cached = null;
+    }
+    if (cached && cached.account?.key === acc.key) return { ...cached, offline: true };
+    return { account: acc, all: null, week: null, ranks: null, saves: 0, email: null, news: false, accepted: true, scorePublic: true, offline: true };
+  }
 }
 
 /** E-posta ekle ya da değiştir (yeni adres için kod gerekir), yenilik iznini ayarla (metin onayı arayüzde alınır). */
@@ -191,8 +218,11 @@ export async function deleteAccount(password: string): Promise<void> {
   await api('DELETE', '/me', { pass: await clientHash(acc.name, password) });
   for (const m of await localList(acc.key).catch(() => [] as SaveMeta[])) await localDelete(m.id).catch(() => {});
   try {
-    // Eski e-posta erteleme kaydı (artık okunmuyor) kalmasın
+    // Eski e-posta erteleme kaydı (artık okunmuyor) kalmasın; profilin kopyası ve gönderilmemiş skorlar da silinir
     localStorage.removeItem('warsim.emailLater.' + acc.key);
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (raw && (JSON.parse(raw) as Profile).account?.key === acc.key) localStorage.removeItem(PROFILE_KEY);
+    dropAccountStats(acc.key);
   } catch {
     /* depolama kapalı */
   }

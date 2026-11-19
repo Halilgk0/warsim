@@ -9,6 +9,18 @@ import { $, esc, focusField } from './dom';
 import { HINT, LABEL, fmtValue } from './leaderboard';
 import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
 import { L, LANG, LOCALE } from '../i18n';
+import { type PendingSummary, pendingSummary } from '../net/statsOutbox';
+import { legalUrl } from '../yasal/liste';
+
+/** Bekleyen skorun kısa dökümü: "3 düşürme, 12.400 kr, 1 zafer, 25 dk". */
+function pendingText(p: PendingSummary): string {
+  const parts: string[] = [];
+  if (p.kills) parts.push(`${fmtValue('kills', p.kills)} ${L('düşürme', p.kills === 1 ? 'kill' : 'kills')}`);
+  if (p.wins) parts.push(`${p.wins} ${L('zafer', p.wins === 1 ? 'win' : 'wins')}`);
+  if (p.earned) parts.push(fmtValue('earned', p.earned));
+  if (p.playSec >= 60) parts.push(fmtValue('play_sec', p.playSec));
+  return parts.length ? parts.join(', ') : L('oynama süresi', 'play time');
+}
 
 const dateFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -299,6 +311,7 @@ export class ProfileBox {
       return;
     }
     const a = p.account;
+    const pending = pendingSummary(a.key);
     const rows = METRICS.map((m) => {
       const all = p.all?.[m] ?? 0;
       const week = p.week?.[m] ?? 0;
@@ -336,7 +349,7 @@ export class ProfileBox {
           <p class="small">${L(
             'Hesabın, buluttaki kayıtların ve skorların <b>kalıcı olarak</b> silinir; bu geri alınamaz. Açık oyunun kaydedilmez ve ana menüye dönersin.',
             'Your account, cloud saves and scores are deleted <b>permanently</b>; this cannot be undone. Any open game is not saved and you return to the main menu.',
-          )}</p>
+          )} <a href="${legalUrl('deletion', LANG === 'en')}" target="_blank" rel="noopener">${L('Neler silinir, neler kalır', 'What is deleted and what is kept')}</a></p>
           <input type="text" name="user" autocomplete="username" value="${esc(a.name)}" hidden>
           <input type="password" name="delpass" maxlength="${PASS_MAX}" autocomplete="current-password" placeholder="${L('Şifren', 'Your password')}">
           <div class="login-err hidden"></div>
@@ -344,15 +357,20 @@ export class ProfileBox {
         </form>`
       : '';
     this.el.innerHTML = `<div class="login-card pf-card" role="dialog" aria-modal="true">${head}
-      <div class="pf-who"><b>${esc(a.name)}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)} · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
-      <div class="pf-email"><span class="small ${p.email ? '' : 'muted'}">${p.email ? esc(p.email) : L('E-posta eklenmemiş', 'No email added')}</span>
-        <button type="button" class="link" data-pf="mail">${this.mailOpen ? L('Vazgeç', 'Cancel') : p.email ? L('Düzenle', 'Edit') : L('Ekle', 'Add')}</button></div>
+      <div class="pf-who"><b>${esc(a.name)}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)}${p.offline ? '' : ` · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}`} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
+      ${p.offline ? '' : `<div class="pf-email"><span class="small ${p.email ? '' : 'muted'}">${p.email ? esc(p.email) : L('E-posta eklenmemiş', 'No email added')}</span>
+        <button type="button" class="link" data-pf="mail">${this.mailOpen ? L('Vazgeç', 'Cancel') : p.email ? L('Düzenle', 'Edit') : L('Ekle', 'Add')}</button></div>`}
       ${mail}
       <table class="pf-stats">
         <thead><tr><th></th><th>${L('Tüm zamanlar', 'All time')}</th><th>${L('Sıra', 'Rank')}</th><th>${L('Bu hafta', 'This week')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      ${p.all ? '' : `<p class="muted small">${L('Henüz skorun yok: hesabınla bir harekât oyna, skorların burada görünür.', 'No scores yet: play a campaign with your account and your scores appear here.')}</p>`}
+      ${p.all || pending ? '' : `<p class="muted small">${L('Henüz skorun yok: hesabınla bir harekât oyna, skorların burada görünür.', 'No scores yet: play a campaign with your account and your scores appear here.')}</p>`}
+      ${p.offline ? `<p class="muted small pf-offline">${L('İnternet yok: tablodaki skorlar son bağlandığın andaki hâli.', 'No internet: the scores above are from your last connection.')}</p>` : ''}
+      ${pending ? `<p class="small pf-pending">${L(
+        `Henüz gönderilmedi (yalnız bu cihazda): ${pendingText(pending)}. İnternete bağlanınca skorlarına ve tabloya eklenir.`,
+        `Not sent yet (on this device only): ${pendingText(pending)}. Added to your scores and the leaderboard when you are back online.`,
+      )}</p>` : ''}
       <label class="login-check"><input type="checkbox" name="public" ${p.scorePublic ? 'checked' : ''}><span>${L('Skorlarım skor tablosunda herkese açık olsun', 'Show my scores on the public leaderboard')}</span></label>
       <p class="muted small pf-public-hint">${L('Kapalıyken adın ve skorların tabloda görünmez; skorların kaydedilmeye devam eder.', 'When off, your name and scores stay off the leaderboard; your scores keep counting.')}</p>
       <div class="login-err hidden pf-public-err"></div>

@@ -39,7 +39,7 @@ export function encyclopedia(): Plugin {
             res.end((await load()).sitemap(today()));
             return;
           }
-          if (!/^\/(ansiklopedi|gizlilik|kvkk|en\/(encyclopedia|privacy|kvkk))/.test(url)) return next();
+          if (!/^\/(ansiklopedi|gizlilik|kvkk|hesap-silme|en\/(encyclopedia|privacy|kvkk|account-deletion))/.test(url)) return next();
           const path = url.endsWith('/') ? url : `${url}/`;
           const m = await load();
           const page = [...m.encyclopediaPages(today()), ...m.legalPages()].find((p) => p.path === path);

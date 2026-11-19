@@ -102,6 +102,14 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
+      Pas geçme ve iniş tuzakları (2026-11-18; deneme scratchpad `kontrol/pas.ts`, `kontrol/inis.ts`, eski kodla yan yana):
+      - Pas geçme dönüşü 30° yatış ve 1,15 g ile; dönüş başlayınca düz tırmanışa dönülmez (A-26 S çizip 100+ m alçalıyordu). Flaplar
+        bir kez kalkınca açılmaz (`missFlapsUp`; Lancaster ve He 111 tam gazda hız kaybedip düşüyordu).
+      - İniş izni çıksa da uçak ilk yaklaşma noktasının altındaysa önce bekleme paterninde (temiz) tırmanır, yaklaşmada 200 m altında
+        kalırsa paterne döner; flap ve takımla ağır uçak tırmanamıyordu. Tutunma hızına yakın uçak paternde burnunu hafif indirir.
+      - İniş izni 300 sn'de düşer ama son yaklaşmada ve yerde düşmez (`airbase.ts`); sırasını yaklaşmada kaybeden pas geçer.
+      - Motoru duran uçak (`weak`) paternde tırmanmaz, yaklaşma noktası kendi irtifasına göre yakına alınır, flap son yaklaşmada açılır.
+      Sonuç: zorla pas geçirilen 14 türün neredeyse hepsi iniyor (Lancaster 0/6 → 6/6); tek motorlu He 111 ve B-25, hasarlı Ju 88 0/6 → 6/6.
     - Avcı hedef dağıtımı (2026-11-18, `flightGroup.ts` `assignTargets`), sırayla:
       1. Oyuncunun emri (`brain.order`).
       2. Bağlılık: saldırı evresindeki avcı 2,5 km'den (`COMMIT_RANGE`) yakın hedefini tutar; atış mesafesindeki (700 m içi)
@@ -159,9 +167,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - `airDefense.ts`: silahlar gerçek sistemlerdir (kaynaklar dosyanın başında). Silah kimlikleri (`mg`, `aa88`…) kayıtlara yazılır, değişmez.
       15 top (2026-11-18'de M45 `mg4`, 61-K `aa61k`, 52-K `aa85`, QF 3,7 inç `aa94`, 10,5 cm Flak 38 `aa105` eklendi; kaynaklar ve
       tahmin edilen değerler tanımlarının üstünde). Kaynakların ayrıştığı değer (52-K atış hızı) pratik hızdan seçildi.
-      Botların bataryaları iki grupta (`commander.ts` `BOT_GUNS`, batarya kimliğine göre): A eski toplar, B yeni beşi; B kendi topu
+      Botların bataryaları iki grupta (`commander.ts` `BOT_GUNS`; sınıf bataryanın takımdaki sırasından, her üçünden biri ağır; üçlüler A ve B arasında değişir, bot hangisiyle başlar rastgele; eskiden genel kimlikten seçiliyordu, kimi botta ağır batarya hiç olmuyordu): A eski toplar, B yeni beşi; B kendi topu
       açılana dek aradaki topu atlar (botlar benzer güçteki topa çevirmekle para harcamasın). 52-K 8,8 cm ile aynı önkoşulda, bot
       onu önce araştırır. 240 dk ölçümünde denge değişmedi; 4 saatte botlar 52-K, M45 ve 3,7 inçi takıyor, gerisi daha uzun oyunda.
+      Savunma araştırma sırası bot başına (2026-11-18, `defenseOrder`): ağır top (52-K ya da 8,8 cm) sırada 4.–7. (eskiden hep 7.), yarısında
+      radardan önce; öteki işler ±1 sıra kayar. Ana üssün yerinden tohumlanır (her harekâtta farklı, kayıtta aynı). 18 botluk ölçümde ağır top
+      14 botta takılı (eskiden 12'de 8), ilk takılış 152–239. dk; kazanç ve filo aynı.
       - Boya (`structures.ts` `GUN_PAINT`): ordusunun belgeli rengi: Alman koyu gri (RAL 7021), Flak 41 kum sarısı (RAL 7028), ABD
         ve Bofors zeytin yeşili, Sovyet 4BO yeşil, 3,7 inç Khaki Green No. 3, Oerlikon gemi grisi. Ayrıntılar yalnız gerçekte
         olanlar: halka nişangâhlar, kalkanlar, veri alıcı kadranları, M2'nin su kabı, mevzide hazır mermi (pirinç kovan; mermi
@@ -310,7 +321,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     Oyunun içinden konu listesi (2026-11-13, `openTopics`): üst çubuktaki düğmelerin en solundaki Öğretici (telefonda yalnız
     simge) ve duraklatma menüsü. `TOPICS` adımları konulara böler; ana maddeye basınca yalnız o konunun adımları bu harekâtın
     içinde çalışır, bitince liste "izlendi" işaretiyle yeniden açılır; alt maddeler yalnız göstermek ve aramak için. Yeni
-    adım eklenince `TOPICS`'e de yaz. Yalnız harekâtta. `deep` adımlar (etkileşimli: kamera oyuncunun yapısına uçar `flyToOwn`, oyuncu dokunup seçer, sol panelden ilgili pencereye girer) hem baştan sona turda hem konularda; tur 65 adım (~10 dk). Konu turu denemesi: scratchpad `sehir/decor/konu_tur.cjs`. Liste çelik temanın koyu renklerinde; her konu kartının arkasında oyunun kendi sahnesi (`public/ogretici/<konu>.webp`, 900×300; üretimi scratchpad `sehir/decor/kart_gorsel.cjs`: harita, maden, kasaba, itfaiye ve fabrika oyundan çekilir, görev, araştırma ve savaş açılış görsellerinden kırpılır). Admin paneli gibi açık ve düz görünüm reddedildi (2026-11-13).
+    adım eklenince `TOPICS`'e de yaz. Ana menünün üst çubuğunda da aynı düğme (2026-11-18, telefonda yalnız simge): orada
+    listede ana menü konusu (menüde yürür, dil değişip sayfa yenilense de sürer) ve baştan sona tur da var; oyun konusu
+    seçili ayarlarla harekâtı başlatır, konu oyun yüklenince başlar (`mainMenu.ts` `launch` `started`). Denemesi: scratchpad
+    `menu_ogr.cjs`. `deep` adımlar (etkileşimli: kamera oyuncunun yapısına uçar `flyToOwn`, oyuncu dokunup seçer, sol panelden ilgili pencereye girer) hem baştan sona turda hem konularda; tur 65 adım (~10 dk). Konu turu denemesi: scratchpad `sehir/decor/konu_tur.cjs`. Liste çelik temanın koyu renklerinde; her konu kartının arkasında oyunun kendi sahnesi (`public/ogretici/<konu>.webp`, 900×300; üretimi scratchpad `sehir/decor/kart_gorsel.cjs`: harita, maden, kasaba, itfaiye ve fabrika oyundan çekilir, görev, araştırma ve savaş açılış görsellerinden kırpılır). Admin paneli gibi açık ve düz görünüm reddedildi (2026-11-13).
     Adımlar arayüzdeki seçicilere bağlı (`data-act`, `data-mm`, `.psec`…). Bu seçiciler değişirse öğretici de
     güncellenmeli. Tam tur denemesi: scratchpad'deki gibi bir Playwright betiğiyle her adıma tıklanır.
 - **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)
@@ -364,6 +378,25 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     dosyanın başı). Oyuncu hesabını Profil'den şifresiyle kendi siler. Hesaba bağlı yeni tablo eklenirse
     `worker/index.ts` `eraseAccount`'a da ekle; yasal metinler hesabın bütün verisinin silindiğini söylüyor.
 - **`src/game.ts`:** Denetleyici (kipler, seçim, kayıt, kare döngüsü). Giriş noktası `src/main.ts`.
+  - Android geri tuşu (2026-11-19, Play'deki TWA ve telefon tarayıcısı; `bindBackButton`): geçmişe nöbetçi kayıt (`history.state.wsb`)
+    konur, geri tuşu popstate verir: Esc gibi en üstteki pencere kapanır (`onBack`, oyunda `escapeInPlay`), oyunda boştaysa
+    duraklatma açılır; geri tuşu oyundan çıkmaz. Ana menüde boşta ilk basış uyarır, ikinci basış çıkar. Chrome dokunuşsuz eklenen
+    geçmiş kaydını geri tuşunda atlar: nöbetçi ilk dokunuşta ya da tuşta konur. Sayfadan ayrılan her şey (yeniden yükleme, aynı
+    sekmede bağlantı) `game.leavePage` ile gider: önce nöbetçi geri alınır, yoksa dönüşte geri tuşu oyunu yeniden yükler. Yeni
+    açılır pencere eklenince `onBack`'e de ekle. Deneme: scratchpad `geri.cjs`.
+- **İnternetsiz oyun** (2026-11-19):
+  - Service worker derlemede üretilir (`tools/sw/vite.ts` → `dist/sw.js`; `main.ts` yalnız derlenmiş sürümde, açılıştan 4 sn
+    sonra kaydeder; `public/_headers` `no-cache`). Önbelleğe oyunun sayfası, `assets`, `sounds`, `uretim`, `ogretici`, `acilis` ve
+    kökteki simgeler girer (~6 MB); ansiklopedi, haber görselleri, yasal sayfalar ve `/api` girmez. Oyunun sayfası önce ağdan
+    (4 sn), öbürleri önce önbellekten. Önbellek adı dosyaların özeti; en son iki sürüm kalır. Oyunun çalışması için yeni bir
+    klasör gerekirse `DIRS`'e ekle.
+  - Skor bildirimi gönderilemezse cihazda, hesaba bağlı bekler (`net/statsOutbox.ts`, `warsim.stats.outbox.v1`): aynı harekâtın
+    bildirimleri birleşir, oyun açılınca, `online` olayında ve sonraki bildirimden önce sırayla gider. O zamana dek tabloya
+    girmez; Profil "henüz gönderilmedi" satırıyla gösterir. Sunucu (`reportStats`) oynama süresini son bildirimden bu yana geçen
+    süreyle kırpar: birikmiş süre kırpılabilir.
+  - Profilin son hâli cihazda saklanır (`persist.ts` `PROFILE_KEY`, e-postasız); internetsizken o gösterilir. Skorlar sekmesi
+    internetsizken tablo yerine bilgi yazısı gösterir. Kayıtlar zaten önce IndexedDB'ye yazılır, bağlantı gelince yüklenir.
+  - Deneme: scratchpad `internetsiz.cjs` (sunucu kapatılarak; `W`/`H` ile ekran boyu).
 - **Açılış ve harita yükleme:**
   - `main.ts` önce yükleme ekranını çizdirir. Arka görsel her açılışta değişir (`public/acilis/1-7.webp`, 2400×1350,
     art arda aynısı gelmez, `warsim.acilis`); seçimi `index.html` başındaki betik yapar, `404.html` de aynı listeden seçer.
@@ -383,6 +416,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   Metin `metin.ts`'te; sayfaları ansiklopedinin çerçevesiyle `ansiklopedi/sayfalar.ts` üretir, oyun paketine girmez.
   Metinler oyunun gerçekten yaptığını anlatır: toplanan veri ya da hizmet sağlayıcı (analitik, e-posta servisi…) değişirse
   metni ve `shared.ts` `LEGAL_VERSION`'ı güncelle.
+  - Hesap silme sayfası (`/hesap-silme/`, `/en/account-deletion/`; Google Play'in istediği herkese açık adres): adımlar, silinen
+    ve kalan veriler. Kabul edilen metin değildir (`LEGAL_VERSION` değişmez); silme akışı ya da `eraseAccount` değişirse güncelle.
+    Profil'deki silme formu bağlanır.
 - **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron

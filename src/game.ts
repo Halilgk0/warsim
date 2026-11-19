@@ -81,6 +81,11 @@ function hashId(s: string): string {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+/** Tarayıcı geçmişinde geri tuşunun nöbetçi kaydındayız (`Game.bindBackButton`). */
+function onSentinel(): boolean {
+  return !!(history.state as { wsb?: number } | null)?.wsb;
+}
+
 export class Game {
   world = new World();
   readonly renderer: GameRenderer;
@@ -178,6 +183,7 @@ export class Game {
     };
     installKeyboardFit();
     this.bindKeys();
+    this.bindBackButton();
     this.bindPageLifecycle();
     sound.install();
     this.showMainMenu();
@@ -187,10 +193,25 @@ export class Game {
     void refreshSession().then(() => {
       if (this.mode === 'menu') this.menu.render();
       const acc = currentAccount();
-      if (acc) void syncPending(acc.key).catch(() => {});
+      if (acc) {
+        void syncPending(acc.key).catch(() => {});
+        // İnternetsiz oynanan harekâtların skorları: bağlantı varsa şimdi gönderilir
+        void this.stats.flushPending();
+      }
       // E-postası olmayan eski hesaba her açılışta sorulur (adres bağlanana kadar; pencere kapatılabilir)
       if (shouldAskEmail() && this.mode === 'menu' && !this.login.isOpen) this.login.askEmail();
       void this.checkSaveCleanup();
+    });
+    // Bağlantı geri gelince: bekleyen kayıtlar ve skorlar gönderilir, açık menü yenilenir
+    window.addEventListener('online', () => {
+      const acc = currentAccount();
+      if (!acc) return;
+      void syncPending(acc.key).catch(() => {});
+      void this.stats.flushPending();
+      if (this.mode === 'menu') this.menu.render();
+    });
+    window.addEventListener('offline', () => {
+      if (this.mode === 'menu') this.menu.render();
     });
     requestAnimationFrame(this.loop);
     $('loading').classList.add('hidden');
@@ -991,18 +1012,100 @@ export class Game {
           this.cycle(e.shiftKey ? -1 : 1);
           break;
         case 'Escape':
-          if (this.hangar.isOpen) this.hangar.close();
-          else if (this.modals.isOpen) this.modals.close();
-          else if (this.interaction.mode !== 'none') this.cancelStep();
-          else if (this.planner.isOpen) this.planner.close();
-          else if (this.build.isOpen) this.build.close();
-          else if (this.selectedAircraftId !== null || this.selectedStructureId !== null) {
-            this.selectAircraft(null);
-            this.selectStructure(null);
-          } else this.pause.open();
+          this.escapeInPlay();
           break;
       }
     });
+  }
+
+  /** Oyunda Esc ve geri tuşu: en üstteki pencere ya da adım kapanır; boştaysa duraklatma menüsü açılır. */
+  private escapeInPlay(): void {
+    if (this.hangar.isOpen) this.hangar.close();
+    else if (this.modals.isOpen) this.modals.close();
+    else if (this.interaction.mode !== 'none') this.cancelStep();
+    else if (this.planner.isOpen) this.planner.close();
+    else if (this.build.isOpen) this.build.close();
+    else if (this.selectedAircraftId !== null || this.selectedStructureId !== null) {
+      this.selectAircraft(null);
+      this.selectStructure(null);
+    } else this.pause.open();
+  }
+
+  /**
+   * Android geri tuşu (2026-11-19; Play'deki TWA ve telefon tarayıcısı). Tarayıcı geçmişine bir nöbetçi kayıt konur; geri tuşu
+   * onu geri alınca popstate gelir ve nöbetçi yeniden konur: Esc gibi en üstteki pencere kapanır, oyunda boştaysa duraklatma
+   * menüsü açılır (geri tuşu oyundan hiç çıkmaz). Ana menüde boşta ilk basış uyarır, nöbetçi oyuncu ekrana dokunana dek konmaz:
+   * ikinci basış oyundan çıkar (TWA kapanır, tarayıcıda önceki sayfa).
+   * Chrome, kullanıcı dokunmadan eklenen geçmiş kaydını geri tuşunda atlar: nöbetçi açılışta değil ilk dokunuşta konur.
+   * Sayfadan ayrılırken (dil değişimi, ansiklopedi bağlantısı) önce nöbetçi geri alınır (`leavePage`): yoksa dönüşte altındaki
+   * kayıt eski sayfanındır ve geri tuşu oyunu yeniden yükler.
+   */
+  private bindBackButton(): void {
+    // Sayfa nöbetçi kayıtta açıldı (ör. telefon sekmeyi atıp geri getirdi): alttaki kayıt eski sayfanın, kullanılmaz
+    if (onSentinel()) history.replaceState(null, '');
+    const arm = () => {
+      if (!onSentinel()) history.pushState({ wsb: 1 }, '');
+    };
+    window.addEventListener('pointerdown', arm, true);
+    window.addEventListener('keydown', arm, true);
+    window.addEventListener('popstate', () => {
+      if (this.leaving) {
+        const go = this.leaving;
+        this.leaving = null;
+        go();
+        return;
+      }
+      if (onSentinel()) return; // ileri tuşuyla nöbetçiye dönüldü
+      if (this.onBack()) arm();
+      else this.toast(L('Çıkmak için geri tuşuna bir kez daha bas.', 'Press back again to exit.'));
+    });
+    // Aynı sekmede açılan bağlantılar (ansiklopedi) da önce nöbetçiyi geri alır
+    document.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement | null)?.closest?.<HTMLAnchorElement>('a[href]');
+      if (!a || a.target || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      if (a.origin !== location.origin || !onSentinel()) return;
+      e.preventDefault();
+      this.leavePage(() => location.assign(a.href));
+    });
+  }
+
+  private leaving: (() => void) | null = null;
+
+  /** Sayfadan ayrıl (yeniden yükleme ya da başka adres): önce geri tuşunun nöbetçi kaydı geri alınır. */
+  leavePage(go: () => void): void {
+    if (!onSentinel()) {
+      go();
+      return;
+    }
+    this.leaving = go;
+    history.back();
+    // Geri alma gelmezse yine de git
+    setTimeout(() => {
+      if (this.leaving !== go) return;
+      this.leaving = null;
+      go();
+    }, 500);
+  }
+
+  /** Geri tuşu: bir şey kapandıysa ya da yok sayıldıysa true; ana menüde boştaysa false (sonraki basış çıkar). */
+  private onBack(): boolean {
+    if (this.tutorial.back()) return true;
+    if (this.profile.isOpen) this.profile.close();
+    else if (this.login.isOpen) this.login.close();
+    else if (this.feedback.isOpen) this.feedback.close();
+    else if (this.news.isOpen) this.news.close();
+    else if (this.mode === 'menu') {
+      if (this.modals.isOpen) this.modals.close();
+      // Ana menü öğreticisi yürürken geri tuşu bir şey yapmaz (öğreticinin kendi kapatma düğmesi var)
+      else if (!this.tutorial.capturesKeys) return false;
+    } else if (this.tutorial.capturesKeys || this.mode !== 'play') {
+      /* öğretici adımı ya da yükleme: yok say */
+    } else if (this.end.isOpen) this.end.close();
+    else if (this.pause.isOpen) {
+      if (this.modals.isOpen) this.modals.close();
+      else this.pause.close();
+    } else this.escapeInPlay();
+    return true;
   }
 
   /**

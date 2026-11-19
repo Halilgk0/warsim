@@ -51,6 +51,10 @@ export interface LandingStyle {
   /** Pas geçme: yana dönüş yüksekliği ve eksenden uzaklık (m). */
   missAgl: number;
   missDist: number;
+  /** Pas geçmede dönüş başladı (düz tırmanışa geri dönülmez; yalnız 60 m altında kanatlar düzelir). */
+  missTurn: boolean;
+  /** Pas geçmede flaplar toplandı (yeniden açılmaz). */
+  missFlapsUp: boolean;
 }
 
 /** Uçak kimliği ve deneme sayısından: kayıt kipinde tekrarlanabilir, ortak rastgele akışı bozmaz. */
@@ -80,6 +84,8 @@ function newStyle(ac: Aircraft, attempt: number): LandingStyle {
     phase: between(0, 6.28),
     missAgl: between(130, 260),
     missDist: between(1500, 2600),
+    missTurn: false,
+    missFlapsUp: false,
   };
 }
 
@@ -212,28 +218,41 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
   const rwyY = _t.y + gearHeight(s);
   // Arazi payı azsa sığ süzülüş yok
   const glide = plan.glideTan * (plan.margin < 40 ? Math.max(st.glideK, 1) : st.glideK);
-  const finalLen = plan.finalDist * st.finalK;
+  // Motoru duran uçak (tek motorlu çift motorlu bombardıman) tırmanamaz, flapla irtifa tutamaz: paternde tırmanmaz, ilk yaklaşma noktası
+  // bulunduğu irtifadan süzülüş yoluna girecek kadar yakına alınır, flaplar son yaklaşmada açılır. Eskiden He 111 ve Ju 88 her denemede
+  // yaklaşmada yere iniyordu.
+  const weak = ac.damage.engines.some((e) => e >= 0.7);
+  const finalLen = weak ? clamp((ac.pos.y - rwyY) / glide, 1500, plan.finalDist * st.finalK) : plan.finalDist * st.finalK;
 
-  // İniş izni çıksa da önce bekleme paterninde uygun irtifaya alçalınır
-  if (ops.stage === 'hold' && ops.queue === 0 && ac.pos.y < base.holdAltitude(0) + 350) ops.stage = 'toIaf';
-  if (ops.stage !== 'hold' && ops.stage !== 'missed' && ops.queue > 0) ops.stage = 'hold';
-  // Yaklaşmada flap ve iniş takımı açık. Pas geçerken flapsız tutunma hızının üstüne çıkınca toplanır: tam flapın sürüklemesiyle
-  // ağır uçak ne hızlanır ne tırmanır
-  cmd.flaps = ops.stage !== 'hold' && !(ops.stage === 'missed' && ac.speed > stallSpeed(ac) * 1.15);
+  const iafAlt = rwyY + finalLen * glide;
+  // İniş izni çıksa da önce bekleme paterninde uygun irtifaya alçalınır, alçaktaysa tırmanılır: flap ve takım açıkken ağır uçak
+  // ilk yaklaşma noktasına tırmanamıyordu (pas geçen B-17 arazi yüzünden 700 m'deki noktanın 500 m altında inişsiz dönüp durdu)
+  if (ops.stage === 'hold' && ops.queue === 0 && ac.pos.y < base.holdAltitude(0) + 350 && (weak || ac.pos.y > iafAlt - 60)) ops.stage = 'toIaf';
+  if (ops.stage === 'toIaf' && !weak && ac.pos.y < iafAlt - 200) ops.stage = 'hold';
+  if (ops.stage !== 'hold' && ops.stage !== 'missed' && ops.queue > 0) {
+    // Sırasını yaklaşmada kaybeden uçak alçaktan doğrudan bekleme paternine atılmaz, pas geçer
+    if (ops.stage === 'final' || ops.stage === 'flare') goAround(ac, brain, world, L('iniş izni düştü', 'clearance lost'));
+    else ops.stage = 'hold';
+  }
+  // Yaklaşmada flap ve iniş takımı açık. Pas geçerken flapsız tutunma hızının üstüne çıkınca toplanır ve bir daha açılmaz: tam
+  // flapın sürüklemesiyle ağır uçak ne hızlanır ne tırmanır (hız eşiğin altına inince flaplar yeniden açılıyordu, Lancaster ve He 111
+  // tam gazda hız kaybederek yere iniyordu)
+  if (ops.stage === 'missed' && ac.speed > stallSpeed(ac) * 1.15) st.missFlapsUp = true;
+  cmd.flaps = ops.stage !== 'hold' && !(ops.stage === 'missed' && st.missFlapsUp) && !(weak && ops.stage === 'toIaf');
 
   switch (ops.stage) {
     case 'hold': {
       base.holdCenter(_hold);
       _hold.x += st.holdDx;
       _hold.z += st.holdDz;
-      orbitDir(cmd.dir, ac, _hold, st.holdR, base.holdAltitude(ops.queue - 1) + st.holdAlt);
+      // İniş izni çıkınca (sıra 0) ilk yaklaşma noktasının üstünde dönülür: oradan alçalarak yaklaşmaya girilir
+      orbitDir(cmd.dir, ac, _hold, st.holdR, Math.max(base.holdAltitude(ops.queue - 1) + st.holdAlt, ops.queue === 0 ? iafAlt + 20 : -Infinity));
       cmd.speed = s.cruiseSpeed * st.holdSpeedK;
       cmd.maxG = 2.2;
       brain.status = `${L('Bekleme paterni: iniş sırası', 'Holding pattern: landing order')} ${ops.queue}`;
       break;
     }
     case 'toIaf': {
-      const iafAlt = rwyY + finalLen * glide;
       // Eksene herkes aynı noktadan girmez; kısa son yaklaşmada kayma az (eksene oturacak yer kalsın)
       const lane = st.lane * clamp((finalLen - 1500) / 3000, 0, 1);
       _iaf.set(_t.x - dx * finalLen - dz * lane, iafAlt, _t.z - dz * finalLen + dx * lane);
@@ -324,12 +343,18 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       cmd.speed = null;
       cmd.maxG = 2.2;
       const agl = ac.pos.y - rwyY;
-      // Önce hız: düz uçarak hızlan, hız varsa tırman. Zayıf tırmanan uçak fazla uzaklaşmadan döner.
-      if (agl < st.missAgl && (along < 3500 || agl < 60)) {
+      // Önce hız: düz uçarak hızlan, hız varsa tırman. Zayıf tırmanan uçak fazla uzaklaşmadan döner. Dönüş başlayınca
+      // düz tırmanışa dönülmez: dönüşte biraz alçalan uçak eşiğin altına inince yeniden düzelip dönüyor, S çiziyordu.
+      if (st.missTurn ? agl < 60 : agl < st.missAgl && (along < 3500 || agl < 60)) {
         cmd.dir.set(dx, ac.speed < vBase * 1.15 ? 0.01 : ac.speed < vBase * 1.3 ? 0.05 : 0.11, dz);
         brain.status = L('Pas geçiyor: tırmanış', 'Going around: climbing');
         break;
       }
+      st.missTurn = true;
+      // Pas geçme dönüşü sığ yatışla ve ona uygun çekişle (alçakta ve yavaşken dik yatış irtifa yer: A-26 70° yatıp 100 m
+      // alçalıyordu; yalnız yatış sınırlanınca fazla çekiş uçağı yukarı itip hızını tutunma hızının altına düşürüyordu)
+      cmd.maxBank = Math.min(cmd.maxBank, (30 * Math.PI) / 180);
+      cmd.maxG = 1.15;
       const hx = -dz * st.missDist - rx - dx * 500;
       const hz = dx * st.missDist - rz - dz * 500;
       const l = Math.hypot(hx, hz) || 1;
@@ -345,6 +370,12 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
     }
     case 'rollout':
       break;
+  }
+  // Tutunma hızına yakın uçak düz uçuşta hızlanamaz (indüklenmiş sürükleme itkiyi aşar): burun hafif iner, hız kazanılır. He 111
+  // pas geçtikten sonra bekleme paterninde tam gazla dakikalarca 40 m/s'de (tutunma hızı) kalıp yere iniyordu.
+  if ((ops.stage === 'hold' || ops.stage === 'toIaf' || (ops.stage === 'missed' && st.missTurn)) && ac.speed < stallSpeed(ac, cmd.flaps) * 1.2
+    && ac.pos.y - groundLevel(ac.pos.x, ac.pos.z) > 60) {
+    cmd.dir.y = Math.min(cmd.dir.y, -0.05 * Math.hypot(cmd.dir.x, cmd.dir.z));
   }
 }
 

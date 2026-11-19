@@ -618,8 +618,10 @@ async function reportStats(req: Request, env: Env, a: AccountRow): Promise<Respo
   const dGame = Math.min(Math.max(0, gameTime - p.game_time), prev ? since * 32 + 120 : gameTime);
   const dKills = Math.min(Math.max(0, Math.round(num(r.kills, 1e6)) - p.kills), Math.ceil(5 + dGame / 10));
   const dEarned = Math.min(Math.max(0, Math.round(num(r.earned, 1e12)) - p.earned), Math.ceil(20000 + dGame * 400));
-  // Oynama süresi artış olarak gelir (eski kayıt yüklenince sayaç geri gitmesin); son bildirimden bu yana geçen süreyi aşamaz
-  const dPlay = Math.min(Math.round(num(r.playSec, 3600)), prev ? Math.ceil(since + 60) : 900);
+  // Oynama süresi artış olarak gelir (eski kayıt yüklenince sayaç geri gitmesin); son bildirimden bu yana geçen süreyi aşamaz.
+  // İnternetsiz oynanan harekât (2026-11-19) bağlantı gelince tek bildirimle birkaç saati getirebilir: tek bildirimde en çok 12
+  // saat; ilk kez bildirilen harekâtta oyun saatinin ilerlediği kadar (oyun hızı en az 1×, oynama oyun saatini aşamaz)
+  const dPlay = Math.min(Math.round(num(r.playSec, 12 * 3600)), prev ? Math.ceil(since + 60) : Math.ceil(Math.max(900, gameTime + 60)));
   const peak = Math.min(Math.round(num(r.peak, 400)), p.peak + Math.ceil(20 + dGame / 5));
   const won = r.won === true && gameTime >= 300 && !p.won ? 1 : 0;
   await env.DB.prepare(

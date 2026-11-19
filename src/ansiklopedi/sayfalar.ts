@@ -628,7 +628,7 @@ export function encyclopediaPages(today: string): { path: string; html: string }
   return out;
 }
 
-/** Gizlilik Politikası ve KVKK Aydınlatma Metni: ansiklopediyle aynı çerçeve. */
+/** Gizlilik Politikası, KVKK Aydınlatma Metni ve hesap silme sayfası: ansiklopediyle aynı çerçeve. */
 export function legalPages(): { path: string; html: string }[] {
   const kinds = Object.keys(LEGAL_PATHS) as LegalKind[];
   return kinds.flatMap((k) => (['tr', 'en'] as Lang[]).map((lang) => {

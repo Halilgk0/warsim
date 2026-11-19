@@ -238,7 +238,110 @@ const kvkkEn: LegalText = {
 `,
 };
 
+// Hesap silme (2026-11-19): Google Play'in istediği herkese açık sayfa (adımlar, silinen ve kalan veriler, ek saklama süresi).
+// Kabul edilen metin değildir: değişince LEGAL_VERSION değişmez. Gizlilik Politikası'ndaki silme bilgisiyle uyuşmalı.
+const deletionTr: LegalText = {
+  title: 'Hesap silme',
+  desc: 'WarSimBox hesabını ve verilerini nasıl silersin; neler silinir, neler kalır.',
+  html: `
+<p>Bu sayfa, WarSimBox hesabını (web sitesi warsimbox.com ve Android uygulaması aynı hesabı kullanır) ve verilerini nasıl sileceğini anlatır. Oyunun geliştiricisi ve veri sorumlusu: ${OWNER.name}.</p>
+
+<h2>Oyunun içinden silmek</h2>
+<ol>
+  <li>Oyunu aç ve hesabınla giriş yap.</li>
+  <li>Ana menünün üstündeki adına dokun. Oyunun içindeysen: Menü → Profil ve skorlar.</li>
+  <li>Profil penceresinin altındaki <b>Hesabımı sil</b>’e dokun.</li>
+  <li>Şifreni yaz ve <b>Hesabımı kalıcı olarak sil</b>’e dokun.</li>
+</ol>
+<p>Hesabın hemen silinir; bu işlem internet bağlantısı ister ve geri alınamaz.</p>
+
+<h2>Şifreni unuttuysan ya da oyuna giremiyorsan</h2>
+<p>${OWNER.email} adresine yaz: hesabının kullanıcı adını belirt, mümkünse hesaba kayıtlı e-posta adresinden yaz. Hesabın sana ait olduğunu doğrulamak için birkaç soru sorabiliriz. Başvurun en geç 30 gün içinde ücretsiz sonuçlandırılır.</p>
+
+<h2>Neler silinir</h2>
+<ul>
+  <li>Hesabın: kullanıcı adın, e-posta adresin, şifrenin ve kurtarma kodunun özetleri, tercihlerin, metinleri kabul ve e-posta izni kayıtların.</li>
+  <li>Buluttaki oyun kayıtların.</li>
+  <li>Skorların, harekât istatistiklerin ve oynama süren; skor tablosundan da çıkarsın.</li>
+  <li>Bütün oturumların (her cihazda oturum kapanır) ve e-posta doğrulama kodların.</li>
+  <li>Silmeyi yaptığın cihazda: oturumun, kayıtlarının kopyaları, profilinin kopyası ve henüz gönderilmemiş skorların.</li>
+</ul>
+
+<h2>Neler kalır ve ne kadar</h2>
+<ul>
+  <li>Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur.</li>
+  <li>Sunucunun teknik kayıtları en çok 7 gün tutulur.</li>
+  <li>Geri bildirimlerin e-posta kutumuzda kalır; silinmesini istiyorsan yazdığın adı belirterek bize yaz.</li>
+  <li>Başka cihazlarda hesabınla giriş yaptıysan o cihazdaki kopyalar (ayarlar, kayıt kopyaları), tarayıcının site verileri temizlenince ya da uygulama kaldırılınca silinir.</li>
+  <li>Yasal olarak saklanması gereken veriler bunun dışındadır.</li>
+</ul>
+
+<h2>Hesabı silmeden bazı verileri silmek</h2>
+<ul>
+  <li>Oyun kayıtlarını ana menüdeki Kayıtlar sekmesinden tek tek silebilirsin.</li>
+  <li>Skor tablosunda görünmemeyi ve yenilik e-postalarını Profil’den kapatabilirsin.</li>
+  <li>Başka bir verinin silinmesi için ${OWNER.email} adresine yaz.</li>
+</ul>
+
+<h2>Misafir olarak oynadıysan</h2>
+<p>Hesapsız oyunda sunucumuzda senin adına veri tutulmaz. Cihazındaki oyun verileri (ayarlar, tercihler) tarayıcının site verileri temizlenince ya da uygulama kaldırılınca silinir.</p>
+
+<p>Ayrıntılar <a href="${legalUrl('privacy', false)}">Gizlilik Politikası</a>’nda ve <a href="${legalUrl('kvkk', false)}">KVKK Aydınlatma Metni</a>’ndedir.</p>
+`,
+};
+
+const deletionEn: LegalText = {
+  title: 'Account deletion',
+  desc: 'How to delete your WarSimBox account and data, and what is deleted or kept.',
+  html: `
+<p>This page explains how to delete your WarSimBox account (the website warsimbox.com and the Android app use the same account) and its data. Developer and data controller: ${OWNER.nameEn}.</p>
+
+<h2>Delete it in the game</h2>
+<ol>
+  <li>Open the game and log in to your account.</li>
+  <li>Tap your name at the top of the main menu. During a game: Menu → Profile and scores.</li>
+  <li>Tap <b>Delete my account</b> at the bottom of the Profile window.</li>
+  <li>Enter your password and tap <b>Delete my account permanently</b>.</li>
+</ol>
+<p>Your account is deleted at once; this needs an internet connection and cannot be undone.</p>
+
+<h2>If you forgot your password or cannot get into the game</h2>
+<p>Write to ${OWNER.email}: give your account’s user name and, if you can, write from the email address registered to the account. We may ask a few questions to confirm that the account is yours. Your request is concluded free of charge within 30 days at the latest.</p>
+
+<h2>What is deleted</h2>
+<ul>
+  <li>Your account: user name, email address, password and recovery code hashes, preferences, and the records of your acceptance of the texts and your email permission.</li>
+  <li>Your saves in the cloud.</li>
+  <li>Your scores, campaign statistics and play time; you are also removed from the leaderboard.</li>
+  <li>All your sessions (you are logged out on every device) and email verification codes.</li>
+  <li>On the device you delete from: your session, the copies of your saves, the copy of your profile and any scores not yet sent.</li>
+</ul>
+
+<h2>What is kept, and for how long</h2>
+<ul>
+  <li>Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically.</li>
+  <li>The server’s technical logs are kept for up to 7 days.</li>
+  <li>Your feedback stays in our mailbox; to have it deleted, write to us and tell us the name you wrote.</li>
+  <li>If you logged in on other devices, the copies there (settings, save copies) are deleted when that browser’s site data is cleared or the app is uninstalled.</li>
+  <li>Data the law requires us to keep is excepted.</li>
+</ul>
+
+<h2>Deleting some data without deleting the account</h2>
+<ul>
+  <li>You can delete game saves one by one in the Saves tab of the main menu.</li>
+  <li>You can hide yourself from the leaderboard and turn off news emails in your Profile.</li>
+  <li>To have any other data deleted, write to ${OWNER.email}.</li>
+</ul>
+
+<h2>If you played as a guest</h2>
+<p>We keep no data about you on our server for guest games. The game data on your device (settings, preferences) is deleted when the browser’s site data is cleared or the app is uninstalled.</p>
+
+<p>See the <a href="${legalUrl('privacy', true)}">Privacy Policy</a> and the <a href="${legalUrl('kvkk', true)}">KVKK Privacy Notice</a> for details.</p>
+`,
+};
+
 export const LEGAL_TEXT: Record<LegalKind, { tr: LegalText; en: LegalText }> = {
   privacy: { tr: privacyTr, en: privacyEn },
   kvkk: { tr: kvkkTr, en: kvkkEn },
+  deletion: { tr: deletionTr, en: deletionEn },
 };

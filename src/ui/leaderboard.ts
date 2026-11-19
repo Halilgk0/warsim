@@ -1,7 +1,7 @@
 // Skor tablosu (ana menüde "Skorlar" sekmesi): ölçüt (düşürme, zafer, kazanç, en büyük hava kuvveti, oynama süresi) ve
 // dönem (tüm zamanlar, bu hafta). İlk 50 ve oyuncunun kendi sırası; sonuçlar bir dakika önbellekte.
 
-import { api } from '../net/api';
+import { ApiError, api } from '../net/api';
 import type { LeaderRow, Metric } from '../net/shared';
 import { currentAccount } from '../persist';
 import { fmtMoney } from '../sim/economy';
@@ -53,6 +53,8 @@ export class LeaderboardPanel {
   private boards = new Map<string, Board>();
   private loading = false;
   private error = '';
+  /** Bağlantı yok: tablo yerine açıklama. */
+  private offline = false;
 
   constructor(private readonly rerender: () => void) {}
 
@@ -69,14 +71,21 @@ export class LeaderboardPanel {
     const key = this.key;
     const b = this.boards.get(key);
     if (!force && b && Date.now() - b.at < CACHE_MS) return;
-    this.loading = !b;
     this.error = '';
+    this.offline = !navigator.onLine;
+    if (this.offline) {
+      this.loading = false;
+      this.rerender();
+      return;
+    }
+    this.loading = !b;
     this.rerender();
     try {
       const r = await api<{ rows: LeaderRow[]; me: LeaderRow | null }>('GET', `/leaderboard?metric=${this.metric}&period=${this.period}`);
       this.boards.set(key, { rows: r.rows, me: r.me, at: Date.now() });
     } catch (e) {
-      this.error = (e as Error).message;
+      if (e instanceof ApiError && e.code === 'offline') this.offline = true;
+      else this.error = (e as Error).message;
     }
     this.loading = false;
     this.rerender();
@@ -91,7 +100,14 @@ export class LeaderboardPanel {
     const acc = currentAccount();
     const board = this.boards.get(this.key);
     let list: string;
-    if (this.loading) list = `<p class="muted">${L('Skorlar yükleniyor…', 'Loading scores…')}</p>`;
+    if (this.offline) {
+      // İnternetsiz: tablo gösterilmez; oyuncunun skoru bu cihazda bekler, bağlanınca tabloya eklenir
+      list = `<div class="lb-offline"><b>${L('Skorlar için internet gerekiyor', 'Scores need an internet connection')}</b>
+        <p class="muted small">${acc
+          ? L('İnternetsiz oynadığın harekâtlar yine sayılıyor: sonuçların bu cihazda bekler, bağlandığında skor tablosuna eklenir. O zamana kadar onları Profil’de görebilirsin.',
+            'Campaigns you play offline still count: your results wait on this device and are added to the leaderboard when you are back online. Until then you can see them in your Profile.')
+          : L('Oyun internetsiz de oynanır; skor tablosu bağlanınca görünür.', 'You can play without internet; the leaderboard appears when you are back online.')}</p></div>`;
+    } else if (this.loading) list = `<p class="muted">${L('Skorlar yükleniyor…', 'Loading scores…')}</p>`;
     else if (this.error && !board) list = `<p class="login-err">${esc(this.error)}</p>`;
     else if (!board || (!board.rows.length && !board.me)) {
       list = `<p class="muted">${this.period === 'week'

@@ -705,6 +705,9 @@ function wingPieceGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+/** Aynı anda çizilen en çok kanat paneli. */
+const WING_MAX = 160;
+
 /** Enkaz: infilak eden ya da parçalanan uçaktan kopan, dönerek düşen parçalar (görsel). */
 const _e = new THREE.Euler();
 
@@ -725,7 +728,7 @@ export class Debris {
     };
     this.bits = make(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x77727c, flatShading: true }), max);
     // Kanat: boyalı ya da çıplak metal ortalaması, açık gri; iki yüz de görünsün (ince parça döner)
-    this.wings = make(wingPieceGeometry(), new THREE.MeshLambertMaterial({ color: 0x9a9c9e, side: THREE.DoubleSide }), 40);
+    this.wings = make(wingPieceGeometry(), new THREE.MeshLambertMaterial({ color: 0xb4b7ba, side: THREE.DoubleSide }), WING_MAX);
     this.mesh.add(this.bits, this.wings);
   }
 
@@ -735,12 +738,18 @@ export class Debris {
     this.wings.count = 0;
   }
 
-  /** count parça; size ≈ parça boyu (m). count = 1 ise kanat gibi uzun yassı parça. */
+  /**
+   * count parça; size ≈ parça boyu (m). count = 1 ise kopan kanat: tek büyük levha yerine birkaç ince kanat paneli. Uçağın
+   * modeli kanadını yitirmediği için kanat boyunda tek levha (B-17'de 14 × 5 m) gökte koyu bir dikdörtgen gibi duruyordu.
+   */
   spawn(pos: THREE.Vector3, vel: THREE.Vector3, count: number, size: number, burning: boolean): void {
-    for (let i = 0; i < count && this.pieces.length < this.max; i++) {
-      const wingPiece = count === 1;
+    const wingPiece = count === 1;
+    const n = wingPiece ? 3 + Math.floor(Math.random() * 2) : count;
+    for (let i = 0; i < n && this.pieces.length < this.max; i++) {
       const v = vel.clone().add(randDir().multiplyScalar(rand(5, 22)));
-      const s = wingPiece ? new THREE.Vector3(size, 0.25, size * 0.35) : new THREE.Vector3(rand(0.5, 1.3), rand(0.2, 0.6), rand(0.5, 1.5)).multiplyScalar(size);
+      const s = wingPiece
+        ? new THREE.Vector3(size * rand(0.16, 0.28), Math.max(0.06, size * 0.008), size * rand(0.09, 0.15))
+        : new THREE.Vector3(rand(0.5, 1.3), rand(0.2, 0.6), rand(0.5, 1.5)).multiplyScalar(size);
       this.pieces.push({
         pos: pos.clone().add(randDir().multiplyScalar(size * 0.3)), vel: v, rot: new THREE.Euler(rand(0, 6), rand(0, 6), rand(0, 6)),
         spin: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), size: s, burning: burning && (wingPiece || Math.random() < 0.6),
@@ -784,7 +793,7 @@ export class Debris {
       _s.copy(p.size).multiplyScalar(k);
       _m.compose(p.pos, _q, _s);
       if (p.wing) {
-        if (nw < 40) this.wings.setMatrixAt(nw++, _m);
+        if (nw < WING_MAX) this.wings.setMatrixAt(nw++, _m);
       } else this.bits.setMatrixAt(nb++, _m);
     }
     this.bits.count = nb;

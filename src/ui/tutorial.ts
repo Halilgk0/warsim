@@ -79,6 +79,7 @@ function joinList(items: string[]): string {
 
 /** Konu simgeleri: 24×24 çizgi siluetler (konunun kendisi). */
 const TOPIC_ICON: Record<string, string> = {
+  menu: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8.5h18M7 12.5h10M7 16h6"/>',
   map: '<path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/>',
   mission: '<path d="M12 2.5v19M4 12.5l8-3 8 3M8.5 20.5 12 19l3.5 1.5"/><path d="M12 2.5c1 1 1.4 2.4 1.4 4"/>',
   money: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5M5 11.5v5c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-5"/>',
@@ -95,9 +96,22 @@ interface Topic {
   icon: string;
   /** Adım kimlikleri ve alt madde adları (göstermek ve aramak için). */
   steps: [string, () => string][];
+  /** Ana menünün konusu: yalnız ana menüden açılan listede, orada yürür. */
+  menu?: boolean;
 }
 
 const TOPICS: Topic[] = [
+  {
+    id: 'menu', title: () => L('Ana menü', 'Main menu'), icon: 'menu', menu: true,
+    steps: [
+      ['lang', () => L('Dil', 'Language')],
+      ['mapsize', () => L('Harita ve büyüklüğü', 'Map and size')],
+      ['account', () => L('Hesap ve kayıt', 'Account and saves')],
+      ['news', () => L('Haberler', 'News')],
+      ['social', () => L('Sosyal medya', 'Social media')],
+      ['feedback', () => L('Geri bildirim', 'Feedback')],
+    ],
+  },
   {
     id: 'map', title: () => L('Harita ve kamera', 'Map and camera'), icon: 'map',
     steps: [
@@ -217,6 +231,8 @@ export class Tutorial {
   private readonly topicsDone = new Set<string>();
   /** Liste kapanınca dönülecek oyun hızı. */
   private topicsResume = 1;
+  /** Liste ana menüden açıldı: ana menü konusu orada yürür, öbür konularda seçili ayarlarla harekât başlar. */
+  private topicsMenu = false;
   private steps: Step[] = [];
   private i = 0;
   private active = false;
@@ -261,7 +277,7 @@ export class Tutorial {
         'Bir konu seç: o kısım bu harekâtın içinde gösterilir, sonra oyun kaldığı yerden sürer.',
         'Pick a topic: that part is shown inside this campaign, then the game carries on where it was.',
       )}</p></div><button class="tt-x" data-tt="close" aria-label="${L('Kapat', 'Close')}">✕</button></div>
-      <div class="tt-prog"><span></span><i><b></b></i></div>
+      <div class="tt-prog"><span></span><i><b></b></i><button class="tt-full" data-tt="full" hidden>${L('Baştan sona tur (10 dk)', 'Full tour (10 min)')} ›</button></div>
       <label class="tt-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/></svg><input type="search" name="tt-q" autocomplete="off" placeholder="${L('Ara: itfaiye, radar, kalkış…', 'Search: fire, radar, take-off…')}" aria-label="${L('Konularda ara', 'Search topics')}"></label>
       <div class="tt-list"></div>
     </div>`;
@@ -280,18 +296,33 @@ export class Tutorial {
   }
 
   /**
-   * Konu listesini aç (üst çubuktaki Öğretici düğmesi ve duraklatma menüsü). Liste açıkken oyun durur; kapatılınca
-   * resume hızına döner (duraklatma menüsünden gelince onun saklı hızı). Yalnız harekâtta.
+   * Konu listesini aç (ana menünün ve oyunun üst çubuğundaki Öğretici düğmesi, duraklatma menüsü). Oyunda liste açıkken
+   * oyun durur; kapatılınca resume hızına döner (duraklatma menüsünden gelince onun saklı hızı). Ana menüde ana menü
+   * konusu ve baştan sona tur da listededir.
    */
   openTopics(resume?: number): void {
     const g = this.game;
-    if (g.mode !== 'play' || !g.world.setup) {
+    const menu = g.mode === 'menu';
+    if (!menu && (g.mode !== 'play' || !g.world.setup)) {
       g.toast(L('Öğretici konuları harekâtta açılır.', 'Tutorial topics open during a campaign.'), true);
       return;
     }
     if (this.active) this.stop();
-    this.topicsResume = resume ?? (g.timeScale || 1);
-    g.setTimeScale(0);
+    this.topicsMenu = menu;
+    if (!menu) {
+      this.topicsResume = resume ?? (g.timeScale || 1);
+      g.setTimeScale(0);
+    }
+    this.topicsEl.querySelector('.tt-head p')!.textContent = menu
+      ? L(
+        'Bir konu seç: ana menü burada gösterilir; öbür konularda seçtiğin ayarlarla harekât başlar ve konu onun içinde gösterilir.',
+        'Pick a topic: the main menu is shown right here; the other topics start a campaign with your chosen settings and are shown inside it.',
+      )
+      : L(
+        'Bir konu seç: o kısım bu harekâtın içinde gösterilir, sonra oyun kaldığı yerden sürer.',
+        'Pick a topic: that part is shown inside this campaign, then the game carries on where it was.',
+      );
+    this.topicsEl.querySelector<HTMLElement>('.tt-full')!.hidden = !menu;
     const input = this.topicsEl.querySelector('input')!;
     input.value = '';
     this.renderTopics('');
@@ -303,7 +334,12 @@ export class Tutorial {
     if (!this.topicsOpen) return;
     this.topicsEl.classList.add('hidden');
     (document.activeElement as HTMLElement | null)?.blur();
-    if (resume) this.game.setTimeScale(this.topicsResume);
+    if (resume && !this.topicsMenu) this.game.setTimeScale(this.topicsResume);
+  }
+
+  /** Listede gösterilen konular: ana menü konusu yalnız ana menüde. */
+  private shownTopics(): Topic[] {
+    return TOPICS.filter((t) => !t.menu || this.topicsMenu);
   }
 
   /** Liste: ana madde (başlatır) ve altında adımları (yalnız gösterir; aramada eşleşenler vurgulanır). */
@@ -311,7 +347,8 @@ export class Tutorial {
     const f = fold(q.trim());
     const list = this.topicsEl.querySelector('.tt-list')!;
     let shown = 0;
-    const html = TOPICS.map((t) => {
+    const topics = this.shownTopics();
+    const html = topics.map((t, ti) => {
       const subs = t.steps.map(([, name]) => name());
       const hitTitle = !f || fold(t.title()).includes(f);
       const hits = subs.map((x) => !!f && fold(x).includes(f));
@@ -319,7 +356,7 @@ export class Tutorial {
       shown++;
       const done = this.topicsDone.has(t.id);
       const n = t.steps.length;
-      const no = TOPICS.indexOf(t) + 1;
+      const no = ti + 1;
       return `<section class="tt-topic h-${t.icon}${done ? ' done' : ''}" style="--bg:url('${import.meta.env.BASE_URL}ogretici/${t.id}.webp')">
         <button class="tt-main" data-tt="start" data-id="${t.id}"><span class="tt-ic">${topicSvg(t.icon)}${done ? '<i class="tt-ok">✓</i>' : ''}</span><span class="tt-t"><b><em>${no}</em>${esc(t.title())}</b><small>${L(`${n} adım`, `${n} ${n === 1 ? 'step' : 'steps'}`)}${done ? L(' · izlendi', ' · watched') : ''}</small></span><span class="tt-go">${done ? L('Tekrar', 'Again') : L('Başlat', 'Start')} ›</span></button>
         <ul class="tt-sub">${subs.map((x, i) => `<li${hits[i] ? ' class="hit"' : ''}>${esc(x)}</li>`).join('')}</ul>
@@ -327,10 +364,11 @@ export class Tutorial {
     }).join('');
     list.innerHTML = shown ? html : `<p class="tt-none">${L('Bu aramayla eşleşen konu yok.', 'No topic matches this search.')}</p>`;
     // İlerleme: izlenen konu sayısı
-    const k = TOPICS.filter((t) => this.topicsDone.has(t.id)).length;
+    const k = topics.filter((t) => this.topicsDone.has(t.id)).length;
+    const n = topics.length;
     const pr = this.topicsEl.querySelector<HTMLElement>('.tt-prog')!;
-    pr.querySelector('span')!.textContent = k ? L(`${TOPICS.length} konudan ${k}'i izlendi`, `${k} of ${TOPICS.length} topics watched`) : L(`${TOPICS.length} konu · istediğinden başla`, `${TOPICS.length} topics · start anywhere`);
-    pr.querySelector<HTMLElement>('b')!.style.width = `${(k / TOPICS.length) * 100}%`;
+    pr.querySelector('span')!.textContent = k ? L(`${n} konudan ${k}'i izlendi`, `${k} of ${n} topics watched`) : L(`${n} konu · istediğinden başla`, `${n} topics · start anywhere`);
+    pr.querySelector<HTMLElement>('b')!.style.width = `${(k / n) * 100}%`;
   }
 
   private onTopics(e: Event): void {
@@ -342,6 +380,11 @@ export class Tutorial {
     if (!b) return;
     if (b.dataset.tt === 'close') this.closeTopics();
     else if (b.dataset.tt === 'start' && b.dataset.id) this.beginTopic(b.dataset.id);
+    else if (b.dataset.tt === 'full' && this.topicsMenu) {
+      // Baştan sona tur: "Oyuna başla" → "Öğreticiyi başlat" ile aynı (ad geçersizse menü söyler)
+      this.closeTopics(false);
+      if (this.game.menu.validName()) this.begin(true);
+    }
   }
 
   /** Konudan listeye dön: konunun açtığı pencere ve inşa çubuğu kapanır (liste kapanınca oyuncu haritaya döner). */
@@ -351,17 +394,49 @@ export class Tutorial {
     this.openTopics();
   }
 
-  /** Yalnız bu konunun adımları, bu harekâtın içinde. */
+  /** Konunun adımları (sırası adım listesindeki gibi). */
+  private topicSteps(t: Topic): Step[] {
+    const ids = t.steps.map(([sid]) => sid);
+    return this.buildSteps().filter((st) => ids.includes(st.id));
+  }
+
+  /**
+   * Yalnız bu konunun adımları, bu harekâtın içinde. Ana menüden: ana menü konusu orada yürür; öbür konularda seçili
+   * ayarlarla harekât başlar (ad geçersizse ya da kayıt yeri yoksa menü söyler) ve konu oyun yüklenince başlar.
+   */
   private beginTopic(id: string): void {
     const t = TOPICS.find((x) => x.id === id);
     if (!t) return;
-    const ids = t.steps.map(([sid]) => sid);
+    const fromMenu = this.topicsMenu;
     this.closeTopics(false);
+    if (fromMenu && !t.menu) {
+      this.game.menu.launch(false, () => {
+        this.begin(true);
+        this.topic = id;
+        this.steps = this.topicSteps(t);
+        this.waitPlay = true;
+        this.el.classList.add('hidden');
+      });
+      return;
+    }
     this.game.modals.close();
     this.game.build.close();
-    this.begin(false);
+    this.begin(fromMenu);
     this.topic = id;
-    this.steps = this.buildSteps().filter((st) => ids.includes(st.id));
+    this.steps = this.topicSteps(t);
+  }
+
+  /** Geri tuşu: konu listesi ya da başlarken soru penceresi açıksa kapanır (true). */
+  back(): boolean {
+    if (this.topicsOpen) {
+      this.closeTopics();
+      return true;
+    }
+    if (!this.promptEl.classList.contains('hidden')) {
+      this.promptEl.classList.add('hidden');
+      return true;
+    }
+    return false;
   }
 
   /** Öğretici ya da soru penceresi açık (ana menüde başlatma ve kısayollar beklesin). */
@@ -429,11 +504,21 @@ export class Tutorial {
       return;
     }
     if (!id || this.game.mode !== 'menu') return;
-    const steps = this.buildSteps();
-    let k = steps.findIndex((s) => s.id === id);
+    // Ana menü konusunda "konu:adım" (yalnız konunun adımlarıyla sürer)
+    const sep = id.indexOf(':');
+    const t = sep > 0 ? TOPICS.find((x) => x.id === id.slice(0, sep)) : undefined;
+    const sid = sep > 0 ? id.slice(sep + 1) : id;
+    const steps = t ? this.topicSteps(t) : this.buildSteps();
+    let k = steps.findIndex((s) => s.id === sid);
     if (k < 0) return;
-    if (id === 'lang') k++;
+    if (sid === 'lang') k++;
+    if (k >= steps.length) return;
     this.begin(true, steps[k].id);
+    if (t) {
+      this.topic = t.id;
+      this.steps = steps;
+      this.i = k;
+    }
   }
 
   /** Öğreticiyi kapat. Ana menüdeyken bitirilirse oyun başlar (oyuncu "Oyuna başla"ya basmıştı). */
@@ -487,7 +572,7 @@ export class Tutorial {
     const act = (e.target as HTMLElement).closest<HTMLElement>('[data-tut]')?.dataset.tut;
     if (act === 'next' || act === 'skip') this.advance();
     else if (act === 'chapter') this.nextChapter();
-    else if (act === 'end') this.stop(this.steps[this.i]?.ch === 'menu');
+    else if (act === 'end') this.stop(!this.topic && this.steps[this.i]?.ch === 'menu');
     else if (act === 'topics') {
       this.stop();
       this.leaveTopic();
@@ -542,7 +627,7 @@ export class Tutorial {
       this.cam = { x: r.target.x, z: r.target.z, d: r.distance, yaw: r.yaw, pitch: r.pitch };
     }
     try {
-      if (st.ch === 'menu') sessionStorage.setItem(RESUME, st.id);
+      if (st.ch === 'menu') sessionStorage.setItem(RESUME, this.topic ? `${this.topic}:${st.id}` : st.id);
       else sessionStorage.removeItem(RESUME);
     } catch {
       /* yok say */
@@ -580,7 +665,7 @@ export class Tutorial {
       const k = inCh.indexOf(st) + 1;
       const lastCh = st.ch === this.steps[this.steps.length - 1].ch;
       const tp = this.topic ? TOPICS.find((x) => x.id === this.topic) : undefined;
-      const btn = st.button?.() ?? (last ? (tp ? L('Konuyu bitir', 'Finish topic') : L('Bitir', 'Finish')) : L('Devam et', 'Continue'));
+      const btn = last && tp ? L('Konuyu bitir', 'Finish topic') : st.button?.() ?? (last ? L('Bitir', 'Finish') : L('Devam et', 'Continue'));
       // Konu kipinde başlık konunun adı, bölüm geçişi yok; "Konular" listeye döner
       const headHtml = tp
         ? `<b>${esc(tp.title())}</b><span>${this.i + 1}/${this.steps.length}</span>`

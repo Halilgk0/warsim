@@ -9,7 +9,7 @@ import type { LaunchGroup } from './world';
 import { flakTarget } from './ai/strike';
 import { TECH_BY_ID, type Research } from './tech';
 import { AA_WEAPONS, AA_WEAPON_ORDER, type AAWeaponId } from './structures/airDefense';
-import { rand } from '../core/math';
+import { mulberry32, rand } from '../core/math';
 import { groundLevel } from './terrain';
 import { BASE_UPGRADE_COST, MAINT_CREW, aircraftPrice, researchCost } from './economy';
 import { FIRE_STAFF, FIRE_UPGRADE_COST, roadLinked } from './structures/fireStation';
@@ -30,8 +30,8 @@ const BOT_GUNS: AAWeaponId[][] = [
   ['aa105', 'aa94', 'aa85', 'aa88', 'aa40', 'aa37', 'aa20', 'mg'],
 ];
 
-/** Bataryanın istediği top: kimliğinden sınıf, sınıfta açık olan ilk top. */
-const botGun = (id: number, r: Research): AAWeaponId => BOT_GUNS[id % BOT_GUNS.length].find((g) => r.has(AA_WEAPONS[g].requires ?? undefined)) ?? 'mg';
+/** Sınıfta açık olan ilk top. */
+const classGun = (cls: number, r: Research): AAWeaponId => BOT_GUNS[cls].find((g) => r.has(AA_WEAPONS[g].requires ?? undefined)) ?? 'mg';
 
 /**
  * Hava savunma hattının sırası. Radar toplardan önce: yoksa yüksek akın ancak 20 km kala görülür, avcılar 6,5 km'ye tırmanamaz (120. dakikada
@@ -42,6 +42,27 @@ const DEFENSE_PRIORITY = [
   'hd_m45', 'hd_fort2', 'hd_predictor', 'hd_40', 'hd_61k', 'hd_90', 'hd_crew', 'hd_ammo', 'radar_ew2', 'hd_camo', 'hd_gunradar', 'hd_vt',
   'hd_flak41', 'hd_105', 'hd_128', 'hd_fort3',
 ];
+
+/**
+ * Botun kendi savunma sırası (2026-11-18): ağır top (52-K ya da 8,8 cm, hangisinin önce geleceği rastgele) eskisinden erken, ama her
+ * bot başka türlü: kimi 37 mm ve ağır topu radardan önce alır (topçu), kimi radardan hemen sonra (dengeli), kimi telsiz ve radarı bitirip
+ * (radarcı); öteki işler de birkaç sıra kayar. Önkoşulu açılmamış iş sırasını bekler (`nextDefense` açık olan ilkini seçer). Ana üssün
+ * yerinden tohumlanır: başlangıç yerleri rastgele olduğu için her harekâtta farklı, kayıt yüklenince aynı. Ortak Math.random akışına dokunmaz.
+ */
+function defenseOrder(seed: number): string[] {
+  const r = mulberry32(seed);
+  const heavy = r() < 0.5 ? 'hd_52k' : 'hd_88';
+  const other = heavy === 'hd_52k' ? 'hd_88' : 'hd_52k';
+  const roll = r();
+  const key = new Map<string, number>();
+  // 2 cm hep ilk (her şey ona bağlı); ötekiler ±1 sıra kayar. Ağır top telemetreyi de ister: topçu onu telemetre ve 37 mm biter bitmez alır
+  DEFENSE_PRIORITY.forEach((id, i) => key.set(id, i === 0 ? 0 : i + (r() - 0.5) * 2));
+  const [k37, kHeavy] = roll < 0.4 ? [1.6, 2.1] : roll < 0.75 ? [2.6, 3.1] : [3.6, 4.1];
+  key.set('hd_37', k37 + (r() - 0.5) * 0.3);
+  key.set(heavy, kHeavy + (r() - 0.5) * 0.3);
+  key.set(other, kHeavy + 2 + r() * 4);
+  return [...DEFENSE_PRIORITY].sort((a, b) => key.get(a)! - key.get(b)!);
+}
 
 const TECH_PRIORITY = [
   'hd_20', 'observer', 'radio', 'self_sealing', 'm_vp_prop', 'n_reflector', 'hd_fort1', 'pilot_armor', 'w_mg8', 'm_v12',
@@ -249,7 +270,7 @@ export class Commander {
         // Sıradaki iş ya da para bekleyen iş. Savunma fonu yetiyorsa filo ve uçak araştırması beklerken de başlar: bir bot 1.750 kr'lik
         // 37 mm'yi 100 dakikadan fazla bekliyordu. Fon rezervden düşer, araştırma adımı ödemeyi kendisi yapar.
         const queued = r.slots.defense.queue[0];
-        const next = queued ?? this.nextDefense(r);
+        const next = queued ?? this.nextDefense(world, r);
         if (next) {
           const tm = world.teams[this.team];
           const cost = researchCost(TECH_BY_ID[next]);
@@ -508,11 +529,36 @@ export class Commander {
 
   /** Açık olan en iyi topa çevrilmeyi bekleyen batarya var mı. */
   private gunsPending(world: World, r: Research): boolean {
-    return world.structures.some((s) => s.team === this.team && s.active && !!s.aa && s.aa.uniformGun !== botGun(s.id, r));
+    return world.structures.some((s) => s.team === this.team && s.active && !!s.aa && s.aa.uniformGun !== this.botGun(world, s, r));
   }
 
-  private nextDefense(r: Research): string | undefined {
-    return DEFENSE_PRIORITY.find((id) => TECH_BY_ID[id] && r.available(TECH_BY_ID[id]));
+  /** Bu botun savunma sırası ve batarya grubu (ilk kullanımda ana üssün yerinden kurulur). */
+  private defOrder: string[] | null = null;
+  private gunFlip = 0;
+
+  private nextDefense(world: World, r: Research): string | undefined {
+    this.ensureDoctrine(world);
+    return this.defOrder!.find((id) => TECH_BY_ID[id] && r.available(TECH_BY_ID[id]));
+  }
+
+  private ensureDoctrine(world: World): void {
+    if (this.defOrder) return;
+    const home = world.structures.find((s) => s.team === this.team && s.kind === 'airbase');
+    const seed = (home ? (Math.round(home.pos.x) * 73856093) ^ (Math.round(home.pos.z) * 19349663) ^ (this.team * 83492791) : this.team * 2654435761) >>> 0;
+    this.defOrder = defenseOrder(seed);
+    this.gunFlip = mulberry32(seed ^ 0x5bd1e995)() < 0.5 ? 0 : 1;
+  }
+
+  /**
+   * Bataryanın istediği top. Sınıf, bataryanın takımın kendi bataryaları arasındaki sırasından: her üçünden biri hafif, orta, ağır; üçlüler
+   * A ve B grubu arasında değişir, botun hangi grupla başlayacağı rastgele. Eskiden yapının genel kimliğinden (kimlik % 6) seçiliyordu: kimlikler
+   * bütün takımlarda ortak olduğu için kimi botun hiçbir bataryası ağır sınıfa düşmüyor, 8,8 cm'i araştırsa da takmıyordu (12 botun 4'ü).
+   */
+  private botGun(world: World, s: Structure, r: Research): AAWeaponId {
+    this.ensureDoctrine(world);
+    let rank = 0;
+    for (const o of world.structures) if (o.team === this.team && o.aa && !o.destroyed && o.id < s.id) rank++;
+    return classGun((rank % 3) + 3 * ((Math.floor(rank / 3) + this.gunFlip) % 2), r);
   }
 
   /** Yedek (araştırma ve yükseltmelerin dokunmadığı para): maden fonu + filo fonu. */
@@ -562,7 +608,7 @@ export class Commander {
     // araştırma beklerken de yalnız kendi parasıyla top alabilir
     const waiting = this.researchWaiting(world);
     const research = world.teams[this.team].research;
-    const nextDef = this.nextDefense(research);
+    const nextDef = this.nextDefense(world, research);
     // Açık bir topa çevrilmeyi bekleyen batarya ya da sıradaki top araştırması varsa fon ona birikir: 8,8 cm araştırıldıktan sonra para seviye
     // ve aletlere gidiyor, iki topun ~5.700 kr'si hiç birikmiyordu
     const saveForGun = (!!nextDef && AA_WEAPON_ORDER.some((id) => AA_WEAPONS[id].requires === nextDef)) || this.gunsPending(world, research);
@@ -579,7 +625,7 @@ export class Commander {
       const saving = saveForGun;
       const opts = s.aa.options(research).filter((o) => o.enabled && o.cost <= free + (saving && !o.key.startsWith('all:') ? 0 : this.defenseFund));
       // Tek tip batarya: her batarya kimliğine göre bir sınıfa bakar, açık olan en iyi topa çevrilir; parası yoksa bekler, karıştırmaz
-      const want = botGun(s.id, research);
+      const want = this.botGun(world, s, research);
       // Önce top: 12,7 mm'lik bataryanın seviyesi ya da telemetresi yüksek uçağa bir şey yapmaz
       const pick =
         opts.find((o) => o.key === `all:${want}`) ??

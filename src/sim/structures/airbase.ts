@@ -397,11 +397,15 @@ export class Airbase {
     }
     if (!this.s.active) return;
 
-    // İniş sırası: yaklaşmadakiler temizlenir, önceki son yaklaşmanın yarısını geçince sıradaki izin alır
+    // İniş sırası: yaklaşmadakiler temizlenir, önceki son yaklaşmanın yarısını geçince sıradaki izin alır. İzin 300 sn'de düşer
+    // (yaklaşamayan uçak sırayı tutmasın); son yaklaşmadaki ve yerdeki uçağınki düşmez: yavaş tırmanan Lancaster pistin 350 m
+    // önünde, 63 m'de iznini kaybedip bekleme paternine atılıyor, yere çakılıyordu
     for (let i = this.approaching.length - 1; i >= 0; i--) {
       const id = this.approaching[i];
       const a = world.aircraftById(id);
-      if (!a || a.status !== 'flying' || a.brain.ops.mode !== 'landing' || t - (this.clearedAt.get(id) ?? t) > 300) {
+      const st = a?.brain.ops.stage;
+      const late = t - (this.clearedAt.get(id) ?? t) > 300 && !a?.onGround && st !== 'final' && st !== 'flare' && st !== 'rollout';
+      if (!a || a.status !== 'flying' || a.brain.ops.mode !== 'landing' || late) {
         this.approaching.splice(i, 1);
         this.clearedAt.delete(id);
       }

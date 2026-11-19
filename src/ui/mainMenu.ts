@@ -31,6 +31,9 @@ type Tab = 'new' | 'saves' | 'scores';
 const DRAFT = 'warsim.menuDraft';
 interface Draft { name: string; enemies: number; mapId: string; size?: number }
 
+/** Öğretici düğmesinin kitap simgesi (oyunun üst çubuğundakiyle aynı). */
+const TUT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5c3-1.2 6-1.2 9 .6 3-1.8 6-1.8 9-.6v13c-3-1.2-6-1.2-9 .6-3-1.8-6-1.8-9-.6z"/><path d="M12 6.1v13.1"/></svg>';
+
 /** Seçilen harita büyüklüğü bu tarayıcıda hatırlanır. */
 const SIZE_KEY = 'warsim.mapSize';
 
@@ -174,7 +177,7 @@ export class MainMenu {
     } catch {
       /* taslak kaydedilemezse yalnız dil değişir */
     }
-    playLangSwap(next, () => location.reload());
+    playLangSwap(next, () => this.game.leavePage(() => location.reload()));
   }
 
   /** "Oyuna başla": ad geçerliyse öğretici sorulur (sorulmayacaksa oyun hemen başlar). */
@@ -183,7 +186,8 @@ export class MainMenu {
     if (!this.game.tutorial.ask()) this.launch();
   }
 
-  private validName(): boolean {
+  /** Komutan adı geçerli mi; değilse hata yazılır ve alana odaklanılır. */
+  validName(): boolean {
     const err = nameError(this.name);
     if (!err) return true;
     this.error = `${L('Komutan adı', 'Commander name')}: ${lower(err)}`;
@@ -194,13 +198,14 @@ export class MainMenu {
 
   /**
    * Harekâtı başlat (öğretici penceresi ya da ana menü bölümü bitince). Ad geçersizse false. Otomatik kayıt için boş yer
-   * yoksa önce söylenir (force: oyuncu yine de başlattı).
+   * yoksa önce söylenir (force: oyuncu yine de başlattı). started: harekât kurulunca (öğreticinin konusu; kayıt yeri
+   * uyarısından sonra başlatılırsa da çalışır).
    */
-  launch(force = false): boolean {
+  launch(force = false, started?: () => void): boolean {
     if (!this.validName()) return false;
     const name = cleanName(this.name);
     if (!force && this.noAutoSlot(name)) {
-      this.warnNoAutoSlot(name, L('Otomatik kayıtsız başla', 'Start without autosave'), () => this.launch(true));
+      this.warnNoAutoSlot(name, L('Otomatik kayıtsız başla', 'Start without autosave'), () => this.launch(true, started));
       return false;
     }
     enterFullscreen();
@@ -208,6 +213,7 @@ export class MainMenu {
     const lay = this.currentLayout();
     this.game.newCampaign(name, this.enemies, this.mapId, this.size, lay ?? undefined);
     this.layout = null;
+    started?.();
     return true;
   }
 
@@ -320,6 +326,9 @@ export class MainMenu {
       case 'start':
         this.start();
         return;
+      case 'tutorial':
+        if (!this.game.tutorial.busy) this.game.tutorial.openTopics();
+        return;
       case 'enemies':
         this.enemies = Number(b.dataset.v);
         this.render();
@@ -368,7 +377,7 @@ export class MainMenu {
         return;
       }
       case 'newsite':
-        location.href = NEW_SITE;
+        this.game.leavePage(() => location.assign(NEW_SITE));
         return;
       case 'profile':
         void this.game.profile.open();
@@ -403,7 +412,8 @@ export class MainMenu {
       : '';
     // Dil: iki yarım (EN | TR), seçili dilin yarısı koyu; üst çubuktaki düğmelerin en solunda
     const lang = `<button class="mm-login mm-lang ${LANG}" data-mm="lang" title="${L('Dil: Türkçe (İngilizceye geç)', 'Language: English (switch to Turkish)')}"
-      aria-label="${L('Dili değiştir', 'Change language')}"><span class="en">EN</span><span class="tr">TR</span></button>`;
+      aria-label="${L('Dili değiştir', 'Change language')}"><span class="en">EN</span><span class="tr">TR</span></button><button class="mm-login tut-btn" data-mm="tutorial"
+      title="${L('Öğretici: konu seç', 'Tutorial: pick a topic')}" aria-label="${L('Öğretici', 'Tutorial')}">${TUT_ICON}<span>${L('Öğretici', 'Tutorial')}</span></button>`;
     // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
     // Ansiklopedi gerçek bağlantı (arama motorları düğmeyi değil bağlantıyı izler)
     const newsBtn = `${lang}<a class="mm-login mm-link" href="${encUrl(LANG === 'en')}">${L('Ansiklopedi', 'Encyclopedia')}</a><button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;

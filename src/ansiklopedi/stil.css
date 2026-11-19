@@ -181,7 +181,7 @@ main { max-width: calc(1088px + var(--pl) + var(--pr)); margin: 18px auto 0; pad
 .legal { max-width: 800px; margin: 0 auto; overflow-wrap: anywhere; }
 .legal h1 { font-size: 32px; font-weight: 800; margin-bottom: 4px; }
 .legal h2 { font-size: 20px; margin: 22px 0 6px; }
-.legal ul { margin: 0 0 12px; padding-left: 22px; }
+.legal ul, .legal ol { margin: 0 0 12px; padding-left: 22px; }
 .legal li { margin-bottom: 6px; color: #dde5e0; }
 .legal li::marker { color: var(--accent); }
 .legal-date { font-size: 14px; color: var(--muted); }

@@ -44,6 +44,19 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('rec')) {
   ));
 } else {
   void start();
+  registerOfflineCache();
+}
+
+/**
+ * İnternetsiz oyun (2026-11-19): service worker oyunun dosyalarını önbelleğe alır, sonraki açılışlar bağlantısız da çalışır
+ * (dist/sw.js derlemede üretilir: tools/sw/vite.ts). Geliştirme sunucusunda yok. Oyun açıldıktan sonra kaydedilir: ilk açılışın
+ * indirmesiyle yarışmasın.
+ */
+function registerOfflineCache(): void {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  const go = () => setTimeout(() => void navigator.serviceWorker.register('./sw.js').catch(() => {}), 4000);
+  if (document.readyState === 'complete') go();
+  else window.addEventListener('load', go, { once: true });
 }
 
 /** İki kare sonra (tarayıcı arada çizsin). */

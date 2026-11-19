@@ -2,10 +2,14 @@
 // ve gerçek oynama süresini dakikada bir sunucuya bildirir. Oynama süresi yalnız harekât ekranı görünürken ve oyuncu
 // son 3 dakikada dokunmuş ya da tuşa basmışsa sayılır (açık bırakılan sekme süre biriktirmesin). Zaferde ve sekme
 // arka plana geçerken hemen bildirilir. Senaryolar (harekât kimliği boş) sayılmaz.
+// Bağlantı yoksa bildirim bu cihazda bekler (statsOutbox.ts): her bildirim önce oraya yazılır, sonra bekleyenlerle birlikte
+// gönderilir; oyun açılınca ve bağlantı gelince de gönderilir.
 
 import type { World } from '../sim/world';
-import { api } from './api';
+import { ApiError, api } from './api';
 import type { StatsReport } from './shared';
+import { currentAccount } from '../persist';
+import { ackReport, pendingReports, queueReport } from './statsOutbox';
 
 const REPORT_SEC = 60;
 /** Misafirin toplam oynama süresi (sn), bu tarayıcıda: teşekkür penceresi için. */
@@ -74,22 +78,49 @@ export class StatsTracker {
 
   private async send(w: World, team: number, keepalive = false): Promise<void> {
     const t = w.teams[team];
-    if (!t || this.sending) return;
+    const acc = currentAccount()?.key;
+    if (!t || !acc || this.sending) return;
     const playSec = Math.floor(this.pending);
     const report: StatsReport = {
       campaign: w.campaignId, kills: t.kills, earned: Math.round(t.earned), peak: t.peakFleet,
       won: w.winner === team, gameTime: w.time, playSec,
     };
+    // Önce cihaza: bağlantı yoksa ya da sayfa kapanıyorsa kaybolmasın
+    queueReport(acc, report, playSec);
+    this.pending -= playSec;
+    if (report.won) this.wonSent = w.campaignId;
     this.sending = true;
     try {
-      const res = await api<{ totalPlaySec?: number }>('POST', '/stats', report, { keepalive });
-      this.pending -= playSec;
-      if (typeof res?.totalPlaySec === 'number') this.onTotal?.(res.totalPlaySec);
-      if (report.won) this.wonSent = w.campaignId;
-    } catch {
-      /* bağlantı yok: süre birikir, sonra bildirilir */
+      await this.drain(acc, keepalive);
     } finally {
       this.sending = false;
+    }
+  }
+
+  /** Bekleyen bildirimleri gönder (oyun açılınca, bağlantı gelince). */
+  async flushPending(): Promise<void> {
+    const acc = currentAccount()?.key;
+    if (!acc || this.sending) return;
+    this.sending = true;
+    try {
+      await this.drain(acc, false);
+    } finally {
+      this.sending = false;
+    }
+  }
+
+  /** Bekleyenleri sırayla gönder; bağlantı yoksa durur (sonra yeniden denenir). */
+  private async drain(acc: string, keepalive: boolean): Promise<void> {
+    for (const r of pendingReports(acc)) {
+      try {
+        const res = await api<{ totalPlaySec?: number }>('POST', '/stats', r, { keepalive });
+        ackReport(acc, r);
+        if (typeof res?.totalPlaySec === 'number') this.onTotal?.(res.totalPlaySec);
+      } catch (e) {
+        // Sunucunun kabul etmediği (bozuk) bildirim bekletilmez; bağlantı ve sunucu sorununda sonra yeniden
+        if (e instanceof ApiError && e.code === 'bad_stats') ackReport(acc, r);
+        else return;
+      }
     }
   }
 }
