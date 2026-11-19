@@ -397,6 +397,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Profilin son hâli cihazda saklanır (`persist.ts` `PROFILE_KEY`, e-postasız); internetsizken o gösterilir. Skorlar sekmesi
     internetsizken tablo yerine bilgi yazısı gösterir. Kayıtlar zaten önce IndexedDB'ye yazılır, bağlantı gelince yüklenir.
   - Deneme: scratchpad `internetsiz.cjs` (sunucu kapatılarak; `W`/`H` ile ekran boyu).
+- **Android (Google Play, TWA)** (2026-11-19): paket `com.warsimbox.app`, siteyi tam ekran açan kabuk; oyunun kendisi sitedir,
+  site güncellenince uygulama da güncellenir. Paket repoda değil: `C:\Users\Helss_0\warsimbox-android` (Bubblewrap core,
+  JDK 17, Android SDK; üretim `tools/uret.cjs <versionCode> <versionName>`, çıktı `cikti/`). Yükleme anahtarı `anahtar/`
+  (şifresi `sifre.txt`; ekrana, repoya ve günlüğe yazma). Site, `public/.well-known/assetlinks.json` ile uygulamayı tanır:
+  yükleme anahtarının ve Play'in uygulama imzalama anahtarının SHA-256'sı orada olmalı, yoksa uygulama adres çubuğuyla açılır.
+  Yeni paket yalnız kabuk ayarı (ad, simge, renk, yön) değişince gerekir; `versionCode` her yüklemede artar.
 - **Açılış ve harita yükleme:**
   - `main.ts` önce yükleme ekranını çizdirir. Arka görsel her açılışta değişir (`public/acilis/1-7.webp`, 2400×1350,
     art arda aynısı gelmez, `warsim.acilis`); seçimi `index.html` başındaki betik yapar, `404.html` de aynı listeden seçer.

@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.warsimbox.app",
+        "sha256_cert_fingerprints": ["93:83:99:51:10:F4:79:A6:A9:2D:B2:16:44:5C:E6:5F:5A:34:30:E6:30:86:D9:E7:D1:06:60:89:C3:B5:54:67"]
+      }
+    }]
