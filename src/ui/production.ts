@@ -159,6 +159,13 @@ export function factoryBody(game: Game, s: Structure, tab: FactoryTab): string {
   const pick = factories.length > 1
     ? `<div class="seg prd-pick">${factories.map((x) => `<button class="${x.id === s.id ? 'active' : ''}" data-act="fab-pick" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
     : '';
+  // Teslim üssü (2026-11-20): her fabrika uçağını oyuncunun seçtiği üsse yollar (varsayılan: bağlı olduğu üs, yoksa en yakın)
+  const bases = w.airbasesOf(s.team).filter((b) => !b.s.destroyed);
+  const chosen = s.factory!.chosenBase(w, s);
+  const dest = bases.length > 1 && tab === 'ucak'
+    ? `<div class="prd-dest"><span class="muted small">${L('Uçaklar şu üsse gider:', 'Aircraft go to:')}</span><div class="seg prd-pick">${bases.map((b) => `<button class="${chosen?.s.id === b.s.id ? 'active' : ''}" data-act="fab-dest" data-id="${b.s.id}">${esc(b.s.name)}</button>`).join('')}</div></div>`
+    : '';
+  const idle = s.active ? '' : `<p class="note warn">${L('Fabrika çalışmıyor: inşaat ya da onarım sürüyor.', 'The factory is not running: under construction or repair.')}</p>`;
   const planes = SPEC_LIST.filter((sp) => {
     const n = aircraftNode(sp.id);
     return sp.playable && !!n && !n.future;
@@ -171,15 +178,15 @@ export function factoryBody(game: Game, s: Structure, tab: FactoryTab): string {
   const note = tab === 'top'
     ? L('Biten top depoya girer. Takmak için haritada bataryaya dokun, yuvasını seç.', 'A finished gun goes into stock. To fit it, tap a battery on the map and pick a gun pit.')
     : w.personnelEnabled
-      ? L(`Biten uçak üssün hangarına teslim edilir. Her uçak ${MAINT_CREW} bakım personeli ister: siparişte ayrılır, uçak düşene ya da satılana dek onda kalır. Uçarken pilotu ve mürettebatı ayrıca gerekir.`,
-        `A finished aircraft is delivered to the base hangar. Each aircraft needs ${MAINT_CREW} ground crew: assigned when ordered, they stay with it until it is lost or sold. Its pilot and crew are needed on top when it flies.`)
-      : L('Biten uçak üssün hangarına teslim edilir.', 'A finished aircraft is delivered to the base hangar.');
+      ? L(`Biten uçak seçili üssün hangarına teslim edilir (hangarı doluysa en yakın üsse). Her uçak ${MAINT_CREW} bakım personeli ister: siparişte ayrılır, uçak düşene ya da satılana dek onda kalır. Uçarken pilotu ve mürettebatı ayrıca gerekir.`,
+        `A finished aircraft is delivered to the chosen base's hangar (the nearest base if it is full). Each aircraft needs ${MAINT_CREW} ground crew: assigned when ordered, they stay with it until it is lost or sold. Its pilot and crew are needed on top when it flies.`)
+      : L('Biten uçak seçili üssün hangarına teslim edilir.', "A finished aircraft is delivered to the chosen base's hangar.");
   return `<div class="prd-head">
       <div class="seg prd-tabs"><button class="${tab === 'ucak' ? 'active' : ''}" data-act="fab-tab" data-v="ucak">${L('Uçaklar', 'Aircraft')}</button><button class="${tab === 'top' ? 'active' : ''}" data-act="fab-tab" data-v="top">${L('Hava savunma', 'Air defence')}</button></div>
       ${pick}
       ${cell('prd-money', 'prd-money', `${w.economyEnabled ? `${L('Hazine', 'Treasury')} <b>${fmtMoney(team.money)}</b>` : ''}${w.personnelEnabled && tab === 'ucak' ? ` <span class="prd-pers" title="${L('Üretimde her uçak için 1 kişi ayrılır', 'One person is assigned per aircraft ordered')}">${ICON.person}<b class="${w.crewFree(s.team) < MAINT_CREW ? 'bad' : ''}">${w.crewFree(s.team)}</b> ${L('boşta', 'free')}</span>` : ''}`)}
     </div>
-    ${s.active ? '' : `<p class="note warn">${L('Fabrika çalışmıyor: inşaat ya da onarım sürüyor.', 'The factory is not running: under construction or repair.')}</p>`}
+    ${idle || dest ? `<div class="prd-sub">${idle}${dest}</div>` : ''}
     <div class="prd-list">${rows}</div>
     <div class="prd-foot"><span class="muted small">${note}</span>
       ${tab === 'ucak' ? `<label class="check"><input type="checkbox" data-act="fab-repeat" ${f.repeat ? 'checked' : ''}> ${L('Bitince tekrarla', 'Repeat when done')}</label>` : ''}</div>`;

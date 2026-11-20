@@ -405,7 +405,15 @@ export class Hud {
         ? (touch ? L('Uygun yer', 'Good spot') : L('Uygun yer — tıkla ve inşa et', 'Good spot — click to build'))
         : it.reason ?? (touch ? L('Yer seçmek için haritaya dokun', 'Tap the map to choose a spot') : L('Yer seç', 'Choose a spot'));
       const grid = `<button data-hint="grid" class="${this.game.buildGrid ? 'on' : ''}" title="${L('Izgara: açıkken yapı ızgarada gezer, kapalıyken serbest (X)', 'Grid: on, the building moves on the grid; off, it moves freely (X)')}">▦ ${L('Izgara', 'Grid')}</button>`;
-      html = `<span>${esc(msg)}${touch ? '' : L(' · R: döndür · X: ızgara · Sağ tık / Esc: iptal', ' · R: rotate · X: grid · Right click / Esc: cancel')}</span>${btn('rotate', L('↻ Döndür', '↻ Rotate'))}${grid}${btn('place', L('✓ Yerleştir', '✓ Place'), it.ok)}${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
+      const mv = it.move !== undefined ? this.game.world.structureById(it.move) : undefined;
+      const fee = mv && this.game.world.economyEnabled ? ` · ${L('bedel', 'fee')} ${fmtMoney(this.game.world.moveCost(mv))}` : '';
+      const place = mv ? L('✓ Taşı', '✓ Move') : L('✓ Yerleştir', '✓ Place');
+      html = `<span>${esc(mv ? `${mv.name}: ${msg}${fee}` : msg)}${touch ? '' : L(' · R: döndür · X: ızgara · Sağ tık / Esc: iptal', ' · R: rotate · X: grid · Right click / Esc: cancel')}</span>${btn('rotate', L('↻ Döndür', '↻ Rotate'))}${grid}${btn('place', place, it.ok)}${btn('cancel', L('✕ İptal', '✕ Cancel'))}`;
+    } else if (it.mode === 'road' && it.del) {
+      const msg = it.ok
+        ? `${L('Bu yol kalkar', 'This road is removed')} (${Math.round(it.length)} m) · ${L('iade', 'refund')} ${fmtMoney(it.cost)}${touch ? '' : L(' — tıkla', ' — click')}`
+        : it.reason ?? (touch ? L('Kaldırılacak yola dokun', 'Tap the road to remove') : L('Kaldırılacak yola tıkla', 'Click the road to remove'));
+      html = `<span>${esc(msg)}${touch ? '' : L(' · Sağ tık / Esc: bitir', ' · Right click / Esc: done')}</span>${btn('place', L('✓ Kaldır', '✓ Remove'), it.ok)}${btn('cancel', L('✕ Bitir', '✕ Done'))}`;
     } else if (it.mode === 'road') {
       const grid = `<button data-hint="grid" class="${this.game.buildGrid ? 'on' : ''}" title="${L('Izgara: açıkken yol ızgara noktalarına oturur (X)', 'Grid: on, the road snaps to grid points (X)')}">▦ ${L('Izgara', 'Grid')}</button>`;
       const where = touch ? L('dokun', 'tap') : L('tıkla', 'click');

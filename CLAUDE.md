@@ -147,6 +147,15 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       `ROAD_COST`): her parça mevcut bir yoldan başlar, araziyi düzleştirmez, yıkılmaz. Botlar evleri `findLot` ile
       yola dizer, arsa bitince `growRoads` ile sokak açar (yol boyunca her 100 m'de bir kavşak yeri boş kalır). Yolsuz
       eski kayıt yüklenince her tarafa bedava belediye verilir (`save.ts`, `campaign.ts` `foundTown`).
+    - Oyuncu isteğiyle (2026-11-20):
+      - Yol kaldırma: İnşa → Şehir → Yol kaldır (`game.beginRoad(true)`, `world.roadRemoval` / `removeRoad`). Belediyenin
+        ana caddesi kalkmaz, bedelin yarısı döner, yanındaki evler yerinde kalır.
+      - Taşıma ve döndürme: belediye dışındaki şehir binaları (`structure.ts` `MOVABLE_KINDS`), panelde "Taşı / döndür"
+        (`game.beginMove`, `world.checkMove` / `moveStructure`). Bedel kuruluşun beşte biri; durum aynen kalır. Taşırken R
+        tam tur döner. Görünüm yer ya da yön değişince yeniden kurulur (`render/structures.ts` `placeKeyOf`).
+    - Fabrika teslim üssü (2026-11-20, `factory.ts` `deliverTo`, kayda yazılır): üretim penceresinde fabrika başına seçilir
+      (birden çok üs varken). Seçilmemişse bağlı olduğu üs, o da yoksa en yakın üs; hangar doluysa en yakın boş üs. Üst
+      çubuktaki Üretim seçili fabrikayı ya da seçili üssün fabrikasını açar (`modals.ts` `toggleFactory`).
     - Bakım personeli (2026-11-13): her uçak 1 kişi (`economy.ts` `MAINT_CREW`). Hangarda, havada ve fabrika bandındaki
       uçaklar `world.maintOf` ile her seferinde sayılır, `crewFree`'den düşer; sipariş (`orderAircraft`, nedeni `orderBlock`)
       ve pazar alımı boşta kişi ister. Harekât her tarafa 4 evle başlar (16 kişi: 6 bakımcı + 8 uçuş + 2 boş). Bütün

@@ -14,7 +14,7 @@ import { FlightGroup } from './ai/flightGroup';
 import { MISSION_NAMES, TASK_NAMES, TASK_SPLIT, defaultLoadout, type FlightTask, type MissionPlan, type MissionType, type Roe } from './ai/missions';
 import type { FormationType } from './ai/formation';
 import type { BeltId } from './aircraft/ammo';
-import { ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
+import { MOVABLE_KINDS, ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
 import {
   GRID, LOT_LINE, ROAD_MAX, ROAD_MIN, ROAD_REACH, ROAD_SLOPE, ROAD_VERGE, TOWN_ROAD, lotAt, nearestRoad, projectOnRoad, roadComponents, roadHitsRect, type Road,
 } from './roads';
@@ -970,6 +970,36 @@ export class World {
     return [x + fx * d, z + fz * d, x + fx * (d + TOWN_ROAD), z + fz * (d + TOWN_ROAD)];
   }
 
+  /**
+   * Yol parçası kaldırılabilir mi (2026-11-20, oyuncu isteği): kendi yolu olmalı; belediye binasının ana caddesi kalkmaz
+   * (kasabanın çıkış yolu). İade: yolun bedelinin yarısı. Yolun yanındaki evler yerinde kalır.
+   */
+  roadRemoval(team: number, id: number): { ok: boolean; reason?: string; refund: number; road?: Road } {
+    const r = this.roads.find((x) => x.id === id);
+    if (!r || r.team !== team) return { ok: false, reason: L('Kendi yolun değil', 'Not your road'), refund: 0 };
+    for (const s of this.structures) {
+      if (s.team !== team || s.kind !== 'townhall' || s.destroyed) continue;
+      const [ax, az, bx, bz] = World.townRoad(s.pos.x, s.pos.z, s.heading);
+      if (Math.hypot(r.ax - ax, r.az - az) < 1 && Math.hypot(r.bx - bx, r.bz - bz) < 1) {
+        return { ok: false, reason: L('Belediyenin ana caddesi kaldırılamaz', "The town hall's main street cannot be removed"), refund: 0, road: r };
+      }
+    }
+    const len = Math.hypot(r.bx - r.ax, r.bz - r.az);
+    return { ok: true, refund: Math.round((len * ROAD_COST * 0.5) / 10) * 10, road: r };
+  }
+
+  /** Yol parçasını kaldır; bedelinin yarısı iade edilir. */
+  removeRoad(team: number, id: number): boolean {
+    const chk = this.roadRemoval(team, id);
+    if (!chk.ok || !chk.road) return false;
+    const len = Math.round(Math.hypot(chk.road.bx - chk.road.ax, chk.road.bz - chk.road.az));
+    this.roads.splice(this.roads.indexOf(chk.road), 1);
+    this.roadVersion++;
+    this.earn(team, chk.refund, L('Yol kaldırıldı', 'Road removed'), 'refund');
+    this.log(L(`Yol kaldırıldı (${len} m)`, `Road removed (${len} m)`), team, 'build');
+    return true;
+  }
+
   /** Yolu doğrudan ekle (kural sorulmaz: belediyenin caddesi, kayıt yükleme). */
   addRoad(team: number, ax: number, az: number, bx: number, bz: number, id?: number): Road {
     const r: Road = { id: id ?? this.nextRoadId, team, ax, az, bx, bz };
@@ -1149,6 +1179,36 @@ export class World {
     const building = this.structures.filter((s) => s.team === team && s.build < 1 && !s.destroyed && s.def.category === def.category).length;
     if (building >= limit) return fail(city ? L('Şehir inşaat sırası dolu (12)', 'City build queue is full (12)') : L(`Aynı anda en fazla ${limit} inşaat (bu tür)`, `At most ${limit} at a time (this type)`));
     return { ok: true, elevation };
+  }
+
+  /** Taşıma bedeli: yapının kuruluş bedelinin beşte biri. */
+  moveCost(s: Structure): number {
+    return this.economyEnabled ? Math.round((STRUCTURE_COST[s.kind] * 0.2) / 10) * 10 : 0;
+  }
+
+  /** Yapı yeni yerine (ve yönüne) taşınabilir mi: kendisiyle çakışma sayılmaz; yol ve arazi kuralları aynı. */
+  checkMove(s: Structure, x: number, z: number, headingRad: number): PlacementCheck {
+    if (!MOVABLE_KINDS.has(s.kind) || s.destroyed) return { ok: false, reason: L('Bu yapı taşınamaz', 'This structure cannot be moved'), elevation: 0 };
+    const chk = this.checkPlacement(s.team, s.kind, x, z, headingRad, s.id, true);
+    if (!chk.ok) return chk;
+    const cost = this.moveCost(s);
+    if (!this.canAfford(s.team, cost)) return { ok: false, reason: `${L('Para yetmiyor', 'Not enough money')} (${fmtMoney(cost)})`, elevation: chk.elevation };
+    return chk;
+  }
+
+  /**
+   * Şehir binasını taşı ya da döndür (2026-11-20): durumu (hasar, inşaat, itfaiye seviyesi, kadro) aynen kalır; yeni yer
+   * düzleşir, eski yerin arazisi olduğu gibi kalır.
+   */
+  moveStructure(s: Structure, x: number, z: number, headingRad: number): boolean {
+    const chk = this.checkMove(s, x, z, headingRad);
+    if (!chk.ok) return false;
+    if (!this.pay(s.team, this.moveCost(s), `${L('Taşıma', 'Relocation')}: ${s.def.name}`, 'build')) return false;
+    flattenStructure(s.kind, x, z, headingRad, chk.elevation);
+    s.pos.set(x, chk.elevation, z);
+    s.heading = headingRad;
+    this.log(L(`${s.name} taşındı`, `${s.name} moved`), s.team, 'build');
+    return true;
   }
 
   /** Hava üssünün yanına bağlı uçak fabrikası. */

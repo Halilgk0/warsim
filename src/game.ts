@@ -67,9 +67,9 @@ export type Interaction =
   /** Avcıya hava hedefi verme: sıradaki dokunuş düşman uçağını seçer. */
   | { mode: 'pickAir'; acId: number }
   /** heading: oyuncunun R ile verdiği yön; face: kurulacak yön (yola dizilince yol belirler). px, pz: imlecin yerdeki yeri. */
-  | { mode: 'build'; kind: StructureKind; heading: number; face: number; x: number; z: number; px: number; pz: number; ok: boolean; reason?: string }
+  | { mode: 'build'; kind: StructureKind; heading: number; face: number; x: number; z: number; px: number; pz: number; ok: boolean; reason?: string; move?: number }
   /** Yol çizimi: önce başlangıç (mevcut yolun üstünde), sonra uç; kurulunca uçtan devam eder. ux, uz: ızgaranın doğrultusu. */
-  | { mode: 'road'; start: { x: number; z: number; ux: number; uz: number } | null; x: number; z: number; ux: number; uz: number; px: number; pz: number; ok: boolean; reason?: string; cost: number; length: number };
+  | { mode: 'road'; start: { x: number; z: number; ux: number; uz: number } | null; x: number; z: number; ux: number; uz: number; px: number; pz: number; ok: boolean; reason?: string; cost: number; length: number; del?: boolean; hit?: number | null };
 
 /** Yerleşim ızgarası açık mı (tarayıcıda saklanır). */
 const GRID_KEY = 'warsim.grid';
@@ -737,11 +737,19 @@ export class Game {
     this.interaction = { mode: 'build', kind, heading: 0, face: 0, x: 0, z: 0, px: 0, pz: 0, ok: false };
   }
 
-  /** Yol çizimine başla (İnşa → Şehir → Yol). */
-  beginRoad(): void {
+  /** Şehir binasını taşı ya da döndür: inşa kipi, ama yerleştirince bina yeni yerine geçer (bedel kuruluşun beşte biri). */
+  beginMove(s: Structure): void {
+    this.planner.close();
+    this.renderer.roadGhost = null;
+    this.interaction = { mode: 'build', kind: s.kind, heading: s.heading, face: s.heading, x: s.pos.x, z: s.pos.z, px: s.pos.x, pz: s.pos.z, ok: false, move: s.id };
+    this.refreshBuild();
+  }
+
+  /** Yol çizimine başla (İnşa → Şehir → Yol); del: yol kaldırma kipi (İnşa → Şehir → Yol kaldır). */
+  beginRoad(del = false): void {
     this.planner.close();
     this.renderer.ghost = null;
-    this.interaction = { mode: 'road', start: null, x: 0, z: 0, ux: 1, uz: 0, px: 0, pz: 0, ok: false, cost: 0, length: 0 };
+    this.interaction = { mode: 'road', start: null, x: 0, z: 0, ux: 1, uz: 0, px: 0, pz: 0, ok: false, cost: 0, length: 0, del, hit: null };
   }
 
   private handleHover(x: number, y: number): void {
@@ -791,7 +799,8 @@ export class Game {
     it.x = x;
     it.z = z;
     it.face = face;
-    const chk = this.world.checkPlacement(this.playerTeam, it.kind, x, z, face);
+    const moving = it.move !== undefined ? this.world.structureById(it.move) : undefined;
+    const chk = moving ? this.world.checkMove(moving, x, z, face) : this.world.checkPlacement(this.playerTeam, it.kind, x, z, face);
     it.ok = chk.ok;
     it.reason = chk.reason;
     this.renderer.ghost = { kind: it.kind, x, z, heading: face, ok: chk.ok };
@@ -806,6 +815,19 @@ export class Game {
     const team = this.playerTeam;
     let x = it.px;
     let z = it.pz;
+    if (it.del) {
+      // Yol kaldırma: imlecin altındaki kendi yol parçası kırmızı vurgulanır; iade ya da neden alt satırda
+      const h = nearestRoad(w.roads, team, x, z, 14);
+      const chk = h ? w.roadRemoval(team, h.road.id) : null;
+      it.hit = h ? h.road.id : null;
+      it.ok = !!chk?.ok;
+      it.reason = chk ? chk.reason : L('Kaldırılacak yolun üstünü seç', 'Pick a road to remove');
+      it.cost = chk?.refund ?? 0;
+      it.length = h ? Math.hypot(h.road.bx - h.road.ax, h.road.bz - h.road.az) : 0;
+      this.renderer.roadGhost = h ? { ax: h.road.ax, az: h.road.az, bx: h.road.bx, bz: h.road.bz, ok: false } : null;
+      this.renderer.gridFrame = null;
+      return;
+    }
     const snapEnds = (h: { s: number; len: number }): number => (h.s < 6 ? 0 : h.len - h.s < 6 ? h.len : h.s);
     if (!it.start) {
       const h = nearestRoad(w.roads, team, x, z, 60);
@@ -854,10 +876,11 @@ export class Game {
     this.renderer.gridFrame = this.buildGrid ? { x, z, ox: st.x, oz: st.z, ux: st.ux, uz: st.uz, radius: 150 } : null;
   }
 
-  /** İnşa: yapıyı 15° döndür (R). */
+  /** İnşa: yapıyı 15° döndür (R). Taşırken tam tur: binanın ön cephesi ters yöne de dönebilsin. */
   rotateBuild(): void {
     if (this.interaction.mode !== 'build') return;
-    this.interaction.heading = (this.interaction.heading + Math.PI / 12) % Math.PI;
+    const turn = this.interaction.move !== undefined ? 2 * Math.PI : Math.PI;
+    this.interaction.heading = (this.interaction.heading + Math.PI / 12) % turn;
     this.refreshBuild();
   }
 
@@ -867,6 +890,16 @@ export class Game {
     if (it.mode === 'road') {
       if (!it.ok) {
         sound.play('error', 'ui');
+        return;
+      }
+      if (it.del) {
+        if (it.hit === null || it.hit === undefined || !this.world.removeRoad(this.playerTeam, it.hit)) {
+          sound.play('error', 'ui');
+          return;
+        }
+        sound.play('place', 'ui');
+        this.refreshBuild();
+        this.build.refresh();
         return;
       }
       if (!it.start) {
@@ -889,6 +922,17 @@ export class Game {
     if (it.mode !== 'build') return;
     if (!it.ok) {
       sound.play('error', 'ui');
+      return;
+    }
+    if (it.move !== undefined) {
+      const m = this.world.structureById(it.move);
+      if (!m || !this.world.moveStructure(m, it.x, it.z, it.face)) {
+        sound.play('error', 'ui');
+        return;
+      }
+      sound.play('place', 'ui');
+      this.cancelInteraction();
+      this.selectStructure(m.id);
       return;
     }
     const s = this.world.placeStructure(this.playerTeam, it.kind, it.x, it.z, it.face);

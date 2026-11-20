@@ -2,7 +2,7 @@ import type { Structure } from './structure';
 import type { World } from '../world';
 import { SPECS } from '../aircraft/specs';
 import { AA_WEAPONS, gunBuildTime, type AAWeaponId } from './airDefense';
-import { newAirframe } from './airbase';
+import { newAirframe, type Airbase } from './airbase';
 import { L } from '../../i18n';
 
 export interface ProductionItem {
@@ -24,7 +24,8 @@ export interface GunItem {
 }
 
 /**
- * Fabrika: uçakları sırayla üretir, bitince en yakın uygun hava üssüne teslim eder. Uçaksavar topları ayrı bantta, aynı anda üretilir
+ * Fabrika: uçakları sırayla üretir, bitince teslim üssüne verir: oyuncunun seçtiği (deliverTo), yoksa bağlı olduğu üs,
+ * yoksa en yakın üs; seçilen üs çalışmıyorsa ya da hangarı doluysa en yakın uygun üsse. Uçaksavar topları ayrı bantta, aynı anda üretilir
  * ve takım deposuna girer.
  */
 export class Factory {
@@ -32,6 +33,24 @@ export class Factory {
   readonly gunQueue: GunItem[] = [];
   /** Kuyruk boşalınca kendiliğinden tekrar et. */
   repeat = false;
+  /** Oyuncunun seçtiği teslim üssü (yapı kimliği; null: bağlı olduğu üs, yoksa en yakın üs). */
+  deliverTo: number | null = null;
+
+  /** Bitecek uçağın gideceği üs (hangarında yer olan); yoksa null. */
+  target(world: World, s: Structure): Airbase | null {
+    const pref = this.deliverTo ?? s.attachedTo;
+    const own = pref !== null ? world.airbaseById(pref) : undefined;
+    if (own && own.s.team === s.team && !own.s.destroyed && own.s.active && own.freeSlots > 0) return own;
+    return world.nearestAirbase(s.team, s.pos, (b) => b.s.active && b.freeSlots > 0);
+  }
+
+  /** Oyuncunun seçebileceği ya da varsayılan teslim üssü (doluluğa bakmaz; arayüz için). */
+  chosenBase(world: World, s: Structure): Airbase | null {
+    const pref = this.deliverTo ?? s.attachedTo;
+    const own = pref !== null ? world.airbaseById(pref) : undefined;
+    if (own && own.s.team === s.team && !own.s.destroyed) return own;
+    return world.nearestAirbase(s.team, s.pos);
+  }
 
   private updateGuns(world: World, s: Structure, dt: number): void {
     const item = this.gunQueue[0];
@@ -60,8 +79,7 @@ export class Factory {
     // Hasarlı fabrika yavaş üretir
     item.progress += (dt / spec.buildTime) * (0.4 + 0.6 * (s.hp / s.maxHp));
     if (item.progress < 1) return;
-    const own = s.attachedTo !== null ? world.airbaseById(s.attachedTo) : undefined;
-    const base = own && own.s.active && own.freeSlots > 0 ? own : world.nearestAirbase(s.team, s.pos, (b) => b.s.active && b.freeSlots > 0);
+    const base = this.target(world, s);
     if (!base) {
       item.progress = 1;
       return;

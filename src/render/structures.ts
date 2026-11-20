@@ -1734,6 +1734,9 @@ function gunPit(b: B, level: number, r: number, x: number, z: number): void {
   A(b, CYL, 0.6, 0.18, 0.6, x + Math.cos(toC + 2.2) * (r - 1.2), 0, z + Math.sin(toC + 2.2) * (r - 1.2), 0x8a7440, SURF.metal);
 }
 
+/** Yapının yeri ve yönü (taşınınca görünüm yeniden kurulur: gameRenderer syncStructures). */
+export const placeKeyOf = (s: Structure): string => `${s.pos.x.toFixed(2)},${s.pos.z.toFixed(2)},${s.heading.toFixed(4)}`;
+
 export class StructureView {
   readonly group = new THREE.Group();
   /** Yapının tek malzemesi: hasar ve inşaat saydamlığı yapıya özgü. */
@@ -1769,7 +1772,11 @@ export class StructureView {
   /** İtfaiye merkezinin çizildiği seviye (seviye atlayınca görünüm yeniden kurulur: gameRenderer syncStructures). */
   readonly fireLevel: number;
 
+  /** Kurulduğu yer ve yön (placeKeyOf). */
+  readonly placeKey: string;
+
   constructor(readonly s: Structure) {
+    this.placeKey = placeKeyOf(s);
     this.fireLevel = s.fire?.level ?? 0;
     const rng = mulberry32(s.id * 977);
     const city = s.def.category !== 'military';

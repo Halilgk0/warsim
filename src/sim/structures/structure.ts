@@ -17,6 +17,11 @@ export type StructureCategory = 'military' | 'city' | 'economy';
 /** İnşa menüsündeki şehir yapıları. Çarşı, iş merkezi ve ambar 2026-11-11'de kalktı (eski kayıtlarda duranlar kalır). */
 export const CITY_KINDS: StructureKind[] = ['townhall', 'firestation', 'smallhouse', 'midhouse', 'house', 'apartment', 'park'];
 /** Yol bağlantısı isteyen yapılar (yol kuralı açıkken, world.roadRules): evler ancak bir yolun yanına kurulur. */
+/**
+ * Taşınabilen ve döndürülebilen yapılar (2026-11-20, oyuncu isteği): belediye dışındaki şehir binaları. Belediyenin caddesi,
+ * madenin damarı, bataryanın yuvaları ve üssün pisti yerine bağlı olduğu için onlar taşınmaz.
+ */
+export const MOVABLE_KINDS: ReadonlySet<StructureKind> = new Set<StructureKind>(['firestation', 'smallhouse', 'midhouse', 'house', 'apartment', 'park']);
 export const ROAD_KINDS: ReadonlySet<StructureKind> = new Set<StructureKind>(['smallhouse', 'midhouse', 'house', 'apartment', 'firestation']);
 export const MILITARY_KINDS: StructureKind[] = ['airbase', 'aa', 'radar', 'factory'];
 export const ECONOMY_KINDS: StructureKind[] = ['mine'];
@@ -181,8 +186,8 @@ export class Structure {
     readonly kind: StructureKind,
     public name: string,
     readonly pos: Vector3,
-    /** Yön (radyan, pusula). Pist ve bina dizilimi için. */
-    readonly heading: number,
+    /** Yön (radyan, pusula). Pist ve bina dizilimi için. Şehir binası taşınınca değişir (world.moveStructure). */
+    public heading: number,
     built = true,
     /** Kayıttan yüklerken eski kimlik korunur. */
     id?: number,

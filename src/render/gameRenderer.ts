@@ -15,7 +15,7 @@ import { gearHeight } from '../sim/aircraft/flightModel';
 import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
-import { StructureView } from './structures';
+import { StructureView, placeKeyOf } from './structures';
 import { buildAircraftModel, buildStoreMeshes, propU, type AircraftModel } from './models';
 import { Scenery } from './scenery';
 import { DecorLayer } from './decor';
@@ -460,7 +460,7 @@ export class GameRenderer {
   /** Yapı tabanlarını süs katmanına bildir (ağaç, ev, tarla temizlenir). */
   private updateClearings(w: World): void {
     let key = `${w.roadVersion}:`;
-    for (const s of w.structures) if (!s.destroyed) key += `${s.id},`;
+    for (const s of w.structures) if (!s.destroyed) key += `${s.id}:${Math.round(s.pos.x)}:${Math.round(s.pos.z)},`;
     if (key === this.clearKey) return;
     this.clearKey = key;
     const list = w.structures.filter((s) => !s.destroyed).map((s) => ({
@@ -553,6 +553,13 @@ export class GameRenderer {
   private syncStructures(w: World, simDt: number): void {
     for (const s of w.structures) {
       let v = this.structViews.get(s.id);
+      if (v && v.placeKey !== placeKeyOf(s)) {
+        // Taşındı ya da döndürüldü: görünüm yeni yerinde yeniden kurulur
+        this.structGroup.remove(v.group);
+        this.scene.remove(v.ring);
+        this.structViews.delete(s.id);
+        v = undefined;
+      }
       if (v && s.fire && v.fireLevel !== s.fire.level) {
         // İtfaiye merkezi seviye atladı: yeni seviyenin modeli
         this.structGroup.remove(v.group);

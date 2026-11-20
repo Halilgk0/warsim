@@ -93,7 +93,7 @@ interface StructureSave {
   radar?: { level: 1 | 2 };
   /** İtfaiye merkezi: seviye ve süren yükseltme (ekipler kayıtta merkeze dönmüş sayılır). */
   fire?: { level: 1 | 2 | 3; job: { left: number; total: number } | null; repaired: number };
-  factory?: { queue: { specId: string; progress: number; paid: number; noMaint?: boolean }[]; repeat: boolean; guns?: GunItem[] };
+  factory?: { queue: { specId: string; progress: number; paid: number; noMaint?: boolean }[]; repeat: boolean; guns?: GunItem[]; /** Teslim üssü (2026-11-20; yoksa bağlı üs ya da en yakın). */ to?: number | null };
 }
 
 export interface SaveData {
@@ -183,7 +183,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     }
     if (s.radar) o.radar = { level: s.radar.level };
     if (s.fire) o.fire = { level: s.fire.level, job: s.fire.job ? { ...s.fire.job } : null, repaired: s.fire.repaired };
-    if (s.factory) o.factory = { queue: s.factory.queue.map((q) => ({ ...q })), repeat: s.factory.repeat, guns: s.factory.gunQueue.map((q) => ({ ...q })) };
+    if (s.factory) o.factory = { queue: s.factory.queue.map((q) => ({ ...q })), repeat: s.factory.repeat, guns: s.factory.gunQueue.map((q) => ({ ...q })), to: s.factory.deliverTo };
     return o;
   });
   return {
@@ -317,6 +317,7 @@ export function deserializeWorld(d: SaveData): World {
     if (s.factory && o.factory) {
       s.factory.queue.push(...o.factory.queue.map((q) => ({ ...q })));
       s.factory.repeat = o.factory.repeat;
+      s.factory.deliverTo = o.factory.to ?? null;
       s.factory.gunQueue.push(...(o.factory.guns ?? []).map((q) => ({ ...q })));
     }
     w.structures.push(s);

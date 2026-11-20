@@ -3,7 +3,7 @@
 
 import type { Game } from '../game';
 import type { Structure } from '../sim/structures/structure';
-import { STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
+import { MOVABLE_KINDS, STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
 import { AA_WEAPONS, AA_SENSORS, type AASensorId, type AAWeaponId, type UpgradeOption } from '../sim/structures/airDefense';
 import { BASE_UPGRADES, type BaseUpgrade } from '../sim/structures/airbase';
 import { RADAR_LEVELS } from '../sim/structures/radar';
@@ -216,7 +216,9 @@ export class LeftPanel {
         </div>
       </div>
       ${s.build < 1 ? bar(s.build * 100, 'var(--warn)') : bar((s.hp / s.maxHp) * 100, hpColor((s.hp / s.maxHp) * 100))}
-      ${this.repairRow(s)}`;
+      ${this.repairRow(s)}
+      ${s.team === this.game.playerTeam && !s.destroyed && MOVABLE_KINDS.has(s.kind)
+    ? `<button class="wide" data-act="move-struct" title="${L('Binayı başka yere taşı ya da yönünü değiştir (ızgara kapalıyken R ile döner)', 'Move the building or change its facing (with the grid off it turns with R)')}">⇄ ${L('Taşı / döndür', 'Move / rotate')}${this.game.world.economyEnabled ? ` · ${fmtMoney(this.game.world.moveCost(s))}` : ''}</button>` : ''}`;
   }
 
   /** Kendi hasarlı yapımız: onarım düğmesi ya da sürüp giden onarımın durumu. */
@@ -481,8 +483,7 @@ export class LeftPanel {
   private factory(s: Structure): string {
     const f = s.factory!;
     const w = this.game.world;
-    const own = s.attachedTo !== null ? w.airbaseById(s.attachedTo) : undefined;
-    const target = own && own.s.active && own.freeSlots > 0 ? own : w.nearestAirbase(s.team, s.pos, (b) => b.s.active && b.freeSlots > 0);
+    const target = f.target(w, s);
     const line = (label: string, name: string | null, progress: number, n: number) => `<div class="qrow"><span>${label}: ${name ? `<b>${esc(name)}</b>${n > 1 ? ` <small class="muted-ink">+${n - 1}</small>` : ''}` : `<span class="muted">${L('boş', 'idle')}</span>`}</span>${name ? bar(progress * 100, 'var(--accent)', true) : ''}</div>`;
     const stock = Object.values(w.teams[s.team].gunStock).reduce((a, b) => a + (b ?? 0), 0);
     return `
@@ -580,6 +581,9 @@ export class LeftPanel {
         break;
       case 'repair':
         if (s) g.world.setRepair(s, true);
+        break;
+      case 'move-struct':
+        if (s) g.beginMove(s);
         break;
       case 'fire-up':
         if (s?.fire) g.world.startFireUpgrade(s);

@@ -119,8 +119,17 @@ export class Modals {
 
   /** Üst çubuk ve U tuşu: açıksa kapat, yoksa takımın fabrikası. */
   toggleFactory(): void {
-    if (this.isOpen && this.kind === 'factory') this.close();
-    else this.openFactory(this.factoryId);
+    if (this.isOpen && this.kind === 'factory') {
+      this.close();
+      return;
+    }
+    // Seçili fabrika ya da seçili üssün fabrikası önce (eskiden hep son açılan, ilk açılışta ana üssünkü)
+    const w = this.game.world;
+    const sel = this.game.selectedStructure;
+    let id = this.factoryId;
+    if (sel?.factory) id = sel.id;
+    else if (sel?.airbase) id = w.structures.find((x) => x.attachedTo === sel.id && x.factory && !x.destroyed)?.id ?? id;
+    this.openFactory(id);
   }
 
   /** Teşekkür penceresi (6 saat). */
@@ -238,6 +247,15 @@ export class Modals {
     if (mainEl) {
       mainEl.scrollTop = mainTop;
       mainEl.scrollLeft = mainLeft;
+    }
+    // Üretim: fabrika ve teslim üssü sekmeleri yana kayar; seçili olan görünür kalsın
+    for (const row of this.el.querySelectorAll<HTMLElement>('.prd-pick')) {
+      const a = row.querySelector<HTMLElement>('button.active');
+      if (!a) continue;
+      const r = row.getBoundingClientRect();
+      const b = a.getBoundingClientRect();
+      if (b.right > r.right) row.scrollLeft += b.right - r.right;
+      else if (b.left < r.left) row.scrollLeft -= r.left - b.left;
     }
   }
 
@@ -361,6 +379,16 @@ export class Modals {
         this.factoryId = Number(b.dataset.id);
         this.render();
         return;
+      case 'fab-dest': {
+        const fac = g.world.structures.find((x) => x.id === this.factoryId);
+        const base = g.world.airbaseById(Number(b.dataset.id));
+        if (fac?.factory && base) {
+          fac.factory.deliverTo = base.s.id;
+          g.toast(L(`${fac.name}: uçaklar ${base.s.name} hangarına gidecek`, `${fac.name}: aircraft will go to the ${base.s.name} hangar`));
+        }
+        this.render();
+        return;
+      }
       case 'fab-add':
       case 'fab-del':
       case 'fab-add-gun':

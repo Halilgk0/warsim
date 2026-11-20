@@ -23,6 +23,7 @@ export class BuildBar {
       const b = t.closest<HTMLButtonElement>('button[data-kind]');
       if (b) {
         if (b.dataset.kind === 'road') game.beginRoad();
+        else if (b.dataset.kind === 'roaddel') game.beginRoad(true);
         else game.beginBuild(b.dataset.kind as StructureKind);
         this.render();
         return;
@@ -80,7 +81,7 @@ export class BuildBar {
     const team = w.teams[g.playerTeam];
     const mine = w.structures.filter((s) => s.team === g.playerTeam && !s.destroyed);
     const busy = (cat: StructureCategory) => mine.filter((s) => s.build < 1 && s.def.category === cat).length;
-    const active = g.interaction.mode === 'build' ? g.interaction.kind : g.interaction.mode === 'road' ? 'road' : null;
+    const active = g.interaction.mode === 'build' ? g.interaction.kind : g.interaction.mode === 'road' ? (g.interaction.del ? 'roaddel' : 'road') : null;
     const kinds = this.tab === 'city' ? CITY_KINDS : this.tab === 'economy' ? ECONOMY_KINDS : MILITARY_KINDS;
     const econ = w.economyEnabled;
     const cards = kinds.map((k) => {
@@ -117,6 +118,15 @@ export class BuildBar {
         <b>${L('Yol', 'Road')}</b>
         <small>${roads.length ? L(`hemen biter · en çok ${ROAD_MAX} m`, `built at once · up to ${ROAD_MAX} m`) : L('önce belediye binası', 'town hall first')}</small>
         <small class="bdesc">${esc(desc)}</small>
+      </button>`);
+      // Yol kaldırma (2026-11-20): belediyenin ana caddesi dışındaki yollar; bedelin yarısı iade
+      const ddesc = L('Bir yol parçasını kaldır: bedelinin yarısı geri döner. Belediyenin ana caddesi kalkmaz; yanındaki evler yerinde kalır.',
+        "Remove a piece of road: half its cost comes back. The town hall's main street stays; houses beside it stay too.");
+      cards.splice(2, 0, `<button class="bcard ${active === 'roaddel' ? 'active' : ''}" data-kind="roaddel" ${roads.length > 1 ? '' : 'disabled'} title="${esc(ddesc)}">
+        <span class="btop"><span class="bicon">⌫</span>${econ ? `<span class="cost">%50 ${L('iade', 'refund')}</span>` : ''}</span>
+        <b>${L('Yol kaldır', 'Remove road')}</b>
+        <small>${roads.length > 1 ? L('dokun ve kaldır', 'tap and remove') : L('kaldırılacak yol yok', 'no road to remove')}</small>
+        <small class="bdesc">${esc(ddesc)}</small>
       </button>`);
     }
     const cardsHtml = cards.join('');
