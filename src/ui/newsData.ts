@@ -34,6 +34,87 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'modeller-doku',
+    date: '2026-11-20',
+    title: 'Uçaklar ve uçaksavar topları yeniden dokulandı',
+    summary: 'Araştırma ağacındaki 51 uçak ve 15 uçaksavar topu artık boyası, perçini ve yıpranmasıyla dokulu. Toplar ateş edince namludan alev ve duman çıkıyor, ağır topların çevresinde toz kalkıyor.',
+    cover: img('modeller-kapak.webp'),
+    images: [
+      { src: img('modeller-kiyas.webp'), caption: 'Hangarda Bofors 40 mm: solda eski, sağda yeni doku.' },
+      { src: img('modeller-batarya.webp'), caption: 'Bataryada dokulu 8,8 cm Flak, ateşten hemen sonra.' },
+    ],
+    sections: [
+      {
+        heading: 'Uçaklar',
+        bullets: [
+          'Araştırma ağacındaki 51 uçağın hepsi ve MiG-15 yeniden dokulandı: panel çizgileri, perçinler, motor kaputu vidaları, kumaş kaplı kumanda yüzeylerinde nervür bantları.',
+          'Kamuflajlar dönemin düzenleriyle: RAF uçaklarında dalgalı Dark Earth ve Dark Green, Alman uçaklarında kıymık desenler ve benekler. Üst yüzler güneşte solmuş, motorun altında yağ izi var, basma yerlerinde ve hücum kenarlarında boya dökülmüş.',
+          'Uçakların biçimi, uçuşu ve hasarı aynı kaldı. Uzaklaşınca uçak daha sade bir modele geçer, yaklaşınca ayrıntılı hâli döner; kare hızı korunur.',
+        ],
+      },
+      {
+        heading: 'Uçaksavar topları',
+        bullets: [
+          '15 topun hepsi dokulandı: kenarlarda aşınmış boyanın altından çelik görünür, üst yüzler solmuş, yanlarda yağmur izleri, yarıklarda kir, tabanda toz var. Mermi sandıklarında tahta damarı, kovanlarda kararmış pirinç.',
+          'Kutuların ve plakaların kenarları artık yuvarlak; ışığı gerçek metal gibi yakalar. Boyalar orduların belgeli renklerinde kaldı.',
+          'Hangar vitrininde, ansiklopedide ve üretim listesinde de yeni görünüm var.',
+        ],
+      },
+      {
+        heading: 'Ateş eden toplar',
+        bullets: [
+          'Orta ve ağır toplarda namlu ağzından kalibreyle büyüyen alev ve duman çıkar; ağır toplar ateş edince çevrelerinde toz kalkar. Eskiden yalnız küçük bir parlama vardı, 8,8 cm ateş etmiyormuş gibi görünüyordu.',
+          'Hangar vitrinindeki topun alevi de artık namlu boyunca uzanıyor.',
+        ],
+      },
+      {
+        heading: 'Hangi ayarda görünür?',
+        bullets: [
+          'Dokulu modeller Orta ve Yüksek kalitede ve hangarda görünür. Düşük kalitede telefon akıcı kalsın diye sade modeller sürer.',
+          'Bir uçak ya da top ilk kez ekrana gelince dokusu iner; o ana dek sade hâli görünür. İnternetsiz oyunda sade modeller kullanılır.',
+        ],
+      },
+      {
+        heading: 'Görünümdeki öteki yenilikler',
+        bullets: [
+          'Yüksek kalitede yakından bakınca binalar ve park eden uçaklar güneş gölgesi düşürür (Ayarlar → Grafik → Güneş gölgesi).',
+          'Haritadaki çiftlikler ahır, silo, kümes ve meyve bahçesiyle yeniden yapıldı. Kayalar, bombalar ve roketler, üs ve fabrika ayrıntıları da yenilendi; inşa edilen bina iskeleler arasında yerden yükselir.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ayarlar-takilma',
+    date: '2026-11-20',
+    // Yalnız oyunda: e-postayla model haberi gider (2026-11-20, kullanıcının kararı)
+    noMail: true,
+    title: 'Ayarlar yenilendi; oyun takılırsa söylüyor',
+    summary: 'Ayarlar sekmelere ayrıldı, her satırda ne işe yaradığı yazıyor. Oyun cihazında takılırsa grafik ayarını düşürmeyi öneriyor.',
+    cover: img('ayarlar.webp'),
+    images: [
+      { src: img('takilma.webp'), caption: 'Oyun takılınca çıkan öneri.' },
+    ],
+    sections: [
+      {
+        heading: 'Yeni ayarlar penceresi',
+        bullets: [
+          'Ayarlar beş sekmede: Grafik, Ses, Harita, Bilgi paneli, Oyun. Her ayarın simgesi ve kısa açıklaması var; bilgi panelinin her satırında panelde ne gösterdiği yazıyor.',
+          'Satırın herhangi bir yerine dokunmak ayarı açıp kapatır. Kalite ve çözünürlük tek dokunuşla seçilir, altında neyi değiştirdikleri yazar.',
+          'Seçili kalitede olmayan seçenekler (Düşükte bulut, Yüksek dışında güneş gölgesi) soluk görünür.',
+          'Ağaç, kaya ve yerleşimler ile duman ve patlamalar, kare hızını etkiledikleri için Grafik sekmesine taşındı.',
+        ],
+      },
+      {
+        heading: 'Takılmaya karşı öneri',
+        bullets: [
+          'Oyun harekât sırasında kare hızını izler. 20 saniye boyunca akıcı gitmezse grafik ayarını bir basamak düşürmeyi önerir: Yüksekten Ortaya, Ortadan Düşüğe; Düşükte önce çözünürlük, sonra ağaçlar.',
+          '“Grafik ayarlarını aç” dersen ayarlar açılır, önerilen seçenek işaretli olur; istediğini seçersin.',
+          '“Şimdi değil” öneriyi 10 dakika susturur, “Bir daha sorma” bu cihazda bir daha sormaz.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'kasaba-itfaiye',
     date: '2026-11-14',
     title: 'Kasabaya yol açıldı: itfaiye ve bakım personeli',

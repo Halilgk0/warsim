@@ -15,6 +15,79 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'modeller-doku': {
+    title: 'Aircraft and flak guns get new textures',
+    summary: 'All 51 aircraft in the research tree and all 15 anti-aircraft guns are now textured, with paint, rivets and wear. When the guns fire, flame and smoke leave the muzzle and dust rises around the heavy guns.',
+    captions: [
+      'The Bofors 40 mm in the hangar: old texture on the left, new on the right.',
+      'A textured 8.8 cm Flak in its battery, just after firing.',
+    ],
+    sections: [
+      {
+        heading: 'Aircraft',
+        bullets: [
+          'All 51 aircraft in the research tree, and the MiG-15, have new textures: panel lines, rivets, cowling fasteners, and rib tapes on fabric-covered control surfaces.',
+          'Camouflage follows the period schemes: wavy Dark Earth and Dark Green on RAF aircraft, splinter patterns and mottling on German ones. Upper surfaces are sun-faded, oil streaks run under the engine, and paint has worn off walkways and leading edges.',
+          'The aircraft keep their shape, flight model and damage. Zoomed out, an aircraft switches to a simpler model and returns to full detail as you zoom in, so the frame rate holds.',
+        ],
+      },
+      {
+        heading: 'Anti-aircraft guns',
+        bullets: [
+          'All 15 guns are textured: steel shows through worn paint on the edges, upper surfaces are faded, rain streaks run down the sides, dirt sits in the crevices and dust on the base. Ammunition boxes show wood grain; shell cases are tarnished brass.',
+          'Box and plate edges are now rounded and catch the light like real metal. Each gun keeps its army’s documented colour.',
+          'The hangar showroom, the encyclopedia and the production list show the new look too.',
+        ],
+      },
+      {
+        heading: 'Guns that fire',
+        bullets: [
+          'Medium and heavy guns now throw flame and smoke from the muzzle, scaled to the calibre, and heavy guns raise dust around them when they fire. Before, there was only a small flash, and the 8.8 cm looked as if it was not firing at all.',
+          'In the hangar showroom the flame also stretches along the barrel.',
+        ],
+      },
+      {
+        heading: 'Which settings show them?',
+        bullets: [
+          'Textured models appear at Medium and High quality and in the hangar. At Low quality the simple models stay, so phones keep running smoothly.',
+          'An aircraft or gun downloads its textures the first time it comes on screen; until then the simple model is shown. Offline, the game uses the simple models.',
+        ],
+      },
+      {
+        heading: 'More visual updates',
+        bullets: [
+          'At High quality, buildings and parked aircraft cast sun shadows when you zoom in (Settings → Graphics → Sun shadows).',
+          'Farms on the map have been rebuilt with barns, silos, coops and orchards. Rocks, bombs and rockets, and base and factory details have been renewed too; buildings under construction rise from the ground inside their scaffolding.',
+        ],
+      },
+    ],
+  },
+  'ayarlar-takilma': {
+    title: 'New settings, and the game tells you when it stutters',
+    summary: 'Settings are now split into tabs, and every line says what it does. If the game stutters on your device, it suggests lowering a graphics setting.',
+    cover: 'ayarlar-en.webp',
+    files: ['takilma-en.webp'],
+    captions: ['The suggestion shown when the game stutters.'],
+    sections: [
+      {
+        heading: 'A new settings window',
+        bullets: [
+          'Settings come in five tabs: Graphics, Sound, Map, Info panel and Game. Every setting has an icon and a short description; each info panel line says what it shows.',
+          'Tap anywhere on a line to switch it on or off. Quality and resolution are picked with a single tap, with a note on what each one changes.',
+          'Options not available at the chosen quality (clouds on Low, sun shadows below High) are shown faded.',
+          'Trees, rocks and settlements, and smoke and explosions, moved to the Graphics tab because they affect the frame rate.',
+        ],
+      },
+      {
+        heading: 'A suggestion when the game stutters',
+        bullets: [
+          'The game watches the frame rate during a campaign. If it runs poorly for 20 seconds, it suggests lowering a graphics setting by one step: High to Medium, Medium to Low; at Low, first the resolution, then the trees.',
+          'Choose “Open graphics settings” and the settings open with the suggested option marked; pick whatever you like.',
+          '“Not now” silences the suggestion for 10 minutes; “Don’t ask again” stops it on this device.',
+        ],
+      },
+    ],
+  },
   'kasaba-itfaiye': {
     title: 'A town takes shape: roads, fire crews and ground staff',
     summary: 'Each side now starts a campaign with a town hall and a main street. Homes provide residents; aircraft need ground crew, and fire crews reach damaged buildings by road.',

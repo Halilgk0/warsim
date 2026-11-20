@@ -1023,8 +1023,8 @@ export async function loadAllSkins(): Promise<void> {
 }
 
 let gltfLoader: Promise<import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader> | null = null;
-/** glTF yükleyici (Draco çözücüsü public/draco'da; işçide çözer, kare döngüsünü bekletmez). */
-function gltf() {
+/** glTF yükleyici (Draco çözücüsü public/draco'da; işçide çözer, kare döngüsünü bekletmez). Toplar da kullanır (gunSkins.ts). */
+export function gltf() {
   gltfLoader ??= (async () => {
     const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
       import('three/examples/jsm/loaders/GLTFLoader.js'),
@@ -1039,14 +1039,15 @@ function gltf() {
 }
 
 const texLoader = new THREE.TextureLoader();
-/** glTF UV'si ters v ile yazılır: doku çevrilmeden yüklenir. */
-async function skinTexture(f: string, srgb: boolean): Promise<THREE.Texture> {
-  const t = await texLoader.loadAsync(`${import.meta.env.BASE_URL}ucak/${f}`);
+/** Pişirilmiş doku (public altındaki yol). glTF UV'si ters v ile yazılır: doku çevrilmeden yüklenir. */
+export async function bakedTexture(path: string, srgb: boolean): Promise<THREE.Texture> {
+  const t = await texLoader.loadAsync(`${import.meta.env.BASE_URL}${path}`);
   t.flipY = false;
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.anisotropy = 4;
   return t;
 }
+const skinTexture = (f: string, srgb: boolean) => bakedTexture(`ucak/${f}`, srgb);
 
 async function loadSkin(kind: string): Promise<void> {
   const loader = await gltf();

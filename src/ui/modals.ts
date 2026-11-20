@@ -1,10 +1,9 @@
 // Pencereler: senaryolar, araştırma ağacı, hazine (pazar kapalı; MARKET_ON), ayarlar (ses, görünüm).
 
 import type { Game } from '../game';
-import {
-  INFO_FIELDS, LOG_CATEGORIES, MAP_LAYERS, QUALITY, RESOLUTIONS, SOUND_LEVELS, onSettingsChange, saveSettings, settings,
-  type GraphicsQuality, type Resolution, type SoundLevel,
-} from './settings';
+import { onSettingsChange, saveSettings, settings, type SoundLevel } from './settings';
+import { applySetting, settingsBody, type SettingsTab } from './settingsMenu';
+import type { PerfHint } from '../perfWatch';
 import { sound } from '../audio/sound';
 import { defaultSelection, researchBody, stageOf, type ResearchStage, type ResearchTab } from './research';
 import { TECH_BY_ID } from '../sim/tech';
@@ -56,6 +55,10 @@ export class Modals {
   private thanks = { name: '', sec: 0 };
   /** Bildirim penceresi (kayıt yeri uyarıları gibi): başlık, gövde (HTML), düğmeler. */
   private notice: { title: string; body: string; buttons: NoticeButton[] } = { title: '', body: '', buttons: [] };
+  /** Ayarlarda açık sekme (oturum boyunca kalır). */
+  private settingsTab: SettingsTab = 'grafik';
+  /** Takılma önerisiyle açıldıysa işaretlenecek seçenek (pencere kapanınca kalkar). */
+  private settingsHint: PerfHint | null = null;
 
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -68,9 +71,10 @@ export class Modals {
     // Ses düzeyi sürüklerken hemen duyulur (kayıt bırakınca)
     this.el.addEventListener('input', (e) => {
       const el = e.target as HTMLInputElement;
+      const out = el.nextElementSibling;
+      if (el.dataset.set === 'tracerScale' && out) out.textContent = `${Number(el.value).toFixed(1)}×`;
       if (el.dataset.set !== 'sound') return;
       sound.setLevel(el.dataset.k as SoundLevel, Number(el.value));
-      const out = el.nextElementSibling;
       if (out) out.textContent = String(Math.round(Number(el.value) * 100));
     });
     this.el.addEventListener('scroll', () => (this.lastScroll = performance.now()), true);
@@ -82,6 +86,7 @@ export class Modals {
       return;
     }
     if (kind === 'market') this.treasuryMine = null;
+    if (kind === 'settings') this.settingsHint = null;
     if (tab && tab !== this.tab) {
       this.tab = tab;
       this.sel = null;
@@ -132,6 +137,16 @@ export class Modals {
     this.openFactory(id);
   }
 
+  /** Ayarlar belirli sekmede; hint: takılma önerisinde işaretlenecek seçenek. Açıksa kapatmaz. */
+  openSettings(tab: SettingsTab, hint: PerfHint | null = null): void {
+    this.settingsTab = tab;
+    this.settingsHint = hint;
+    this.kind = 'settings';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
   /** Teşekkür penceresi (6 saat). */
   openThanks(name: string, sec: number): void {
     this.thanks = { name, sec };
@@ -172,6 +187,7 @@ export class Modals {
   close(): void {
     this.isOpen = false;
     this.kind = null;
+    this.settingsHint = null;
     this.el.classList.add('hidden');
   }
 
@@ -201,6 +217,7 @@ export class Modals {
     const main = this.el.querySelector('.rb-main');
     const mainTop = main?.scrollTop ?? 0;
     const mainLeft = main?.scrollLeft ?? 0;
+    const stTop = this.el.querySelector('.st-list')?.scrollTop ?? 0;
     let body = '';
     let title = '';
     if (this.kind === 'thanks') {
@@ -215,7 +232,7 @@ export class Modals {
       body = this.research();
     } else if (this.kind === 'settings') {
       title = L('Ayarlar', 'Settings');
-      body = this.settingsBody();
+      body = settingsBody(this.settingsTab, this.settingsHint);
     } else if (this.kind === 'factory') {
       title = L('Üretim', 'Production');
       body = this.factoryHtml();
@@ -233,12 +250,14 @@ export class Modals {
     // Bildirim ana menünün ve hesap penceresinin de üstünde açılır
     this.el.classList.toggle('over', this.kind === 'notice');
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' ? ' steel' : ''}${this.kind === 'town' || this.kind === 'market' ? ' civic' : ''}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' || this.kind === 'settings' ? ' steel' : ''}${this.kind === 'town' || this.kind === 'market' ? ' civic' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
     const mb = this.el.querySelector('.modal-body');
     if (mb) mb.scrollTop = scroll;
+    const st = this.el.querySelector('.st-list');
+    if (st) st.scrollTop = stTop;
     const tl = this.el.querySelector('.tl-scroll');
     if (tl && tlLeft !== null) tl.scrollLeft = tlLeft;
     const dos = this.el.querySelector('.rb-dos');
@@ -266,55 +285,6 @@ export class Modals {
     return researchBody(r, this.tab, g.world, g.playerTeam, this.sel, this.stage);
   }
 
-  private settingsBody(): string {
-    const map = MAP_LAYERS.map((l) =>
-      `<label class="check"><input type="checkbox" data-set="map" data-k="${l.id}" ${settings.map[l.id] ? 'checked' : ''}> ${l.name}${l.desc ? ` <span class="muted small">— ${l.desc}</span>` : ''}</label>`).join('');
-    const info = INFO_FIELDS.map((f) =>
-      `<label class="check"><input type="checkbox" data-set="info" data-k="${f.id}" ${settings.info[f.id] ? 'checked' : ''}> ${f.name}</label>`).join('');
-    const log = LOG_CATEGORIES.map((c) =>
-      `<label class="check"><input type="checkbox" data-set="log" data-k="${c.id}" ${settings.log[c.id] ? 'checked' : ''}> ${c.name}</label>`).join('');
-    const snd = SOUND_LEVELS.map((l) => `<div class="snd-row" ${l.desc ? `title="${l.desc}"` : ''}>
-        <span>${l.name}</span>
-        <input type="range" min="0" max="1" step="0.05" value="${settings.sound[l.id]}" data-set="sound" data-k="${l.id}">
-        <b>${Math.round(settings.sound[l.id] * 100)}</b>
-      </div>`).join('');
-    return `
-      <div class="set-grid">
-        <div><h3>${L('Ses', 'Sound')}</h3>
-          <label class="check"><input type="checkbox" data-set="muted" ${settings.sound.muted ? 'checked' : ''}> ${L('Sessiz', 'Mute')} <span class="muted small">— ${L('N tuşu ya da üst çubuktaki hoparlör', 'N key or the speaker in the top bar')}</span></label>
-          ${snd}
-          <p class="muted small">${L(
-            'Savaş sesleri kamera yaklaştıkça duyulur; uyarılar her zaman. Telefonda sessiz düğmesi açıksa ses gelmeyebilir. Seslerin hepsi gerçek kayıt; künyesi Haberler → “Sesler geldi”de.',
-            'Battle sounds are heard as the camera gets closer; alerts always. On a phone with the silent switch on, you may hear nothing. Every sound is a real recording; credits are in News → “Sounds are here”.',
-          )}</p>
-          <h3>${L('Grafik', 'Graphics')}</h3>
-          <div class="form-row"><span>${L('Kalite', 'Quality')}</span><select data-set="quality">${(Object.keys(QUALITY) as GraphicsQuality[]).map((q) =>
-            `<option value="${q}" ${q === settings.graphics.quality ? 'selected' : ''}>${QUALITY[q].name}</option>`).join('')}</select></div>
-          <div class="form-row"><span>${L('Çözünürlük', 'Resolution')}</span><select data-set="resolution">${RESOLUTIONS.map((r) =>
-            `<option value="${r.id}" ${r.id === settings.graphics.resolution ? 'selected' : ''}>${r.name}</option>`).join('')}</select></div>
-          <label class="check"><input type="checkbox" data-set="dayCycle" ${settings.graphics.dayCycle ? 'checked' : ''}> ${L('Gün döngüsü', 'Day cycle')} <span class="muted small">— ${L('oyunda 48 dakikada bir gün; kapalıyken hep gündüz', 'one day every 48 minutes in game; always daytime when off')}</span></label>
-          <label class="check"><input type="checkbox" data-set="clouds" ${settings.graphics.clouds ? 'checked' : ''}> ${L('Bulutlar', 'Clouds')} <span class="muted small">— ${L('düşük kalitede yok; uzaktan bakınca söner', 'none on low quality; they fade when zoomed out')}</span></label>
-          <label class="check"><input type="checkbox" data-set="shadows" ${settings.graphics.shadows ? 'checked' : ''}> ${L('Güneş gölgesi', 'Sun shadows')} <span class="muted small">— ${L('yalnız yüksek kalitede; binalar ve park eden uçaklar yere gölge düşürür', 'high quality only; buildings and parked aircraft cast shadows on the ground')}</span></label>
-          <p class="muted small">${L(
-            'Telefon ısınır ya da takılırsa kaliteyi düşür. Düşük: sade uçaklar, bulut yok. Orta: ayrıntılı uçaklar, az bulut. Yüksek: ayrıca yakın arazi ayrıntısı, binaların güneş gölgesi, tam bulut, daha uzaktaki ağaç ve köyler. Otomatik çözünürlük kare hızı düşünce görüntüyü biraz yumuşatır.',
-            'If your phone gets hot or stutters, lower the quality. Low: simple aircraft, no clouds. Medium: detailed aircraft, a few clouds. High: also close-up ground detail, sun shadows from buildings, full clouds, trees and villages farther out. Auto resolution softens the image slightly when the frame rate drops.',
-          )}</p>
-        </div>
-        <div><h3>${L('Oyun', 'Game')}</h3>
-          <label class="check"><input type="checkbox" data-set="autoFast" ${settings.game.autoFast ? 'checked' : ''}> ${L('Boş yolda otomatik 2×', 'Automatic 2× on the open road')} <span class="muted small">— ${L(
-            '1× seçiliyken kolların yalnız yoldaysa; çatışma, görev, kalkış ve inişte 1×',
-            'while 1× is selected and your flights are only travelling; 1× in combat, missions, takeoff and landing',
-          )}</span></label>
-          <h3>${L('Harita', 'Map')}</h3>${map}
-          <div class="form-row"><span>${L('Radar kapsama yüksekliği', 'Radar coverage height')}</span><select data-set="radarAgl">${[100, 200, 300, 600, 1500, 3000].map((v) =>
-            `<option value="${v}" ${v === settings.radarAgl ? 'selected' : ''}>${v} m</option>`).join('')}</select></div>
-          <div class="form-row"><span>${L('Mermi izi kalınlığı', 'Tracer thickness')}</span><input type="range" min="0.4" max="2.5" step="0.1" value="${settings.tracerScale}" data-set="tracerScale"></div>
-        </div>
-        <div><h3>${L('Bilgi paneli', 'Info panel')}</h3>${info}</div>
-        <div><h3>${L('Olay günlüğü', 'Event log')}</h3>${log}</div>
-      </div>`;
-  }
-
   private onClick(e: Event): void {
     if (e.target === this.el) {
       // Teşekkür penceresi bir kez gösterilir: oyuncunun haritaya devam eden dokunuşu okumadan kapatmasın, yalnız düğmeyle kapanır
@@ -325,6 +295,16 @@ export class Modals {
     if (!b) return;
     const g = this.game;
     switch (b.dataset.act) {
+      case 'stab':
+        this.settingsTab = b.dataset.tab as SettingsTab;
+        this.el.querySelector('.st-list')?.scrollTo(0, 0);
+        this.render();
+        return;
+      case 'sset':
+        applySetting(b.dataset.set!, b.dataset.k, b.dataset.v!);
+        saveSettings();
+        this.render();
+        return;
       case 'nb': {
         const btn = this.notice.buttons[Number(b.dataset.i)];
         this.close();
@@ -517,22 +497,11 @@ export class Modals {
     }
     const set = el.dataset.set;
     if (!set) return;
-    const k = el.dataset.k as string;
-    if (set === 'map') settings.map[k as keyof typeof settings.map] = (el as HTMLInputElement).checked;
-    else if (set === 'info') settings.info[k as keyof typeof settings.info] = (el as HTMLInputElement).checked;
-    else if (set === 'log') settings.log[k as keyof typeof settings.log] = (el as HTMLInputElement).checked;
-    else if (set === 'radarAgl') settings.radarAgl = Number(el.value);
-    else if (set === 'tracerScale') settings.tracerScale = Number(el.value);
-    else if (set === 'quality') settings.graphics.quality = el.value as GraphicsQuality;
-    else if (set === 'resolution') settings.graphics.resolution = el.value as Resolution;
-    else if (set === 'dayCycle') settings.graphics.dayCycle = (el as HTMLInputElement).checked;
-    else if (set === 'clouds') settings.graphics.clouds = (el as HTMLInputElement).checked;
-    else if (set === 'shadows') settings.graphics.shadows = (el as HTMLInputElement).checked;
-    else if (set === 'autoFast') settings.game.autoFast = (el as HTMLInputElement).checked;
-    else if (set === 'muted') settings.sound.muted = (el as HTMLInputElement).checked;
-    else if (set === 'sound') {
+    const k = el.dataset.k;
+    const box = el instanceof HTMLInputElement && el.type === 'checkbox';
+    applySetting(set, k, box ? el.checked : el.value);
+    if (set === 'sound') {
       const id = k as SoundLevel;
-      settings.sound[id] = Number(el.value);
       saveSettings();
       // Örnek: arayüzde tıklama, savaşta uzak flak patlaması (oyun duraklatılmışsa duyulmaz), diğerlerinde daktilo zili
       if (id === 'ui') sound.play('tap', 'ui');

@@ -8,24 +8,24 @@ export type InfoField =
   | 'flight' | 'mission' | 'status' | 'speed' | 'alt' | 'agl' | 'g' | 'heading' | 'attitude'
   | 'throttle' | 'fuel' | 'mass' | 'ammo' | 'stores' | 'damage' | 'pilot' | 'kills';
 
-export const INFO_FIELDS: { id: InfoField; name: string }[] = [
-  { id: 'flight', name: L('Kol ve formasyon', 'Flight and formation') },
-  { id: 'mission', name: L('Görev ve aşama', 'Mission and phase') },
-  { id: 'status', name: L('Anlık davranış', 'Current behaviour') },
-  { id: 'speed', name: L('Hız (gerçek, gösterge, Mach)', 'Speed (true, indicated, Mach)') },
-  { id: 'alt', name: L('İrtifa (deniz)', 'Altitude (sea level)') },
-  { id: 'agl', name: L('Yerden yükseklik', 'Height above ground') },
-  { id: 'g', name: L('Yük (G)', 'Load (G)') },
-  { id: 'heading', name: L('Yön', 'Heading') },
-  { id: 'attitude', name: L('Yatış / yunuslama', 'Bank / pitch') },
-  { id: 'throttle', name: L('Gaz, flap, fren', 'Throttle, flaps, brakes') },
-  { id: 'fuel', name: L('Yakıt', 'Fuel') },
-  { id: 'mass', name: L('Anlık kütle', 'Current mass') },
-  { id: 'ammo', name: L('Mühimmat', 'Ammo') },
-  { id: 'stores', name: L('Dış yük', 'Stores') },
-  { id: 'damage', name: L('Hasar ayrıntısı', 'Damage details') },
-  { id: 'pilot', name: L('Pilot', 'Pilot') },
-  { id: 'kills', name: L('Düşürülen', 'Kills') },
+export const INFO_FIELDS: { id: InfoField; name: string; desc: string }[] = [
+  { id: 'flight', name: L('Kol ve formasyon', 'Flight and formation'), desc: L('Kolun adı, uçağın yeri (lider, kanat adamı) ve düzen', 'The flight’s name, the aircraft’s place (leader, wingman) and formation') },
+  { id: 'mission', name: L('Görev ve aşama', 'Mission and phase'), desc: L('Görev türü ve aşaması; inişte yaklaşma basamağı', 'Mission type and phase; the approach step when landing') },
+  { id: 'status', name: L('Anlık davranış', 'Current behaviour'), desc: L('Pilotun o an yaptığı iş; yere çok yaklaşınca uyarı', 'What the pilot is doing right now; a warning near the ground') },
+  { id: 'speed', name: L('Hız (gerçek, gösterge, Mach)', 'Speed (true, indicated, Mach)'), desc: L('km/sa, pilotun göstergesindeki hız ve Mach sayısı', 'km/h, the speed on the pilot’s dial and the Mach number') },
+  { id: 'alt', name: L('İrtifa (deniz)', 'Altitude (sea level)'), desc: L('Deniz seviyesinden metre', 'Metres above sea level') },
+  { id: 'agl', name: L('Yerden yükseklik', 'Height above ground'), desc: L('Altındaki araziden metre', 'Metres above the ground below') },
+  { id: 'g', name: L('Yük (G)', 'Load (G)'), desc: L('Uçağa binen yük; sert dönüşte artar', 'The load on the airframe; it rises in hard turns') },
+  { id: 'heading', name: L('Yön', 'Heading'), desc: L('Pusula derecesi', 'Compass degrees') },
+  { id: 'attitude', name: L('Yatış / yunuslama', 'Bank / pitch'), desc: L('Kanat yatışı ve burun açısı', 'Wing bank and nose angle') },
+  { id: 'throttle', name: L('Gaz, flap, fren', 'Throttle, flaps, brakes'), desc: L('Gaz yüzdesi, acil güç, flap ve frenler; jette devir', 'Throttle, emergency power, flaps and brakes; rpm on jets') },
+  { id: 'fuel', name: L('Yakıt', 'Fuel'), desc: L('Kalan yakıt ve bu tüketimle kaç dakika yeteceği', 'Fuel left and how many minutes it lasts at this rate') },
+  { id: 'mass', name: L('Anlık kütle', 'Current mass'), desc: L('Yakıt ve yük azaldıkça düşer', 'Falls as fuel and load are used up') },
+  { id: 'ammo', name: L('Mühimmat', 'Ammo'), desc: L('Kalan mermi ve kuşak türü; taretlerin mermisi', 'Rounds left and belt type; turret ammunition') },
+  { id: 'stores', name: L('Dış yük', 'Stores'), desc: L('Taşınan bomba, roket ve tanklar', 'Bombs, rockets and tanks carried') },
+  { id: 'damage', name: L('Hasar ayrıntısı', 'Damage details'), desc: L('Motor, yangın, sızıntı, hararet, kumanda, kanat', 'Engine, fire, leaks, overheating, controls, wings') },
+  { id: 'pilot', name: L('Pilot', 'Pilot'), desc: L('Ustalığı; yaralı ya da yorgunsa', 'Skill; whether wounded or tired') },
+  { id: 'kills', name: L('Düşürülen', 'Kills'), desc: L('Bu uçağın düşürdüğü düşmanlar', 'Enemies this aircraft has shot down') },
 ];
 
 export type MapLayer =
@@ -33,14 +33,14 @@ export type MapLayer =
   | 'aaRanges' | 'radarCoverage' | 'fogOfWar' | 'contacts';
 
 export const MAP_LAYERS: { id: MapLayer; name: string; desc: string }[] = [
-  { id: 'scenery', name: L('Ağaç, kaya ve yerleşimler', 'Trees, rocks and settlements'), desc: L('Orman, kaya, yol, köy ve dekor şehirleri (yavaş bilgisayarda kapat)', 'Forests, rocks, roads, villages and scenery towns (turn off on slow computers)') },
+  { id: 'scenery', name: L('Ağaç, kaya ve yerleşimler', 'Trees, rocks and settlements'), desc: L('Orman, kaya, çiftlik ve köyler (yavaş cihazda kapat)', 'Forests, rocks, farms and villages (turn off on slow devices)') },
   { id: 'labels', name: L('Uçak etiketleri', 'Aircraft labels'), desc: L('Çağrı adı ve tip', 'Callsign and type') },
   { id: 'icons', name: L('Uzak görünüm simgeleri', 'Distant view icons'), desc: L('Uzaklaşınca uçaklar takım renginde okla gösterilir', 'When zoomed out, aircraft show as arrows in team colours') },
   { id: 'trails', name: L('Uçuş izleri', 'Flight trails'), desc: L('Son ~10 saniyelik yol', 'The last ~10 seconds of the path') },
   { id: 'dropLines', name: L('İrtifa çizgileri', 'Altitude lines'), desc: L('Uçaktan yere dikey çizgi', 'A vertical line from aircraft to ground') },
   { id: 'shadows', name: L('Gölgeler', 'Shadows'), desc: L('Uçağın yerdeki gölgesi', 'The aircraft\'s shadow on the ground') },
   { id: 'tracers', name: L('Mermi izleri', 'Tracers'), desc: L('Uçak ve uçaksavar mermileri', 'Aircraft and flak rounds') },
-  { id: 'effects', name: L('Duman ve patlamalar', 'Smoke and explosions'), desc: '' },
+  { id: 'effects', name: L('Duman ve patlamalar', 'Smoke and explosions'), desc: L('Kapalıyken duman, ateş ve patlama çizilmez (yavaş cihazda)', 'When off, smoke, fire and explosions are not drawn (for slow devices)') },
   { id: 'routes', name: L('Görev rotaları', 'Mission routes'), desc: L('Seçili kolun rotası ve hedefi', 'Route and target of the selected flight') },
   { id: 'aaRanges', name: L('Uçaksavar menzilleri', 'Flak ranges'), desc: L('Kendi mevzilerinin etkili menzili', 'Effective range of your own batteries') },
   { id: 'radarCoverage', name: L('Radar kapsaması', 'Radar coverage'), desc: L('Seçilen irtifada radarın görebildiği alan', 'The area radar can see at the chosen height') },
@@ -48,15 +48,15 @@ export const MAP_LAYERS: { id: MapLayer; name: string; desc: string }[] = [
   { id: 'fogOfWar', name: L('Savaş sisi', 'Fog of war'), desc: L('Görülmeyen düşman uçaklarını gizle', 'Hide enemy aircraft that nobody has spotted') },
 ];
 
-export const LOG_CATEGORIES: { id: LogCategory; name: string }[] = [
-  { id: 'kill', name: L('Düşürmeler', 'Kills') },
-  { id: 'combat', name: L('Çatışma ve hasar', 'Combat and damage') },
-  { id: 'strike', name: L('Bombalama ve isabetler', 'Bombing and hits') },
-  { id: 'ops', name: L('Kalkış, iniş, kollar', 'Takeoffs, landings, flights') },
-  { id: 'defense', name: L('Hava savunma', 'Air defence') },
-  { id: 'build', name: L('İnşaat ve üretim', 'Construction and production') },
-  { id: 'research', name: L('Araştırma', 'Research') },
-  { id: 'info', name: L('Genel', 'General') },
+export const LOG_CATEGORIES: { id: LogCategory; name: string; desc: string }[] = [
+  { id: 'kill', name: L('Düşürmeler', 'Kills'), desc: L('Düşen uçaklar ve kimin düşürdüğü', 'Aircraft shot down and by whom') },
+  { id: 'combat', name: L('Çatışma ve hasar', 'Combat and damage'), desc: L('Çatışmaya girişler ve alınan isabetler', 'Engagements and the hits taken') },
+  { id: 'strike', name: L('Bombalama ve isabetler', 'Bombing and hits'), desc: L('Bomba bırakma, vurulan ve yıkılan yapılar', 'Bombs away, buildings hit and destroyed') },
+  { id: 'ops', name: L('Kalkış, iniş, kollar', 'Takeoffs, landings, flights'), desc: L('Kolların kalkışı, yolu, dönüşü ve inişi', 'Flights taking off, travelling, returning and landing') },
+  { id: 'defense', name: L('Hava savunma', 'Air defence'), desc: L('Uçaksavar kurulumu, radar, önleme kalkışları', 'Gun installs, radar, interceptor scrambles') },
+  { id: 'build', name: L('İnşaat ve üretim', 'Construction and production'), desc: L('Biten, taşınan ve kaldırılan yapılar', 'Buildings finished, moved and removed') },
+  { id: 'research', name: L('Araştırma', 'Research'), desc: L('Başlayan ve biten araştırmalar', 'Research started and finished') },
+  { id: 'info', name: L('Genel', 'General'), desc: L('Harekâtın genel haberleri', 'General campaign news') },
 ];
 
 export type GraphicsQuality = 'low' | 'medium' | 'high';
@@ -98,14 +98,14 @@ export const QUALITY: Record<GraphicsQuality, QualityPreset> = {
 export const RESOLUTIONS: { id: Resolution; name: string }[] = [
   { id: 'auto', name: L('Otomatik', 'Auto') },
   { id: '1', name: L('Tam', 'Full') },
-  { id: '0.75', name: '%75' },
-  { id: '0.5', name: '%50' },
+  { id: '0.75', name: L('%75', '75%') },
+  { id: '0.5', name: L('%50', '50%') },
 ];
 
 export type SoundLevel = 'master' | 'world' | 'alerts' | 'ui';
 
 export const SOUND_LEVELS: { id: SoundLevel; name: string; desc: string }[] = [
-  { id: 'master', name: L('Genel ses', 'Master volume'), desc: '' },
+  { id: 'master', name: L('Genel ses', 'Master volume'), desc: L('Bütün seslerin üst sınırı', 'The ceiling for all sounds') },
   { id: 'world', name: L('Savaş sesleri', 'Battle sounds'), desc: L('Motor, silah, uçaksavar, patlama (yakınlaştıkça duyulur)', 'Engines, guns, flak, explosions (heard as you zoom in)') },
   { id: 'alerts', name: L('Uyarılar', 'Alerts'), desc: L('Hava saldırısı sireni, üs alarmı, araştırma ve görev sonuçları', 'Air raid siren, base alarm, research and mission results') },
   { id: 'ui', name: L('Arayüz', 'Interface'), desc: L('Düğme tıklamaları', 'Button clicks') },

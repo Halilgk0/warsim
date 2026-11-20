@@ -26,10 +26,11 @@ try {
   await p.goto(`http://localhost:${PORT}/ansiklopedi/`);
   const args = process.argv.slice(2);
   const views = args.filter((a) => a.startsWith('--')).map((a) => a.slice(2));
-  // Blender'da kurulan ve dokulanan modeller (public/ucak; oyunda Orta ve Yüksek kalitede de bunlar çizilir)
+  // Blender'da kurulan ve dokulanan modeller (public/ucak ve public/top; oyunda Orta ve Yüksek kalitede de bunlar çizilir)
   await p.evaluate(async () => {
     const m = await import('/src/render/models.ts');
     await m.loadAllSkins();
+    await (await import('/src/render/gunSkins.ts')).loadAllGunSkins();
   });
   const named = args.filter((a) => !a.startsWith('--'));
   // Hava savunma silahları "gun-<kimlik>" adıyla (yalnız kart ve paylaşım görseli)

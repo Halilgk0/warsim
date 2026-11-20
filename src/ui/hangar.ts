@@ -8,6 +8,7 @@ import { aircraftNode, TECH, TECH_BY_ID, type Research } from '../sim/tech';
 import { modAppliesTo } from '../sim/mods';
 import { buildAircraftModel, ensureSkin, requestSkin } from '../render/models';
 import { buildAAGun, recoilAt } from '../render/structures';
+import { ensureGunSkin, requestGunSkin } from '../render/gunSkins';
 import { AA_CLASS_NAMES, AA_CLASS_ORDER, AA_WEAPONS, AA_WEAPON_ORDER, type AAClass, type AAWeaponId } from '../sim/structures/airDefense';
 import { aaDetails } from './hangarAA';
 import { esc, nf } from './dom';
@@ -271,11 +272,13 @@ export class Hangar {
     this.pivot.clear();
     this.pivot.userData.props = [];
     this.pivot.rotation.z = 0;
+    // Blender dokulu model henüz yüklenmediyse kodla kurulan görünür; yüklenince vitrin yenilenir
     let gun = this.guns.get(id);
-    if (!gun) {
+    if (!gun || (!gun.userData.baked && requestGunSkin(id))) {
       gun = buildAAGun(id);
       this.guns.set(id, gun);
     }
+    if (!gun.userData.baked) void ensureGunSkin(id).then(() => { if (requestGunSkin(id) && this.isOpen && this.mode === 'aa' && this.gunId === id) this.showGun(id); });
     const u = gun.userData;
     this.pivot.rotation.y = 0.5;
     this.pivot.add(gun);
@@ -288,7 +291,10 @@ export class Hangar {
     // Yerdeki uzun kollar (90 mm) çerçeveyi büyütüp topu küçültmesin: yükseklik ölçü, kollar taşabilir
     const rad = Math.min(Math.max(size.x, size.y, size.z), size.y * 1.15);
     (u.muzzle as THREE.Object3D).add(this.flash);
-    this.flash.scale.setScalar(Math.max(0.05, w.bore / 900));
+    // Alev namlu doğrultusunda uzanır, çapla büyür (88 mm: ~23 cm yarıçap, 60 cm boy; eskiden 10 cm'lik küre seçilmiyordu)
+    const fr = Math.max(0.05, w.bore / 380);
+    this.flash.scale.set(fr, fr, fr * 2.6);
+    this.flash.userData.reach = fr * 2.2;
     this.flash.visible = false;
     const floor = this.scene.getObjectByName('floor')!;
     floor.scale.setScalar(rad * 1.7);
@@ -315,8 +321,9 @@ export class Hangar {
       s.reloading = false;
       s.recoilT = 0;
       // Dörtlü topta parlama sırayla namlu uçlarında (modeldeki namlu aralığı)
-      if (w.barrels === 4) this.flash.position.set(s.rounds % 2 ? 0.25 : -0.25, s.rounds % 4 < 2 ? 0.2 : -0.18, 0);
-      else this.flash.position.set(0, 0, 0);
+      const reach = this.flash.userData.reach as number;
+      if (w.barrels === 4) this.flash.position.set(s.rounds % 2 ? 0.25 : -0.25, s.rounds % 4 < 2 ? 0.2 : -0.18, reach);
+      else this.flash.position.set(0, 0, reach);
       s.cooldown += 1 / w.rate;
       if (w.mag > 0 && --s.rounds <= 0) {
         s.rounds = w.mag;

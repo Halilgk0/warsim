@@ -62,6 +62,28 @@ export type Surf = (typeof SURF)[keyof typeof SURF];
 /** Gece pencere ışıkları (0 gündüz, 1 gece): her karede atmosferden. */
 export const archU = { archNight: { value: 0 } };
 
+/**
+ * Gürültü ve hasar lekesi: yapı malzemesi ve Blender'da dokulanmış parçalar (uçaksavar topları) ortak. Önce vAP (parçanın
+ * konumu) ve archDamage tanımlı olmalı.
+ */
+const BURN = /* glsl */ `
+  float aHash( vec3 c ) { return fract( sin( dot( c, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ); }
+  float aNoise( vec3 p ) {
+    vec3 i = floor( p );
+    vec3 f = fract( p );
+    f = f * f * ( 3.0 - 2.0 * f );
+    return mix( mix( mix( aHash( i ), aHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( aHash( i + vec3( 0, 1, 0 ) ), aHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
+      mix( mix( aHash( i + vec3( 0, 0, 1 ) ), aHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( aHash( i + vec3( 0, 1, 1 ) ), aHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z );
+  }
+  /** Hasar: kurum ve yanık lekeleri, hasar arttıkça yayılır. */
+  vec3 aBurn( vec3 c ) {
+    if ( archDamage <= 0.01 ) return c;
+    float ch = aNoise( vAP * 0.18 ) * 0.7 + aNoise( vAP * 0.9 ) * 0.3;
+    float burn = smoothstep( 1.0 - archDamage * 0.85, 1.08 - archDamage * 0.85, ch );
+    return mix( c, vec3( 0.06, 0.055, 0.05 ), burn * 0.88 );
+  }
+`;
+
 const PARS = /* glsl */ `
   varying float vSurf;
   varying vec3 vPL;
@@ -71,16 +93,8 @@ const PARS = /* glsl */ `
   uniform float archNight;
   uniform float archDamage;
   uniform float archLit;
-
-  float aHash( vec3 c ) { return fract( sin( dot( c, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ); }
+  ${BURN}
   float aHash2( vec2 c ) { return fract( sin( dot( c, vec2( 41.13, 289.71 ) ) ) * 43758.5453 ); }
-  float aNoise( vec3 p ) {
-    vec3 i = floor( p );
-    vec3 f = fract( p );
-    f = f * f * ( 3.0 - 2.0 * f );
-    return mix( mix( mix( aHash( i ), aHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( aHash( i + vec3( 0, 1, 0 ) ), aHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
-      mix( mix( aHash( i + vec3( 0, 0, 1 ) ), aHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( aHash( i + vec3( 0, 1, 1 ) ), aHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z );
-  }
   /** Izgara derzi: c koordinatta sp aralıklı, w yarı kalınlıklı çizgi; piksel büyüyünce söner. */
   float aLine( float c, float sp, float w ) {
     float fw = fwidth( c );
@@ -651,13 +665,7 @@ const COLOR = /* glsl */ `
       float lum = dot( c, vec3( 0.299, 0.587, 0.114 ) );
       c = mix( vec3( lum ), c, 0.86 );
     }
-    // Hasar: kurum ve yanık lekeleri, hasar arttıkça yayılır
-    if ( archDamage > 0.01 ) {
-      float ch = aNoise( vAP * 0.18 ) * 0.7 + aNoise( vAP * 0.9 ) * 0.3;
-      float burn = smoothstep( 1.0 - archDamage * 0.85, 1.08 - archDamage * 0.85, ch );
-      c = mix( c, vec3( 0.06, 0.055, 0.05 ), burn * 0.88 );
-    }
-    diffuseColor.rgb = c;
+    diffuseColor.rgb = aBurn( c );
   }
 `;
 
@@ -691,6 +699,30 @@ export function archMaterial(): THREE.MeshLambertMaterial {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize( normal + ( viewMatrix * vec4( aBump, 0.0 ) ).xyz );');
   };
   m.customProgramCacheKey = () => 'arch';
+  return m;
+}
+
+/**
+ * Blender'da dokulanmış yapı parçası (uçaksavar topları, gunSkins.ts): boya, normal ve ortam gölgesi dokudan; sis, bulut
+ * gölgesi ve hasar lekesi yapı malzemesiyle aynı. src: yapının malzemesi (hasar değerini paylaşır: setArchDamage ikisine de
+ * işler).
+ */
+export function archBakedMaterial(src: THREE.Material, maps: { albedo: THREE.Texture; normal: THREE.Texture; ao: THREE.Texture }): THREE.MeshLambertMaterial {
+  const m = new THREE.MeshLambertMaterial({ map: maps.albedo, normalMap: maps.normal, aoMap: maps.ao });
+  const own = src.userData.arch as { archDamage: THREE.IUniform<number>; archLit: THREE.IUniform<number> };
+  m.userData.arch = own;
+  m.onBeforeCompile = (shader) => {
+    linkAtmosphere(shader);
+    linkCloudShadow(shader);
+    Object.assign(shader.uniforms, own);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vAP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAP = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vAP;\nuniform float archDamage;\n${BURN}`)
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = aBurn( diffuseColor.rgb );');
+  };
+  m.customProgramCacheKey = () => 'archBaked';
   return m;
 }
 

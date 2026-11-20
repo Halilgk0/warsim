@@ -16,7 +16,8 @@ import { Modals } from './ui/modals';
 import { Hangar } from './ui/hangar';
 import { BuildBar } from './ui/build';
 import { Layout } from './ui/layout';
-import { onSettingsChange, settings } from './ui/settings';
+import { MAP_LAYERS, QUALITY, onSettingsChange, settings, type GraphicsQuality } from './ui/settings';
+import { PerfWatch, silencePerfHint, type PerfHint } from './perfWatch';
 import { aircraftNode } from './sim/tech';
 import { groundLevel, mapKey, terrainMap } from './sim/terrain';
 import { loadMapParallel } from './render/mapLoad';
@@ -116,6 +117,8 @@ export class Game {
   readonly autoFast = new AutoFast();
   /** Skor tablosu istatistikleri (hesap açıkken harekâtta). */
   readonly stats = new StatsTracker();
+  /** Takılma algılama: uzun süre akıcı değilse grafik ayarlarını düşürmeyi önerir (perfWatch.ts). */
+  private readonly perf = new PerfWatch();
   /** Otomatik 2× ilk kez devreye girince bir kez açıklanır. */
   private autoFastTold = false;
   /** Savaş sesleri (yakınlaştıkça) ve oyuncuya uyarılar. */
@@ -380,6 +383,7 @@ export class Game {
   private attachWorld(w: World, scenarioId: string): void {
     this.scenarioId = scenarioId;
     this.world = w;
+    this.perf.reset();
     this.battle.reset();
     this.renderer.setWorld(w);
     this.hangar.hasAircraft = (id) => !aircraftNode(id) || this.world.teams[this.playerTeam].research.hasAircraft(id);
@@ -1210,6 +1214,27 @@ export class Game {
     this.modals.openThanks(this.world.playerName || currentAccount()?.name || '', sec);
   }
 
+  /**
+   * Takılma önerisi (perfWatch.ts): neyin önerildiği yazılır; kabul edilirse ayarlar Grafik sekmesinde, önerilen seçenek
+   * işaretli açılır, oyuncu istediğini seçer. Pencere dışına dokunmak "Şimdi değil" sayılır (öneri 10 dk susar).
+   */
+  private offerPerfHint(h: PerfHint): void {
+    this.perf.snooze();
+    const fps = Math.round(h.fps);
+    const what = h.set === 'quality' ? `${L('Kalite', 'Quality')}: ${QUALITY[h.v as GraphicsQuality].name}`
+      : h.set === 'resolution' ? `${L('Çözünürlük', 'Resolution')}: ${L('%50', '50%')}`
+        : `${MAP_LAYERS.find((l) => l.id === h.k)?.name ?? ''}: ${L('kapalı', 'off')}`;
+    const why = h.stutter
+      ? L('Son 20 saniyede kareler sık sık takıldı: her dört kareden birinden fazlası gecikti.', 'Over the last 20 seconds the picture kept hitching: more than one frame in four was late.')
+      : L(`Son 20 saniyede ortalama <b>${fps} kare/sn</b> çizilebildi: bu cihazda oyun akıcı değil.`, `Over the last 20 seconds only <b>${fps} frames per second</b> were drawn on average: the game is not running smoothly on this device.`);
+    this.modals.openNotice(L('Oyun takılıyor', 'The game is stuttering'), `<p>${why}</p>
+      <p>${L('Grafik ayarlarını düşürmek oyunu akıcılaştırır. Önerimiz', 'Lowering the graphics settings makes the game smoother. Our suggestion')}: <b>${what}</b>. ${L('Ayarlarda işaretli olacak; istediğini seçebilirsin.', 'It will be marked in the settings; choose whatever you like.')}</p>`, [
+      { label: L('Grafik ayarlarını aç', 'Open graphics settings'), primary: true, run: () => this.modals.openSettings('grafik', h) },
+      { label: L('Şimdi değil', 'Not now'), run: () => undefined },
+      { label: L('Bir daha sorma', 'Don’t ask again'), run: silencePerfHint },
+    ]);
+  }
+
   /** Oyunun önünde pencere var mı (arka plan buğulu ya da örtülü). */
   private get windowOpen(): boolean {
     return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen;
@@ -1270,6 +1295,10 @@ export class Game {
     if (currentAccount()) this.stats.update(real, this.world, this.playerTeam, visible);
     else this.stats.guest(real, this.world, visible);
     if (this.thanksDue && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen) this.showThanks();
+    // Takılma: yalnız harekâtta (senaryolar test ve kayıt içindir), oyunun önünde pencere yokken, sekme görünürken ve 4× dışında
+    // sayılır (4×'te yavaş kare simülasyondan gelir, grafikten değil)
+    const slow = this.perf.update(raw, this.scenarioId === 'kampanya' && visible && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen && this.timeScale < 4);
+    if (slow) this.offerPerfHint(slow);
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
     if (!this.pause.isOpen && this.timeScale > 0) {
       this.autosaveClock += real;

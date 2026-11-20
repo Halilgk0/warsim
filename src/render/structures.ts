@@ -20,6 +20,7 @@ import { LAMP, LampSet } from './lamps';
 import { groundStructure } from './ground';
 import { bodyInfo, buildScaffold } from './construction';
 import { parkedParts, requestSkin, skinStamp } from './models';
+import { bakedGun, gunSkinStamp, requestGunSkin } from './gunSkins';
 import { autoParts } from './vehicleParts';
 import { aircraftTractor, ambulance, refueller, starterTrolley } from './airfieldVehicles';
 import { fireVehicle } from './fireVehicles';
@@ -283,8 +284,9 @@ function dials(b: B, x: number, y: number, z: number, side: number, n = 2): void
  * (beşik içinde geri tepen namlu kümesi: namlu, ağız freni, kama) ve userData.muzzle (namlu ucu: alev buradan çıkar)
  * bulunur; userData.recoilLen / recoilBack geri tepme boyu (m) ve yerine dönüş süresi (s), gerçek silahlara yakın.
  * Ölçüler gerçek silahlara yakın (M2 Browning 12,7 mm … 128 mm Flak 40). Boya alaca gri, namlular çelik.
+ * baked: Blender dokulu parçalar yüklüyse onlar (gunSkins.ts; userData.baked), yoksa kodla kurulan model.
  */
-function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
+function aaGun(w: AAWeaponId, mat: THREE.Material, baked = false): THREE.Group {
   const g = new THREE.Group();
   const yawG = new THREE.Group();
   const pitchG = new THREE.Group();
@@ -819,16 +821,19 @@ function aaGun(w: AAWeaponId, mat: THREE.Material): THREE.Group {
       break;
     }
   }
-  base.build(g, mat);
-  yb.build(yawG, mat);
-  pb.build(pitchG, mat);
-  rb.build(recoilG, mat);
+  // Blender dokulu parçalar (yüklüyse ve isteniyorsa) kodla kurulanların yerine: aynı geometri, aynı grup ekseni
+  const sk = baked ? bakedGun(w, mat) : null;
+  for (const [bt, grp, key] of [[base, g, 'base'], [yb, yawG, 'yaw'], [pb, pitchG, 'pitch'], [rb, recoilG, 'recoil']] as const) {
+    const geo = sk?.geos.get(key);
+    if (geo) grp.add(new THREE.Mesh(geo, sk!.mat));
+    else bt.build(grp, mat);
+  }
   const muzzle = new THREE.Object3D();
   muzzle.position.copy(tip);
   recoilG.add(muzzle);
   pitchG.add(recoilG);
   yawG.add(pitchG);
-  Object.assign(g.userData, { yaw: yawG, pitch: pitchG, recoil: recoilG, muzzle, recoilLen, recoilBack, fired: -1, recoilT: 1e9 });
+  Object.assign(g.userData, { yaw: yawG, pitch: pitchG, recoil: recoilG, muzzle, recoilLen, recoilBack, fired: -1, recoilT: 1e9, baked: !!sk });
   return g;
 }
 
@@ -845,10 +850,10 @@ export function recoilAt(t: number, len: number, back: number): number {
 
 let showcaseMat: THREE.Material | null = null;
 
-/** Hangar için tek top (oyundaki modelin aynısı). */
-export function buildAAGun(w: AAWeaponId): THREE.Group {
+/** Hangar ve görseller için tek top (oyundaki modelin aynısı; Blender dokusu yüklüyse o, code: hep kodla kurulan). */
+export function buildAAGun(w: AAWeaponId, code = false): THREE.Group {
   showcaseMat ??= archMaterial();
-  return aaGun(w, showcaseMat);
+  return aaGun(w, showcaseMat, !code);
 }
 
 /** Testere dişi çatı: w × len holün üstünde (y üst kot), ~12 m'lik dişler boyuna dizili, aralarında dere oluğu. */
@@ -2433,7 +2438,10 @@ export class StructureView {
   }
 
   private syncAA(aa: AASite, simDt: number): void {
-    const sig = aa.mounts.map((m) => m.weapon).join(',') + '|' + [...aa.sensors].join(',') + '|' + aa.level;
+    // Blender dokulu toplar ayrıntılı modelde ve inşaat bitince (inşaat kırpması yapı malzemesinde); yüklenince yeniden kurulur
+    const baked = quality().models > 0 && this.s.build >= 1;
+    if (baked) for (const m of aa.mounts) requestGunSkin(m.weapon);
+    const sig = aa.mounts.map((m) => m.weapon).join(',') + '|' + [...aa.sensors].join(',') + '|' + aa.level + '|' + (baked ? gunSkinStamp() : -1);
     if (sig !== this.mountSig) {
       this.mountSig = sig;
       this.mountGroup.clear();
@@ -2456,7 +2464,7 @@ export class StructureView {
       }
       pits.build(this.mountGroup, this.mat);
       aa.mounts.forEach((m, i) => {
-        const gun = aaGun(m.weapon, this.mat);
+        const gun = aaGun(m.weapon, this.mat, baked);
         const [ox, oz] = AASite.mountOffset(i);
         gun.position.set(ox, 0, oz);
         gun.name = `gun${i}`;

@@ -275,6 +275,11 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         Blender modelleriyle çizer).
   - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
     malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
+    - Blender dokuları (2026-11-20, `gunSkins.ts`; araçlar `tools/blender/README.md`): 15 topun oyun geometrisi dört parça
+      hâlinde (taban, dönen kısım, beşik, namlu) dokulanır; `public/top` (`<top>.glb`, `_albedo/_normal/_aos.webp`). Orta ve
+      Yüksek kalitede, inşaat bitince (kırpma yalnız yapı malzemesinde); Düşükte kodla kurulan model. Malzeme
+      `arch.ts` `archBakedMaterial`: yapının hasar değerini paylaşır (`setArchDamage`). Top modeli değişince `top_al.mjs` →
+      `top.py` → `dokular.mjs`, sonra ansiklopedi ve üretim görselleri.
   - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, kaya, çiftlik), `palette.ts`.
   - **Harita süsleri** (2026-11-13, `decor.ts`): haritanın dekor şehirleri, sokakları, şehirleri bağlayan yollar ve yol boyu
     köyler kaldırıldı (yalnız çizimden: `CITIES` arazinin düzlüklerini ve başlangıç yeri kuralını biçimlendirmeye devam
@@ -338,6 +343,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     verenlere e-postayla da gider (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
     İngilizce görseli `cover` ve `files` ile verilir). Okunmamış işareti kendiliğinden çıkar: açılan haberin kimliği hesaba
     yazılır (`accounts.news_seen`), misafirde işaret yok. `MARK_DAYS`'ten eski haber işaretlenmez.
+  - Ayarlar penceresi (2026-11-20, `settingsMenu.ts`; değerler `settings.ts`): sekmeler (Grafik, Ses, Harita, Bilgi paneli, Oyun),
+    gruplu satırlar: simge, ad, kısa açıklama, sağda denetim. Kaliteye bağlı seçenek o kalitede yoksa kilitli. Yeni ayar eklerken
+    açıklamasını ve simgesini de yaz. `modals.openSettings(sekme, öneri)` belirli sekmeyi açar.
+  - Takılma önerisi (2026-11-20, `perfWatch.ts`): harekâtta 20 sn'lik dilimde ortalama 24 kare/sn altı ya da karelerin dörtte
+    birinden fazlası 70 ms üstüyse grafik ayarını bir basamak düşürmeyi önerir (`game.ts` `offerPerfHint`); kabul edilince ayarlar
+    Grafik sekmesinde, önerilen seçenek işaretli açılır, oyuncu istediğini seçer. İlk 30 sn, pencere açıkken, sekme gizliyken,
+    öğreticide ve 4×'te sayılmaz; öneriden sonra 10 dk susar; "Bir daha sorma" `warsim.perfHint`. Senaryolarda kapalı (testler).
   - `production.ts`: üretim menüsü (fabrika; uçak ve top satırları) ve yuva penceresi (bataryada top takma). Pencere açıkken yalnız `data-cell` hücreleri güncellenir; tam çizim düğmeyi kaçırıyordu. Resimler hazır dosya (`public/uretim`; araştırma dosyası ve `plan/` altındaki siluetler de): telefon bu pencereler için model kurmaz, liste metni kısa kalır. Yeni uçak ya da top eklenince, model değişince `npm run uretim:gorsel [ac-<uçak> gun-<top>]`.
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
     Oyunun içinden konu listesi (2026-11-13, `openTopics`): üst çubuktaki düğmelerin en solundaki Öğretici (telefonda yalnız

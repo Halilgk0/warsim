@@ -109,6 +109,8 @@ export interface Ghost {
 
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
+const _aaDir = new THREE.Vector3();
+const _aaGround = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
@@ -618,12 +620,16 @@ export class GameRenderer {
           if (w.time - m.lastFire < simDt + 1e-4 && simDt > 0) {
             // Alev modeldeki namlu ucundan (yükseliş açısı dahil); model yoksa yuvanın önünden
             const wd = AA_WEAPONS[m.weapon];
+            const [ox, oz] = AASite.mountOffset(i);
             if (!v.muzzleWorld(i, _v)) {
-              const [ox, oz] = AASite.mountOffset(i);
               const reach = m.weapon === 'aa128' ? 8 : wd.medium ? 5 : 3;
               _v.set(s.pos.x + ox + Math.sin(m.yaw) * reach, s.pos.y + 3, s.pos.z + oz - Math.cos(m.yaw) * reach);
             }
-            this.effects.muzzle(_v, Math.min(this.rig.fxScale, 4) * (m.weapon === 'aa128' ? 4 : wd.medium ? 3 : 1.5));
+            // Namlu doğrultusu (pusula açısı ve yükseliş) ve yuvanın zemini (ağır topta kalkan toz)
+            const cp = Math.cos(m.pitch);
+            _aaDir.set(Math.sin(m.yaw) * cp, Math.sin(m.pitch), -Math.cos(m.yaw) * cp);
+            _aaGround.set(s.pos.x + ox, s.pos.y, s.pos.z + oz);
+            this.effects.gunFire(_v, _aaDir, this.rig.fxScale, wd.bore, _aaGround);
           }
         });
       }

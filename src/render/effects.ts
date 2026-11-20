@@ -493,6 +493,49 @@ export class Effects {
     this.spawn(pos, { size: 0.9 * Math.min(vis, 6), life: 0.06, color: PALETTE.fire[0], bright: 1.5, glow: true, opaque: 0.3, soft: true, fadeIn: 0 });
   }
 
+  /**
+   * Uçaksavar topunun atışı (namlu ucunda, namlu doğrultusunda; bore mm). Orta ve ağır topta namlu boyunca uzanan,
+   * çekirdeği beyaza yakın turuncu alev ve ileri savrulup yavaşlayarak genişleyen barut dumanı; ağır topta (75 mm ve üstü)
+   * namlunun altında yerden kalkan toz. Hafif silahta (20 mm ve makineli) yalnız küçük parlama. Eskiden her topta tek
+   * yuvarlak parlama vardı: 88'de namlunun önünde güneş gibi duruyordu. vis: uzaklıkla büyütme (fxScale).
+   */
+  gunFire(pos: THREE.Vector3, dir: THREE.Vector3, vis: number, bore: number, ground: THREE.Vector3 | null): void {
+    if (bore < 30) {
+      this.muzzle(pos, Math.min(vis, 4) * 1.5);
+      return;
+    }
+    const heavy = bore >= 75;
+    const s = Math.min(Math.max(vis, 1), 4) * (heavy ? 1 : 0.55);
+    // Alev: namlu ucundan ileri daralan üç parlama
+    const flames: [number, number, number][] = [[0.3, 1.1, PALETTE.fire[0]], [1.1, 0.85, PALETTE.fire[1]], [2.0, 0.55, PALETTE.fire[1]]];
+    for (const [k, sz, col] of flames) {
+      _p.copy(pos).addScaledVector(dir, k * s);
+      this.spawn(_p, { size: sz * s, life: 0.07, color: col, end: PALETTE.fire[2], bright: 1.6, glow: true, opaque: 0.6, soft: true, fadeIn: 0 });
+    }
+    // Barut dumanı: namlu doğrultusunda savrulur, havada yavaşlar ve genişler
+    const n = heavy ? 4 : 2;
+    for (let i = 0; i < n; i++) {
+      _p.copy(pos).addScaledVector(dir, (0.5 + i * 0.6) * s);
+      _v.copy(dir).multiplyScalar((heavy ? 13 : 8) * (1 - i * 0.2) * s);
+      _v.x += rand(-1, 1) * s;
+      _v.y += rand(0, 1) * s;
+      _v.z += rand(-1, 1) * s;
+      // Açık gri ve dağınık (koyu topak uçaksavar patlamasıyla karışıyordu)
+      this.spawn(_p, {
+        vel: _v, size: (heavy ? 1.2 : 0.7) * s, life: heavy ? 2.4 : 1.4, color: 0xd2cfca, grow: 3.4, drag: 2.6,
+        rise: 0.5 * s, alpha: heavy ? 0.4 : 0.3, tint: 0.06, fadeIn: 0.03, soft: true,
+      });
+    }
+    if (!heavy || !ground) return;
+    // Ağır top: ağız basıncı namlunun altındaki toprağı kaldırır (topun çevresinde, namlunun baktığı yana ağır)
+    for (let i = 0; i < 5; i++) {
+      const a = Math.atan2(dir.x, dir.z) + rand(-1.3, 1.3);
+      _p.set(ground.x + Math.sin(a) * 2.2 * s, ground.y + 0.4, ground.z + Math.cos(a) * 2.2 * s);
+      _v.set(Math.sin(a), 0.25, Math.cos(a)).multiplyScalar(rand(2, 4) * s);
+      this.spawn(_p, { vel: _v, size: 1.4 * s, life: 1.8, color: PALETTE.dust, grow: 2.2, drag: 1.6, rise: 0.2, alpha: 0.4, tint: 0.1, fadeIn: 0.05 });
+    }
+  }
+
   rocketTrail(pos: THREE.Vector3, vis: number): void {
     this.spawn(pos, { size: 1.2 * Math.min(vis, 5), life: 1.2, color: 0xe9e6ea, grow: 1.5, drag: 2, alpha: 0.7 });
   }
