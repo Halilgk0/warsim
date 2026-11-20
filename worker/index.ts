@@ -646,7 +646,7 @@ async function leaderboard(url: URL, env: Env, a: AccountRow | null): Promise<Re
   // Sütun adı yalnız beyaz listeden (METRICS): sorguya kullanıcı girdisi girmez
   const { results } = await env.DB.prepare(
     `SELECT a.name AS name, s.${metric} AS value FROM stats s JOIN accounts a ON a.id = s.account_id
-     WHERE s.period = ? AND s.${metric} > 0 AND a.score_public = 1 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 50`,
+     WHERE s.period = ? AND s.${metric} > 0 AND a.score_public = 1 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 200`,
   ).bind(period).all<{ name: string; value: number }>();
   const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value }));
   let me: LeaderRow | null = null;

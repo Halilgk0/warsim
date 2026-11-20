@@ -1453,8 +1453,18 @@ button.link { background: none; padding: 0; color: #5b6fa8; font-size: calc(11px
 .lb-row.top1 .lb-rank { color: #b08a2e; }
 .lb-row.top2 .lb-rank { color: #8b929b; }
 .lb-row.top3 .lb-rank { color: #a8714a; }
-.lb-row.me { background: var(--accent-soft); border-color: var(--accent); }
-.lb-gap { text-align: center; color: var(--muted); line-height: 1; }
+/* Oyuncunun kendi satırı: sırasına göre soluk renkli vurgu (1 altın, 2 gümüş, 3 kırmızı, 4–5 mavi, ötesi gri); hafif kenar ve gölge */
+.lb-row.me { font-weight: 800; border-width: 1.5px; padding: calc(5.5px * var(--ui)) calc(9.5px * var(--ui)); }
+.lb-row.me .lb-rank { color: #4a4a4a; }
+.lb-row.me.r1 { background: linear-gradient(90deg, #f5e6b5, #fdf9ec); border-color: #dcc277; box-shadow: 0 0 calc(6px * var(--ui)) rgba(214, 168, 40, 0.2); }
+.lb-row.me.r2 { background: linear-gradient(90deg, #e3e8ee, #f8fafb); border-color: #b7c0ca; box-shadow: 0 0 calc(6px * var(--ui)) rgba(150, 160, 172, 0.22); }
+.lb-row.me.r3 { background: linear-gradient(90deg, #f2d0ca, #fdf3f1); border-color: #d99a91; box-shadow: 0 0 calc(6px * var(--ui)) rgba(192, 57, 43, 0.14); }
+.lb-row.me.r45 { background: linear-gradient(90deg, #d4e1f5, #f3f7fd); border-color: #9bb7e0; box-shadow: 0 0 calc(6px * var(--ui)) rgba(60, 120, 216, 0.14); }
+.lb-row.me.rx { background: linear-gradient(90deg, #c3c6cb, #e4e6e9); border-color: #7a8088; box-shadow: 0 0 calc(6px * var(--ui)) rgba(0, 0, 0, 0.12); }
+/* Bütün liste: sabit yükseklikte kayar (menü uzamaz) */
+.lb-scroll { max-height: min(calc(250px * var(--ui)), calc(var(--vh100) * 0.42)); overflow-y: auto; overscroll-behavior: contain; padding: calc(3px * var(--ui)); margin: calc(-3px * var(--ui)); scrollbar-width: thin; }
+.lb-more { align-self: center; min-height: max(32px, calc(32px * var(--ui))); padding: 0 calc(16px * var(--ui)); font-size: calc(12.5px * var(--ui)); font-weight: 700; background: transparent; border: 1px dashed var(--line); }
+.lb-more:hover { background: var(--chip); }
 
 /* Profil penceresi (profile.ts): ad etiketi dokunulabilir */
 .mm-user { cursor: pointer; }

@@ -1,5 +1,8 @@
 // Skor tablosu (ana menüde "Skorlar" sekmesi): ölçüt (düşürme, zafer, kazanç, en büyük hava kuvveti, oynama süresi) ve
-// dönem (tüm zamanlar, bu hafta). İlk 50 ve oyuncunun kendi sırası; sonuçlar bir dakika önbellekte.
+// dönem (tüm zamanlar, bu hafta). Sunucu ilk 200'ü ve oyuncunun kendi sırasını verir; sonuçlar bir dakika önbellekte.
+// Görünüm (2026-11-21): önce ilk 5, altında "Tüm oyuncuları göster" ve oyuncunun kendi satırı (ilk 5'teyse yok). Açılınca
+// bütün liste sabit yükseklikte kayar (menü uzamaz); oyuncunun satırı kendi yerinde. Kendi satırı sırasına göre soluk renkle
+// vurgulu: 1 altın, 2 gümüş, 3 kırmızı, 4–5 mavi, ötesi gri. (Kutusuz, madalya şeritli deneme beğenilmedi.)
 
 import { ApiError, api } from '../net/api';
 import type { LeaderRow, Metric } from '../net/shared';
@@ -55,6 +58,8 @@ export class LeaderboardPanel {
   private error = '';
   /** Bağlantı yok: tablo yerine açıklama. */
   private offline = false;
+  /** Bütün liste açık (kaydırmalı). */
+  private all = false;
 
   constructor(private readonly rerender: () => void) {}
 
@@ -114,12 +119,23 @@ export class LeaderboardPanel {
         ? L('Bu hafta henüz kimse yok. İlk sen ol!', 'Nobody yet this week. Be the first!')
         : L('Henüz kimse yok. İlk sen ol!', 'Nobody yet. Be the first!')}</p>`;
     } else {
-      const row = (r: LeaderRow, me: boolean) => `<div class="lb-row ${me ? 'me' : ''} ${!r.hidden && r.rank <= 3 ? `top top${r.rank}` : ''}">
-        <span class="lb-rank">${r.hidden ? '–' : r.rank}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
       const mine = board.me;
-      const inTop = !!mine && board.rows.some((r) => r.rank === mine.rank && r.name === mine.name);
-      list = `<div class="lb-list">${board.rows.map((r) => row(r, !!acc && r.name === acc.name)).join('')}
-        ${mine && !inTop ? `${board.rows.length ? '<div class="lb-gap">…</div>' : ''}${row(mine, true)}` : ''}</div>
+      // Oyuncunun satırı listede kendi yerinde (ad hesaba özgü; eşit puanda sunucunun sırası listedekinden farklı olabilir)
+      const isMe = (r: LeaderRow) => !!mine && !mine.hidden && r.name === mine.name;
+      const tone = (rank: number) => (rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : rank === 4 || rank === 5 ? 'r45' : 'rx');
+      const row = (r: LeaderRow, me: boolean) => `<div class="lb-row ${me ? `me ${r.hidden ? 'rx' : tone(r.rank)}` : ''} ${!r.hidden && r.rank <= 3 ? `top top${r.rank}` : ''}" ${me ? 'data-me="1"' : ''}>
+        <span class="lb-rank">${r.hidden ? '–' : r.rank}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
+      const shown = this.all ? board.rows : board.rows.slice(0, 5);
+      const inShown = !!mine && shown.some(isMe);
+      const more = board.rows.length > 5
+        ? `<button class="lb-more" data-lb="all">${this.all
+          ? L('İlk 5’e dön', 'Back to the top 5')
+          : L(`Tüm oyuncuları göster (${board.rows.length})`, `Show all players (${board.rows.length})`)}</button>`
+        : '';
+      const rows = shown.map((r) => row(r, isMe(r))).join('');
+      list = `${this.all ? `<div class="lb-list lb-scroll">${rows}</div>` : `<div class="lb-list">${rows}</div>`}
+        ${more}
+        ${mine && !inShown ? `<div class="lb-list">${row(mine, true)}</div>` : ''}
         ${mine?.hidden ? `<p class="muted small">${L('Skorların gizli: bu satırı yalnız sen görüyorsun. Profil’den açabilirsin.', 'Your scores are hidden: only you can see this row. You can turn them on in your Profile.')}</p>` : ''}`;
     }
     const foot = acc
@@ -136,6 +152,11 @@ export class LeaderboardPanel {
   handle(t: HTMLElement): boolean {
     const b = t.closest<HTMLElement>('[data-lb]');
     if (!b) return false;
+    if (b.dataset.lb === 'all') {
+      this.all = !this.all;
+      this.rerender();
+      return true;
+    }
     if (b.dataset.lb === 'metric') this.metric = b.dataset.v as Metric;
     else if (b.dataset.lb === 'period') this.period = b.dataset.v as Period;
     void this.refresh();
