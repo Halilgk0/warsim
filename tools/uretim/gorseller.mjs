@@ -27,6 +27,11 @@ try {
   p.on('pageerror', (e) => console.log('HATA', e.message));
   // Boş bir sayfa yeter (oyun yüklenmez): modül vite üzerinden gelir
   await p.goto(`http://localhost:${PORT}/ansiklopedi/`);
+  // Blender'da kurulan ve dokulanan modeller (public/ucak; oyunda Orta ve Yüksek kalitede de bunlar çizilir)
+  await p.evaluate(async () => {
+    const m = await import('/src/render/models.ts');
+    await m.loadAllSkins();
+  });
   const all = await p.evaluate(async () => (await import('/tools/uretim/cekim.ts')).names());
   const wanted = process.argv.slice(2);
   // "ac-*" gibi yıldızlı ad: yalnız o önekli ana resimler (siluetler hariç)

@@ -16,7 +16,7 @@ import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
 import { StructureView, placeKeyOf } from './structures';
-import { buildAircraftModel, buildStoreMeshes, propU, type AircraftModel } from './models';
+import { buildAircraftModel, buildStoreMeshes, propU, requestSkin, type AircraftModel } from './models';
 import { Scenery } from './scenery';
 import { DecorLayer } from './decor';
 import { FarmLayer } from './farms';
@@ -61,6 +61,10 @@ interface AircraftView {
   visible: boolean;
   /** Küçük ayrıntılar çiziliyor mu (ekrandaki boyuta göre, eşikte gidip gelmesin diye payla). */
   fine: boolean;
+  /** Blender modelinde seyrek geometri çiziliyor mu (uzakta; payla). */
+  lod: boolean;
+  /** Türün Blender modeli yüklü mü (değilse yüklenince model yerinde yenilenir; düşük ayrıntıda hep evet). */
+  skinReady: boolean;
   /** Hareketli parçaların o anki konumu (rad; takım 0 kalkık … 1 inik): kumandaya yumuşakça yaklaşır. */
   surf: { ail: number; ele: number; rud: number; flap: number; brake: number; gear: number; chk: number };
 }
@@ -80,6 +84,11 @@ const RUNWAY_TOP = 1.2;
  * çizim sayısı yarıya iner. Video kaydında yarısı.
  */
 const FINE_PX = 10;
+/**
+ * Blender modelinde seyrek geometriye geçilen ekran yarıçapı (CSS piksel): aynı doku, üçgenin %20–40'ı. Bu boyutta (kanat
+ * açıklığı ekranın yüksekliğinin ~beşte biri, telefonda) seyreltme görünmez; kalabalık gökte uçak başına üçgen üçte bire iner.
+ */
+const LOD_PX = 45;
 
 /** Kurulacak yolun önizlemesi: b yoksa yalnız başlangıç işareti. */
 export interface RoadPreview {
@@ -699,9 +708,24 @@ export class GameRenderer {
       trailBuf: new Float32Array(TRAIL_N * 3), trailHead: 0, trailCount: 0,
       lastSample: -1, lastSmoke: -1, lastMuzzle: -1,
       trailColor: this.teamColors[ac.team] ?? this.teamColors[0],
-      label, visible: true, fine: true,
+      label, visible: true, fine: true, lod: false,
+      skinReady: this.modelDetail ? requestSkin(ac.spec.model) : true,
       surf: { ail: 0, ele: 0, rud: 0, flap: 0, brake: 0, gear: ac.onGround ? 1 : 0, chk: 0 },
     };
+  }
+
+  /** Blender modeli yüklenince uçağın modelini yerinde yenile (iz, etiket ve gölge kalır). */
+  private remodel(v: AircraftView): void {
+    v.root.remove(v.model.root);
+    const model = buildAircraftModel(v.ac.spec.model, { detail: this.modelDetail });
+    const stores = buildStoreMeshes(v.ac.spec.model, v.ac.spec, v.ac.stores.slots, this.modelDetail);
+    for (const sm of stores) if (sm) model.root.add(sm);
+    v.root.add(model.root);
+    v.model = model;
+    v.stores = stores;
+    v.fine = true;
+    v.lod = false;
+    v.skinReady = true;
   }
 
   private removeView(v: AircraftView): void {
@@ -729,6 +753,7 @@ export class GameRenderer {
         this.views.set(ac.id, v);
       }
       alive.add(ac.id);
+      if (!v.skinReady && requestSkin(ac.spec.model)) this.remodel(v);
       v.visible = this.isVisible(ac);
       // Uzak görünümde simge modelin yerini alır (üst üste binmesin)
       const iconified = this.rig.iconMode && settings.map.icons && ac.status === 'flying' && !ac.onGround;
@@ -766,6 +791,11 @@ export class GameRenderer {
       if (fine !== v.fine) {
         v.fine = fine;
         for (const o of v.model.fine) o.visible = fine;
+      }
+      const lod = v.lod ? px < LOD_PX * 1.15 : px < LOD_PX;
+      if (lod !== v.lod) {
+        v.lod = lod;
+        for (const l of v.model.lods) l.mesh.geometry = lod ? l.lod : l.full;
       }
       // Yoğuşma izi: her motorun arkasından (irtifaya göre; motor çalışmıyorsa yok)
       if (m.effects && v.visible) {

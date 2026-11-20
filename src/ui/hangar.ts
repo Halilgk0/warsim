@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { ENGINE_NAMES, GENERATIONS, ROLE_NAMES, SPEC_LIST, generationInfo, originName, type AircraftSpec } from '../sim/aircraft/specs';
 import { aircraftNode, TECH, TECH_BY_ID, type Research } from '../sim/tech';
 import { modAppliesTo } from '../sim/mods';
-import { buildAircraftModel } from '../render/models';
+import { buildAircraftModel, ensureSkin, requestSkin } from '../render/models';
 import { buildAAGun, recoilAt } from '../render/structures';
 import { AA_CLASS_NAMES, AA_CLASS_ORDER, AA_WEAPONS, AA_WEAPON_ORDER, type AAClass, type AAWeaponId } from '../sim/structures/airDefense';
 import { aaDetails } from './hangarAA';
@@ -331,6 +331,15 @@ export class Hangar {
     if (busy) this.stateEl.textContent = w.drum ? L('Tambur değişiyor', 'Changing drum') : w.clip ? L('Tarak değişiyor', 'Changing clip') : L('Şarjör değişiyor', 'Changing magazine');
   }
 
+  /** Vitrine uçağın modelini koy (pervaneler döndürülmek için kaydedilir). */
+  private placeModel(spec: AircraftSpec): ReturnType<typeof buildAircraftModel> {
+    this.pivot.clear();
+    const model = buildAircraftModel(spec.model, { gear: true });
+    this.pivot.add(model.root);
+    this.pivot.userData.props = model.props;
+    return model;
+  }
+
   private show(spec: AircraftSpec): void {
     this.spec = spec;
     this.syncMode();
@@ -339,10 +348,9 @@ export class Hangar {
       b.classList.toggle('locked', !this.hasAircraft(b.dataset.spec!));
     }
     this.showGen(spec.generation);
-    this.pivot.clear();
-    const model = buildAircraftModel(spec.model, { gear: true });
-    this.pivot.add(model.root);
-    this.pivot.userData.props = model.props;
+    const model = this.placeModel(spec);
+    // Blender modeli henüz yüklenmediyse kodla boyanmış model görünür; yüklenince yalnız model değişir
+    if (!requestSkin(spec.model)) void ensureSkin(spec.model).then(() => { if (this.spec === spec) this.placeModel(spec); });
     const r = model.radius;
     const floor = this.scene.getObjectByName('floor')!;
     floor.scale.setScalar(r * 2);

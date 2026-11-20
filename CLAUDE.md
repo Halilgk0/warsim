@@ -35,8 +35,9 @@ savunmasının **gerçekçi davranması**: gerçek uçaklar, gerçek veriler. Ş
 - **Üslup:**
   - Pastel ve low-poly kalsın; arayüz War Thunder'a benzemesin.
   - Grafik yönü (2026-10-23 kararı): low-poly modeller kalır ama görünüm daha gerçekçi ve ayrıntılı olur. Önce gerçekçi
-    ışık ve gölge, gökyüzü ve bulutlar, atmosfer, su ve arazi ayrıntısı gelir; uçaklar kodla zenginleşir. Blender ya da
-    hazır model yok. Her adımda telefon kare hızı ölçülür.
+    ışık ve gölge, gökyüzü ve bulutlar, atmosfer, su ve arazi ayrıntısı gelir; uçaklar kodla zenginleşir. Hazır model yok;
+    Blender yalnız oyunun kendi geometrisini dokulamak ve yeni model kurmak için (2026-11-19 kullanıcı kararı; uçaklar
+    2026-11-20'den beri Blender dokulu, aşağıda). Her adımda telefon kare hızı ölçülür.
   - Planlayıcı yalnız göreve ilişkin alanları gösterir.
   - Arayüz dili (`style.css` sonundaki "Görünüm" bölümü): seçili öğede açık zemin ve altta sönen uçak izi (`--trail`); yeşil
     dolgu yalnız o ekranın asıl eyleminde; oyun içi üst çubuklar tepeden sarkar (ana menünün üst düğmeleri ayrı ayrı kalır,
@@ -260,6 +261,18 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Eklem menteşe ekseniyle döner. `gameRenderer.ts` `animateParts` kumandalara bağlar.
     - Işıklar model tanımında (`lights`): seyir lambaları ve iniş farı. Ek çözünürlük `HIRES`.
     - Yeni uçağa eklerken bu dört parçayı ve ışıkları tanıma ekle.
+    - **Blender dokuları** (2026-11-20; araçlar ve adımlar `tools/blender/README.md`): araştırma ağacındaki 51 uçağın oyun
+      geometrisi Blender'da UV açılıp dokulanır (boya, normal haritası: panel, perçin, vida; AO + parlaklık), MiG-15'in gövdesi
+      Blender'da kurulur. Yalnız ayrıntılı modelde: Orta ve Yüksek kalite, hangar vitrini; Düşükte kodla boyanmış model.
+      - Dosyalar `public/ucak` (`<tür>.glb` Draco, `_albedo/_normal/_aos.webp`; normal haritası kayıpsız), çözücü `public/draco`.
+        Ham çıktılar `tools/blender/cikti` (git dışı). Service worker'a girmez (internetsizken kodla boyanmış model).
+      - İsteğe bağlı: tür ilk kez çizilince yüklenir (`models.ts` `requestSkin`); o zamana dek kodla boyanmış model, yüklenince
+        model yerinde yenilenir (`gameRenderer.ts` `remodel`, park eden uçaklar `skinStamp` ile). Açılışta hiçbiri yüklenmez.
+      - Uzak görünüş: aynı dosyada seyrek kopya (`-lod`, düzlemsel seyreltme 4°, UV sınırı korunur; üçgenin %20–40'ı); uçak
+        ekranda `LOD_PX` (45 CSS px yarıçap) altına inince ona geçer. Seyrek geometride sarım yüklemede normale uydurulur
+        (`matchWinding`: oyunun bazı dönel gövdeleri içe sarımlı, iki yüzlü çizim).
+      - Model ya da boya değişince: `doku.py` → `sikistir.py` + `dokular.mjs`, sonra ansiklopedi ve üretim görselleri (araçlar
+        Blender modelleriyle çizer).
   - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
     malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
   - Diğerleri: `terrain.ts`, `scenery.ts` (yakın ağaç, kaya, çiftlik), `palette.ts`.

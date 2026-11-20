@@ -19,7 +19,7 @@ import { GABLE } from './props';
 import { LAMP, LampSet } from './lamps';
 import { groundStructure } from './ground';
 import { bodyInfo, buildScaffold } from './construction';
-import { parkedParts } from './models';
+import { parkedParts, requestSkin, skinStamp } from './models';
 import { autoParts } from './vehicleParts';
 import { aircraftTractor, ambulance, refueller, starterTrolley } from './airfieldVehicles';
 import { fireVehicle } from './fireVehicles';
@@ -2599,7 +2599,9 @@ export class StructureView {
     // çadır hangarlar, sığınaklar, siperler), kalanlar aprona
     const parked = ab.inventory.filter((a) => a.status !== 'airborne');
     const detail = quality().models;
-    const sig = `${detail}|${usig}|${parked.map((a) => a.specId).sort().join(',')}`;
+    // Blender modeli istenir; yüklenince (skinStamp) uçaklar yeniden yerleşir
+    if (detail) for (const a of parked) requestSkin(SPECS[a.specId].model);
+    const sig = `${detail}|${skinStamp()}|${usig}|${parked.map((a) => a.specId).sort().join(',')}`;
     if (sig !== this.parkedSig) {
       this.parkedSig = sig;
       this.placeParked(parked.map((a) => SPECS[a.specId]), detail);

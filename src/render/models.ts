@@ -970,13 +970,187 @@ function brakeShell(s: number, z0: number, z1: number, y0: number, y1: number, o
  * göbeği; arkaya incelen gövde, kuyrukta egzoz borusu, türbin yüzü ve göbeği. Kesit biraz yüksek. Profil çizgileri dış
  * yüzde burundan kuyruğa, kanal ve borunun içinde ters yönde (yüzleri içe bakar).
  */
+/** Hava freni yuvası: kapağın altında koyu, gövdeye oturan kavisli yama. Kapaktan küçük: kapalıyken görünmez, uzakta
+ * kesik kesik çizgi vermez; kapak açılınca ortaya çıkar. */
+function migWells(): Geo[] {
+  const { zf, len, h, y } = MIG_BRAKE;
+  return [1, -1].map((s) => tag(brakeShell(s, zf - 0.02, zf - len + 0.02, y - h / 2 + 0.02, y + h / 2 - 0.02, 0.004, null), 'dark'));
+}
+
+/**
+ * Blender'da kurulan ya da dokulanan uçaklar (2026-11-20; tools/blender/README.md): yalnız ayrıntılı modelde (Orta ve
+ * Yüksek kalite, hangar vitrini). Dosyalar public/ucak'ta; bir tür ilk kez istenince yüklenir (requestSkin), o zamana dek
+ * kodla boyanmış model çizilir, yüklenince o türün modeli yeniden kurulur (skinStamp artar).
+ * - Dokulu türler (SKIN_KINDS): oyunun kendi geometrisi UV ile geri gelir ('solid', 'j:<eklem>' ve uzak görünüş için
+ *   seyreltilmiş '-lod' kopyaları; Draco), dokular boya (albedo), normal ve AO + parlaklık (WebP). Armalar ve egzoz isi
+ *   gölgelendiriciden.
+ * - MiG-15: gövde, kanat, kuyruk ve kanopi Blender'da kurulmuş geometri (mig15.glb; nesne adı "<parça>-<ad>": body, glass,
+ *   dark; kumanda yüzeylerinde glTF extras: joint, pivot, axis, big), normal haritası ve AO. Boya, armalar, takım, hava
+ *   frenleri, lambalar ve pilot kodla.
+ */
+const SKIN_KINDS = new Set([
+  'hurricane', 'ju87b', 'bf109e', 'spitfire', 'bf110', 'he111', 'i16', 'a6m', 'blenheim',
+  'spitfire5', 'spitfire9', 'bf109f', 'bf109g', 'p47', 'il2', 'il2m3', 'typhoon', 'il10', 'sbd', 'ju87d', 'sb2c', 'ju88', 'b25', 'b17',
+  'p40', 'pe2', 'yak3', 'la7', 'p38', 'f6f', 'lancaster', 'mosquito', 'seafury', 'f8f', 'f4u', 'ad4', 'a26', 'b29', 'fw190', 'p51d',
+  'me262', 'me262u4', 'meteor', 'sabre', 'f84', 'he162', 'p80', 'vampire', 'ar234', 'canberra', 'il28',
+]);
+const glbSkin = new Map<string, { geos: Map<string, Geo>; albedo: THREE.Texture; normal: THREE.Texture; aos: THREE.Texture }>();
+let glbMig: { geo: Geo; part: Part; joint: JointTag | null }[] | null = null;
+let glbMigTex: { normal: THREE.Texture; ao: THREE.Texture } | null = null;
+const skinLoads = new Map<string, Promise<void>>();
+let skinVersion = 0;
+
+/** Yüklenmiş Blender modellerinin sürümü: artınca modeller yeniden kurulmalı (park eden uçaklar). */
+export function skinStamp(): number {
+  return skinVersion;
+}
+
+/** Türün Blender modeli hazır mı (ya da hiç yok mu); değilse yüklemeyi başlatır. Hazır değilken kodla boyanmış model çizilir. */
+export function requestSkin(kind: string): boolean {
+  if (kind === 'mig15' ? glbMig !== null : !SKIN_KINDS.has(kind) || glbSkin.has(kind)) return true;
+  if (!skinLoads.has(kind)) skinLoads.set(kind, loadSkin(kind).catch((e) => console.warn('uçak modeli', kind, e)));
+  return false;
+}
+
+/** Türün Blender modeli yüklenene dek bekle (hangar vitrini, görsel araçları). */
+export async function ensureSkin(kind: string): Promise<void> {
+  if (!requestSkin(kind)) await skinLoads.get(kind);
+}
+
+/** Bütün Blender modelleri (ansiklopedi ve üretim görselleri). */
+export async function loadAllSkins(): Promise<void> {
+  await Promise.all(['mig15', ...SKIN_KINDS].map(ensureSkin));
+}
+
+let gltfLoader: Promise<import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader> | null = null;
+/** glTF yükleyici (Draco çözücüsü public/draco'da; işçide çözer, kare döngüsünü bekletmez). */
+function gltf() {
+  gltfLoader ??= (async () => {
+    const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/loaders/DRACOLoader.js'),
+    ]);
+    const draco = new DRACOLoader();
+    draco.setDecoderPath(`${import.meta.env.BASE_URL}draco/`);
+    draco.setDecoderConfig({ type: 'wasm' });
+    return new GLTFLoader().setDRACOLoader(draco);
+  })();
+  return gltfLoader;
+}
+
+const texLoader = new THREE.TextureLoader();
+/** glTF UV'si ters v ile yazılır: doku çevrilmeden yüklenir. */
+async function skinTexture(f: string, srgb: boolean): Promise<THREE.Texture> {
+  const t = await texLoader.loadAsync(`${import.meta.env.BASE_URL}ucak/${f}`);
+  t.flipY = false;
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+async function loadSkin(kind: string): Promise<void> {
+  const loader = await gltf();
+  if (kind === 'mig15') {
+    const [g, normal, ao] = await Promise.all([
+      loader.loadAsync(`${import.meta.env.BASE_URL}ucak/mig15.glb`), skinTexture('mig15_normal.webp', false), skinTexture('mig15_ao.webp', false),
+    ]);
+    g.scene.updateMatrixWorld(true);
+    const out: { geo: Geo; part: Part; joint: JointTag | null }[] = [];
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const node = m.userData.joint ? m : (m.parent ?? m);
+      const ud = { ...node.userData, ...m.userData } as { joint?: string; pivot?: V3; axis?: V3; big?: number };
+      const geo = (m.geometry as Geo).clone().applyMatrix4(m.matrixWorld);
+      const name = (m.name || node.name || '').split('-')[0];
+      const part: Part = name === 'glass' || name === 'dark' ? name : 'body';
+      out.push({ geo, part, joint: ud.joint ? { name: ud.joint, pivot: ud.pivot!, axis: ud.axis, big: ud.big !== 0 } : null });
+    });
+    glbMig = out;
+    glbMigTex = { normal, ao };
+  } else {
+    const [g, albedo, normal, aos] = await Promise.all([
+      loader.loadAsync(`${import.meta.env.BASE_URL}ucak/${kind}.glb`),
+      skinTexture(`${kind}_albedo.webp`, true), skinTexture(`${kind}_normal.webp`, false), skinTexture(`${kind}_aos.webp`, false),
+    ]);
+    g.scene.updateMatrixWorld(true);
+    const geos = new Map<string, Geo>();
+    g.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const geo = (m.geometry as Geo).clone().applyMatrix4(m.matrixWorld);
+      geo.computeBoundingSphere();
+      // GLTFLoader düğüm adındaki ':' gibi işaretleri siler: anahtar her iki yanda da yalnız harf ve rakam ('solid', 'jaileronL',
+      // seyrek kopyalar 'solidlod', 'jaileronLlod')
+      const key = (m.name || m.parent?.name || '').replace(/[^A-Za-z0-9]/g, '');
+      if (key.endsWith('lod')) matchWinding(geo);
+      geos.set(key, geo);
+    });
+    glbSkin.set(kind, { geos, albedo, normal, aos });
+  }
+  // Bu türün önbellekteki modelleri yeniden kurulsun
+  for (const k of [...geoCache.keys()]) if (k.startsWith(`${kind}|`)) geoCache.delete(k);
+  for (const k of [...parkedCache.keys()]) if (k.startsWith(`${kind}|`)) parkedCache.delete(k);
+  skinVersion++;
+}
+
+/**
+ * Seyreltilmiş geometride sarımı köşe normalleriyle çelişen üçgeni çevir. Oyunun dönel gövdelerinin bir kısmı içe sarımlı ve
+ * normali de içe dönük (iki yüzlü çizimde ışık doğru); seyreltme bu bölgeleri birleştirince sarım karışıyor, iki yüzlü çizim
+ * normali ters çevirip benek benek karanlık yüzler veriyordu.
+ */
+function matchWinding(g: Geo): void {
+  const idx = g.index;
+  const p = g.getAttribute('position');
+  const n = g.getAttribute('normal');
+  if (!idx || !n) return;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  for (let t = 0; t + 2 < idx.count; t += 3) {
+    const i0 = idx.getX(t);
+    const i1 = idx.getX(t + 1);
+    const i2 = idx.getX(t + 2);
+    a.fromBufferAttribute(p, i0);
+    b.fromBufferAttribute(p, i1).sub(a);
+    c.fromBufferAttribute(p, i2).sub(a);
+    b.cross(c);
+    const d = b.x * (n.getX(i0) + n.getX(i1) + n.getX(i2)) + b.y * (n.getY(i0) + n.getY(i1) + n.getY(i2)) + b.z * (n.getZ(i0) + n.getZ(i1) + n.getZ(i2));
+    if (d < 0) {
+      idx.setX(t + 1, i2);
+      idx.setX(t + 2, i1);
+    }
+  }
+  idx.needsUpdate = true;
+}
+
+/** Pişirilmiş dokular boya malzemesine (Blender modeli olan tür, ayrıntılı modelde). */
+function bakedSkin(kind: string, detail: number, m: THREE.MeshPhongMaterial): THREE.MeshPhongMaterial {
+  const sk = detail ? glbSkin.get(kind) : undefined;
+  if (sk) {
+    m.map = sk.albedo;
+    m.normalMap = sk.normal;
+    m.aoMap = sk.aos;
+    m.aoMapIntensity = 1;
+    m.defines = { ...m.defines, SKIN_BAKED: '', SKIN_BAKED_COLOR: '' };
+    const key0 = m.customProgramCacheKey.bind(m);
+    m.customProgramCacheKey = () => `${key0()}-bakedc`;
+    return m;
+  }
+  if (kind !== 'mig15' || !glbMig || !glbMigTex || !detail) return m;
+  m.normalMap = glbMigTex.normal;
+  m.aoMap = glbMigTex.ao;
+  m.aoMapIntensity = 1;
+  m.defines = { ...m.defines, SKIN_BAKED: '' };
+  const key = m.customProgramCacheKey.bind(m);
+  m.customProgramCacheKey = () => `${key()}-baked`;
+  return m;
+}
+
 function migFuselage(): Geo[] {
   const sy = MIG_SY;
   const skin = MIG_SKIN;
-  const { zf, len, h, y } = MIG_BRAKE;
-  // Hava freni yuvası: kapağın altında koyu, gövdeye oturan kavisli yama. Kapaktan küçük: kapalıyken görünmez, uzakta
-  // kesik kesik çizgi vermez; kapak açılınca ortaya çıkar.
-  const wells = [1, -1].map((s) => tag(brakeShell(s, zf - 0.02, zf - len + 0.02, y - h / 2 + 0.02, y + h / 2 - 0.02, 0.004, null), 'dark'));
+  const wells = migWells();
   const disc = (r: number, z: number, back: boolean) => {
     const g = new THREE.CircleGeometry(r, sg(14)).scale(1, sy, 1);
     if (back) g.rotateY(Math.PI);
@@ -2332,6 +2506,25 @@ function defineModel(key: string): ModelDef {
       const T: WingOpts = { x0: 0.05, z: -4.35, root: 1.2, y: 2.3, tipX: 1.7, tip: 0.6, sweep: 1.0, dihedral: 0, t: 0.1 };
       const F: Fin = { y0: 0.5, z0: -2.4, h: 2.4, root: 2.8, tip: 1.2, sweep: 2.4, t: 0.15 };
       const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const lightsMig: ModelDef['lights'] = [
+        { p: [W.tipX + 0.04, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+        { p: [-W.tipX - 0.04, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+        { p: [0, F.y0 - 0.25 + (F.h + 0.25) * 0.85, F.z0 - F.sweep * 0.85 - (F.root + (F.tip - F.root) * 0.85) + 0.04], kind: 'white' },
+        { p: [1.9, W.y - 0.3, 0.25], kind: 'landing' },
+      ];
+      if (glbMig && DETAIL) {
+        // Blender denemesi: gövde, kanat, kuyruk ve kanopi glb'den; kanopi ve dikey kuyruk kayıtları (pilot, arma) elle
+        canopySink.push({ z: 2.2, len: 1.6, h: 0.46, y: 0.72, w: 0.42, bubble: true });
+        const chordMid = (F.root + F.tip) / 2;
+        finSink.push({ x: 0, yTop: F.y0 + F.h, yRoot: F.y0, zTop: F.z0 - F.sweep - F.tip * 0.35, zMid: F.z0 - F.sweep * 0.5 - chordMid * 0.5, chordMid });
+        const solids = glbMig.map((p) => {
+          const g = p.geo.clone();
+          if (p.part !== 'body') tag(g, p.part as 'glass' | 'dark');
+          if (p.joint) g.userData.joint = p.joint;
+          return g;
+        });
+        return { solids: [...migWells(), ...solids], props: [], tank: mirror(2.6, (x) => tankAt(-0.4, 0.6, x, 0.85)), lights: lightsMig };
+      }
       return {
         solids: [
           ...migFuselage(),
@@ -4205,29 +4398,39 @@ function partOf(g: Geo): Part {
   return (g.userData.part as Part | undefined) ?? 'body';
 }
 
-/** Yalnız konum ve normal (indekssiz). Normali olmayan parça (düşük ayrıntıda kutu kanat) yüz normali alır. */
-function cleanGeo(g: Geo): Geo {
+/** Yalnız konum ve normal (indekssiz); uv istenirse o da (Blender'da dokulanmış model). Normali olmayan parça (düşük
+ * ayrıntıda kutu kanat) yüz normali alır. */
+function cleanGeo(g: Geo, uv = false): Geo {
   const n = g.index ? g.toNonIndexed() : g;
   if (!n.getAttribute('normal')) n.computeVertexNormals();
   const c = new THREE.BufferGeometry();
   c.setAttribute('position', n.getAttribute('position'));
   c.setAttribute('normal', n.getAttribute('normal'));
+  if (uv) c.setAttribute('uv', n.getAttribute('uv'));
   return c;
 }
 
-/** Parçaları birleştirir; her parça kendi normalini taşır (dönel gövde ve profil pürüzsüz, kutu köşeli). */
+/** Parçaları birleştirir; her parça kendi normalini taşır (dönel gövde ve profil pürüzsüz, kutu köşeli). Bütün
+ * parçalarda uv varsa korunur. */
 function merge(list: Geo[]): Geo {
-  const m = mergeGeometries(list.map(cleanGeo), false);
+  const uv = list.length > 0 && list.every((g) => !!g.getAttribute('uv'));
+  const m = mergeGeometries(list.map((g) => cleanGeo(g, uv)), false);
   if (!m) throw new Error('model birleştirilemedi');
   m.computeBoundingSphere();
   return m;
 }
 
 /** Eklemin birleşmiş ağları (gövde rengi, cam, küçük parçalar). */
-interface JointModel { name: string; pivot: THREE.Vector3; big: boolean; axis: THREE.Vector3 | null; solid: Geo | null; glass: Geo | null; detail: Geo | null }
+interface JointModel {
+  name: string; pivot: THREE.Vector3; big: boolean; axis: THREE.Vector3 | null; solid: Geo | null; glass: Geo | null; detail: Geo | null;
+  /** Blender modelinde uzak görünüş için seyreltilmiş boyalı geometri (aynı UV). */
+  solidLod?: Geo | null;
+}
 
 interface CachedModel {
   solid: Geo;
+  /** Blender modelinde uzak görünüş için seyreltilmiş gövde (aynı UV ve doku; düzlemsel seyreltme, üçgenin %20–40'ı). */
+  solidLod?: Geo | null;
   glass: Geo | null;
   /** Küçük parçalar tek ağda (koyu metal, pilot, seyir lambaları). */
   detail: Geo | null;
@@ -4817,7 +5020,7 @@ function cached(kind: string, detail: number): CachedModel {
     ]),
     joints,
     disc: discGeo(def.props),
-    skin: skinMaterial(info, detail),
+    skin: bakedSkin(kind, detail, skinMaterial(info, detail)),
     gear: opt(gear),
     props: def.props,
     emitters: contrailEmitters(bb, spec, def.props),
@@ -4830,6 +5033,16 @@ function cached(kind: string, detail: number): CachedModel {
   DETAIL = 1;
   RES = 1;
   setAirfoilRes(10);
+  // Blender'da dokulanmış uçak: boyalı geometri UV'li olanla değişir (aynı şekil; yalnız yüksek ayrıntıda)
+  const sk = detail ? glbSkin.get(kind) : undefined;
+  if (sk) {
+    c.solid = sk.geos.get('solid') ?? c.solid;
+    c.solidLod = sk.geos.get('solidlod') ?? null;
+    for (const j of c.joints) {
+      j.solid = sk.geos.get(`j${j.name}`) ?? j.solid;
+      j.solidLod = sk.geos.get(`j${j.name}lod`) ?? null;
+    }
+  }
   geoCache.set(key, c);
   return c;
 }
@@ -5046,6 +5259,8 @@ export interface AircraftModel {
   joints: Record<string, THREE.Object3D>;
   /** Ekranda küçük kalan uçakta gizlenen küçük ayrıntılar (cam, koyu parçalar, pilot, lambalar, küçük eklemler). */
   fine: THREE.Object3D[];
+  /** Blender modelinde boyalı ağlar ve seyrek geometrileri: uzaktaki uçakta seyreğe geçilir (aynı doku, az üçgen). */
+  lods: { mesh: THREE.Mesh; full: THREE.BufferGeometry; lod: THREE.BufferGeometry }[];
   /** Yoğuşma izi çıkış noktaları (model ekseninde, gerçek ölçek). */
   emitters: THREE.Vector3[];
   /** Katlanır iniş takımı (yerde ve son yaklaşmada görünür). */
@@ -5064,7 +5279,10 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
   const detail = opts.detail ?? 1;
   const c = cached(kind, detail);
   const root = new THREE.Group();
-  root.add(new THREE.Mesh(c.solid, c.skin));
+  const body = new THREE.Mesh(c.solid, c.skin);
+  root.add(body);
+  const lods: AircraftModel['lods'] = [];
+  if (c.solidLod) lods.push({ mesh: body, full: c.solid, lod: c.solidLod });
   const fine: THREE.Object3D[] = [];
   const add = (into: THREE.Object3D, g: Geo | null, m: THREE.Material) => {
     if (!g) return null;
@@ -5083,7 +5301,8 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     const inner = new THREE.Group();
     inner.position.copy(j.pivot).negate();
     outer.add(inner);
-    add(inner, j.solid, c.skin);
+    const jm = add(inner, j.solid, c.skin);
+    if (jm && j.solid && j.solidLod) lods.push({ mesh: jm, full: j.solid, lod: j.solidLod });
     add(inner, j.glass, GLASS[detail]);
     add(inner, j.detail, DETAIL_MAT[detail]);
     if (j.axis) outer.userData.axis = j.axis;
@@ -5126,7 +5345,7 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     landing.visible = false;
     root.add(landing);
   }
-  return { root, props, disc, joints, fine, emitters: c.emitters, gear, landing, landingPool, length: c.length, radius: c.radius };
+  return { root, props, disc, joints, fine, lods, emitters: c.emitters, gear, landing, landingPool, length: c.length, radius: c.radius };
 }
 
 const parkedCache = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material }[]>();
@@ -5148,7 +5367,10 @@ export function parkedParts(kind: string, detail: number): { geo: THREE.BufferGe
     if (m) out.push({ geo: m, mat });
     else for (const g of geos) out.push({ geo: g, mat });
   };
-  add([c.solid, ...c.joints.map((j) => j.solid)], c.skin);
+  // Blender'da dokulanmış uçakta boyalı parçalar indeksli ve UV'li, kodla kurulanlar (UV'siz) karışık olabilir: aynı biçime
+  const skinGeos = [c.solid, ...c.joints.map((j) => j.solid)].filter((g): g is Geo => !!g);
+  const anyUv = skinGeos.some((g) => !!g.getAttribute('uv'));
+  add(anyUv ? skinGeos.map((g) => cleanGeo(g, skinGeos.every((x) => !!x.getAttribute('uv')))) : skinGeos, c.skin);
   add([c.glass, ...c.joints.map((j) => j.glass)], GLASS[detail]);
   add([c.detail, ...c.joints.map((j) => j.detail)], DETAIL_MAT[detail]);
   add([c.gear], DARK[detail]);
@@ -5171,7 +5393,7 @@ const finBomb = mergeGeometries([
   unitBomb.toNonIndexed(),
   new THREE.BoxGeometry(0.26, 0.012, 0.12).translate(0, 0, -0.44).toNonIndexed(),
   new THREE.BoxGeometry(0.012, 0.26, 0.12).translate(0, 0, -0.44).toNonIndexed(),
-].map(cleanGeo))!;
+].map((g) => cleanGeo(g)))!;
 finBomb.computeVertexNormals();
 const unitTank = body([[0.5, 0], [0.32, 0.12], [-0.2, 0.13], [-0.5, 0.01]], 8);
 unitTank.computeVertexNormals();

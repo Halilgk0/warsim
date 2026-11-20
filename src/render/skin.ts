@@ -158,6 +158,8 @@ const PARS = /* glsl */ `
 
 /** Renk ve doku: diffuseColor yerine geçer (color_fragment'tan sonra). skPanel: panel başına 0..1 (metal yansıması). */
 const COLOR = /* glsl */ `
+  // Blender'da pişirilmiş boya (SKIN_BAKED_COLOR): doku rengi (map_fragment) burada saklanır, desen hesabının yerine geçer
+  vec3 skBase = diffuseColor.rgb;
   vec3 skP = vSkP;
   // Dönel gövdelerde köşe sarımı ve normali içe dönük (çift yüzlü çizimde ışık yine doğru): görünen yüze göre düzelt
   vec3 skN = normalize( vSkN ) * ( gl_FrontFacing ? 1.0 : -1.0 );
@@ -223,6 +225,13 @@ const COLOR = /* glsl */ `
         float line = clamp( max( max( lz, lx ), ly ) + rv, 0.0, 1.0 );
         vec3 cell = floor( vec3( skP.x / 0.58, ( skP.y + 0.27 * floor( skP.z / 0.74 ) ) / 0.52, skP.z / 0.74 ) );
         skPanel = skHash3( cell );
+        #ifdef SKIN_BAKED
+          // Blender'da pişirilmiş model (deneme): panel çizgileri ve perçinler normal haritasında, dikiş kiri ve ortam gölgesi
+          // AO haritasında; genel ızgara ve ızgaraya bağlı levha tonu kapalı
+          line = 0.0;
+          skPanel = 0.5;
+          cell = vec3( 0.0 );
+        #endif
         #ifdef SKIN_METAL
           // Çıplak alüminyum: levhalar farklı ton ve hafif renk sapmasında
           c *= ( 1.0 + ( skPanel - 0.5 ) * 0.12 ) * vec3( 1.0 + ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02, 1.0, 1.0 - ( skHash3( cell + 9.1 ) - 0.5 ) * 0.02 );
@@ -241,6 +250,9 @@ const COLOR = /* glsl */ `
             c *= 1.0 + ( skNoise( skP * 0.9 + 31.0 ) - 0.5 ) * 0.14 * skD.x;
             // Boya dökülmesi: panel dikişlerinin ve hücum kenarlarının yanında küçük aşınmalar, altından alüminyum
             float seam = max( skLine( skP.z, 0.74, 0.03 ), skLine( skP.x, 0.58, 0.03 ) * step( 0.95, abs( skP.x ) ) );
+            #ifdef SKIN_BAKED
+              seam = 0.0;
+            #endif
             float lead = smoothstep( 0.78, 0.95, skN.z );
             float chip = smoothstep( 0.76, 0.8, skNoise( skP * 16.0 ) ) * max( seam, lead ) * near * skD.x;
             c = mix( c, vec3( 0.34, 0.35, 0.36 ), chip );
@@ -280,7 +292,16 @@ const COLOR = /* glsl */ `
       float fade = 0.2 + 0.08 * smoothstep( 0.2, 0.8, skN.y );
       c = mix( c, vec3( skL ) * vec3( 1.0, 1.0, 0.98 ) + 0.012, fade );
     #endif
+    #ifdef SKIN_BAKED_COLOR
+      // Kamuflaj, solma, kir, dökülme ve levha tonu dokuda; parlaklık AO dokusunun yeşilinde (0,5 = olağan)
+      c = skBase;
+      skSpec = texture2D( aoMap, vAoMapUv ).g * 2.0;
+    #endif
     c *= skD.y;
+    #if defined( SKIN_BAKED ) && defined( USE_AOMAP )
+      // Dikiş kiri ve oyuklardaki gölge doğrudan renge de (AO yalnız dolaylı ışığı karartır)
+      c *= mix( 1.0, texture2D( aoMap, vAoMapUv ).r, 0.65 );
+    #endif
 
     // Egzoz isi: çıkışın gerisinde, gövde ya da nasel yanında koyulaşan iz
     float soot = 0.0;

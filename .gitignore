@@ -10,3 +10,4 @@ tools/rec/out
 tools/rec/node_modules
 .wrangler
 .dev.vars
+tools/blender/cikti
