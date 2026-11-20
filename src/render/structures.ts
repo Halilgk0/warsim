@@ -856,6 +856,28 @@ export function buildAAGun(w: AAWeaponId, code = false): THREE.Group {
   return aaGun(w, showcaseMat, !code);
 }
 
+/**
+ * Yapının takım halkası (yerde, takım renginde). Görünümden ayrı: uzaktaki yapının ağır görünümü ertelense de halkası ve
+ * etiketi hep çizilir (gameRenderer syncStructures). Şehir binaları yan yana dizildiği için halkaları tabana sığar ve soluktur.
+ */
+export function structureRing(s: Structure): THREE.Mesh {
+  const city = s.def.category !== 'military';
+  const rr = s.kind === 'airbase' ? 1400 : city ? Math.max(s.def.halfW, s.def.halfL) * (s.kind === 'mine' ? 1.25 : 1.05) : s.def.radius * 1.6 + 20;
+  const ring = new THREE.Mesh(
+    RING,
+    new THREE.MeshBasicMaterial({ color: PALETTE.team[s.team], transparent: true, opacity: s.def.category === 'city' ? 0.16 : 0.4, depthWrite: false, depthTest: false }),
+  );
+  ring.renderOrder = 1;
+  ring.scale.setScalar(rr);
+  ring.position.set(s.pos.x, s.pos.y + 2, s.pos.z);
+  return ring;
+}
+
+/** Yapının çizildiği alanın yarıçapı (m): görünümü kurmaya değecek kadar büyük görünüyor mu (gameRenderer). */
+export function viewRadius(s: Structure): number {
+  return s.kind === 'airbase' ? 1400 : Math.max(s.def.radius, Math.hypot(s.def.halfW, s.def.halfL));
+}
+
 /** Testere dişi çatı: w × len holün üstünde (y üst kot), ~12 m'lik dişler boyuna dizili, aralarında dere oluğu. */
 function sawtoothRoof(b: B, w: number, len: number, x: number, y: number, z: number): void {
   const n = Math.max(3, Math.round(len / 12));
@@ -1772,7 +1794,6 @@ export class StructureView {
   private clip: THREE.Plane | null = null;
   private clipTop = 0;
   private clipMain = 0;
-  readonly ring: THREE.Mesh;
   private built = false;
   /** İtfaiye merkezinin çizildiği seviye (seviye atlayınca görünüm yeniden kurulur: gameRenderer syncStructures). */
   readonly fireLevel: number;
@@ -1845,16 +1866,6 @@ export class StructureView {
     }
     b.build(g, this.mat);
     this.reground();
-
-    // Şehir binaları yan yana dizildiği için halkaları tabana sığar ve soluktur
-    const rr = s.kind === 'airbase' ? 1400 : city ? Math.max(s.def.halfW, s.def.halfL) * (s.kind === 'mine' ? 1.25 : 1.05) : s.def.radius * 1.6 + 20;
-    this.ring = new THREE.Mesh(
-      RING,
-      new THREE.MeshBasicMaterial({ color: PALETTE.team[s.team], transparent: true, opacity: s.def.category === 'city' ? 0.16 : 0.4, depthWrite: false, depthTest: false }),
-    );
-    this.ring.renderOrder = 1;
-    this.ring.scale.setScalar(rr);
-    this.ring.position.set(s.pos.x, s.pos.y + 2, s.pos.z);
   }
 
   private buildAirbase(b: B, rng: () => number): void {

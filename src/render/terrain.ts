@@ -12,7 +12,8 @@ import { PALETTE } from './palette';
 import { linkAtmosphere } from './atmosphere';
 import { linkCloudShadow } from './clouds';
 import { freeze } from './props';
-import { FIELD_COLORS, clearFactor, fieldGrid, fieldKind, forestGrid, slopeGrid, urbanGrid } from './landcover';
+import { FIELD_COLORS, clearFactorIn, clearingsIn, fieldGrid, fieldKind, forestGrid, slopeGrid, urbanGrid } from './landcover';
+import type { Circle } from './landcoverGen';
 
 
 
@@ -42,9 +43,10 @@ const CLIFF: [number, number, number] = [132, 126, 118];
 
 /**
  * Köşe rengi: yüksekliğe göre temel renk, üstüne dik yamaçta kaya, ormanda koyu yeşil, ovada tarla parselleri.
- * k: ızgara köşe indeksi (arazi örtüsü ızgaraları), x/z: dünya konumu (yapı tabanları temizlenir).
+ * k: ızgara köşe indeksi (arazi örtüsü ızgaraları), x/z: dünya konumu (yapı tabanları temizlenir; clear: bu bölgeye değen
+ * yapı açıklıkları, clearingsIn ile parça başına bir kez süzülür).
  */
-function colorAt(h: number, out: number[], k = -1, x = 0, z = 0): void {
+function colorAt(h: number, out: number[], k = -1, x = 0, z = 0, clear: readonly Circle[] = NO_CLEAR): void {
   let i = 0;
   while (i < STOPS.length - 1 && h > STOPS[i + 1][0]) i++;
   const [h0, c0] = STOPS[i];
@@ -59,7 +61,7 @@ function colorAt(h: number, out: number[], k = -1, x = 0, z = 0): void {
       g += (c[1] - g) * a;
       b += (c[2] - b) * a;
     };
-    const keep = clearFactor(x, z);
+    const keep = clearFactorIn(clear, x, z);
     const slope = slopeGrid[k];
     if (slope > 0.45 && h > 150) mix(CLIFF, smoothstep(0.45, 1.1, slope) * 0.5);
     const fl = (fieldGrid[k] / 255) * keep;
@@ -107,12 +109,20 @@ const fineCol = new Uint8Array(TERRAIN_W * TERRAIN_W * 3);
 /** Parçanın ince renkleri hazır mı (komşu payıyla). */
 const fineReady = new Uint8Array(NC * NC);
 
+const NO_CLEAR: readonly Circle[] = [];
+
+/** Izgara köşe aralığına (dahil) değen yapı açıklıkları. */
+function clearsFor(i0: number, i1: number, j0: number, j1: number): Circle[] {
+  return clearingsIn(-HALF + i0 * TERRAIN_CELL, -HALF + j0 * TERRAIN_CELL, -HALF + i1 * TERRAIN_CELL, -HALF + j1 * TERRAIN_CELL);
+}
+
 function fillFine(i0: number, i1: number, j0: number, j1: number): void {
   const c = [0, 0, 0];
+  const clear = clearsFor(i0, i1, j0, j1);
   for (let j = Math.max(0, j0); j <= Math.min(TERRAIN_N, j1); j++) {
     for (let i = Math.max(0, i0); i <= Math.min(TERRAIN_N, i1); i++) {
       const k = j * TERRAIN_W + i;
-      colorAt(heights[k], c, k, -HALF + i * TERRAIN_CELL, -HALF + j * TERRAIN_CELL);
+      colorAt(heights[k], c, k, -HALF + i * TERRAIN_CELL, -HALF + j * TERRAIN_CELL, clear);
       fineCol[k * 3] = Math.round(c[0] * 255);
       fineCol[k * 3 + 1] = Math.round(c[1] * 255);
       fineCol[k * 3 + 2] = Math.round(c[2] * 255);
@@ -580,6 +590,7 @@ export class TerrainView {
     const cx = -HALF + (ci + 0.5) * CH * TERRAIN_CELL;
     const cz = -HALF + (cj + 0.5) * CH * TERRAIN_CELL;
     const ring = 4 * n;
+    const clear = step === 4 ? clearsFor(ci * CH, (ci + 1) * CH, cj * CH, (cj + 1) * CH) : NO_CLEAR;
     // Yüzey köşeleri + etek: her kenar parçasının kendi dört köşesi (üstteki ikisi yüzeyle aynı, alttaki ikisi aşağıda)
     const nv = w * w + ring * 4;
     const pos = new Float32Array(nv * 3);
@@ -608,7 +619,7 @@ export class TerrainView {
         c[2] = fineCol[k * 3 + 2] / 255;
       } else if (step === 2) coarseColor(i, j, step, c);
       // Çeyrek düzey yalnız ufukta (sisin içinde): doğrudan örnek yeter
-      else colorAt(h, c, k, -HALF + i * TERRAIN_CELL, -HALF + j * TERRAIN_CELL);
+      else colorAt(h, c, k, -HALF + i * TERRAIN_CELL, -HALF + j * TERRAIN_CELL, clear);
       col[o * 3] = c[0];
       col[o * 3 + 1] = c[1];
       col[o * 3 + 2] = c[2];

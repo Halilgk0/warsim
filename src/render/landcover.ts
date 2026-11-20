@@ -71,12 +71,32 @@ export function cleared(x: number, z: number, pad = 0): boolean {
 
 /** Yapı tabanındaysa 0, kenarına doğru 1 (arazi rengi yumuşak geçsin). */
 export function clearFactor(x: number, z: number): number {
+  return clearFactorIn(dynamicClear, x, z);
+}
+
+/** clearFactor, önceden süzülmüş listeyle (clearingsIn). */
+export function clearFactorIn(list: readonly Circle[], x: number, z: number): number {
   let f = 1;
-  for (const c of dynamicClear) {
-    const d = Math.hypot(x - c.x, z - c.z);
-    if (d < c.r * 1.4) f = Math.min(f, smoothstep(c.r * 0.9, c.r * 1.4, d));
+  for (const c of list) {
+    const dx = x - c.x;
+    const dz = z - c.z;
+    const R = c.r * 1.4;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < R * R) f = Math.min(f, smoothstep(c.r * 0.9, R, Math.sqrt(d2)));
   }
   return f;
+}
+
+/**
+ * Bu dikdörtgene (geçiş payıyla) değen yapı açıklıkları. Arazi parçası boyanırken her köşe bütün listeyi dolaşmasın:
+ * harekâtta yollar 20 m'de bir açıklık sayıldığı için liste yüzlerce kayıt olur, parça başına ~19 bin köşeyle yeni
+ * görünen her parça telefonda yarım saniyeyi aşan takılma yapıyordu (2026-11-21).
+ */
+export function clearingsIn(x0: number, z0: number, x1: number, z1: number): Circle[] {
+  return dynamicClear.filter((c) => {
+    const R = c.r * 1.4;
+    return c.x + R > x0 && c.x - R < x1 && c.z + R > z0 && c.z - R < z1;
+  });
 }
 
 /** Hangi harita sürümü için hesaplandı. */

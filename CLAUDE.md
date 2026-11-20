@@ -221,6 +221,11 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `lamps.ts`: yapı ışıkları (kameraya dönük lambalar, yerde ışık havuzları). Akşam `archNight` ile yanar; gündüz
     üçgenleri çöker, maliyeti yok.
   - `structures.ts`: hava üssü, uçaksavar, radar, fabrika.
+    - Görünümler ertelenir (2026-11-21, `gameRenderer.ts` `syncStructures`): ağır görünüm (`StructureView`) yalnız görüşteki ve
+      ekranda `viewMinPx`'ten (CSS px yarıçap; ana menüde 8, oyunda 3) büyük yapıya kurulur, yakından uzağa, kare başına ~6 ms
+      bütçeyle (en az bir); dünya bağlanınca ilk eşlemede görüştekilerin hepsi. Takım halkası (`structureRing`) ve etiket her
+      yapıda baştan. Yeni ya da taşınan yapı komşularını yeniden oturtur (`regroundNear`). Video kaydında hepsi baştan kurulur.
+      Eskiden ilk karede bütün yapılar kuruluyordu: menü ve harekât başı telefonda saniyelerce donuyordu.
     - Yeni üs yapıları `|x| ≤ 400` içinde kalsın: simülasyonun üs alanı bu (dışına başka yapı kurulabiliyor). Üssün
       çizimi düzleşen alanın dışına taşarsa `flattenStructure`'ı da güncelle.
   - `roads.ts`: şehir yollarının şeridi (araziyi izler, arazi değişince yeniden oturur; yol boyunca ağaç temizlenir),
@@ -449,6 +454,15 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     `sim/terrainGen.ts` ve `render/landcoverGen.ts`'tedir; tek seferlik yol da aynı işlevleri kullanır, sonuç bit bit
     aynıdır (eski kayıtlar).
   - Oyun içinde harita değişimi (`withMap`) de işçilerle yapılır; bu sırada kare döngüsü bekler.
+  - Hazırlık (2026-11-21, `game.ts` `warmUp`, `GameRenderer.warm`): açılışta, harekât başında, kayıt açılırken ve menüde harita
+    değişince yükleme ekranı açık kalır; sahne bir kez çizilmeden eşlenir, gölgelendiriciler `compileAsync` ile arka planda
+    derlenir (KHR_parallel_shader_compile), sonra ekran kalkar. İlk kare derlemeyi beklemez.
+  - Arazi rengi (`terrain.ts` `colorAt`) yapı açıklıklarını parça başına süzülmüş listeden okur (`landcover.ts` `clearingsIn`):
+    yollar 20 m'de bir açıklık sayıldığı için tam liste yüzlerce kayıttı, yeni görünen her arazi parçası telefonda yarım
+    saniyeyi aşan takılma yapıyordu.
+  - Ölçüm (telefon benzetimi, işlemci 4× yavaş): scratchpad `acilis_olc.cjs` (menü süresi, uzun görevler, harekâtın ilk 30 sn'si;
+    canlı siteyle aynı koşuda), `acilis_prof.cjs` (işlemci profili, 150 ms üstü dilimlerin işlevleri). 2026-11-21: ilk açılış 14,7 →
+    8,6 sn (en uzun donma 10 → 1,7 sn), harekât kurulumu 7,7 → 2,6 sn, ilk 30 sn'deki 600–850 ms'lik 15 takılma gitti.
   - Başsız simülasyonda (Node) ilk harita `terrain.ts` yüklenirken eski yolla üretilir.
   - Kayıt kipi ve görsel denetim haritayı önceden yüklemez: `GameRenderer` kurulurken yüklü harita yoksa ilk haritayı
     300 km'de yükler (eski çekimler aynı kalır).

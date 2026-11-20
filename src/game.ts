@@ -154,6 +154,8 @@ export class Game {
   private lastErrorLog = 0;
   /** withMap haritayı işçilerde yüklerken (döngü bekler). */
   private mapLoading = false;
+  /** warmUp sahneyi hazırlayıp gölgelendiricileri derlerken (döngü bekler, yükleme ekranı açık). */
+  private warming = false;
   /** Son işlenen karenin zamanı (kare sınırı). */
   private lastDraw = 0;
   private errorShown = false;
@@ -217,7 +219,24 @@ export class Game {
       if (this.mode === 'menu') this.menu.render();
     });
     requestAnimationFrame(this.loop);
-    $('loading').classList.add('hidden');
+    this.warmUp();
+  }
+
+  /**
+   * Yükleme ekranı açıkken sahneyi bir kez çizmeden hazırla ve gölgelendiricileri arka planda derle (GameRenderer.warm),
+   * sonra ekranı kaldır. İlk kare derlemeyi beklemez: telefonda açılışta ve harekât başında saniyelerce donuyordu.
+   */
+  private warmUp(text?: string): void {
+    const el = $('loading');
+    if (text) el.querySelector('span')!.textContent = text;
+    el.classList.remove('hidden');
+    this.warming = true;
+    void this.renderer.warm()
+      .catch((e) => this.reportError(e))
+      .finally(() => {
+        this.warming = false;
+        if (!this.mapLoading) el.classList.add('hidden');
+      });
   }
 
   /**
@@ -244,7 +263,8 @@ export class Game {
         .catch((e) => this.reportError(e))
         .finally(() => {
           this.mapLoading = false;
-          el.classList.add('hidden');
+          // Ardından sahne hazırlanıyorsa (warmUp) ekran o bitince kalkar
+          if (!this.warming) el.classList.add('hidden');
         });
     }));
   }
@@ -266,6 +286,8 @@ export class Game {
     const w = new World();
     setupCampaign(w, { enemies: 3, playerName: '', demo: true });
     this.attachWorld(w, 'menu');
+    // Haritanın tamamı görünür: üsler birkaç piksel, yalnız halkaları çizilir (ağır görünümleri kurulmaz)
+    this.renderer.viewMinPx = 8;
     this.setTimeScale(2);
     const rig = this.renderer.rig;
     // Haritanın tamamı görünsün (küçük haritada kamera da yakın)
@@ -281,6 +303,7 @@ export class Game {
       this.buildBackdrop();
       // Harita yüklendi: menü önizlemesinde rastgele başlangıç yerleri atılabilir
       this.menu.refreshLayout();
+      this.warmUp();
     });
   }
 
@@ -297,6 +320,7 @@ export class Game {
       this.enterPlay(w, 'kampanya');
       this.lastSave = null;
       this.focusHome();
+      this.warmUp(L('Harekât hazırlanıyor…', 'Preparing the campaign…'));
     });
   }
 
@@ -333,6 +357,7 @@ export class Game {
       rig.yaw = cam.yaw;
       rig.pitch = cam.pitch;
     } else this.focusHome();
+    this.warmUp(L('Kayıt açılıyor…', 'Opening the save…'));
     this.toast(`${L('Kayıt yüklendi', 'Save loaded')} · ${mapById(d.mapId).name} · ${L('oyun', 'game')} ${fmtTime(w.playTime)}`);
     // Bakım personeli kuralından önceki kayıt: kural ve bedava konut bir kez söylenir (sonraki kayıtta maintRule var)
     const gift = w.maintGift;
@@ -367,6 +392,7 @@ export class Game {
 
   private enterPlay(w: World, scenarioId: string): void {
     this.attachWorld(w, scenarioId);
+    this.renderer.viewMinPx = 3;
     this.mode = 'play';
     $('app').classList.remove('menu-mode');
     this.menu.close();
@@ -1180,8 +1206,8 @@ export class Game {
     // 90–144 Hz ekranlarda saniyede ~60 kare: iş ve ısınma yarıya iner (telefon ısınıp yavaşlamaz); 60 Hz'de fark yok
     if (now - this.lastDraw < 10) return;
     this.lastDraw = now;
-    if (this.mapLoading) {
-      // Harita yükleniyor (withMap): dünya ve çizim bekler; dönüşte uzun bir adım atılmasın
+    if (this.mapLoading || this.warming) {
+      // Harita yükleniyor (withMap) ya da sahne hazırlanıyor (warmUp): dünya ve çizim bekler; dönüşte uzun bir adım atılmasın
       this.last = now;
       return;
     }

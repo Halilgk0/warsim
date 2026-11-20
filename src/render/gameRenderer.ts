@@ -15,7 +15,7 @@ import { gearHeight } from '../sim/aircraft/flightModel';
 import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
-import { StructureView, placeKeyOf } from './structures';
+import { StructureView, placeKeyOf, structureRing, viewRadius } from './structures';
 import { buildAircraftModel, buildStoreMeshes, propU, requestSkin, type AircraftModel } from './models';
 import { Scenery } from './scenery';
 import { DecorLayer } from './decor';
@@ -112,6 +112,8 @@ const _w = new THREE.Vector3();
 const _aaDir = new THREE.Vector3();
 const _aaGround = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+const _frustum = new THREE.Frustum();
+const _sphere = new THREE.Sphere();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
@@ -174,6 +176,17 @@ export class GameRenderer {
   /** Yapı duman sütunlarının ömür çarpanı (kayıt kipi, çekim seçeneği; oyunda 1). */
   cinemaSmoke = 1;
   private structViews = new Map<number, StructureView>();
+  /** Takım halkaları: her yapıda, görünüm ertelense de. */
+  private structRings = new Map<number, THREE.Mesh>();
+  /** Görülmüş yapılar: yeni kurulan yapı komşularının arazisini değiştirmiş olabilir (yalnız onlarda yeniden oturtma). */
+  private knownStructs = new Set<number>();
+  /** Dünya bağlandıktan sonraki ilk eşleme: görüşteki yapıların hepsi bütçesiz kurulur (yükleme ekranı açık). */
+  private bulkViews = true;
+  /**
+   * Yapının ağır görünümü ekranda bu yarıçaptan (CSS px) büyük ve görüşteyse kurulur; küçüğün yalnız halkası ve etiketi
+   * çizilir. Ana menünün arka planında (haritanın tamamı) 8, oyunda 3 (game.ts).
+   */
+  viewMinPx = 3;
   private structLabels = new Map<number, HTMLDivElement>();
   private structGroup = new THREE.Group();
   private bombViews = new Map<number, THREE.Mesh>();
@@ -379,8 +392,11 @@ export class GameRenderer {
     this.views.clear();
     for (const m of this.bombViews.values()) this.scene.remove(m);
     this.bombViews.clear();
-    for (const sv of this.structViews.values()) this.scene.remove(sv.ring);
     this.structViews.clear();
+    for (const r of this.structRings.values()) this.scene.remove(r);
+    this.structRings.clear();
+    this.knownStructs = new Set(world.structures.map((s) => s.id));
+    this.bulkViews = true;
     for (const m of this.fireViews.values()) this.scene.remove(m);
     this.fireViews.clear();
     for (const l of this.structLabels.values()) l.remove();
@@ -408,8 +424,11 @@ export class GameRenderer {
     this.scenery.rebuild();
   }
 
-  /** thinned: pencere açıkken kareler seyrek çizilir; otomatik çözünürlük bunu yavaşlama sanmasın. */
-  frame(realDt: number, alpha = 1, thinned = false): void {
+  /**
+   * thinned: pencere açıkken kareler seyrek çizilir; otomatik çözünürlük bunu yavaşlama sanmasın. draw false: sahne eşlenir,
+   * çizilmez (warm).
+   */
+  frame(realDt: number, alpha = 1, thinned = false, draw = true): void {
     const w = this.world;
     if (!w) return;
     this.alpha = alpha;
@@ -464,8 +483,19 @@ export class GameRenderer {
     this.effects.update(simDt, this.camera);
     this.syncOverlays(w);
     this.updateLabels(ms);
+    if (!draw) return;
     this.shadows.update(this.rig.target, this.camera, this.rig.distance, this.atmosphere.lightDir, realDt, [this.structGroup, this.farms.group, this.decor.group]);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Yükleme ekranı açıkken: sahne bir kez çizilmeden eşlenir (arazi, görüşteki yapılar, uçaklar), sonra gölgelendiriciler
+   * arka planda derlenir (KHR_parallel_shader_compile; yoksa ilk kullanımda eskisi gibi). İlk çizim derlemeyi beklemez:
+   * telefonda açılışın ilk karesi gölgelendiricileri bekleyerek saniyelerce donuyordu (2026-11-21).
+   */
+  async warm(): Promise<void> {
+    this.frame(0, 1, false, false);
+    await this.renderer.compileAsync(this.scene, this.camera);
   }
 
   /** Yapı tabanlarını süs katmanına bildir (ağaç, ev, tarla temizlenir). */
@@ -561,43 +591,92 @@ export class GameRenderer {
 
   // --- Yapılar -----------------------------------------------------------------
 
+  /** Yeni kurulan ya da taşınan yapının düzleştirmesi yakındaki yapıların arazisini değiştirmiş olabilir: onları yeniden oturt. */
+  private regroundNear(s: Structure): void {
+    const reach = Math.hypot(s.def.halfW, s.def.halfL) + 600;
+    for (const o of this.structViews.values()) {
+      if (o.s !== s && Math.hypot(o.s.pos.x - s.pos.x, o.s.pos.z - s.pos.z) < reach + Math.hypot(o.s.def.halfW, o.s.def.halfL)) o.reground();
+    }
+  }
+
+  /** Yapının ağır görünümü şimdi gerekli mi: görüş alanında ve ekranda viewMinPx'ten büyük. */
+  private wantsView(s: Structure, pxPerM: number): boolean {
+    // Video kaydı (sabit tampon): kamera uçarken yapılar kareye sonradan girmesin, hepsi baştan kurulur
+    if (this.fixedBuffer) return true;
+    const r = viewRadius(s);
+    _sphere.center.copy(s.pos);
+    _sphere.radius = r;
+    if (!_frustum.intersectsSphere(_sphere)) return false;
+    return (r / Math.max(1, this.camera.position.distanceTo(s.pos))) * pxPerM >= this.viewMinPx;
+  }
+
   private syncStructures(w: World, simDt: number): void {
+    // Ağır görünüm (on binlerce üçgenlik üs, fabrika, ev) yalnız görüşte ve ekranda birkaç pikselden büyük yapıya kurulur,
+    // yakından uzağa ve kare başına ~6 ms bütçeyle (en az bir); halka ve etiket her yapıda. Eskiden bütün yapılar ilk karede
+    // kuruluyordu: ana menü ve harekât başı telefonda saniyelerce donuyordu, ekranda 1–2 piksellik yapılar için (2026-11-21).
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    _frustum.setFromProjectionMatrix(_m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    const pxPerM = this.renderer.domElement.clientHeight / (2 * Math.tan((cam.fov * Math.PI) / 360));
+    const bulk = this.bulkViews;
+    this.bulkViews = false;
+    const missing: Structure[] = [];
     for (const s of w.structures) {
+      if (!this.knownStructs.has(s.id)) {
+        this.knownStructs.add(s.id);
+        this.regroundNear(s);
+      }
+      let ring = this.structRings.get(s.id);
       let v = this.structViews.get(s.id);
       if (v && v.placeKey !== placeKeyOf(s)) {
-        // Taşındı ya da döndürüldü: görünüm yeni yerinde yeniden kurulur
+        // Taşındı ya da döndürüldü: görünüm yeni yerinde yeniden kurulur, yeni yerin komşuları oturtulur
         this.structGroup.remove(v.group);
-        this.scene.remove(v.ring);
         this.structViews.delete(s.id);
         v = undefined;
+        this.regroundNear(s);
       }
+      if (ring && ring.userData.place !== placeKeyOf(s)) {
+        this.scene.remove(ring);
+        ring = undefined;
+      }
+      if (!ring) {
+        ring = structureRing(s);
+        ring.userData.place = placeKeyOf(s);
+        this.structRings.set(s.id, ring);
+        this.scene.add(ring);
+      }
+      ring.visible = this.rings;
       if (v && s.fire && v.fireLevel !== s.fire.level) {
         // İtfaiye merkezi seviye atladı: yeni seviyenin modeli
         this.structGroup.remove(v.group);
-        this.scene.remove(v.ring);
         this.structViews.delete(s.id);
         v = undefined;
       }
-      if (!v) {
-        // Yeni yapının düzleştirmesi yakındaki yapıların arazisini değiştirmiş olabilir: onları yeniden oturt
-        const reach = Math.hypot(s.def.halfW, s.def.halfL) + 600;
-        for (const o of this.structViews.values()) {
-          if (Math.hypot(o.s.pos.x - s.pos.x, o.s.pos.z - s.pos.z) < reach + Math.hypot(o.s.def.halfW, o.s.def.halfL)) o.reground();
-        }
-        v = new StructureView(s);
+      if (!this.structLabels.has(s.id)) {
+        const lbl = document.createElement('div');
+        lbl.className = `slabel t${s.team}`;
+        lbl.textContent = s.name;
+        this.labelLayer.appendChild(lbl);
+        this.structLabels.set(s.id, lbl);
+      }
+      if (!v && this.wantsView(s, pxPerM)) missing.push(s);
+    }
+    if (missing.length) {
+      const t0 = performance.now();
+      missing.sort((a, b) => cam.position.distanceToSquared(a.pos) - cam.position.distanceToSquared(b.pos));
+      let made = 0;
+      for (const s of missing) {
+        if (!bulk && !this.fixedBuffer && made > 0 && performance.now() - t0 > 6) break;
+        const v = new StructureView(s);
         this.structViews.set(s.id, v);
         this.structGroup.add(v.group);
-        this.scene.add(v.ring);
-        if (!this.structLabels.has(s.id)) {
-          const lbl = document.createElement('div');
-          lbl.className = `slabel t${s.team}`;
-          lbl.textContent = s.name;
-          this.labelLayer.appendChild(lbl);
-          this.structLabels.set(s.id, lbl);
-        }
+        made++;
       }
+    }
+    for (const s of w.structures) {
+      const v = this.structViews.get(s.id);
+      if (!v) continue;
       v.sync(simDt);
-      v.ring.visible = this.rings;
       // Hasarlı yapı tüter
       const ratio = s.hp / s.maxHp;
       if (ratio < 0.7 && w.time >= v.nextSmoke && settings.map.effects) {
