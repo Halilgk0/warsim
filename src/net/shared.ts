@@ -48,17 +48,43 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-10';
+export const LEGAL_VERSION = '2026-11-21';
 
 /**
- * Kayıt yerleri (2026-11-10): hesap başına 4 yer, her yerde bir kayıt. Otomatik kayıt aynı adlı oyunun önceki otomatik
- * kaydının yerine, yoksa önce 4. yere, o doluysa boş bir yere yazılır. Bu düzenden önceki fazla kayıtlar (yeri olmayan) için
- * hesaba uyarı gösterilir; SAVE_CLEANUP_DAYS içinde temizlenmezse sunucu en yeni 4 kayıt dışındakileri siler.
+ * Kayıt yerleri (2026-11-10; 2026-11-21'de 4 → 3): hesap başına SAVE_SLOTS_BASE yer, destekçi paketiyle bir ya da iki fazla
+ * (slotsFor). Her yerde bir kayıt. Otomatik kayıt aynı adlı oyunun önceki otomatik kaydının yerine, yoksa son yere, o doluysa
+ * boş bir yere yazılır. Kayıt sayısı hesabın yer sayısını aşarsa (yer azalınca: 4 kaydı olan eski hesap, iade) uyarı
+ * gösterilir; SAVE_CLEANUP_DAYS içinde inmezse sunucu en eski kayıtları siler.
  */
-export const SAVE_SLOTS = 4;
-export const SAVE_AUTO_HOME = 4;
+export const SAVE_SLOTS_BASE = 3;
+export const SAVE_SLOTS_MAX = 5;
 export const SAVE_CLEANUP_DAYS = 7;
-export const validSlot = (s: unknown): s is number => typeof s === 'number' && Number.isInteger(s) && s >= 1 && s <= SAVE_SLOTS;
+/** Yer numarası geçerli mi (1..n; n verilmezse en büyük yer sayısı). */
+export const validSlot = (s: unknown, n = SAVE_SLOTS_MAX): s is number => typeof s === 'number' && Number.isInteger(s) && s >= 1 && s <= n;
+
+/**
+ * Destekçi paketi (2026-11-21): ödeme Polar'ın sayfasında (satıcı Polar); kart bilgisi oyuna ve sunucuya gelmez. Basamak
+ * hesabın toplam ödemesinden (iade düşülür): 1 $ el sıkışma rozeti, 5 $ kanatlar ve 1 fazla kayıt yeri, 15 $ altın kask ve 2
+ * fazla kayıt yeri. Tek ödeme 1–50 $. Tutarlar sent.
+ */
+export const SUPPORT_MIN = 100;
+export const SUPPORT_MAX = 5000;
+export const SUPPORT_TIERS = [100, 500, 1500] as const;
+/** Fazla kayıt yeri: basamak 2'de 1, 3'te 2. */
+const EXTRA_SLOTS = [0, 0, 1, 2] as const;
+
+/** Toplam ödemenin basamağı: 0 (yok), 1, 2, 3. */
+export function supportTier(cents: number): 0 | 1 | 2 | 3 {
+  return cents >= SUPPORT_TIERS[2] ? 3 : cents >= SUPPORT_TIERS[1] ? 2 : cents >= SUPPORT_TIERS[0] ? 1 : 0;
+}
+
+/** Hesabın kayıt yeri sayısı. */
+export function slotsFor(cents: number): number {
+  return SAVE_SLOTS_BASE + EXTRA_SLOTS[supportTier(cents)];
+}
+
+/** Basamağın kazandırdığı fazla kayıt yeri. */
+export const extraSlots = (tier: number): number => EXTRA_SLOTS[tier as 0 | 1 | 2 | 3] ?? 0;
 
 /** Geri bildirim: görüş metninin en büyük uzunluğu ve "Steam'de _ $ veririm" üst sınırı. */
 export const FEEDBACK_MAX = 2000;
@@ -90,4 +116,6 @@ export interface LeaderRow {
   value: number;
   /** Yalnız oyuncunun kendi satırında: skoru gizli, tabloda sırası yok (rank 0). */
   hidden?: boolean;
+  /** Destekçi rozeti (1–3; yoksa yok). */
+  badge?: number;
 }

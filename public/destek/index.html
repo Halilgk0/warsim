@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Destekçi paketi | WarSimBox</title>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  /* Destekçi paketi: Polar'ın ödeme sayfasından dönülen sayfa (?durum=tamam|geri&l=tr|en). Oyun ödeme sayfasını yeni sekmede
+     açtığı için bu sekme kapatılıp oyuna dönülür; oyun sekmeye dönülünce rozeti kendisi yükler. 404.html ile aynı görünüm. */
+  :root { --bg: #eef1ec; --paper: #fbf8f3; --ink: #45434f; --muted: #8b8797; --accent: #86b3a2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: var(--bg) url(/yukleme.jpg) center 62% / cover; font: 500 16px/1.5 Nunito, system-ui, sans-serif; color: var(--ink); }
+  main { max-width: 440px; width: 100%; text-align: center; background: rgba(251, 248, 243, 0.94); border-radius: 18px;
+    padding: 24px 22px; box-shadow: 0 6px 24px rgba(60, 50, 80, 0.18); }
+  h1 { margin: 0 0 6px; font-size: 24px; font-weight: 800; }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+  a, button { display: inline-flex; align-items: center; height: 42px; padding: 0 16px; border: 0; border-radius: 12px; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .play { background: var(--accent); color: #fff; }
+  .alt { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(60, 55, 75, 0.1); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="h">Teşekkürler!</h1>
+  <p id="p1">Ödemen alındı. Rozetin birkaç saniye içinde hesabına eklenir.</p>
+  <p id="p2" class="muted">Bu sekmeyi kapatıp oyuna dönebilirsin; oyun rozetini kendisi yükler.</p>
+  <nav>
+    <button class="play" id="close" type="button">Sekmeyi kapat</button>
+    <a class="alt" id="game" href="/">Oyunu aç</a>
+  </nav>
+</main>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var en = q.get('l') === 'en';
+    var ok = q.get('durum') !== 'geri';
+    var t = en
+      ? ok
+        ? ['Thank you!', 'Your payment has been received. Your badge is added to your account in a few seconds.', 'You can close this tab and go back to the game; it loads your badge by itself.', 'Close this tab', 'Open the game', 'Supporter pack']
+        : ['No payment made', 'You left the payment page; nothing was charged.', 'You can close this tab and go back to the game.', 'Close this tab', 'Open the game', 'Supporter pack']
+      : ok
+        ? ['Teşekkürler!', 'Ödemen alındı. Rozetin birkaç saniye içinde hesabına eklenir.', 'Bu sekmeyi kapatıp oyuna dönebilirsin; oyun rozetini kendisi yükler.', 'Sekmeyi kapat', 'Oyunu aç', 'Destekçi paketi']
+        : ['Ödeme yapılmadı', 'Ödeme sayfasından çıktın; bir şey ödenmedi.', 'Bu sekmeyi kapatıp oyuna dönebilirsin.', 'Sekmeyi kapat', 'Oyunu aç', 'Destekçi paketi'];
+    document.documentElement.lang = en ? 'en' : 'tr';
+    document.title = t[5] + ' | WarSimBox';
+    ['h', 'p1', 'p2', 'close', 'game'].forEach(function (id, i) { document.getElementById(id).textContent = t[i]; });
+    // Oyunun açtığı sekme kapatılabilir; kapanmazsa (doğrudan açıldıysa) oyun bağlantısı kalır
+    document.getElementById('close').addEventListener('click', function () {
+      window.close();
+      setTimeout(function () { location.href = '/'; }, 300);
+    });
+    var list = ['/acilis/1.webp', '/acilis/2.webp', '/acilis/3.webp', '/acilis/4.webp', '/acilis/5.webp', '/acilis/6.webp', '/acilis/7.webp'];
+    document.body.style.backgroundImage = 'url(' + list[Math.floor(Math.random() * list.length)] + ')';
+  })();
+</script>
+</body>
+</html>

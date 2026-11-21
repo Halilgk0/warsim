@@ -1,6 +1,7 @@
 // Profil penceresi (ana menüde ad etiketine ya da oyunda Menü → Profil'e dokununca): hesap bilgisi, hesabın dili, e-posta
 // (yeni adres kodla doğrulanır) ve yenilik izni, skorlar (tüm zamanlar, sıra, bu hafta), buluttaki kayıt sayısı, şifre
-// değiştirme, hesabı silme ve skorların herkese açık tabloda görünüp görünmeyeceği.
+// değiştirme, hesabı silme ve skorların herkese açık tabloda görünüp görünmeyeceği. Destekçi rozeti adın yanında; destekçi
+// paketi düğmesi (Google Play uygulamasında yok).
 
 import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail, saveScorePublic } from '../persist';
 import { apiMessage } from '../net/api';
@@ -11,6 +12,8 @@ import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
 import { L, LANG, LOCALE } from '../i18n';
 import { type PendingSummary, pendingSummary } from '../net/statsOutbox';
 import { legalUrl } from '../yasal/liste';
+import { badgeName, badgeSvg } from './badges';
+import { SUPPORT_ON } from './support';
 
 /** Bekleyen skorun kısa dökümü: "3 düşürme, 12.400 kr, 1 zafer, 25 dk". */
 function pendingText(p: PendingSummary): string {
@@ -39,8 +42,11 @@ export class ProfileBox {
   private delOpen = false;
   private busy = false;
 
-  /** onDeleted: hesap silinince (ana menüye dönülür, ileti gösterilir). onScoresChanged: skor görünürlüğü değişince. */
-  constructor(private readonly onDeleted: (notice: string) => void, private readonly onScoresChanged: () => void) {
+  /**
+   * onDeleted: hesap silinince (ana menüye dönülür, ileti gösterilir). onScoresChanged: skor görünürlüğü değişince.
+   * onSupport: destekçi paketi penceresi.
+   */
+  constructor(private readonly onDeleted: (notice: string) => void, private readonly onScoresChanged: () => void, private readonly onSupport: () => void) {
     this.el = document.createElement('div');
     this.el.className = 'login profile hidden';
     $('app').append(this.el);
@@ -49,6 +55,7 @@ export class ProfileBox {
       if (t === this.el) return this.close();
       const act = t.closest<HTMLElement>('[data-pf]')?.dataset.pf;
       if (act === 'close') this.close();
+      else if (act === 'support') this.onSupport();
       else if (act === 'pw') {
         this.pwOpen = !this.pwOpen;
         this.mailOpen = false;
@@ -302,6 +309,19 @@ export class ProfileBox {
     }
   }
 
+  /** Destekçi satırı: rozet ve kayıt yeri; paket düğmesi (Play uygulamasında yok, rozet yine görünür). */
+  private supportRow(p: Profile): string {
+    const a = p.account;
+    const btn = SUPPORT_ON && !p.offline ? `<button type="button" class="link" data-pf="support">${L('Destekçi paketi', 'Supporter pack')}</button>` : '';
+    if (!a.badge) return btn ? `<div class="pf-sup">${btn}</div>` : '';
+    const n = a.supportCount ?? 0;
+    const usd = `${((a.support ?? 0) / 100).toLocaleString(LANG === 'en' ? 'en-US' : 'tr-TR', { maximumFractionDigits: 2 })} $`;
+    return `<div class="pf-sup">${badgeSvg(a.badge, '2.2em')}<span><b>${badgeName(a.badge)}</b><span class="muted small">${L(
+      `Destekçi · ${n} ödeme, toplam ${usd} · ${a.slots ?? 3} kayıt yeri`,
+      `Supporter · ${n} ${n === 1 ? 'payment' : 'payments'}, ${usd} in total · ${a.slots ?? 3} save slots`,
+    )}</span></span>${btn}</div>`;
+  }
+
   private render(): void {
     const p = this.profile;
     const head = `<div class="login-head"><b>${L('Profil', 'Profile')}</b><button type="button" class="icon" data-pf="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>`;
@@ -357,10 +377,11 @@ export class ProfileBox {
         </form>`
       : '';
     this.el.innerHTML = `<div class="login-card pf-card" role="dialog" aria-modal="true">${head}
-      <div class="pf-who"><b>${esc(a.name)}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)}${p.offline ? '' : ` · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}`} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
+      <div class="pf-who"><b>${esc(a.name)}${a.badge ? ` ${badgeSvg(a.badge, '1.3em')}` : ''}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)}${p.offline ? '' : ` · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}`} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
       ${p.offline ? '' : `<div class="pf-email"><span class="small ${p.email ? '' : 'muted'}">${p.email ? esc(p.email) : L('E-posta eklenmemiş', 'No email added')}</span>
         <button type="button" class="link" data-pf="mail">${this.mailOpen ? L('Vazgeç', 'Cancel') : p.email ? L('Düzenle', 'Edit') : L('Ekle', 'Add')}</button></div>`}
       ${mail}
+      ${this.supportRow(p)}
       <table class="pf-stats">
         <thead><tr><th></th><th>${L('Tüm zamanlar', 'All time')}</th><th>${L('Sıra', 'Rank')}</th><th>${L('Bu hafta', 'This week')}</th></tr></thead>
         <tbody>${rows}</tbody>

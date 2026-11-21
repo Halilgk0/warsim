@@ -15,7 +15,7 @@ import { $, esc } from './dom';
 import { L } from '../i18n';
 import { thanksBody, thanksTitle } from './thanks';
 
-export type ModalKind = 'research' | 'settings' | 'market' | 'town' | 'factory' | 'pit' | 'thanks' | 'notice';
+export type ModalKind = 'research' | 'settings' | 'market' | 'town' | 'factory' | 'pit' | 'thanks' | 'notice' | 'support';
 
 /** Bildirim penceresinin düğmesi: tıklanınca pencere kapanır, sonra run çalışır. */
 export interface NoticeButton {
@@ -165,6 +165,19 @@ export class Modals {
     this.render();
   }
 
+  /** Destekçi paketi penceresi (içeriği game.support). */
+  openSupport(): void {
+    this.kind = 'support';
+    this.isOpen = true;
+    this.el.classList.remove('hidden');
+    this.render();
+  }
+
+  /** Bu tür pencere açıksa yeniden çiz (zaman uyumsuz işlem bitince). */
+  rerender(kind: ModalKind): void {
+    if (this.isOpen && this.kind === kind) this.render();
+  }
+
   /** Bataryanın yuvası için top seçimi. */
   openPit(id: number, slot: number): void {
     this.pit = { id, slot };
@@ -223,6 +236,9 @@ export class Modals {
     if (this.kind === 'thanks') {
       title = thanksTitle(this.thanks.name);
       body = thanksBody(this.thanks.sec);
+    } else if (this.kind === 'support') {
+      title = this.game.support.title();
+      body = this.game.support.body();
     } else if (this.kind === 'notice') {
       title = this.notice.title;
       body = `<div class="notice-body">${this.notice.body}</div><div class="btn-row">${this.notice.buttons.map((b, i) =>
@@ -248,9 +264,9 @@ export class Modals {
       body = (this.marketMsg ? `<div class="mk-msg">${esc(this.marketMsg)}</div>` : '') + marketBody(this.game.world, this.game.playerTeam, this.marketBase, this.treasuryMine);
     }
     // Bildirim ana menünün ve hesap penceresinin de üstünde açılır
-    this.el.classList.toggle('over', this.kind === 'notice');
+    this.el.classList.toggle('over', this.kind === 'notice' || this.kind === 'support');
     this.el.innerHTML = `
-      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' || this.kind === 'settings' ? ' steel' : ''}${this.kind === 'town' || this.kind === 'market' ? ' civic' : ''}">
+      <div class="modal-card ${this.kind}${this.kind === 'factory' || this.kind === 'pit' || this.kind === 'research' || this.kind === 'thanks' || this.kind === 'notice' || this.kind === 'settings' || this.kind === 'support' ? ' steel' : ''}${this.kind === 'town' || this.kind === 'market' ? ' civic' : ''}">
         <div class="modal-head"><h2>${title}</h2><button class="close" data-act="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>
         <div class="modal-body">${body}</div>
       </div>`;
@@ -304,6 +320,9 @@ export class Modals {
         applySetting(b.dataset.set!, b.dataset.k, b.dataset.v!);
         saveSettings();
         this.render();
+        return;
+      case 'sp':
+        g.support.act(b);
         return;
       case 'nb': {
         const btn = this.notice.buttons[Number(b.dataset.i)];

@@ -8,7 +8,7 @@
 import type { SaveData } from './sim/save';
 import { L, LANG } from './i18n';
 import { ApiError, api, authToken, clientHash, gunzip, gzip, storeAuth, storedAccount } from './net/api';
-import { NAME_MAX, cleanName, nameKey, nameProblem } from './net/shared';
+import { NAME_MAX, SAVE_SLOTS_BASE, cleanName, nameKey, nameProblem } from './net/shared';
 import { dropAccountStats } from './net/statsOutbox';
 
 export { NAME_MAX, cleanName, nameKey };
@@ -33,6 +33,11 @@ export interface Account {
   lang?: 'tr' | 'en' | null;
   /** Okunan haberlerin kimlikleri (okunmamış işareti). */
   newsSeen?: string[];
+  /** Destekçi paketi toplamı (sent, iadeler düşülmüş), sayılan ödeme sayısı, rozetin basamağı (0–3) ve kayıt yeri sayısı. */
+  support?: number;
+  supportCount?: number;
+  badge?: number;
+  slots?: number;
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -54,7 +59,7 @@ export interface SaveMeta {
   mapSize?: number;
   /** Kayıt biçimi sürümü. */
   v?: number;
-  /** Kayıt yeri (1-4). Yoksa kayıt yerlerinden önceki fazla kayıt: temizlenmeyi bekler. */
+  /** Kayıt yeri (1..5). Yoksa kayıt yerlerinden önceki fazla kayıt: temizlenmeyi bekler. */
   slot?: number;
   /** Bu tarayıcıdaki kopya buluta yüklendi mi (yalnız yerel önbellekte). */
   synced?: boolean;
@@ -239,6 +244,7 @@ export async function changePassword(oldPass: string, newPass: string): Promise<
 
 export function logout(): void {
   if (authToken()) void api('POST', '/logout', undefined, { keepalive: true }).catch(() => {});
+  cleanupBy = null;
   session = null;
   storeAuth(null);
 }
@@ -459,9 +465,14 @@ export async function syncPending(account: string): Promise<void> {
 
 let cleanupBy: number | null = null;
 
-/** Fazla (yersiz) kayıtların sunucuda silineceği an; son listeye göre. Yoksa null. */
+/** Fazla kayıtların sunucuda silineceği an; son listeye göre. Yoksa null. */
 export function savesCleanupBy(): number | null {
   return cleanupBy;
+}
+
+/** Hesabın kayıt yeri sayısı (hesabın son bilinen hâli; kayıt listesi ve oturum yenilenince güncellenir). */
+export function saveSlotCount(): number {
+  return currentAccount()?.slots ?? SAVE_SLOTS_BASE;
 }
 
 /** Hesabın kayıtları, en yenisi önce: bulut + bu cihazda bekleyenler. Bağlantı yoksa yalnız bu cihazdakiler. */
@@ -471,9 +482,14 @@ export async function listSaves(account: string): Promise<SaveMeta[]> {
   try {
     await syncPending(account);
     local = await localList(account);
-    const r = await api<{ saves: SaveMeta[]; cleanupBy?: number | null }>('GET', '/saves');
+    const r = await api<{ saves: SaveMeta[]; cleanupBy?: number | null; slots?: number }>('GET', '/saves');
     cloud = r.saves;
     cleanupBy = r.cleanupBy ?? null;
+    const acc = currentAccount();
+    if (acc && r.slots && acc.slots !== r.slots) {
+      acc.slots = r.slots;
+      storeAuth(authToken(), acc);
+    }
   } catch {
     cloud = null;
   }
@@ -504,7 +520,9 @@ export async function writeSave(account: string, title: string, kind: SaveKind, 
   try {
     await upload(meta, json);
   } catch (e) {
-    if (e instanceof ApiError && (e.code === 'too_big' || e.code === 'too_many')) throw e;
+    // Yer yok (yer sayısı başka cihazda azalmış): bu cihazda da bekletilmez
+    if (e instanceof ApiError && e.code === 'no_slot') await localDelete(meta.id).catch(() => {});
+    if (e instanceof ApiError && (e.code === 'too_big' || e.code === 'too_many' || e.code === 'no_slot')) throw e;
     return { meta, cloud: false };
   }
   await localPut({ ...meta, synced: true }, null);

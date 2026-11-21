@@ -3,12 +3,14 @@
 // Görünüm (2026-11-21): önce ilk 5, altında "Tüm oyuncuları göster" ve oyuncunun kendi satırı (ilk 5'teyse yok). Açılınca
 // bütün liste sabit yükseklikte kayar (menü uzamaz); oyuncunun satırı kendi yerinde. Kendi satırı sırasına göre soluk renkle
 // vurgulu: 1 altın, 2 gümüş, 3 kırmızı, 4–5 mavi, ötesi gri. (Kutusuz, madalya şeritli deneme beğenilmedi.)
+// Destekçi rozeti adın yanında (2026-11-21; sunucu yalnız basamağı verir, tutarı vermez).
 
 import { ApiError, api } from '../net/api';
 import type { LeaderRow, Metric } from '../net/shared';
 import { currentAccount } from '../persist';
 import { fmtMoney } from '../sim/economy';
 import { esc, nf } from './dom';
+import { badgeSvg } from './badges';
 import { L } from '../i18n';
 
 type Period = 'all' | 'week';
@@ -124,7 +126,7 @@ export class LeaderboardPanel {
       const isMe = (r: LeaderRow) => !!mine && !mine.hidden && r.name === mine.name;
       const tone = (rank: number) => (rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : rank === 4 || rank === 5 ? 'r45' : 'rx');
       const row = (r: LeaderRow, me: boolean) => `<div class="lb-row ${me ? `me ${r.hidden ? 'rx' : tone(r.rank)}` : ''} ${!r.hidden && r.rank <= 3 ? `top top${r.rank}` : ''}" ${me ? 'data-me="1"' : ''}>
-        <span class="lb-rank">${r.hidden ? '–' : r.rank}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
+        <span class="lb-rank">${r.hidden ? '–' : r.rank}</span><span class="lb-name"><span>${esc(r.name)}</span>${r.badge ? badgeSvg(r.badge, '1.25em') : ''}</span><span class="lb-val">${fmtValue(m, r.value)}</span></div>`;
       const shown = this.all ? board.rows : board.rows.slice(0, 5);
       const inShown = !!mine && shown.some(isMe);
       const more = board.rows.length > 5

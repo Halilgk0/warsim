@@ -372,15 +372,33 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)
   yazılır, bağlantı yoksa orada bekler ve sonra yüklenir. Eski şifresiz hesabın (`warsim.accounts.v1`) sahibi şifre
   belirleyince bu tarayıcıdaki kayıtları yeni hesaba geçer.
-  - **Kayıt yerleri** (2026-11-10, `src/saveSlots.ts`, sabitler `shared.ts` `SAVE_SLOTS`): hesap başına 4 yer, yerde bir
-    kayıt (`SaveMeta.slot`); yazınca o yerdeki eski kayıt silinir (istemci ve sunucu). Otomatik kayıt `autoSlotFor`: aynı
-    adlı (komutan adı, `nameKey`) oyunun otomatik kaydının yeri, yoksa 4, 3, 2, 1'den ilk boş; yer yoksa alınmaz, ana menü
-    başlamadan ve yüklemeden önce söyler (`mainMenu.ts` `warnNoAutoSlot`). Elle kayıtta oyuncu yeri seçer (duraklatma →
-    Kaydet), dolu yere onayla.
-  - Yersiz (önceki) kayıtlar: sunucu `listSaves` toplam 4'ü aşınca `accounts.saves_warned`'a (migration 0008) ilk uyarı
-    anını yazar, `cleanupBy` döner; oyun her girişte uyarır (`game.ts` `checkSaveCleanup`, bildirim penceresi
-    `modals.openNotice`). 7 gün sonra yerdekiler ve en yeni yersizler kalır, gerisi silinir; sığınca yersizler boş yerlere
-    yerleşir (otomatikler 4'ten, elle olanlar 1'den). Yasal metinler bunu anlatır.
+  - **Kayıt yerleri** (2026-11-10; 2026-11-21'de 4 → 3, `src/saveSlots.ts`, `shared.ts` `SAVE_SLOTS_BASE`, `slotsFor`): hesap
+    başına 3 yer, destekçi paketiyle 4 ya da 5 (sunucu hesaba göre verir: `publicAccount.slots`, `/saves` `slots`; istemci
+    `persist.ts` `saveSlotCount`). Yerde bir kayıt (`SaveMeta.slot`); yazınca o yerdeki eski kayıt silinir (istemci ve sunucu).
+    Sunucu boş yere yeni kaydı ancak yer sayısının içindeyse ve kayıt sayısı yer sayısının altındaysa alır (`no_slot`); dolu
+    yerin üstüne yazmak hep olur. Otomatik kayıt `autoSlotFor`: aynı adlı (komutan adı, `nameKey`) oyunun otomatik kaydının
+    yeri, yoksa son yerden geriye ilk boş; yer yoksa alınmaz, ana menü başlamadan ve yüklemeden önce söyler (`mainMenu.ts`
+    `warnNoAutoSlot`). Elle kayıtta oyuncu yeri seçer (duraklatma → Kaydet), dolu yere onayla.
+  - Kayıt sayısı yer sayısını aşınca (4 kaydı olan eski hesap, iade): sunucu `listSaves` `accounts.saves_warned`'a (migration
+    0008) ilk uyarı anını yazar, `cleanupBy` döner; oyun her girişte "Bir kaydını sil" penceresini açar (`game.ts`
+    `checkSaveCleanup`, metin `savesList.ts` `overText`). Yer sayısının dışındaki dolu yer listede "fazla". 7 gün sonra en
+    yeniler yer sayısı kadar kalır, en eskiler silinir; sığınca yeri olmayan ya da dışarıda kalan kayıtlar boş yerlere geçer
+    (`placeSaves`: otomatikler sondan, elle olanlar 1'den). Yasal metinler bunu anlatır.
+  - **Destekçi paketi** (2026-11-21; plan ve kararlar hafızada `supporter-pack`): oyuncu 1–50 $ seçer (`ui/support.ts`, çelik
+    pencere, ana menü üst çubuğu ve Profil), sunucu Polar'da ödeme oturumu açar (`/api/support/checkout`; hesap numarası
+    siparişin `metadata.account`'unda), ödeme oyunun üstünde Polar'ın gömülü sayfasında (satıcı Polar; kart bilgisi bize gelmez).
+    Polar'ın imzalı bildirimi (`/api/support/webhook`, Standard Webhooks; `order.paid` / `order.refunded` / `order.updated`)
+    siparişi `support_orders`'a yazar (migration 0009), `accounts.support_cents` iadeler düşülerek yeniden hesaplanır; yalnız
+    USD sayılır. İade kuralı: ödemeden sonra 7 gün içinde ve toplam 2,5 saatten az oynandıysa; sipariş ilk yazılınca hesabın
+    toplam oynama süresi `play_sec_at`'e girer (migration 0010), `tools/admin.mjs` bilgi çıktısı `support.orders[].playedSinceMin`
+    verir. Ödeme oyunun üstünde Polar'ın gömülü sayfasında (`support.ts` `embed`, iframe + `POLAR_CHECKOUT` mesajları; oturum
+    `embed_origin` ile açılır, site Polar'da Settings → Embedding listesinde olmalı). Basamak toplamdan (`shared.ts` `supportTier`): 1 $ el sıkışma (bronz), 5 $ kanatlar (gri) ve +1 yer, 15 $
+    altın kask ve +2 yer; rozetler `ui/badges.ts` (sınıf `sbadge`; `.badge` panel etiketidir). Ödemeden önce pencerede
+    rozetler kilitli "Özel rozet". Skor tablosuna yalnız basamak gider, tutar gitmez. Ödeme penceresi kapanınca oyun hesabı
+    yeniler, rozet gelince teşekkür penceresi açar (yeni sekmede ödenirse `public/destek/`'e dönülür). Google Play uygulamasında
+    (`platform.ts` `IN_PLAY_APP`) ve eski adreste düğmeler yok (Play kuralı). Sırlar Cloudflare'de: `POLAR_TOKEN`,
+    `POLAR_WEBHOOK_SECRET`, `POLAR_PRODUCT_ID`; deneme için `POLAR_API` sandbox adresi ve `SITE_URL`. Yerel denemede
+    `wrangler dev --var POLAR_WEBHOOK_SECRET:...` ve imzalı sahte bildirim.
 - **`src/net/`:** sunucuyla konuşma (`api.ts`), istemci ve sunucu ortak kuralları (`shared.ts`: ad anahtarı, ölçütler),
   skor istatistiği (`stats.ts`).
 - **`worker/` + `migrations/`: sunucu (Cloudflare Worker + D1).** Oyunun dosyalarını Cloudflare sunar, worker yalnız
@@ -476,6 +494,11 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Hesap silme sayfası (`/hesap-silme/`, `/en/account-deletion/`; Google Play'in istediği herkese açık adres): adımlar, silinen
     ve kalan veriler. Kabul edilen metin değildir (`LEGAL_VERSION` değişmez); silme akışı ya da `eraseAccount` değişirse güncelle.
     Profil'deki silme formu bağlanır.
+  - Destekçi Paketi Koşulları (`/destekci-paketi-kosullari/`, `/en/supporter-pack-terms/`; 2026-11-21, avukat onaylı): satıcı
+    Polar, ne alındığı, teslim, iade (7 gün ve ödemeden sonra 2,5 saatten az oynama). Destekçi paketi penceresi ve Polar'daki
+    ürün açıklaması bağlanır. Gizlilik, KVKK ve hesap silme metinleri aynı gün Polar'ı, sipariş kayıtlarını ve 3 kayıt yerini
+    anlatacak biçimde güncellendi (taslak `release/avukat/destekci_paketi_taslak.md`, git dışı). Oyunda metin değişince
+    yeniden onay istenmez: önemli değişiklik haberle duyurulur.
 - **`src/autoFast.ts`:** Boş yolda otomatik 2×. 1× seçiliyken kollar yalnız yoldaysa oyun 2× akar. Görev, çatışma,
   kalkış, iniş ya da bilinen düşman yakındaysa 1× olur. Ayarlar → Oyun.
 - **`src/rec/`:** Video kayıt kipi. Tohumlu ve tekrarlanabilir sinematik çekimler, kare kare görüntü ve onunla senkron

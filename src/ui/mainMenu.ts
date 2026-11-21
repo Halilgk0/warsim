@@ -10,10 +10,9 @@ import { buildStartSitePool, rollStartSites, startSitesReady } from '../sim/star
 import type { StartLayout } from '../game';
 import type { SiteDef } from '../sim/mapData';
 import { mapPreview } from './mapPreview';
-import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError } from '../persist';
+import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError, saveSlotCount } from '../persist';
 import { SavesPanel } from './savesList';
 import { autoSlotFor } from '../saveSlots';
-import { SAVE_SLOTS } from '../net/shared';
 import { NEWS, newsCard, syncNewsMarks } from './news';
 import { enterFullscreen, fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
 import { $, esc, focusField } from './dom';
@@ -24,6 +23,8 @@ import { LeaderboardPanel } from './leaderboard';
 import { NEW_SITE, OLD_SITE } from '../net/api';
 import { encUrl } from '../ansiklopedi/liste';
 import { legalUrl } from '../yasal/liste';
+import { badgeSvg } from './badges';
+import { SUPPORT_ICON, SUPPORT_ON } from './support';
 
 type Tab = 'new' | 'saves' | 'scores';
 
@@ -219,15 +220,16 @@ export class MainMenu {
 
   /** Hesapta bu adlı oyunun otomatik kaydı için yer yok mu (liste henüz gelmediyse sorulmaz; oyunda ayrıca bakılır). */
   private noAutoSlot(playerName: string): boolean {
-    return !!currentAccount() && !this.saves.loading && autoSlotFor(this.saves.list, playerName) === null;
+    return !!currentAccount() && !this.saves.loading && autoSlotFor(this.saves.list, playerName, saveSlotCount()) === null;
   }
 
   private warnNoAutoSlot(playerName: string, goLabel: string, go: () => void): void {
+    const n = saveSlotCount();
     this.game.modals.openNotice(
       L('Otomatik kayıt için boş yer yok', 'No free slot for autosave'),
       `<p>${L(
-        `${SAVE_SLOTS} kayıt yerinin hepsi dolu ve hiçbiri <b>${esc(playerName)}</b> oyununun otomatik kaydı değil. Böyle başlarsan oyun otomatik kaydedilmez.`,
-        `All ${SAVE_SLOTS} save slots are full and none of them holds the autosave of <b>${esc(playerName)}</b>. If you start like this, the game will not autosave.`,
+        `${n} kayıt yerinin hepsi dolu ve hiçbiri <b>${esc(playerName)}</b> oyununun otomatik kaydı değil. Böyle başlarsan oyun otomatik kaydedilmez.`,
+        `All ${n} save slots are full and none of them holds the autosave of <b>${esc(playerName)}</b>. If you start like this, the game will not autosave.`,
       )}</p>
       <p>${L(
         'Kayıtlar\'dan birini silersen otomatik kayıt kendiliğinden başlar; oyunun içinden de silebilirsin (Menü → Kayıtlar).',
@@ -382,6 +384,9 @@ export class MainMenu {
       case 'profile':
         void this.game.profile.open();
         return;
+      case 'support':
+        this.game.support.open();
+        return;
       case 'news':
         this.game.news.open();
         return;
@@ -416,9 +421,13 @@ export class MainMenu {
       title="${L('Öğretici: konu seç', 'Tutorial: pick a topic')}" aria-label="${L('Öğretici', 'Tutorial')}">${TUT_ICON}<span>${L('Öğretici', 'Tutorial')}</span></button>`;
     // Dar ekranda haber kutusu ve sağdaki geri bildirim düğmesi yerine üst çubukta düğme
     // Ansiklopedi gerçek bağlantı (arama motorları düğmeyi değil bağlantıyı izler)
-    const newsBtn = `${lang}<a class="mm-login mm-link" href="${encUrl(LANG === 'en')}">${L('Ansiklopedi', 'Encyclopedia')}</a><button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;
+    // Destekçi paketi (Google Play uygulamasında yok): rozeti olana kendi rozeti, olmayana madalya simgesi; telefonda yalnız simge
+    const sup = SUPPORT_ON
+      ? `<button class="mm-login tut-btn sp-btn" data-mm="support" title="${L('Destekçi paketi', 'Supporter pack')}" aria-label="${L('Destekçi paketi', 'Supporter pack')}">${acc?.badge ? badgeSvg(acc.badge, '1.25em') : SUPPORT_ICON}<span>${L('Destekçi paketi', 'Supporter pack')}</span></button>`
+      : '';
+    const newsBtn = `${lang}${sup}<a class="mm-login mm-link" href="${encUrl(LANG === 'en')}">${L('Ansiklopedi', 'Encyclopedia')}</a><button class="mm-login mm-news-btn" data-mm="news">${L('Haberler', 'News')}</button><button class="mm-login mm-fb-btn" data-mm="feedback">${L('Geri bildirim', 'Feedback')}</button>`;
     const top = acc
-      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" role="button" tabindex="0" data-mm="profile" title="${L('Profil', 'Profile')}: ${esc(acc.name)}"><i></i><b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">${L('Çıkış yap', 'Log out')}</button></div>`
+      ? `<div class="mm-acc">${newsBtn}${fs}<span class="mm-user" role="button" tabindex="0" data-mm="profile" title="${L('Profil', 'Profile')}: ${esc(acc.name)}">${acc.badge ? badgeSvg(acc.badge, '1.3em') : '<i></i>'}<b>${esc(acc.name)}</b></span><button class="mini" data-mm="logout">${L('Çıkış yap', 'Log out')}</button></div>`
       : `<div class="mm-acc">${newsBtn}${fs}<button class="mm-login" data-mm="login">${L('Giriş yap', 'Log in')}</button></div>`;
     const foes = TEAM_SITES.slice(1, this.enemies + 1)
       .map((t) => `<span class="mm-foe"><i style="background:${t.color}"></i>${t.name}</span>`).join('');

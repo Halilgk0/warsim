@@ -24,7 +24,7 @@ import { loadMapParallel } from './render/mapLoad';
 import { mapById } from './sim/maps';
 import { setupCampaign, type MaintGift } from './sim/campaign';
 import { deserializeWorld, serializeWorld } from './sim/save';
-import { type SaveKind, currentAccount, listSaves, readSave, refreshSession, savesCleanupBy, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
+import { type SaveKind, currentAccount, listSaves, readSave, refreshSession, saveSlotCount, savesCleanupBy, shouldAskEmail, syncPending, writeSave, markThanksShown, thanksShown } from './persist';
 import { autoSlotFor } from './saveSlots';
 import { rollStartSites } from './sim/startSites';
 import type { SiteDef } from './sim/mapData';
@@ -47,8 +47,10 @@ import { sound } from './audio/sound';
 import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
-import { L, LOCALE, count } from './i18n';
-import { SAVE_SLOTS } from './net/shared';
+import { L, count } from './i18n';
+import { SAVE_SLOTS_BASE } from './net/shared';
+import { overText } from './ui/savesList';
+import { SupportBox } from './ui/support';
 import { Tutorial } from './ui/tutorial';
 import { MAP_BASE, MAP_SCALE } from './sim/mapData';
 import { AutoFast } from './autoFast';
@@ -98,7 +100,9 @@ export class Game {
   readonly build: BuildBar;
   readonly layout = new Layout();
   readonly login = new LoginBox();
-  readonly profile = new ProfileBox((notice) => this.showMainMenu(notice), () => this.menu.scoresChanged());
+  readonly profile = new ProfileBox((notice) => this.showMainMenu(notice), () => this.menu.scoresChanged(), () => this.support.open());
+  /** Destekçi paketi penceresi (Google Play uygulamasında kapalı). */
+  readonly support = new SupportBox(this);
   readonly news = new NewsView();
   readonly feedback = new FeedbackBox({
     login: () => this.login.open((a, created) => {
@@ -503,18 +507,14 @@ export class Game {
   private showCleanup(): void {
     const c = this.cleanupDue!;
     this.cleanupDue = null;
-    const left = Math.max(0, Math.ceil((c.by - Date.now()) / 86400000));
-    const when = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' }).format(c.by);
+    const n = saveSlotCount();
+    if (c.count <= n) return;
+    const k = c.count - n;
     this.modals.openNotice(
-      L('Kayıtlarını temizle', 'Clean up your saves'),
-      `<p>${L(
-        `Artık her hesapta en çok <b>${SAVE_SLOTS} kayıt</b> var. Senin <b>${c.count} kaydın</b> var.`,
-        `Each account now has at most <b>${SAVE_SLOTS} saves</b>. You have <b>${c.count} saves</b>.`,
-      )}</p>
-      <p>${L(
-        `Kayıtlar sekmesinden istemediklerini sil. <b>${when}</b> tarihine kadar (${left} gün) ${SAVE_SLOTS}'e inmezse en yeni ${SAVE_SLOTS} kayıt dışındakiler kendiliğinden silinir.`,
-        `Delete the ones you don't need in the Saves tab. If you still have more than ${SAVE_SLOTS} by <b>${when}</b> (${left} ${left === 1 ? 'day' : 'days'}), all but your newest ${SAVE_SLOTS} are deleted automatically.`,
-      )}</p>`,
+      k === 1 ? L('Bir kaydını sil', 'Delete one save') : L(`${k} kaydını sil`, `Delete ${k} saves`),
+      // Temel yer sayısı 4'ten 3'e indi (2026-11-21): eski hesaplara nedeni de söylenir
+      `${n === SAVE_SLOTS_BASE ? `<p>${L(`Kayıt yeri sayısı <b>${SAVE_SLOTS_BASE}</b>'e indi.`, `The number of save slots is now <b>${SAVE_SLOTS_BASE}</b>.`)}</p>` : ''}
+      <p>${overText(n, c.count, c.by)}</p>`,
       [
         { label: L('Kayıtları aç', 'Open saves'), primary: true, run: () => this.menu.openSaves() },
         { label: L('Sonra', 'Later'), run: () => {} },
@@ -531,7 +531,7 @@ export class Game {
     if (!acc || this.mode !== 'play') return false;
     try {
       if (kind === 'auto') {
-        const s = autoSlotFor(await listSaves(acc.key), this.world.playerName);
+        const s = autoSlotFor(await listSaves(acc.key), this.world.playerName, saveSlotCount());
         if (s === null) {
           if (!this.autoNoSlotTold) this.toast(L('Otomatik kayıt alınamadı: boş kayıt yeri yok. Menü → Kayıtlar\'dan birini silebilirsin.', 'Could not autosave: no free save slot. You can delete one in Menu → Saves.'), true);
           this.autoNoSlotTold = true;
@@ -1027,6 +1027,16 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       const tgt = e.target as HTMLElement;
       if (tgt instanceof HTMLInputElement || tgt instanceof HTMLSelectElement || tgt instanceof HTMLTextAreaElement) return;
+      // Ödeme penceresi, destekçi paketi ve bildirim en üstte: Esc önce onları kapatır, kısayollar çalışmaz
+      if (this.support.paying) {
+        if (e.code === 'Escape') this.support.closeEmbed();
+        return;
+      }
+      const top = this.modals.openKind;
+      if (top === 'support' || top === 'notice') {
+        if (e.code === 'Escape') this.modals.close();
+        return;
+      }
       // Profil penceresi ana menüde de açılır: odak dışındayken de Esc kapatsın
       if (this.profile.isOpen) {
         if (e.code === 'Escape') this.profile.close();
@@ -1164,7 +1174,12 @@ export class Game {
   /** Geri tuşu: bir şey kapandıysa ya da yok sayıldıysa true; ana menüde boştaysa false (sonraki basış çıkar). */
   private onBack(): boolean {
     if (this.tutorial.back()) return true;
-    if (this.profile.isOpen) this.profile.close();
+    // Ödeme penceresi (Polar) en üstte
+    if (this.support.closeEmbed()) return true;
+    // Destekçi paketi ve bildirim pencereleri profilin ve ana menünün üstünde açılır: önce onlar kapanır
+    const top = this.modals.openKind;
+    if (top === 'support' || top === 'notice') this.modals.close();
+    else if (this.profile.isOpen) this.profile.close();
     else if (this.login.isOpen) this.login.close();
     else if (this.feedback.isOpen) this.feedback.close();
     else if (this.news.isOpen) this.news.close();

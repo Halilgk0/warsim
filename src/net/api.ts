@@ -57,6 +57,11 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'too_big': return L('Kayıt çok büyük', 'The save is too large');
     case 'too_many': return L('Kayıt sınırı (30) doldu; eski bir kaydı sil', 'Save limit (30) reached; delete an old save');
     case 'no_save': return L('Kayıt bulunamadı', 'Save not found');
+    case 'no_slot': return L('Boş kayıt yeri yok; birini silip yer aç', 'No free save slot; delete one to make room');
+    case 'support_off': return L('Destekçi paketi şu an alınamıyor; biraz sonra tekrar dene', 'The supporter pack is not available right now; try again later');
+    case 'bad_amount': return L('Tutar 1 ile 50 $ arasında olmalı', 'The amount must be between $1 and $50');
+    case 'support_limit': return L('Çok fazla deneme; biraz sonra tekrar dene', 'Too many attempts; try again later');
+    case 'support_failed': return L('Ödeme sayfası açılamadı; biraz sonra tekrar dene', 'Could not open the payment page; try again later');
     case 'offline': return L('Sunucuya ulaşılamadı; bağlantını kontrol et', 'Could not reach the server; check your connection');
     default: return L('Sunucuda bir sorun oldu; biraz sonra tekrar dene', 'Something went wrong on the server; try again later');
   }

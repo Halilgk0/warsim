@@ -19,8 +19,12 @@
 //   gittiği news_seen listesinde "mail:<haber>" olarak durur; oyuncu bu önekle yazamaz, istemciye dönmez, hesapla silinir.
 // - Yönetici: ADMIN_KEY gizli değişkeniyle hesap bilgisi (kimlik doğrulama soruları için), kurtarma kodu sıfırlama ve
 //   hesap silme.
+// - Destekçi paketi (2026-11-21): oyuncu tutarı seçer, sunucu Polar'da ödeme oturumu açar (hesap kimliği siparişin
+//   metadata'sında), ödeme Polar'ın sayfasında yapılır; kart bilgisi buraya gelmez. Polar'ın imzalı sipariş bildirimi
+//   (order.paid, order.refunded, order.updated) siparişi yazar, hesabın toplamı iadeler düşülerek yeniden hesaplanır. Rozet ve
+//   kayıt yeri sayısı toplamdan çıkar (shared.ts supportTier, slotsFor).
 
-import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, SAVE_AUTO_HOME, SAVE_CLEANUP_DAYS, SAVE_SLOTS, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, validEmail } from '../src/net/shared';
+import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
@@ -32,6 +36,13 @@ interface Env extends MailEnv {
   ADMIN_KEY?: string;
   /** Oyunun dosyaları (dist/): olmayan adreste 404.html buradan. */
   ASSETS: Fetcher;
+  /** Polar (destekçi paketi): kurum erişim belirteci, bildirim sırrı (whsec_…), ürün kimliği; API adresi (deneme: sandbox). */
+  POLAR_TOKEN?: string;
+  POLAR_WEBHOOK_SECRET?: string;
+  POLAR_PRODUCT_ID?: string;
+  POLAR_API?: string;
+  /** Ödeme bitince dönülen site (yerelde http://localhost:5173). */
+  SITE_URL?: string;
 }
 
 interface AccountRow {
@@ -57,6 +68,10 @@ interface AccountRow {
   score_public: number;
   /** Fazla kayıt uyarısının ilk gösterildiği an (ms; migration 0008). Kayıt sayısı yerlere sığınca boşalır. */
   saves_warned?: number | null;
+  /** Destekçi paketi toplamı (sent, iadeler düşülmüş; migration 0009), seviyesi (0–3) ve sayılan ödeme sayısı (0010). */
+  support_cents?: number;
+  support_tier?: number;
+  support_count?: number;
 }
 
 const NEWS_SEEN_MAX = 200;
@@ -159,7 +174,11 @@ function newsSeenList(a: AccountRow): string[] {
   }
 }
 
-const publicAccount = (a: AccountRow) => ({ name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang, newsSeen: newsSeenList(a) });
+/** Hesabın sahibine dönen bilgi (tarayıcıda saklanır; skor tablosuna gitmez). */
+const publicAccount = (a: AccountRow) => {
+  const cents = a.support_cents ?? 0;
+  return { name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang, newsSeen: newsSeenList(a), support: cents, supportCount: a.support_count ?? 0, badge: supportTier(cents), slots: slotsFor(cents) };
+};
 
 /** Geçerli dil kodu ya da yok. */
 const langCode = (v: unknown): 'tr' | 'en' | null => (v === 'tr' || v === 'en' ? v : null);
@@ -307,7 +326,7 @@ async function emailTaken(env: Env, email: string, accountId = 0): Promise<boole
 /** Hesabı ve ona bağlı bütün verileri siler. Hesaba bağlı yeni tablo eklenirse buraya da eklenmeli. */
 async function eraseAccount(env: Env, a: AccountRow): Promise<{ sessions: number; saves: number; campaigns: number; stats: number }> {
   const done = await env.DB.batch([
-    ...['sessions', 'saves', 'campaigns', 'stats'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE account_id = ?`).bind(a.id)),
+    ...['sessions', 'saves', 'campaigns', 'stats', 'support_orders'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE account_id = ?`).bind(a.id)),
     env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(a.email ?? ''),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(a.id),
   ]);
@@ -494,16 +513,17 @@ function bytesToB64(b: Uint8Array): string {
 interface SaveRow { id: string; created: number; meta: Record<string, unknown> }
 
 /**
- * Yeri olmayan (kayıt yerlerinden önceki) kayıtları boş yerlere yerleştirir: otomatikler önce 4. yere doğru, elle olanlar
- * 1. yerden başlayarak; en yenisi önce. Yer kalmazsa yersiz kalır.
+ * Yeri olmayan ya da hesabın yer sayısının (n) dışında kalan kayıtları boş yerlere yerleştirir: otomatikler son yerden geriye,
+ * elle olanlar 1. yerden başlayarak; en yenisi önce. Yer kalmazsa yersiz kalır (çağıran, kayıtlar sığınca çağırır).
  */
-async function placeLegacySaves(env: Env, a: AccountRow, rows: SaveRow[]): Promise<void> {
-  const free = new Set(Array.from({ length: SAVE_SLOTS }, (_, i) => i + 1));
-  for (const r of rows) if (validSlot(r.meta.slot)) free.delete(r.meta.slot);
-  const legacy = rows.filter((r) => !validSlot(r.meta.slot)).sort((x, y) => y.created - x.created);
+async function placeSaves(env: Env, a: AccountRow, rows: SaveRow[], n: number): Promise<void> {
+  const free = new Set(Array.from({ length: n }, (_, i) => i + 1));
+  for (const r of rows) if (validSlot(r.meta.slot, n)) free.delete(r.meta.slot);
+  const out = rows.filter((r) => !validSlot(r.meta.slot, n)).sort((x, y) => y.created - x.created);
+  const up = Array.from({ length: n }, (_, i) => i + 1);
   const ups: D1PreparedStatement[] = [];
-  for (const r of legacy) {
-    const order = r.meta.kind === 'auto' ? [SAVE_AUTO_HOME, 3, 2, 1] : [1, 2, 3, 4];
+  for (const r of out) {
+    const order = r.meta.kind === 'auto' ? [...up].reverse() : up;
     const slot = order.find((s) => free.has(s));
     if (slot === undefined) break;
     free.delete(slot);
@@ -514,35 +534,35 @@ async function placeLegacySaves(env: Env, a: AccountRow, rows: SaveRow[]): Promi
 }
 
 /**
- * Kayıt listesi, en yenisi önce. Toplam SAVE_SLOTS'u aşıyorsa (düzenden önceki fazla kayıtlar): ilk listede uyarı zamanı
- * yazılır ve cleanupBy döner; SAVE_CLEANUP_DAYS sonra yerdeki kayıtlar ve en yeni yersiz kayıtlar kalır, gerisi silinir.
- * Sığıyorsa yersizler boş yerlere yerleşir.
+ * Kayıt listesi, en yenisi önce; hesabın yer sayısıyla (slots). Kayıt sayısı yer sayısını aşıyorsa (yer 4'ten 3'e indi, iade,
+ * kayıt yerlerinden önceki fazla kayıtlar): ilk listede uyarı zamanı yazılır ve cleanupBy döner; SAVE_CLEANUP_DAYS sonra en
+ * yeni kayıtlar yer sayısı kadar kalır, en eskiler silinir. Sığınca yeri olmayan ya da yer sayısının dışında kalanlar boş
+ * yerlere geçer.
  */
 async function listSaves(env: Env, a: AccountRow): Promise<Response> {
   const now = Date.now();
+  const n = slotsFor(a.support_cents ?? 0);
   const { results } = await env.DB.prepare('SELECT id, created, meta FROM saves WHERE account_id = ?').bind(a.id).all<{ id: string; created: number; meta: string }>();
   let rows: SaveRow[] = results.map((r) => ({ id: r.id, created: r.created, meta: JSON.parse(r.meta) as Record<string, unknown> }));
   let cleanupBy: number | null = null;
-  if (rows.length > SAVE_SLOTS) {
+  if (rows.length > n) {
     const warned = a.saves_warned ?? now;
     if (a.saves_warned == null) await env.DB.prepare('UPDATE accounts SET saves_warned = ? WHERE id = ?').bind(now, a.id).run();
     cleanupBy = warned + SAVE_CLEANUP_DAYS * DAY_MS;
     if (now >= cleanupBy) {
-      const slotted = rows.filter((r) => validSlot(r.meta.slot));
-      const legacy = rows.filter((r) => !validSlot(r.meta.slot)).sort((x, y) => y.created - x.created);
-      const keep = new Set([...slotted, ...legacy.slice(0, Math.max(0, SAVE_SLOTS - slotted.length))].map((r) => r.id));
+      const keep = new Set([...rows].sort((x, y) => y.created - x.created).slice(0, n).map((r) => r.id));
       const gone = rows.filter((r) => !keep.has(r.id));
       if (gone.length) await env.DB.batch(gone.map((r) => env.DB.prepare('DELETE FROM saves WHERE id = ? AND account_id = ?').bind(r.id, a.id)));
       rows = rows.filter((r) => keep.has(r.id));
       cleanupBy = null;
     }
   }
-  if (rows.length <= SAVE_SLOTS) {
+  if (rows.length <= n) {
     if (a.saves_warned != null) await env.DB.prepare('UPDATE accounts SET saves_warned = NULL WHERE id = ?').bind(a.id).run();
-    await placeLegacySaves(env, a, rows);
+    await placeSaves(env, a, rows, n);
   }
   rows.sort((x, y) => y.created - x.created);
-  return json({ saves: rows.map((r) => r.meta), cleanupBy });
+  return json({ saves: rows.map((r) => r.meta), cleanupBy, slots: n });
 }
 
 async function putSave(req: Request, env: Env, a: AccountRow, id: string): Promise<Response> {
@@ -560,6 +580,16 @@ async function putSave(req: Request, env: Env, a: AccountRow, id: string): Promi
   const kind = b.meta.kind === 'auto' ? 'auto' : 'manual';
   const created = typeof b.meta.created === 'number' ? b.meta.created : Date.now();
   const slot = validSlot(b.meta.slot) ? b.meta.slot : null;
+  if (!owner && slot !== null) {
+    // Dolu yerin üstüne yazmak her zaman olur (yer sayısı azalmış hesapta yer sayısının dışındaki kendi yerine de); boş yere
+    // yeni kayıt ancak yer sayısının içindeyse ve kayıt sayısı yer sayısının altındaysa
+    const n = slotsFor(a.support_cents ?? 0);
+    const [taken, count] = await env.DB.batch<{ n: number }>([
+      env.DB.prepare("SELECT COUNT(*) AS n FROM saves WHERE account_id = ? AND json_extract(meta, '$.slot') = ?").bind(a.id, slot),
+      env.DB.prepare('SELECT COUNT(*) AS n FROM saves WHERE account_id = ?').bind(a.id),
+    ]);
+    if (!taken.results[0]?.n && (slot > n || (count.results[0]?.n ?? 0) >= n)) return fail(409, 'no_slot');
+  }
   if (!owner && kind === 'manual' && slot === null) {
     // Yersiz elle kayıt: yalnız kayıt yerlerinden önceki istemciler (eski sınır)
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM saves WHERE account_id = ? AND kind = 'manual'").bind(a.id).first<{ n: number }>();
@@ -645,21 +675,168 @@ async function leaderboard(url: URL, env: Env, a: AccountRow | null): Promise<Re
   const period = url.searchParams.get('period') === 'week' ? isoWeek(Date.now()) : 'all';
   // Sütun adı yalnız beyaz listeden (METRICS): sorguya kullanıcı girdisi girmez
   const { results } = await env.DB.prepare(
-    `SELECT a.name AS name, s.${metric} AS value FROM stats s JOIN accounts a ON a.id = s.account_id
+    `SELECT a.name AS name, s.${metric} AS value, a.support_cents AS cents FROM stats s JOIN accounts a ON a.id = s.account_id
      WHERE s.period = ? AND s.${metric} > 0 AND a.score_public = 1 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 200`,
-  ).bind(period).all<{ name: string; value: number }>();
-  const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value }));
+  ).bind(period).all<{ name: string; value: number; cents: number }>();
+  // Tutar tabloya gitmez, yalnız rozetin basamağı
+  const badge = (cents: number | undefined) => supportTier(cents ?? 0) || undefined;
+  const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value, badge: badge(r.cents) }));
   let me: LeaderRow | null = null;
   if (a) {
     const mine = await env.DB.prepare(`SELECT ${metric} AS value FROM stats WHERE account_id = ? AND period = ?`).bind(a.id, period).first<{ value: number }>();
     if (mine && mine.value > 0) {
       if (a.score_public) {
         const above = await env.DB.prepare(`SELECT COUNT(*) AS n FROM stats s JOIN accounts b ON b.id = s.account_id WHERE s.period = ? AND b.score_public = 1 AND s.${metric} > ?`).bind(period, mine.value).first<{ n: number }>();
-        me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value };
-      } else me = { rank: 0, name: a.name, value: mine.value, hidden: true };
+        me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value, badge: badge(a.support_cents) };
+      } else me = { rank: 0, name: a.name, value: mine.value, hidden: true, badge: badge(a.support_cents) };
     }
   }
   return json({ metric, period, rows, me });
+}
+
+// ---------------------------------------------------------------- destekçi paketi (Polar)
+
+const POLAR_API = 'https://api.polar.sh/v1';
+/** Ödeme oturumu açma sınırı: hesap başına (Polar'a gereksiz istek gitmesin). */
+const LIMIT_SUPPORT = { max: 20, ms: 60 * 60 * 1000 };
+/** Bildirimin zaman damgası en çok bu kadar eski ya da ileri olabilir (yeniden oynatma). */
+const WEBHOOK_TOLERANCE_S = 300;
+/** Sayılan sipariş durumları (iade edilen kısım tutardan düşülür). */
+const PAID_STATES = ['paid', 'partially_refunded', 'refunded'];
+
+/**
+ * Ödeme oturumu: oyuncunun seçtiği tutarla (sent, 1–50 $) Polar'da oturum açılır, ödeme sayfasının adresi döner. Hesap kimliği
+ * siparişin metadata'sına yazılır (Polar bunu bildirimde geri yollar); e-posta ve başka hesap bilgisi gönderilmez.
+ */
+async function supportCheckout(req: Request, env: Env, a: AccountRow): Promise<Response> {
+  if (!env.POLAR_TOKEN || !env.POLAR_PRODUCT_ID) return fail(503, 'support_off');
+  const b = await body<{ amount?: number; lang?: string }>(req);
+  const amount = Number(b?.amount);
+  if (!Number.isInteger(amount) || amount < SUPPORT_MIN || amount > SUPPORT_MAX) return fail(400, 'bad_amount');
+  if (await limited(env, [{ key: `sp:hesap:${a.id}`, ...LIMIT_SUPPORT }], Date.now())) return fail(429, 'support_limit');
+  const site = (env.SITE_URL ?? 'https://warsimbox.com').replace(/\/$/, '');
+  const l = langCode(b?.lang) === 'en' ? 'en' : 'tr';
+  const ip = clientIp(req);
+  // Ödeme penceresi oyunun üstünde açılır (gömülü): oyunun adresi; yerel denemede localhost. Polar'da Settings → Embedding'de
+  // listelenmiş olmalı
+  const origin = req.headers.get('origin') ?? '';
+  const embed = origin === new URL(site).origin || /^http:\/\/localhost(:\d+)?$/.test(origin) ? origin : new URL(site).origin;
+  const res = await fetch(`${env.POLAR_API ?? POLAR_API}/checkouts/`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.POLAR_TOKEN}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      products: [env.POLAR_PRODUCT_ID],
+      amount,
+      currency: 'usd',
+      metadata: { account: a.id },
+      embed_origin: embed,
+      success_url: `${site}/destek/?durum=tamam&l=${l}`,
+      return_url: `${site}/destek/?durum=geri&l=${l}`,
+      // Vergi ve para birimi için alıcının ülkesi (Polar'ın önerisi: Worker'da CF-Connecting-IP)
+      ...(ip !== 'yerel' ? { customer_ip_address: ip } : {}),
+    }),
+  }).catch((e: unknown) => {
+    console.error(e);
+    return null;
+  });
+  const out = res ? await res.json().catch(() => null) as { url?: string } | null : null;
+  if (!res?.ok || typeof out?.url !== 'string') {
+    console.error('polar checkout', res?.status, JSON.stringify(out).slice(0, 500));
+    return fail(502, 'support_failed');
+  }
+  return json({ url: out.url });
+}
+
+/**
+ * Standard Webhooks imzası: "v1,<base64>" = HMAC-SHA256(anahtar, "<id>.<zaman>.<gövde>"). Anahtar "whsec_" sonrasının
+ * base64 çözümü; 8 Eylül 2026'dan önceki Polar sırlarında sırrın kendisi (ikisi de denenir).
+ */
+async function webhookSigned(secret: string, h: Headers, raw: string): Promise<boolean> {
+  const id = h.get('webhook-id');
+  const ts = h.get('webhook-timestamp');
+  const sig = h.get('webhook-signature');
+  if (!id || !ts || !sig) return false;
+  const t = Number(ts);
+  if (!Number.isFinite(t) || Math.abs(Date.now() / 1000 - t) > WEBHOOK_TOLERANCE_S) return false;
+  const given = sig.split(' ').map((p) => p.split(',')).filter((p) => p[0] === 'v1' && p[1]).map((p) => p[1]);
+  if (!given.length) return false;
+  const keys: Uint8Array[] = [];
+  try {
+    keys.push(b64ToBytes(secret.replace(/^whsec_/, '')));
+  } catch {
+    /* base64 değil: eski biçim */
+  }
+  keys.push(enc.encode(secret));
+  const content = enc.encode(`${id}.${ts}.${raw}`);
+  for (const k of keys) {
+    const key = await crypto.subtle.importKey('raw', k, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const mac = bytesToB64(new Uint8Array(await crypto.subtle.sign('HMAC', key, content)));
+    if (given.some((g) => same(g, mac))) return true;
+  }
+  return false;
+}
+
+interface PolarOrder {
+  id?: unknown;
+  status?: unknown;
+  net_amount?: unknown;
+  refunded_amount?: unknown;
+  currency?: unknown;
+  product_id?: unknown;
+  metadata?: Record<string, unknown> | null;
+}
+
+const cents = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
+
+/**
+ * Polar'ın sipariş bildirimi: sipariş yazılır (aynı bildirim yeniden gelirse üstüne), iade edilen kısım hiç azalmaz (bildirimler
+ * sırasız gelebilir), hesabın toplamı yeniden hesaplanır. Başka ürünün, hesabı silinmiş ya da kimliksiz siparişi yok sayılır.
+ */
+async function supportWebhook(req: Request, env: Env): Promise<Response> {
+  if (!env.POLAR_WEBHOOK_SECRET) return fail(503, 'support_off');
+  const raw = await req.text();
+  if (!(await webhookSigned(env.POLAR_WEBHOOK_SECRET, req.headers, raw))) return fail(403, 'bad_signature');
+  let ev: { type?: unknown; data?: PolarOrder };
+  try {
+    ev = JSON.parse(raw) as typeof ev;
+  } catch {
+    return fail(400, 'bad_body');
+  }
+  const o = ev.data;
+  if (!['order.paid', 'order.refunded', 'order.updated'].includes(String(ev.type)) || !o || typeof o.id !== 'string') return json({ ok: true, skip: 'type' });
+  if (env.POLAR_PRODUCT_ID && o.product_id !== env.POLAR_PRODUCT_ID) return json({ ok: true, skip: 'product' });
+  const status = String(o.status ?? '');
+  if (!PAID_STATES.includes(status)) return json({ ok: true, skip: 'status' });
+  const accountId = Number(o.metadata?.account);
+  if (!Number.isInteger(accountId) || accountId <= 0) return json({ ok: true, skip: 'account' });
+  if (!(await env.DB.prepare('SELECT 1 FROM accounts WHERE id = ?').bind(accountId).first())) return json({ ok: true, skip: 'gone' });
+  const currency = String(o.currency ?? '').toLowerCase();
+  if (currency !== 'usd') console.error('polar order currency', o.id, currency);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      // play_sec_at: ilk bildirimdeki toplam oynama süresi (iade kuralı: ödemeden sonra 2,5 saat ve üstü oynandıysa iade yok);
+      // sonraki bildirimler değiştirmez
+      `INSERT INTO support_orders (id, account_id, net_cents, refunded_cents, currency, status, created, updated, play_sec_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT play_sec FROM stats WHERE account_id = ?2 AND period = 'all'), 0))
+       ON CONFLICT (id) DO UPDATE SET net_cents = excluded.net_cents, refunded_cents = MAX(refunded_cents, excluded.refunded_cents),
+         status = excluded.status, updated = excluded.updated`,
+    ).bind(o.id, accountId, cents(o.net_amount), cents(o.refunded_amount), currency, status, now, now),
+    // Basamaklar dolar üzerinden: başka para birimindeki sipariş sayılmaz (oturum hep USD açılır). Toplam tutar ve sayılan
+    // ödeme sayısı (iadesi tam yapılmamış ödemeler)
+    env.DB.prepare(
+      `UPDATE accounts SET
+         support_cents = (SELECT COALESCE(SUM(MAX(0, net_cents - refunded_cents)), 0) FROM support_orders
+           WHERE account_id = ?1 AND currency = 'usd' AND status IN ('paid', 'partially_refunded', 'refunded')),
+         support_count = (SELECT COUNT(*) FROM support_orders
+           WHERE account_id = ?1 AND currency = 'usd' AND status IN ('paid', 'partially_refunded') AND net_cents > refunded_cents)
+       WHERE id = ?1`,
+    ).bind(accountId),
+  ]);
+  // Seviye (rozet) toplamdan: eşikler tek yerde (shared.ts supportTier)
+  const total = await env.DB.prepare('SELECT support_cents AS c FROM accounts WHERE id = ?').bind(accountId).first<{ c: number }>();
+  await env.DB.prepare('UPDATE accounts SET support_tier = ? WHERE id = ?').bind(supportTier(total?.c ?? 0), accountId).run();
+  return json({ ok: true });
 }
 
 // ---------------------------------------------------------------- yönetici
@@ -676,10 +853,18 @@ async function admin(req: Request, env: Env, url: URL): Promise<Response> {
   if (req.method === 'GET') {
     // Kimlik doğrulama soruları için: açılış tarihi, son giriş, son harekâtlar ve kayıtlar
     const saves = await env.DB.prepare('SELECT meta FROM saves WHERE account_id = ? ORDER BY created DESC LIMIT 5').bind(a.id).all<{ meta: string }>();
-    const stats = await env.DB.prepare("SELECT * FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id).first();
+    const stats = await env.DB.prepare("SELECT * FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id).first<{ play_sec?: number }>();
+    // Destekçi paketi siparişleri ve iade kuralı için ödemeden sonra oynanan süre
+    const orders = await env.DB.prepare('SELECT id, net_cents, refunded_cents, currency, status, created, play_sec_at FROM support_orders WHERE account_id = ? ORDER BY created DESC')
+      .bind(a.id).all<{ id: string; net_cents: number; refunded_cents: number; currency: string; status: string; created: number; play_sec_at: number | null }>();
     return json({
       name: a.name, email: a.email, lang: a.lang, legalVersion: a.legal_version, newsOpt: !!a.news_opt,
       created: new Date(a.created).toISOString(), lastLogin: new Date(a.last_login).toISOString(), stats,
+      support: { cents: a.support_cents ?? 0, tier: a.support_tier ?? 0, count: a.support_count ?? 0, orders: orders.results.map((o) => ({
+        id: o.id, usd: o.net_cents / 100, refundedUsd: o.refunded_cents / 100, currency: o.currency, status: o.status,
+        paidAt: new Date(o.created).toISOString(), daysSince: Math.floor((Date.now() - o.created) / DAY_MS),
+        playedSinceMin: o.play_sec_at === null ? null : Math.round(((stats?.play_sec ?? 0) - o.play_sec_at) / 60),
+      })) },
       saves: saves.results.map((r) => {
         const m = JSON.parse(r.meta);
         return { title: m.title, created: new Date(m.created).toISOString(), mapId: m.mapId, mapSize: m.mapSize, enemies: m.enemies, gameTime: m.gameTime };
@@ -705,6 +890,7 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   if (m === 'POST' && path === '/recover') return recover(req, env);
   if (m === 'POST' && path === '/logout') return logout(req, env);
   if (path === '/admin') return admin(req, env, url);
+  if (m === 'POST' && path === '/support/webhook') return supportWebhook(req, env);
   if (m === 'GET' && path === '/leaderboard') return leaderboard(url, env, await authed(req, env));
   const a = await authed(req, env);
   if (!a) return fail(401, 'no_session');
@@ -721,6 +907,7 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
     if (m === 'DELETE') return deleteSave(env, a, id);
   }
   if (m === 'POST' && path === '/stats') return reportStats(req, env, a);
+  if (m === 'POST' && path === '/support/checkout') return supportCheckout(req, env, a);
   return fail(404, 'not_found');
 }
 

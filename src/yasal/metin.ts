@@ -32,6 +32,7 @@ const privacyTr: LegalText = {
   <li><b>E-postanı doğrularken:</b> doğrulama kodunun özeti (kod 10 dakika geçerlidir) ve gönderim sınırları için e-posta adresinin ve IP adresinin özetleri. Bunlar kısa süre sonra silinir.</li>
   <li><b>Hesabınla oynarsan:</b> buluta yüklenen oyun kayıtların, skorların (düşürme, zafer, kazanç gibi), harekât istatistiklerin, oynama süren, öğretici ve skor tablosu tercihlerin ve okuduğun haberler.</li>
   <li><b>Geri bildirim gönderirsen:</b> görüş ve önerin, fiyat önerin ve adın; hesabınla gönderdiysen e-posta adresin ve dil seçimin. Görüş ve öneri için e-postalı hesap gerekir, yalnız fiyat önerisi için gerekmez (komutan adı yazman yeterli). Bunlar ${OWNER.email} kutusuna e-posta olarak gelir ve orada saklanır.</li>
+  <li><b>Destekçi paketi alırsan:</b> hesabında destekçi seviyen (rozetin), toplam ödeme tutarın (iadeler düşülmüş) ve ödeme sayın; her ödeme için Polar’ın bize bildirdiği sipariş numarası, tutar (vergi öncesi), iade edilen tutar, para birimi, sipariş durumu, ödeme tarihi ve o andaki toplam oynama süren (iade kuralı için). Kart bilgilerin, fatura adın ve adresin, ödemede yazdığın e-posta adresi doğrudan Polar’a girilir; bize gelmez.</li>
   <li><b>Siteye giren herkes için:</b> sayfanın sunulabilmesi için IP adresin ve tarayıcı bilgilerin barındırma ve yazı tipi hizmetlerince (aşağıda) işlenir.</li>
 </ul>
 <p>Reklam ya da izleme çerezi ve analitik aracı kullanmıyoruz.</p>
@@ -44,6 +45,7 @@ const privacyTr: LegalText = {
   <li>Hesabın sahibini doğrulamak; şifreni ve kurtarma kodunu kaybettiğinde yardımcı olmak.</li>
   <li>Hesabınla ilgili önemli konularda (güvenlik, hizmet değişikliği) sana ulaşmak.</li>
   <li>Hesap sayısı ve oynama süresi gibi toplu bilgilerle oyunu geliştirmek.</li>
+  <li>Destekçi paketini hesabına teslim etmek (rozet ve fazladan kayıt yeri) ve iade isteklerini değerlendirmek (satın alma anındaki toplam oynama süren kaydedilir: ödemeden sonra 2,5 saat ve üstü oynandıysa iade yapılmaz).</li>
 </ul>
 
 <h2>E-posta adresin</h2>
@@ -51,20 +53,21 @@ const privacyTr: LegalText = {
 <p>Yenilik ve duyuru e-postaları yalnız ayrı kutuyu işaretlediysen, hesabında seçili dilde gönderilir. Bu kutu hesap açmanın şartı değildir. İznini istediğin zaman Profil’den, e-postalardaki bağlantıyla ya da bize yazarak geri alabilirsin.</p>
 
 <h2>Herkese görünenler</h2>
-<p>Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Bunu Profil’den kapatabilirsin; kapalıyken adın ve skorların tabloda görünmez. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin.</p>
+<p>Kullanıcı adın ve skorların, skor tablosunda bütün ziyaretçilere görünür. Bunu Profil’den kapatabilirsin; kapalıyken adın ve skorların tabloda görünmez. Kullanıcı adında gerçek adını ya da kişisel bilgilerini kullanmak zorunda değilsin. Destekçi paketi aldıysan rozetin profilinde ve skor tablosunda görünür; ödediğin tutar görünmez.</p>
 
 <h2>Kimlerle paylaşıyoruz</h2>
 <ul>
   <li><b>Cloudflare, Inc. (ABD):</b> sitenin barındırılması, sunucu ve veritabanı. Hesap ve oyun verilerin burada saklanır.</li>
   <li><b>Google LLC (ABD):</b> e-postaların ${OWNER.email} hesabından gönderilmesi ve geri bildirimlerin bu kutuda saklanması (Gmail; e-posta adresin ve e-postanın içeriği), yazı tipleri (Google Fonts; IP adresin). Önceki sürümde gönderilen geri bildirimler Google Forms’ta durur.</li>
+  <li><b>Polar (polar.sh):</b> destekçi paketinin satıcısı ve ödeme sayfası. Ödeme Polar’ın sayfasında yapılır; kart bilgilerin, fatura bilgilerin ve e-posta adresin doğrudan Polar’a girilir. Polar’a bizden yalnız oyundaki hesap numaran (adın ya da e-postan değil) ve vergi hesabı için IP adresin gider. Polar bu verileri satıcı olarak kendi gizlilik politikasına göre işler.</li>
 </ul>
 <p>Toplu gönderim için başka bir e-posta hizmeti kullanırsak adresin o hizmete de aktarılır ve hizmet bu listeye eklenir. Veritabanımız şu an Cloudflare’in Doğu Avrupa bölgesinde çalışıyor; bu konum kesin bir taahhüt değildir. Site Cloudflare’in dünya genelindeki ağı üzerinden sunulur. Yani verilerin Türkiye dışında işlenir. Yasal bir zorunluluk olduğunda veriler yetkili kurumlarla da paylaşılabilir.</p>
 
 <h2>Tarayıcında saklananlar</h2>
-<p>Oturumun, ayarların, dil seçimin ve kayıtlarının bir kopyası tarayıcında (localStorage ve IndexedDB) durur. Bunlar oyunun çalışması için gereklidir ve tarayıcı verilerini temizlediğinde silinir.</p>
+<p>Oturumun, ayarların, dil seçimin ve kayıtlarının bir kopyası tarayıcında (localStorage ve IndexedDB) durur. Bunlar oyunun çalışması için gereklidir ve tarayıcı verilerini temizlediğinde silinir. Destekçi rozetin ve kayıt yeri sayın da hesabının bu kopyasında durur.</p>
 
 <h2>Ne kadar saklıyoruz</h2>
-<p>Hesap ve oyun verilerin, hesabın açık kaldığı sürece saklanır. Her hesapta en çok 4 oyun kaydı tutulur; yeni kayıt, seçilen yerdeki eski kaydın yerini alır. Bu sınırdan önce daha fazla kaydı olan hesaba oyunda uyarı gösterilir; 7 gün içinde 4’e inmezse en yeni 4 kayıt dışındakiler silinir. Hesabını Profil’den kendin silebilirsin (şifren sorulur). Şifreni kaybettiysen bize yaz; başvurunu en geç 30 gün içinde sonuçlandırırız. Yasal olarak saklanması gereken veriler bunun dışındadır. Hesabın, kayıtların, skorların ve oturumların veritabanından birlikte silinir. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur. Oturumlar 90 gün sonra kapanır ve silinir. Sunucunun teknik kayıtları en çok 7 gün tutulur; Cloudflare’in kendi ağ kayıtları kendi kurallarına tabidir. Geri bildirimlerin e-posta kutumuzda durur, hesabını silmek onları silmez: silinmesini istiyorsan bize yazdığın adı belirt.</p>
+<p>Hesap ve oyun verilerin, hesabın açık kaldığı sürece saklanır. Her hesapta 3 oyun kaydı yeri vardır; destekçi paketiyle 4 ya da 5 olur. Yeni kayıt, seçilen yerdeki eski kaydın yerini alır. Kayıt sayın yer sayını aşarsa (yer sayısı azaldığında ya da bir ödeme iade edildiğinde) oyunda uyarı gösterilir; 7 gün içinde yer sayına inmezse en eski kayıtların silinir. Destekçi paketi sipariş kayıtların hesabınla birlikte saklanır ve hesabınla birlikte silinir; Polar’ın tuttuğu satış kayıtları Polar’ın kurallarına tabidir. Hesabını Profil’den kendin silebilirsin (şifren sorulur). Şifreni kaybettiysen bize yaz; başvurunu en geç 30 gün içinde sonuçlandırırız. Yasal olarak saklanması gereken veriler bunun dışındadır. Hesabın, kayıtların, skorların ve oturumların veritabanından birlikte silinir. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur. Oturumlar 90 gün sonra kapanır ve silinir. Sunucunun teknik kayıtları en çok 7 gün tutulur; Cloudflare’in kendi ağ kayıtları kendi kurallarına tabidir. Geri bildirimlerin e-posta kutumuzda durur, hesabını silmek onları silmez: silinmesini istiyorsan bize yazdığın adı belirt.</p>
 
 <h2>Güvenlik</h2>
 <p>Bağlantı HTTPS ile şifrelenir; şifre, kurtarma kodu ve oturum belirteçleri yalnız özet olarak saklanır. E-posta adresin sana yazabilmemiz için okunabilir biçimde saklanır. Hiçbir sistem tam güvenli değildir; başka yerde kullandığın bir şifreyi burada kullanma.</p>
@@ -93,6 +96,7 @@ const privacyEn: LegalText = {
   <li><b>While verifying your email:</b> a hash of the verification code (valid for 10 minutes) and, for sending limits, hashes of your email and IP addresses. These are deleted shortly afterwards.</li>
   <li><b>If you play with an account:</b> saves uploaded to the cloud, your scores (such as kills, wins and earnings), campaign statistics, play time, tutorial and leaderboard preferences and the news items you have read.</li>
   <li><b>If you send feedback:</b> your thoughts and suggestions, price suggestion and name; if sent with your account, also your email address and language. Feedback and suggestions need an account with an email; a price suggestion alone does not (a commander name is enough). These arrive as email in the ${OWNER.email} mailbox and are kept there.</li>
+  <li><b>If you buy a supporter pack:</b> on your account, your supporter level (your badge), your total paid (minus refunds) and your number of payments; for each payment, the order number, amount (before tax), refunded amount, currency, order status, payment date and your total play time at that moment (for the refund rule), as reported to us by Polar. Your card details, billing name and address and the email you enter at checkout go straight to Polar; they never reach us.</li>
   <li><b>For every visitor:</b> to serve the page, your IP address and browser details are processed by the hosting and font services listed below.</li>
 </ul>
 <p>We use no advertising or tracking cookies and no analytics tools.</p>
@@ -105,6 +109,7 @@ const privacyEn: LegalText = {
   <li>To verify who owns an account and help if you lose your password and recovery code.</li>
   <li>To contact you about important account matters (security, service changes).</li>
   <li>To improve the game with aggregate figures such as account numbers and play time.</li>
+  <li>To deliver the supporter pack to your account (badge and extra save slots) and to assess refund requests (your total play time at purchase is recorded: no refund is given if you have played 2.5 hours or more since paying).</li>
 </ul>
 
 <h2>Your email address</h2>
@@ -112,20 +117,21 @@ const privacyEn: LegalText = {
 <p>News and announcement emails are sent only if you ticked the separate box, in the language selected on your account. That box is not a condition of having an account. You can withdraw at any time in your Profile, through the link in the emails or by writing to us.</p>
 
 <h2>What is public</h2>
-<p>Your user name and scores are visible to every visitor on the leaderboard. You can turn this off in your Profile; while it is off, your name and scores do not appear there. Your user name does not have to be your real name or contain personal details.</p>
+<p>Your user name and scores are visible to every visitor on the leaderboard. You can turn this off in your Profile; while it is off, your name and scores do not appear there. Your user name does not have to be your real name or contain personal details. If you bought a supporter pack, your badge is shown in your profile and on the leaderboard; the amount you paid is not.</p>
 
 <h2>Who we share it with</h2>
 <ul>
   <li><b>Cloudflare, Inc. (USA):</b> site hosting, server and database. Your account and game data are stored here.</li>
   <li><b>Google LLC (USA):</b> sending email from the ${OWNER.email} account and keeping feedback in that mailbox (Gmail; your email address and the email’s content), and fonts (Google Fonts; your IP address). Feedback sent with earlier versions remains in Google Forms.</li>
+  <li><b>Polar (polar.sh):</b> seller of the supporter pack and its payment page. You pay on Polar’s page; your card details, billing details and email address go straight to Polar. From us, Polar receives only your in-game account number (not your name or email) and your IP address for tax purposes. Polar processes this data as the seller under its own privacy policy.</li>
 </ul>
 <p>If we use another email service for bulk sending, your address is also transferred to that service and it is added to this list. Our database currently runs in Cloudflare’s Eastern Europe region; this location is not a firm commitment. The site is served through Cloudflare’s global network. Your data is therefore processed outside Türkiye. Data may also be shared with competent authorities where the law requires it.</p>
 
 <h2>What is kept in your browser</h2>
-<p>Your session, settings, language and a copy of your saves are kept in your browser (localStorage and IndexedDB). The game needs them to work, and they are deleted when you clear your browser data.</p>
+<p>Your session, settings, language and a copy of your saves are kept in your browser (localStorage and IndexedDB). The game needs them to work, and they are deleted when you clear your browser data. Your supporter badge and save slot count are also kept in this copy of your account.</p>
 
 <h2>How long we keep it</h2>
-<p>Account and game data are kept for as long as your account exists. Each account keeps at most 4 game saves; a new save replaces the old one in the slot you choose. Accounts that had more saves before this limit see a notice in the game; if they still have more than 4 after 7 days, all but the newest 4 are deleted. You can delete your account yourself in your Profile (your password is required). If you have lost your password, write to us and we conclude your request within 30 days at the latest. Data the law requires us to keep is excepted. Your account, saves, scores and sessions are deleted from the database together. Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically. Sessions end and are deleted after 90 days. The server’s technical logs are kept for up to 7 days; Cloudflare’s own network logs follow its own rules. Your feedback stays in our mailbox and deleting your account does not delete it: to have it deleted, tell us the name you wrote.</p>
+<p>Account and game data are kept for as long as your account exists. Each account has 3 game save slots, or 4 or 5 with the supporter pack; a new save replaces the old one in the slot you choose. If you have more saves than slots (when the number of slots goes down or a payment is refunded), the game shows a notice; if you still have too many after 7 days, your oldest saves are deleted. Your supporter pack order records are kept with your account and deleted with it; the sales records kept by Polar follow Polar’s own rules. You can delete your account yourself in your Profile (your password is required). If you have lost your password, write to us and we conclude your request within 30 days at the latest. Data the law requires us to keep is excepted. Your account, saves, scores and sessions are deleted from the database together. Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically. Sessions end and are deleted after 90 days. The server’s technical logs are kept for up to 7 days; Cloudflare’s own network logs follow its own rules. Your feedback stays in our mailbox and deleting your account does not delete it: to have it deleted, tell us the name you wrote.</p>
 
 <h2>Security</h2>
 <p>Connections are encrypted with HTTPS; passwords, recovery codes and session tokens are stored only as hashes. Your email address is stored in readable form so that we can write to you. No system is fully secure, so do not reuse a password from elsewhere.</p>
@@ -159,6 +165,7 @@ const kvkkTr: LegalText = {
     <tr><td>IP adresi ve tarayıcı bilgileri</td><td>Sitenin sunulması ve güvenliği</td><td>Meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>Geri bildirimde yazılan ad, ileti ve fiyat önerisi; hesapla gönderildiyse e-posta adresi ve dil seçimi</td><td>Görüşlerin değerlendirilmesi</td><td>Meşru menfaat (m. 5/2-f)</td></tr>
     <tr><td>E-posta adresi ve dil seçimi (yalnız izin verdiysen)</td><td>Yenilik ve duyuru e-postaları</td><td>Açık rıza (m. 5/1)</td></tr>
+    <tr><td>Destekçi seviyesi, toplam ödeme tutarı, ödeme sayısı; her ödeme için sipariş numarası, tutar, iade tutarı, para birimi, durum, tarih ve o andaki toplam oynama süresi</td><td>Destekçi paketinin hesaba teslimi (rozet, kayıt yeri), iade isteklerinin değerlendirilmesi</td><td>Sözleşmenin kurulması ve ifası (m. 5/2-c); bir hakkın tesisi, kullanılması veya korunması (m. 5/2-e)</td></tr>
   </tbody>
 </table></div>
 
@@ -166,10 +173,10 @@ const kvkkTr: LegalText = {
 <p>Veriler, hesap ve geri bildirim formlarını doldurman ve oyunu oynaman sırasında elektronik ortamda, otomatik yollarla toplanır.</p>
 
 <h2>Aktarım</h2>
-<p>Veriler, hizmetin sunulması amacıyla barındırma ve veritabanı hizmeti veren Cloudflare, Inc. ile e-posta (Gmail) ve yazı tipi hizmeti veren Google LLC’ye aktarılır; önceki sürümde gönderilen geri bildirimler Google Forms’ta durur. Toplu gönderim için başka bir e-posta hizmeti kullanılırsa adres o hizmete de aktarılır ve hizmet Gizlilik Politikası’nda belirtilir. Bu şirketler ABD merkezlidir. Veritabanı şu an Cloudflare’in Doğu Avrupa bölgesinde çalışır (kesin bir taahhüt değildir) ve site Cloudflare’in dünya genelindeki ağı üzerinden sunulur; yani veriler yurt dışında işlenir. Veriler yasal zorunluluk hâlinde yetkili kamu kurumlarıyla da paylaşılabilir.</p>
+<p>Veriler, hizmetin sunulması amacıyla barındırma ve veritabanı hizmeti veren Cloudflare, Inc. ile e-posta (Gmail) ve yazı tipi hizmeti veren Google LLC’ye aktarılır; önceki sürümde gönderilen geri bildirimler Google Forms’ta durur. Toplu gönderim için başka bir e-posta hizmeti kullanılırsa adres o hizmete de aktarılır ve hizmet Gizlilik Politikası’nda belirtilir. Bu şirketler ABD merkezlidir. Veritabanı şu an Cloudflare’in Doğu Avrupa bölgesinde çalışır (kesin bir taahhüt değildir) ve site Cloudflare’in dünya genelindeki ağı üzerinden sunulur; yani veriler yurt dışında işlenir. Destekçi paketi alan kullanıcının hesap numarası ve IP adresi, satıcı ve ödeme hizmeti olarak Polar’a (ABD merkezli) aktarılır. Kart ve fatura bilgileri doğrudan Polar’a girilir, veri sorumlusuna ulaşmaz. Veriler yasal zorunluluk hâlinde yetkili kamu kurumlarıyla da paylaşılabilir.</p>
 
 <h2>Saklama ve silme</h2>
-<p>Hesap ve oyun verileri hesap açık kaldığı sürece saklanır. Hesap başına en çok 4 oyun kaydı tutulur; fazlası uyarıdan 7 gün sonra en yeni 4 kayıt kalacak biçimde silinir. Hesap Profil’den silinebilir; yazılı silme başvurusu en geç 30 gün içinde sonuçlandırılır. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir, sunucunun teknik kayıtları en çok 7 gün tutulur. Ayrıntılar <a href="${legalUrl('privacy', false)}">Gizlilik Politikası</a>’ndadır.</p>
+<p>Hesap ve oyun verileri hesap açık kaldığı sürece saklanır. Hesap başına 3 oyun kaydı yeri tutulur (destekçi paketiyle 4 ya da 5). Kayıt sayısı yer sayısını aşarsa uyarıdan 7 gün sonra en eski kayıtlar silinir. Destekçi paketi sipariş kayıtları hesapla birlikte silinir. Hesap Profil’den silinebilir; yazılı silme başvurusu en geç 30 gün içinde sonuçlandırılır. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir, sunucunun teknik kayıtları en çok 7 gün tutulur. Ayrıntılar <a href="${legalUrl('privacy', false)}">Gizlilik Politikası</a>’ndadır.</p>
 
 <h2>KVKK m. 11 kapsamındaki hakların</h2>
 <ul>
@@ -209,6 +216,7 @@ const kvkkEn: LegalText = {
     <tr><td>IP address and browser details</td><td>Serving and securing the site</td><td>Legitimate interest (5/2-f)</td></tr>
     <tr><td>Name, message and price suggestion entered as feedback; email address and language if sent with an account</td><td>Reviewing feedback</td><td>Legitimate interest (5/2-f)</td></tr>
     <tr><td>Email address and language (only if you gave permission)</td><td>News and announcement emails</td><td>Explicit consent (5/1)</td></tr>
+    <tr><td>Supporter level, total paid, number of payments; for each payment the order number, amount, refunded amount, currency, status, date and total play time at that moment</td><td>Delivering the supporter pack to the account (badge, save slots), assessing refund requests</td><td>Formation and performance of a contract (5/2-c); establishing, exercising or protecting a right (5/2-e)</td></tr>
   </tbody>
 </table></div>
 
@@ -216,10 +224,10 @@ const kvkkEn: LegalText = {
 <p>Data is collected electronically and automatically when you fill in the account and feedback forms and play the game.</p>
 
 <h2>Transfers</h2>
-<p>To provide the service, data is transferred to Cloudflare, Inc. (hosting and database) and Google LLC (email through Gmail and fonts); feedback sent with earlier versions remains in Google Forms. If another email service is used for bulk sending, the address is also transferred to that service, which is named in the Privacy Policy. These companies are based in the USA. The database currently runs in Cloudflare’s Eastern Europe region (not a firm commitment) and the site is served through Cloudflare’s global network, so data is processed abroad. Data may also be shared with competent public authorities where the law requires it.</p>
+<p>To provide the service, data is transferred to Cloudflare, Inc. (hosting and database) and Google LLC (email through Gmail and fonts); feedback sent with earlier versions remains in Google Forms. If another email service is used for bulk sending, the address is also transferred to that service, which is named in the Privacy Policy. These companies are based in the USA. The database currently runs in Cloudflare’s Eastern Europe region (not a firm commitment) and the site is served through Cloudflare’s global network, so data is processed abroad. The account number and IP address of a user who buys a supporter pack are transferred to Polar (based in the USA) as the seller and payment service. Card and billing details are entered directly with Polar and never reach the data controller. Data may also be shared with competent public authorities where the law requires it.</p>
 
 <h2>Retention and deletion</h2>
-<p>Account and game data are kept for as long as the account exists. At most 4 game saves are kept per account; any extra saves are deleted 7 days after a notice, keeping the newest 4. The account can be deleted in the Profile; written deletion requests are concluded within 30 days at the latest. Deleted data may remain in database backups for up to 30 more days, and the server’s technical logs are kept for up to 7 days. See the <a href="${legalUrl('privacy', true)}">Privacy Policy</a> for details.</p>
+<p>Account and game data are kept for as long as the account exists. Each account has 3 game save slots (4 or 5 with the supporter pack). If there are more saves than slots, the oldest are deleted 7 days after a notice. Supporter pack order records are deleted with the account. The account can be deleted in the Profile; written deletion requests are concluded within 30 days at the latest. Deleted data may remain in database backups for up to 30 more days, and the server’s technical logs are kept for up to 7 days. See the <a href="${legalUrl('privacy', true)}">Privacy Policy</a> for details.</p>
 
 <h2>Your rights under KVKK Art. 11</h2>
 <ul>
@@ -264,6 +272,7 @@ const deletionTr: LegalText = {
   <li>Buluttaki oyun kayıtların.</li>
   <li>Skorların, harekât istatistiklerin ve oynama süren; skor tablosundan da çıkarsın.</li>
   <li>Bütün oturumların (her cihazda oturum kapanır) ve e-posta doğrulama kodların.</li>
+  <li>Destekçi seviyen, toplam ödeme tutarın, ödeme sayın ve sipariş kayıtların; rozetin ve fazladan kayıt yerlerin de gider. Hesap silindikten sonra geri getirilemez.</li>
   <li>Silmeyi yaptığın cihazda: oturumun, kayıtlarının kopyaları, profilinin kopyası ve henüz gönderilmemiş skorların.</li>
 </ul>
 
@@ -271,6 +280,7 @@ const deletionTr: LegalText = {
 <ul>
   <li>Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur.</li>
   <li>Sunucunun teknik kayıtları en çok 7 gün tutulur.</li>
+  <li>Destekçi paketi aldıysan satışın kaydı satıcı olan Polar’da, Polar’ın yasal saklama kurallarına göre kalır.</li>
   <li>Geri bildirimlerin e-posta kutumuzda kalır; silinmesini istiyorsan yazdığın adı belirterek bize yaz.</li>
   <li>Başka cihazlarda hesabınla giriş yaptıysan o cihazdaki kopyalar (ayarlar, kayıt kopyaları), tarayıcının site verileri temizlenince ya da uygulama kaldırılınca silinir.</li>
   <li>Yasal olarak saklanması gereken veriler bunun dışındadır.</li>
@@ -314,6 +324,7 @@ const deletionEn: LegalText = {
   <li>Your saves in the cloud.</li>
   <li>Your scores, campaign statistics and play time; you are also removed from the leaderboard.</li>
   <li>All your sessions (you are logged out on every device) and email verification codes.</li>
+  <li>Your supporter level, total paid, number of payments and order records; your badge and extra save slots go too. They cannot be restored after the account is deleted.</li>
   <li>On the device you delete from: your session, the copies of your saves, the copy of your profile and any scores not yet sent.</li>
 </ul>
 
@@ -321,6 +332,7 @@ const deletionEn: LegalText = {
 <ul>
   <li>Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically.</li>
   <li>The server’s technical logs are kept for up to 7 days.</li>
+  <li>If you bought a supporter pack, the record of the sale stays with Polar, the seller, under Polar’s legal retention rules.</li>
   <li>Your feedback stays in our mailbox; to have it deleted, write to us and tell us the name you wrote.</li>
   <li>If you logged in on other devices, the copies there (settings, save copies) are deleted when that browser’s site data is cleared or the app is uninstalled.</li>
   <li>Data the law requires us to keep is excepted.</li>
@@ -340,8 +352,81 @@ const deletionEn: LegalText = {
 `,
 };
 
+// Destekçi paketi koşulları (2026-11-21, avukat onaylı): satıcı Polar; ne alındığı, teslim, iade (7 gün ve ödemeden sonra
+// 2,5 saatten az oynama), hesap silinince ne olduğu. Polar'daki ürün açıklaması ve oyundaki paket penceresi buraya bağlanır.
+const supportTr: LegalText = {
+  title: 'Destekçi Paketi Koşulları',
+  desc: 'WarSimBox destekçi paketi: ne alırsın, kim satar, nasıl teslim edilir ve iade.',
+  html: `
+<p class="legal-date">Yürürlük tarihi: ${date('tr')}</p>
+
+<h2>Teşekkürler</h2>
+<p>Destekçi paketi WarSimBox’ın gelişmesine katkı olur. Katkın için teşekkür ederiz; aldığın paketle hesabına sana özel bir rozet ve fazladan kayıt yeri eklenir.</p>
+
+<h2>Ne alıyorsun</h2>
+<p>WarSimBox hesabına bağlı dijital içerik: bir profil rozeti ve toplam ödemene göre fazladan kayıt yeri (toplam 5 $ ve üstünde 1, 15 $ ve üstünde 2). Rozet ve kayıt yeri yalnız bu hesapta geçerlidir, başka hesaba aktarılamaz, paraya çevrilemez.</p>
+
+<h2>Fiyat</h2>
+<p>Tutarı sen seçersin (1–50 $). Ülkene göre vergi eklenebilir; son tutar ödeme sayfasında görünür.</p>
+
+<h2>Satıcı ve ödeme</h2>
+<p>Satıcı Polar’dır (polar.sh, “merchant of record”). Ödeme Polar’ın sayfasında yapılır; Polar’ın alıcı koşulları geçerlidir. Kart bilgilerin bize gelmez.</p>
+
+<h2>Teslim</h2>
+<p>İçerik ödemeden hemen sonra hesabına kendiliğinden eklenir. Birkaç dakika içinde gelmezse ${OWNER.email} adresine yaz.</p>
+
+<h2>İade</h2>
+<p>Ödemeden sonraki 7 gün içinde, sipariş numarasıyla ${OWNER.email} adresine yazarak iade isteyebilirsin. Ödemeden sonra toplam 2,5 saat ya da daha fazla oynadıysan iade kabul edilmez: paketin sağladığı kayıt yerleri o süre içinde kullanılmış sayılır. Oynama süresi hesabının harekâtlarda geçen gerçek süresidir ve satın alma anından itibaren sunucumuzda ölçülür. İade edilen ya da bankadan itiraz edilen ödemenin rozeti ve kayıt yeri geri alınır. Kayıt sayın yer sayını aşarsa 7 gün içinde fazlasını silmen istenir; silmezsen en eski kayıtların silinir.</p>
+
+<h2>Hesabın silinirse</h2>
+<p>Rozet ve fazladan kayıt yerleri hesapla birlikte silinir ve geri getirilemez.</p>
+
+<h2>Oyun değişirse</h2>
+<p>Oyun geliştikçe rozetlerin görünüşü değişebilir. Oyun kapanırsa içerik de kullanılamaz hâle gelir.</p>
+
+<h2>İletişim</h2>
+<p>${OWNER.email}. Kişisel verilerin için <a href="${legalUrl('privacy', false)}">Gizlilik Politikası</a>’na bak.</p>
+`,
+};
+
+const supportEn: LegalText = {
+  title: 'Supporter Pack Terms',
+  desc: 'The WarSimBox supporter pack: what you get, who sells it, delivery and refunds.',
+  html: `
+<p class="legal-date">Effective date: ${date('en')}. This is a translation; the Turkish text prevails.</p>
+
+<h2>Thank you</h2>
+<p>The supporter pack helps WarSimBox grow. Thank you for your contribution; the pack adds a special badge and extra save slots to your account.</p>
+
+<h2>What you get</h2>
+<p>Digital content tied to your WarSimBox account: a profile badge and, depending on your total payments, extra save slots (1 from a $5 total, 2 from a $15 total). The badge and slots are valid only on this account; they cannot be transferred to another account or exchanged for money.</p>
+
+<h2>Price</h2>
+<p>You choose the amount ($1–$50). Tax may be added depending on your country; the final amount is shown on the payment page.</p>
+
+<h2>Seller and payment</h2>
+<p>The seller is Polar (polar.sh, the “merchant of record”). You pay on Polar’s page and Polar’s buyer terms apply. Your card details never reach us.</p>
+
+<h2>Delivery</h2>
+<p>The content is added to your account automatically right after payment. If it has not arrived within a few minutes, write to ${OWNER.email}.</p>
+
+<h2>Refunds</h2>
+<p>You can request a refund within 7 days of payment by writing to ${OWNER.email} with your order number. No refund is given if you have played 2.5 hours or more in total since paying: the save slots the pack provides count as used by then. Play time is the real time your account spends in campaigns and is measured on our server from the moment of purchase. If a payment is refunded or disputed through your bank, its badge and save slots are removed. If you then have more saves than slots, you are asked to delete the extra ones within 7 days; otherwise your oldest saves are deleted.</p>
+
+<h2>If your account is deleted</h2>
+<p>The badge and extra save slots are deleted with the account and cannot be restored.</p>
+
+<h2>If the game changes</h2>
+<p>As the game develops, the look of the badges may change. If the game shuts down, the content can no longer be used.</p>
+
+<h2>Contact</h2>
+<p>${OWNER.email}. For your personal data, see the <a href="${legalUrl('privacy', true)}">Privacy Policy</a>.</p>
+`,
+};
+
 export const LEGAL_TEXT: Record<LegalKind, { tr: LegalText; en: LegalText }> = {
   privacy: { tr: privacyTr, en: privacyEn },
   kvkk: { tr: kvkkTr, en: kvkkEn },
   deletion: { tr: deletionTr, en: deletionEn },
+  support: { tr: supportTr, en: supportEn },
 };
