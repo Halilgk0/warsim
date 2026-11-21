@@ -14,8 +14,14 @@ import { legalUrl } from '../yasal/liste';
 import { badgeName, badgeSvg } from './badges';
 import { esc } from './dom';
 
+/**
+ * Polar hesabı ödeme almaya açık mı. 2026-11-21: Polar hesabı "test mode"da (inceleme bitmeden gerçek ödeme yok), paket
+ * gizli. Polar onaylayınca true yapılır; kayıt yeri kuralı (3 yer) paketten bağımsız olarak geçerli.
+ */
+const PAYMENTS_LIVE = false;
+
 /** Destekçi paketi bu sürümde gösterilir mi. */
-export const SUPPORT_ON = !IN_PLAY_APP && !OLD_SITE;
+export const SUPPORT_ON = PAYMENTS_LIVE && !IN_PLAY_APP && !OLD_SITE;
 
 /** Polar'ın ödeme sayfası adresleri (gömülü pencerenin mesajları yalnız buradan kabul edilir). */
 const POLAR_ORIGINS = ['https://polar.sh', 'https://sandbox.polar.sh'];

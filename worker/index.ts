@@ -780,7 +780,9 @@ interface PolarOrder {
   id?: unknown;
   status?: unknown;
   net_amount?: unknown;
+  total_amount?: unknown;
   refunded_amount?: unknown;
+  refunded_tax_amount?: unknown;
   currency?: unknown;
   product_id?: unknown;
   metadata?: Record<string, unknown> | null;
@@ -812,6 +814,10 @@ async function supportWebhook(req: Request, env: Env): Promise<Response> {
   if (!(await env.DB.prepare('SELECT 1 FROM accounts WHERE id = ?').bind(accountId).first())) return json({ ok: true, skip: 'gone' });
   const currency = String(o.currency ?? '').toLowerCase();
   if (currency !== 'usd') console.error('polar order currency', o.id, currency);
+  // Basamak oyuncunun ödediği tutardan (vergi dahil): Türkiye'de KDV fiyatın içinde, vergi öncesi tutar (net_amount) 1 $'lık
+  // ödemede 0,83 $ kalıyordu ve rozet gelmiyordu. İade de vergisiyle birlikte düşülür. (Sütun adı net_cents eski.)
+  const paid = o.total_amount !== undefined ? cents(o.total_amount) : cents(o.net_amount);
+  const refunded = cents(o.refunded_amount) + (o.total_amount !== undefined ? cents(o.refunded_tax_amount) : 0);
   const now = Date.now();
   await env.DB.batch([
     env.DB.prepare(
@@ -821,7 +827,7 @@ async function supportWebhook(req: Request, env: Env): Promise<Response> {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT play_sec FROM stats WHERE account_id = ?2 AND period = 'all'), 0))
        ON CONFLICT (id) DO UPDATE SET net_cents = excluded.net_cents, refunded_cents = MAX(refunded_cents, excluded.refunded_cents),
          status = excluded.status, updated = excluded.updated`,
-    ).bind(o.id, accountId, cents(o.net_amount), cents(o.refunded_amount), currency, status, now, now),
+    ).bind(o.id, accountId, paid, refunded, currency, status, now, now),
     // Basamaklar dolar üzerinden: başka para birimindeki sipariş sayılmaz (oturum hep USD açılır). Toplam tutar ve sayılan
     // ödeme sayısı (iadesi tam yapılmamış ödemeler)
     env.DB.prepare(
