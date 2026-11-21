@@ -110,6 +110,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         kalırsa paterne döner; flap ve takımla ağır uçak tırmanamıyordu. Tutunma hızına yakın uçak paternde burnunu hafif indirir.
       - İniş izni 300 sn'de düşer ama son yaklaşmada ve yerde düşmez (`airbase.ts`); sırasını yaklaşmada kaybeden pas geçer.
       - Motoru duran uçak (`weak`) paternde tırmanmaz, yaklaşma noktası kendi irtifasına göre yakına alınır, flap son yaklaşmada açılır.
+      - Bekleme çemberinin yarıçapı uçağın hızında 2,2 g ile uçulabilir olmalı (`ops.ts` hold: en az v²/(g·√(n²−1))·1,5). Stil yarıçapı (1,4–2,3 km)
+        pervaneli içindi: Canberra, Ar 234 ve Il-28 çemberi tutamayıp alçalmak yerine 11 km'ye tırmanıyor, yakıtı bitene dek dönüyordu
+        (2026-11-21, oyuncu bildirimi). Yüksekten dönen jet bombardıman kolu ve 4'lü iniş: eski 0/16'ya yakın, yeni 16/16 (scratchpad `kontrol/inis.ts`, `canberra.ts`).
       Sonuç: zorla pas geçirilen 14 türün neredeyse hepsi iniyor (Lancaster 0/6 → 6/6); tek motorlu He 111 ve B-25, hasarlı Ju 88 0/6 → 6/6.
     - Avcı hedef dağıtımı (2026-11-18, `flightGroup.ts` `assignTargets`), sırayla:
       1. Oyuncunun emri (`brain.order`).

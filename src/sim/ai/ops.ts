@@ -246,8 +246,11 @@ export function landing(ac: Aircraft, brain: Brain, world: World, dt: number, cm
       _hold.x += st.holdDx;
       _hold.z += st.holdDz;
       // İniş izni çıkınca (sıra 0) ilk yaklaşma noktasının üstünde dönülür: oradan alçalarak yaklaşmaya girilir
-      orbitDir(cmd.dir, ac, _hold, st.holdR, Math.max(base.holdAltitude(ops.queue - 1) + st.holdAlt, ops.queue === 0 ? iafAlt + 20 : -Infinity));
       cmd.speed = s.cruiseSpeed * st.holdSpeedK;
+      // Çember uçağın hızında 2,2 g ile uçulabilir olmalı: yarıçap v²/(g·√(n²−1)) en az; jet bekleme hızında pervanelinin 1,4–2,3 km'lik
+      // çemberini tutamayıp alçalmak yerine tırmanıyordu (Canberra, yüksekten dönüşte)
+      const holdR = Math.max(st.holdR, (cmd.speed * cmd.speed) / (9.81 * Math.sqrt(2.2 * 2.2 - 1)) * 1.5);
+      orbitDir(cmd.dir, ac, _hold, holdR, Math.max(base.holdAltitude(ops.queue - 1) + st.holdAlt, ops.queue === 0 ? iafAlt + 20 : -Infinity));
       cmd.maxG = 2.2;
       brain.status = `${L('Bekleme paterni: iniş sırası', 'Holding pattern: landing order')} ${ops.queue}`;
       break;
