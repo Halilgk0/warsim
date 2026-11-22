@@ -1,4 +1,4 @@
-// Ansiklopedi makaleleri, 1945–1952 uçakları (katalog yılına göre): savaşın son pervanelileri ve ilk jetler.
+// Ansiklopedi makaleleri, 1945–1954 uçakları (katalog yılına göre): savaşın son pervanelileri ve ilk jetler.
 
 import { K, t, type Article } from '../tur';
 
@@ -752,6 +752,153 @@ export const A1945_1952: Article[] = [
       t(
         'Oyunda hafif hattın jet avcısıdır: ses hızına yakın uçar ve hidrolik kumandaları sayesinde yüksek hızda bile çabuk yuvarlanır. Altı 12,7 mm makinelisi vardır; ek yakıt tankı ya da 2 × 1000 lb bomba taşıyabilir.',
         'In the game it is the light line’s jet fighter: it flies close to the speed of sound and, thanks to its hydraulic controls, rolls quickly even at high speed. It has six .50 in guns and can carry a drop tank or 2 × 1,000 lb bombs.',
+      ),
+    ],
+  },
+  {
+    id: 'ar234c3',
+    summary: t(
+      'Blitz’in dört motorlu son sürümü: her kanadın altında yan yana iki BMW 003.',
+      'The last, four-engined version of the Blitz: two BMW 003s side by side under each wing.',
+    ),
+    lead: t(
+      'Arado Ar 234 C, dünyanın ilk jet bombardıman uçağının son üretim sürümüdür. İki Jumo 004’ün yerini dört hafif BMW 003 aldı; motorlar B serisinin bağlantılarına asılan iki çift nasele yerleştirildi, kanat değişmedi. Kabin yeniden çizildi, burnun altına iki top eklendi. Seri üretim 1945 Şubat’ının sonunda başladı, ama savaş bitene dek ancak bir avuç uçak tamamlanabildi.',
+      'The Arado Ar 234 C was the last production version of the world’s first jet bomber. Four light BMW 003s replaced the two Jumo 004s; the engines went into two twin nacelles hung from the B series’ mountings, and the wing was left unchanged. The cockpit was redrawn and two cannon were added under the nose. Series production began at the end of February 1945, but only a handful of aircraft were finished before the war ended.',
+    ),
+    facts: [
+      { k: K.first, v: t('Eylül–Ekim 1944 (V19, C serisinin ilk prototipi)', 'September–October 1944 (V19, the first C-series prototype)') },
+      { k: K.service, v: t('Üretim Şubat 1945 sonunda başladı', 'Production began at the end of February 1945') },
+      { k: K.designer, v: t('Walter Blume (Arado)', 'Walter Blume (Arado)') },
+      { k: K.maker, v: t('Arado, Alt-Lönnewitz', 'Arado, Alt-Lönnewitz') },
+      { k: K.built, v: t('14–19 (kaynaklar ayrışıyor)', '14–19 (sources differ)') },
+      { k: K.engine, v: t('4 × BMW 003A-1, eksenel akışlı turbojet, her biri 7,85 kN (800 kp)', '4 × BMW 003A-1 axial-flow turbojets, 7.85 kN (800 kp) each') },
+      { k: K.speed, v: t('873 km/sa, 6.000 m’de', '873 km/h at 6,000 m') },
+      { k: K.guns, v: t('2 × 20 mm MG 151/20 burun altında; motorların ve gövdenin altında bomba', '2 × 20 mm MG 151/20 under the nose; bombs under the engines and fuselage') },
+      { k: K.crew, v: t('1', '1') },
+      { k: K.size, v: t('14,41 m / 12,84 m', '14.41 m / 12.84 m') },
+    ],
+    sections: [
+      {
+        h: t('Dört motor, iki nasel', 'Four engines, two nacelles'),
+        p: [
+          t(
+            'Arado dört motoru önce ayrı ayrı nasellerde denedi (V6), sonra ikişer ikişer birleştirdi (V8). İkincisi kanadı değiştirmeden B serisinin motor bağlantılarına oturuyordu ve seçildi. BMW 003 Jumo 004’ten hafifti; dört motorun toplam itkisi iki Jumo’nunkini rahatça aşıyordu. Kaynaklara göre C-3 6.000 m’de 873 km/sa ile B-2’den saatte yüz kilometreden fazla hızlıydı ve 10.000 m’ye on dakikada tırmanıyordu.',
+            'Arado first tried the four engines in separate nacelles (V6), then joined them in pairs (V8). The second layout fitted the B series’ engine mountings without changing the wing, and it was chosen. The BMW 003 was lighter than the Jumo 004, and the four engines together comfortably outpowered two Jumos. Sources give the C-3 873 km/h at 6,000 m, more than a hundred kilometres an hour faster than the B-2, and a climb to 10,000 m in ten minutes.',
+          ),
+        ],
+      },
+      {
+        h: t('Yeni kabin', 'A new cockpit'),
+        p: [
+          t(
+            'C serisinin kabininin üst çizgisi hafifçe kabarıktı; 13 parçalı cam 8 parçaya indi ve tepedeki periskopa geriye yatık bir kaporta eklendi. Pilot hâlâ tek başınaydı. Burnun altına öne bakan iki MG 151/20 kondu: uçak gerektiğinde avcı gibi de kullanılabilsin diye.',
+            'The C series’ cockpit had a slightly bulged upper outline; the 13 glazed panels were cut to 8 and the roof periscope got a swept-back fairing. The pilot still flew alone. Two forward-firing MG 151/20s went under the nose, so the aircraft could double as a fighter when needed.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda dört motorlu jet bombardıman uçağıdır: Ar 234 B-2’den hızlı ve çabuk tırmanır, burun altındaki iki 20 mm topla kendini de savunabilir. Kalkışta kanat altındaki Walter roketleri yanar, yanma bitince atılır ve paraşütle düşer; uçak yere inip durunca yenisi takılır (yalnız görüntü).',
+        'In the game it is a four-engined jet bomber: faster than the Ar 234 B-2 and quick to climb, and it can defend itself with the two 20 mm cannon under the nose. On take-off the Walter rockets under the wings burn, are dropped when spent and come down on parachutes; new ones are fitted once the aircraft lands and stops (visual only).',
+      ),
+    ],
+  },
+  {
+    id: 'tu14',
+    summary: t(
+      'Sovyet Deniz Havacılığının düz kanatlı jet torpido bombardıman uçağı.',
+      'The straight-winged jet torpedo bomber of Soviet Naval Aviation.',
+    ),
+    lead: t(
+      'Tupolev Tu-14, Il-28 ile aynı görev için yarışan, daha ağır ve daha uzun menzilli bir jet bombardıman uçağıdır. Hava Kuvvetleri Il-28’i seçince Tu-14 Deniz Havacılığına torpido bombardıman uçağı olarak verildi. Navigatör camlı burunda, nişancı kuyruktaki ayrı basınçlı kabinde otururdu. 1959’a kadar mayın-torpido alaylarında uçtu.',
+      'The Tupolev Tu-14 was a heavier, longer-ranged jet bomber that competed with the Il-28 for the same role. When the Air Force chose the Il-28, the Tu-14 went to Naval Aviation as a torpedo bomber. The navigator sat in the glazed nose, the gunner in a separate pressurised cabin in the tail. It served with the mine-torpedo regiments until 1959.',
+    ),
+    facts: [
+      { k: K.first, v: t('13 Ekim 1949', '13 October 1949') },
+      { k: K.service, v: t('1952 (Deniz Havacılığı)', '1952 (Naval Aviation)') },
+      { k: K.designer, v: t('Tupolev tasarım bürosu', 'Tupolev design bureau') },
+      { k: K.maker, v: t('İrkutsk uçak fabrikası', 'Irkutsk aircraft plant') },
+      { k: K.built, v: t('87–150 (kaynaklar ayrışıyor)', '87–150 (sources differ)') },
+      { k: K.engine, v: t('2 × Klimov VK-1, santrifüj akışlı turbojet, her biri 26,5 kN', '2 × Klimov VK-1 centrifugal-flow turbojets, 26.5 kN each') },
+      { k: K.speed, v: t('845 km/sa, 5.000 m’de', '845 km/h at 5,000 m') },
+      { k: K.guns, v: t('2 × 23 mm NR-23 burunda, 2 × 23 mm NR-23 KDU-81 kuyruk taretinde; 3.000 kg bomba, mayın ya da torpido', '2 × 23 mm NR-23 in the nose, 2 × 23 mm NR-23 in the KDU-81 tail turret; 3,000 kg of bombs, mines or torpedoes') },
+      { k: K.crew, v: t('3', '3') },
+      { k: K.size, v: t('21,69 m / 21,95 m', '21.69 m / 21.95 m') },
+    ],
+    sections: [
+      {
+        h: t('Il-28’e karşı', 'Against the Il-28'),
+        p: [
+          t(
+            'Tupolev’in ilk prototipleri İngiliz Nene motorluydu. Tasarım sonra üç kişilik mürettebata indirildi: pilot, bombardıman nişancısı-navigatör ve kuyruk nişancısı. Sırt ve karın taretleri kaldırıldı, kuyrukta iki NR-23’lü KDU-81 tareti kaldı. Il-28 daha hafifti ve Hava Kuvvetleri onu seçti.',
+            'Tupolev’s first prototypes had British Nene engines. The design was later cut to a crew of three: the pilot, the bombardier-navigator and the tail gunner. The dorsal and ventral turrets were dropped, leaving a KDU-81 turret with two NR-23s in the tail. The Il-28 was lighter, and the Air Force chose it.',
+          ),
+        ],
+      },
+      {
+        h: t('Torpido bombardıman uçağı', 'Torpedo bomber'),
+        p: [
+          t(
+            'Deniz Havacılığında bomba bölmesindeki 3 tonluk yük bomba, torpido ya da mayın olabiliyordu. Navigatörün fırlatma koltuğu deniz sürümünde eklendi. Uçak 1959’da hizmetten çekildi.',
+            'With Naval Aviation the 3-ton load in its bomb bay could be bombs, torpedoes or mines. The navigator’s ejection seat was added for the naval version. The aircraft was withdrawn from service in 1959.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda ağır jet bombardıman uçağıdır: 3 tona kadar bomba taşır, kuyruktaki iki 23 mm topun tareti nişancının hedefine döner, burunda iki sabit 23 mm vardır. Bomba koşusu başlayınca bölmenin iki uzun kapağı açılır, son bomba düşünce kapanır.',
+        'In the game it is a heavy jet bomber: it carries up to 3 tons of bombs, its tail turret with two 23 mm cannon swings towards the gunner’s target, and it has two fixed 23 mm in the nose. When the bomb run begins the two long bay doors open, and they close after the last bomb falls.',
+      ),
+    ],
+  },
+  {
+    id: 'b57b',
+    summary: t(
+      'Canberra’nın Amerika’da taarruza göre yeniden tasarlanmış sürümü; dönen bomba kapağıyla.',
+      'The Canberra redesigned in America for attack, with a rotary bomb door.',
+    ),
+    lead: t(
+      'Martin B-57B, İngiliz Canberra’nın ABD’de lisansla üretilip taarruz uçağına dönüştürülmüş sürümüdür. Camlı nişancı burnu kaldırıldı, pilot ve navigatör savaş uçağı kanopisi altında arka arkaya oturdu. Kanatlara toplar, dış kanada askılar eklendi; bomba bölmesine XB-51’den alınan dönen kapak kondu. Vietnam’da gece ve gündüz taarruzlarında kullanıldı.',
+      'The Martin B-57B was the British Canberra, licence-built in the United States and turned into an attack aircraft. The glazed bomb-aimer’s nose went, and the pilot and navigator sat in tandem under a fighter canopy. Guns went into the wings and pylons onto the outer wings, and the bomb bay got a rotary door taken from the XB-51. It flew day and night attack missions in Vietnam.',
+    ),
+    facts: [
+      { k: K.first, v: t('18 Haziran 1954', '18 June 1954') },
+      { k: K.service, v: t('Ocak 1955 (461. Bombardıman Kanadı)', 'January 1955 (461st Bombardment Wing)') },
+      { k: K.designer, v: t('Glenn L. Martin Company (English Electric Canberra’dan)', 'Glenn L. Martin Company (from the English Electric Canberra)') },
+      { k: K.maker, v: t('Martin, Middle River (Baltimore)', 'Martin, Middle River (Baltimore)') },
+      { k: K.built, v: t('ABD Hava Kuvvetleri için bütün sürümlerden 403 Canberra', '403 Canberras of all versions for the US Air Force') },
+      { k: K.engine, v: t('2 × Wright J65-W-5 (lisanslı Sapphire), eksenel akışlı turbojet, her biri 32,1 kN', '2 × Wright J65-W-5 (licence-built Sapphire) axial-flow turbojets, 32.1 kN each') },
+      { k: K.speed, v: t('960 km/sa, 760 m’de', '960 km/h at 760 m') },
+      { k: K.guns, v: t('İlk 90 uçakta 8 × 12,7 mm, sonra 4 × 20 mm M39; bölmede 2.000 kg, dış kanadın dört askısında 1.300 kg', '8 × 12.7 mm on the first 90 aircraft, then 4 × 20 mm M39; 2,000 kg in the bay and 1,300 kg on four outer-wing pylons') },
+      { k: K.crew, v: t('2', '2') },
+      { k: K.size, v: t('19,51 m / 19,96 m', '19.51 m / 19.96 m') },
+    ],
+    sections: [
+      {
+        h: t('Dönen kapak', 'The rotary door'),
+        p: [
+          t(
+            'B-57B’nin bombaları kapağın iç yüzüne asılıydı. Kapak boyuna ekseni etrafında yarım tur dönünce bombalar gövdenin altına çıkıyor, bölme hiç açık kalmıyordu: yüksek hızda açık bölmenin yaptığı sarsıntı ve sürükleme olmuyordu. Kapak Martin’in XB-51 deneme uçağı için tasarlanmıştı.',
+            'The B-57B’s bombs hung on the inside of the door. When the door turned half a revolution about its long axis the bombs came out under the fuselage, and the bay was never left open: there was none of the buffeting and drag of an open bay at high speed. The door had been designed for Martin’s XB-51 test aircraft.',
+          ),
+        ],
+      },
+      {
+        h: t('Vietnam', 'Vietnam'),
+        p: [
+          t(
+            'B-57B’ler 1965’ten başlayarak Güney Vietnam’dan taarruz görevlerine çıktı; gece için alt yüzleri siyaha boyandı. Arka gövdedeki üçgen hava frenleri ve kanattaki parmak frenleri dalarak bombalamaya izin veriyordu.',
+            'From 1965 B-57Bs flew attack missions from South Vietnam, their undersides painted black for night work. The triangular air brakes on the rear fuselage and the finger brakes in the wings allowed dive bombing.',
+          ),
+        ],
+      },
+    ],
+    inGame: [
+      t(
+        'Oyunda iki kişilik jet taarruz-bombardıman uçağıdır: kanatta dört 20 mm M39, dönen kapakta 8 bomba ve dış kanadın askılarında ek bomba taşır, hava frenleriyle dalarak da bombalar. Bomba koşusunda kapak yarım tur döner ve bombalar gövdenin altına çıkar; hava frenleri arka gövdenin iki yanında açılır, parmak frenleri kanattan dikilir.',
+        'In the game it is a two-seat jet attack bomber: four 20 mm M39s in the wings, 8 bombs on the rotary door and more on the outer-wing pylons, and it can dive-bomb with its air brakes. On the bomb run the door turns half a revolution and the bombs come out under the fuselage; the air brakes open on both sides of the rear fuselage and the finger brakes rise from the wings.',
       ),
     ],
   },

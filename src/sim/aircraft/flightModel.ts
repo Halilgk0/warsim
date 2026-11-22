@@ -131,7 +131,10 @@ export function gearHeight(spec: AircraftSpec): number {
   if (spec.id === 'meteor3') return 1.62;
   if (spec.id === 'vampire') return 1.2;
   if (spec.id === 'he162') return 1.13;
-  if (spec.id === 'ar234') return 1.45;
+  if (spec.id === 'ar234' || spec.id === 'ar234c3') return 1.45;
+  if (spec.id === 'b57b') return 1.6;
+  // Tu-14: çizimde gövde ekseni yerden 2,16 m (tekerlek 1150 mm)
+  if (spec.id === 'tu14') return 2.16;
   if (spec.id === 'canberra') return 1.6;
   if (spec.id === 'il28') return 2.48;
   return spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;

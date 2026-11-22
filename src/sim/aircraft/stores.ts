@@ -415,6 +415,21 @@ export const STORE_TABLE: Record<string, AircraftStores> = {
       { id: 'fab100x12', name: '12 × FAB-100', place: [P('b', 'fab100', 12)] },
     ],
   },
+  ar234c3: {
+    maxLoad: 1500, hardpoints: [C(500, ['bomb']), W(500, ['bomb'], 1, { at: 0.4 })],
+    presets: [
+      { id: 'b500x3', name: '3 × SC 500', place: [P('c', 'sc500'), P('w', 'sc500')] },
+      { id: 'b250x3', name: '3 × SC 250', place: [P('c', 'sc250'), P('w', 'sc250')] },
+    ],
+  },
+  tu14: {
+    maxLoad: 3000, hardpoints: [hp('b', 'Bomba bölmesi', 'bay', 1, 12, 3000, ['bomb'])],
+    presets: [
+      { id: 'fab250x12', name: '12 × FAB-250', place: [P('b', 'fab250', 12)] },
+      { id: 'fab500x6', name: '6 × FAB-500', place: [P('b', 'fab500', 6)] },
+      { id: 'fab100x12', name: '12 × FAB-100', place: [P('b', 'fab100', 12)] },
+    ],
+  },
   // ---------------------------------------------------------- taarruz
   il2: ilTable(),
   il2m3: ilTable(),
@@ -512,6 +527,20 @@ export const STORE_TABLE: Record<string, AircraftStores> = {
       { id: 'lb1000x6', name: '6 × 1000 lb', place: [P('b', 'lb1000', 3)] },
       { id: 'lb500x8', name: '8 × 500 lb', place: [P('b', 'lb500', 4)] },
       { id: 'mix', name: '6 × 1000 lb + 2 × 1000 lb (kanat)', place: [P('b', 'lb1000', 3), P('w', 'lb1000')] },
+    ],
+  },
+  // B-57B: dönen kapakta 4500 lb (iç), dış kanadın dört askısında 2800 lb (bomba ya da roket)
+  b57b: {
+    maxLoad: 3400,
+    hardpoints: [
+      hp('b', 'Bomba bölmesi', 'bay', 1, 8, 2040, ['bomb']),
+      hp('w', 'Kanat altı (iç)', 'wing', 2, 1, 340, ['bomb'], { at: 0.5 }),
+      hp('o', 'Kanat altı (dış)', 'wing', 2, 1, 340, ['bomb'], { at: 0.68 }),
+    ],
+    presets: [
+      { id: 'lb500x8', name: '8 × 500 lb', place: [P('b', 'lb500', 8)] },
+      { id: 'lb1000x4', name: '4 × 1000 lb', place: [P('b', 'lb1000', 4)] },
+      { id: 'mix', name: '8 × 500 lb + 4 × 500 lb (kanat)', place: [P('b', 'lb500', 8), P('w', 'lb500'), P('o', 'lb500')] },
     ],
   },
   // ---------------------------------------------------------- son pervaneliler

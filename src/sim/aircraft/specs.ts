@@ -387,6 +387,8 @@ const GT: Record<string, GunType> = {
   vya: { name: '23 mm VYa', caliber: 'cannon', rpm: 600, dmg: 7.5, mv: 905, disp: 0.016, range: 750 },
   ns23: { name: '23 mm NS-23', caliber: 'cannon', rpm: 550, dmg: 7, mv: 690, disp: 0.017, range: 700 },
   nr23: { name: '23 mm NR-23', caliber: 'cannon', rpm: 850, dmg: 6, mv: 680, disp: 0.016, range: 750 },
+  // M39: beş hazneli döner toplu (revolver) 20 mm; dakikada ~1500 mermi, namlu çıkış hızı 1030 m/s (B-57B, F-86H)
+  m39: { name: '20 mm M39', caliber: 'cannon', rpm: 1500, dmg: 5.5, mv: 1030, disp: 0.014, range: 800 },
   mk108: { name: '30 mm MK 108', caliber: 'cannon', rpm: 650, dmg: 22, mv: 540, disp: 0.02, range: 450 },
   n37: { name: '37 mm N-37', caliber: 'cannon', rpm: 400, dmg: 18, mv: 690, disp: 0.018, range: 800 },
   // Mauser MK 214 A (5 cm Pak 38'den türetildi): dakikada 150 mermi, 920 m/sn, 1,54 kg'lık mermi. Bombardıman kollarına
@@ -1250,6 +1252,50 @@ const DEFS: AircraftDef[] = [
     loadouts: [bombs('fab250x12', '12 × FAB-250', BOMBS.b250, 12, 0)],
     buildTime: 380, cruiseAlt: 10000, vmaxKmh: 902, vmaxAlt: 4500,
   },
+  {
+    // Ar 234 C-3 (1945; ~19 adet): dört BMW 003A-1 (800 kp) iki çift naselde, B serisinin motor bağlantılarında. Boş
+    // 6530 kg, yüklü 11.050 kg, 6000 m'de 873 km/h, 10.000 m'ye 10,3 dk; burun altında iki MG 151/20 (airpages.ru
+    // tablosu; Wikipedia). Kanat ve gövde B-2'ninki, kokpit kabarık ve 8 camlı.
+    id: 'ar234c3', name: 'Arado Ar 234 C-3 Blitz', abbr: 'Ar 234 C', origin: 'Almanya', year: 1945,
+    generation: 'J1', role: 'bomber', model: 'ar234c',
+    description: 'Blitz’in dört motorlu son sürümü: her kanadın altında yan yana iki BMW 003, B-2’den belirgin hızlı ve çevik tırmanır. Kabarık kokpit daha iyi görür, burun altında iki 20 mm top. Savaş bitmeden ancak birkaç düzine yapıldı. 1500 kg’a kadar bomba.',
+    hp: 290, armor: 0.1, crew: 1, engine: jet('4 × BMW 003A-1', 7.85, { count: 4, spool: 9, tsfc: 0.14 }),
+    massEmpty: 6530, fuelKg: 3000, wingArea: 27.0, span: 14.41, clMax: 1.3, mcrit: 0.7, cdWave: 0.08, machTuck: 0.4, vneKmh: 900, nMax: 4,
+    roll: [55, 400, 420], tactic: 'energy', tailDragger: false, gOnset: 3, visualRange: 5500,
+    guns: [gun('mg151', 2, 250, 'nose')],
+    loadouts: [bombs('b500x3', '3 × SC 500', BOMBS.b500, 3, 0.06)],
+    buildTime: 340, cruiseAlt: 8000, vmaxKmh: 873, vmaxAlt: 6000,
+  },
+  {
+    // Martin B-57B (1954): Canberra'nın ABD'de taarruza göre yeniden düzenlenmiş sürümü. 2 × Wright J65-W-5 (7220 lbf),
+    // boş 12.285 kg, 760 m'de 960 km/h, tavan 13.745 m, tırmanış 31 m/s; ilk 90 uçakta sekiz 12,7 mm, sonra dört 20 mm
+    // M39 (290 mermi); dönen bomba kapağı (XB-51'den), dış kanatta dört askı, arka gövdede üçgen hava frenleri ve
+    // kanatta parmak frenleri (Wikipedia, NMUSAF).
+    id: 'b57b', name: 'Martin B-57B Canberra', abbr: 'B-57B', origin: 'ABD', year: 1954,
+    generation: 'J1', role: 'bomber', model: 'b57b', diveBrakes: true,
+    description: 'Canberra’nın Amerikan taarruz sürümü: pilot ve navigatör savaş uçağı kanopisi altında arka arkaya. Kanatta dört 20 mm M39 top, dış kanatta dört askı ve dönen bomba kapağı: bombalar kapağın iç yüzünde durur, kapak döndükçe açığa çıkar. Hava frenleriyle dalarak da bombalar.',
+    hp: 440, armor: 0.14, crew: 2, engine: jet('2 × Wright J65-W-5', 32.1, { count: 2, spool: 7, tsfc: 0.1 }),
+    massEmpty: 12285, fuelKg: 6500, wingArea: 89.0, span: 19.51, clMax: 1.25, mcrit: 0.74, mdd: 0.86, cdWave: 0.09, machTuck: 0.4, vneKmh: 900, nMax: 4,
+    roll: [70, 450, 500], tactic: 'energy', tailDragger: false, gOnset: 3, visualRange: 5500,
+    guns: [gun('m39', 4, 290, 'wing', 5.2)],
+    loadouts: [bombs('lb1000x6', '6 × 1000 lb', BOMBS.lb1000, 6, 0), bombs('lb500x8', '8 × 500 lb', BOMBS.lb500, 8, 0)],
+    buildTime: 380, cruiseAlt: 9000, vmaxKmh: 960, vmaxAlt: 760,
+  },
+  {
+    // Tu-14 (ilk uçuş 1949, hizmette 1952–1959): Deniz Havacılığının jet torpido bombardıman uçağı. 2 × VK-1 (26,48 kN), boş 14.930 kg, kalkış
+    // 21.000 kg (en çok 25.350), deniz seviyesinde 800, 5000 m'de 845 km/h, 5000 m'ye 9,5 dk; burunda iki, KDU-81 kuyruk
+    // taretinde iki NR-23; 3000 kg bomba, mayın ya da torpido (Gunston 1995; Wikipedia). Nişancı ayrı basınçlı kabinde.
+    id: 'tu14', name: 'Tupolev Tu-14', abbr: 'Tu-14', origin: 'Sovyetler Birliği', year: 1952,
+    generation: 'J1', role: 'bomber', model: 'tu14',
+    description: 'Deniz Havacılığının jet torpido bombardıman uçağı: düz kanatlı, üç kişilik. Navigatör camlı burunda, nişancı kuyruktaki ayrı basınçlı kabinde KDU-81 taretinin iki 23 mm topunu yönetir; burunda iki sabit 23 mm. 3 tona kadar bomba.',
+    hp: 560, armor: 0.14, crew: 3, engine: jet('2 × Klimov VK-1', 26.48, { count: 2, spool: 5, tsfc: 0.11 }),
+    massEmpty: 14930, fuelKg: 5800, wingArea: 67.4, span: 21.69, clMax: 1.35, mcrit: 0.74, cdWave: 0.08, machTuck: 0.35, vneKmh: 900, nMax: 4,
+    roll: [50, 420, 450], tactic: 'energy', tailDragger: false, gOnset: 3, visualRange: 5500,
+    guns: [gun('nr23', 2, 85, 'nose')],
+    turrets: [turret('Kuyruk (KDU-81, çift)', [0, -0.24, -11.2], 180, 70, [-40, 40], gun('nr23', 2, 225), true)],
+    loadouts: [bombs('fab250x12', '12 × FAB-250', BOMBS.b250, 12, 0)],
+    buildTime: 400, cruiseAlt: 9000, vmaxKmh: 845, vmaxAlt: 5000,
+  },
   // ============================================================ Sonraki aşama (radar ve füze)
   {
     id: 'mig21', name: 'Mikoyan-Gurevich MiG-21F-13', abbr: 'MiG-21F', origin: 'Sovyetler Birliği', year: 1960,
@@ -1376,7 +1422,7 @@ const LENGTHS: Record<string, number> = {
   typhoon: 9.73, il10: 11.12, ju87b: 11.0, sbd3: 10.09, ju87d: 11.5, sb2c: 11.18, he111: 16.4, ju88a4: 14.36, b25j: 16.13,
   b17g: 22.66, canberra: 19.96, i16: 6.13, a6m2: 9.06, blenheim: 12.98, p40e: 9.66, pe2: 12.66, yak3: 8.5, la7: 8.6, p38j: 11.53,
   f6f5: 10.24, lancaster: 21.11, mosquito: 12.47, seafury: 10.57, f8f: 8.61, f4u4: 10.27, ad4: 11.84, a26b: 15.24, b29: 30.18,
-  he162: 9.05, f80c: 10.49, vampire: 9.37, ar234: 12.64, il28: 17.65, mig21: 14.5, f4e: 19.2, f15a: 19.43, rafale: 15.27, f22a: 18.92,
+  he162: 9.05, f80c: 10.49, vampire: 9.37, ar234: 12.64, il28: 17.65, ar234c3: 12.84, b57b: 19.96, tu14: 21.95, mig21: 14.5, f4e: 19.2, f15a: 19.43, rafale: 15.27, f22a: 18.92,
 };
 
 /**

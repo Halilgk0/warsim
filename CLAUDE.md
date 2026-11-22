@@ -113,6 +113,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       - Bekleme çemberinin yarıçapı uçağın hızında 2,2 g ile uçulabilir olmalı (`ops.ts` hold: en az v²/(g·√(n²−1))·1,5). Stil yarıçapı (1,4–2,3 km)
         pervaneli içindi: Canberra, Ar 234 ve Il-28 çemberi tutamayıp alçalmak yerine 11 km'ye tırmanıyor, yakıtı bitene dek dönüyordu
         (2026-11-21, oyuncu bildirimi). Yüksekten dönen jet bombardıman kolu ve 4'lü iniş: eski 0/16'ya yakın, yeni 16/16 (scratchpad `kontrol/inis.ts`, `canberra.ts`).
+      - Yatışı sınırlı uçak (bombardıman, `nMax` ≤ 4: 55°) alçalmak isterken dönüşte kaldırmanın dikey payını tutturur, en az 1 G
+        (`pilot.ts`); eskiden en az seviyeli dönüş G'sinin üstüne yanal isteği de çekip tırmanıyordu. B-57B paternde 3,5 km'den
+        14 km'ye çıkıp inemiyordu (2026-11-22). 13 bombardıman × 12 iniş (`tools/sim/inis`, hasarsız, motor, hepsi): hepsi indi, süre %5–30 kısaldı.
       Sonuç: zorla pas geçirilen 14 türün neredeyse hepsi iniyor (Lancaster 0/6 → 6/6); tek motorlu He 111 ve B-25, hasarlı Ju 88 0/6 → 6/6.
     - Avcı hedef dağıtımı (2026-11-18, `flightGroup.ts` `assignTargets`), sırayla:
       1. Oyuncunun emri (`brain.order`).
@@ -313,6 +316,21 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Eklem menteşe ekseniyle döner. `gameRenderer.ts` `animateParts` kumandalara bağlar.
     - Işıklar model tanımında (`lights`): seyir lambaları ve iniş farı. Ek çözünürlük `HIRES`.
     - Yeni uçağa eklerken bu dört parçayı ve ışıkları tanıma ekle.
+    - Mürettebat figürü `canopySink`'in ilk kaydına oturur; ek koltuk (B-57B arka koltuk, Tu-14 navigatör ve kuyruk nişancısı)
+      `crew: true` ile ve kokpit kanopisinden sonra eklenir (eskiden yalnız ilk kayıt çiziliyordu, B-57B'nin pilotu yoktu).
+    - `jetGear` içe katlanan bacağın yan desteği arkaya (menteşe ekseni boyunca) uzanır: içe uzanan destek toplanınca yukarı
+      dönüp kanadın üstünden çıkıyordu (F-86, 2026-11-22). Toplanan her parça menteşenin etrafında 90° döner; kanat içinde kalmalı.
+    - Dış yükler (`buildStoreMeshes`) yüzeyden 10–12 cm aşağıda durur; üstlerinde askı (`withPylon`, kanat ucu tankı hariç)
+      yüzeye uzanır (2026-11-22; eskiden bombalar havada asılı görünüyordu).
+    - Egzoz ve iz noktaları kendiliğinden motor kaportalarından bulunur; yanlış çıkan uçakta (yan yana motorlu Ar 234 C,
+      B-57B, Tu-14) tanımda `emitters` ile verilir.
+    - Görev eklemleri (2026-11-22, Ar 234 C-3 `ar234c`, B-57B `b57b`, Tu-14 `tu14`; çizim ve fotoğraftan sıfırdan kurulu):
+      - Bomba kapakları: Tu-14 `bayL`/`bayR` (bölmenin kenarından menteşeli), B-57B döner kapı `bayRot` + üstündeki 8 bomba
+        `bayBombs` (180° döner, bombalar dışarı gelir). Bomba koşusu başlayınca açılır, son bombadan 5 sn sonra kapanır.
+      - B-57B parmak frenleri `fingerL`/`fingerR` (kanat üstü, hava freniyle), gövde yanındaki üçgen frenler `airbrakeL/R`.
+      - Tu-14 kuyruk tareti `taret0`: nişancının hedefine döner (`t.aim`), boştayken geriye bakar.
+      - Ar 234 C kalkış roketleri `rato`: kalkışta yanar (30 sn), havada atılır, paraşütle rüzgârla düşer (`gameRenderer.ts`
+        `rato`, `ratoDrops`); inince yeniden takılı görünür.
     - **Blender dokuları** (2026-11-20; araçlar ve adımlar `tools/blender/README.md`): araştırma ağacındaki 51 uçağın oyun
       geometrisi Blender'da UV açılıp dokulanır (boya, normal haritası: panel, perçin, vida; AO + parlaklık), MiG-15'in gövdesi
       Blender'da kurulur. Yalnız ayrıntılı modelde: Orta ve Yüksek kalite, hangar vitrini; Düşükte kodla boyanmış model.
@@ -325,6 +343,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         (`matchWinding`: oyunun bazı dönel gövdeleri içe sarımlı, iki yüzlü çizim).
       - Model ya da boya değişince: `doku.py` → `sikistir.py` + `dokular.mjs`, sonra ansiklopedi ve üretim görselleri (araçlar
         Blender modelleriyle çizer).
+      - `geo_al.mjs` kaporta ölçülerini kaynaktan okur; okuyamadığı uçakta (`ar234c`, `tu14`) `doku.py` `META_FIX` verir. Üç renkli
+        kamuflaj (B-57B Güneydoğu Asya boyası): `STYLES`'ta `camo` üç renk ve `camo_w` payları.
   - Uçaksavar topları `structures.ts` `aaGun`; hangar vitrini aynı modeli `buildAAGun` ile alır (`ui/hangar.ts`, bilgiler `ui/hangarAA.ts`). Yapı
     malzemesi sis tanımı ister: başka sahnede kullanırken sahneye `fog` ver.
     - Blender dokuları (2026-11-20, `gunSkins.ts`; araçlar `tools/blender/README.md`): 15 topun oyun geometrisi dört parça

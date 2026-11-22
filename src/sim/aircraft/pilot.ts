@@ -371,8 +371,12 @@ export function fly(ac: Aircraft, cmd: FlyCommand, dt: number): void {
         if (Math.abs(bank) > maxBank) {
           const b = Math.sign(bank) * maxBank;
           _desUp.copy(_upP).multiplyScalar(Math.cos(b)).addScaledVector(_rightP, Math.sin(b));
-          // Sınırlı yatışta en az seviyeli dönüş G'si: irtifa kaybetmeden döner
-          nCmd = Math.max(_L.dot(_desUp) / G, 1 / Math.cos(b));
+          // Sınırlı yatışta en az seviyeli dönüş G'si: irtifa kaybetmeden döner. Alçalmak isterken (istenen kaldırmanın
+          // dikey payı seviyeli uçuşunkinden az) dikey pay tutturulur, en az 1 G: fazla çekmek uçağı tırmandırıyordu
+          // (B-57B bekleme paterninde alçalmak isterken 3,5 km'den 14 km'ye çıktı)
+          const level = 1 / Math.cos(b);
+          const nVert = _L.dot(_upP) / (G * Math.cos(b));
+          nCmd = nVert < level ? Math.max(nVert, 1) : Math.max(_L.dot(_desUp) / G, level);
         }
       }
     }

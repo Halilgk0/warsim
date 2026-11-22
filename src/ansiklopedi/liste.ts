@@ -54,6 +54,9 @@ export const ENCYCLOPEDIA: Record<string, string> = {
   f84g: 'republic-f-84g-thunderjet',
   canberra: 'english-electric-canberra',
   f86f: 'north-american-f-86f-sabre',
+  ar234c3: 'arado-ar-234-c-3',
+  tu14: 'tupolev-tu-14',
+  b57b: 'martin-b-57b-canberra',
 };
 
 export const ENC_TR = '/ansiklopedi/';

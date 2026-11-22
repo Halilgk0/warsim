@@ -21,7 +21,7 @@ type Geo = THREE.BufferGeometry;
 let DETAIL = 1;
 /** Yüksek ayrıntıda ek çözünürlük çarpanı (videosu çekilen uçaklarda daha çok kenar ve profil noktası). */
 let RES = 1;
-const HIRES: Record<string, number> = { b29: 1.25, a26: 1.35, lancaster: 1.25, b17: 1.25, b25: 1.3, ju88: 1.3, he111: 1.3, blenheim: 1.4, pe2: 1.4, p38: 1.4, mosquito: 1.4, bf110: 1.4, ad4: 1.5, sb2c: 1.5, sbd: 1.5, ju87d: 1.5, ju87b: 1.5, il10: 1.5, il2m3: 1.5, il2: 1.5, seafury: 1.5, a6m: 1.5, i16: 1.5, f8f: 1.5, f4u: 1.5, f6f: 1.5, p40: 1.5, la7: 1.5, yak3: 1.5, p47: 1.5, typhoon: 1.5, fw190: 1.5, p51d: 1.5, bf109g: 1.5, bf109f: 1.5, bf109e: 1.5, hurricane: 1.5, spitfire: 1.5, spitfire5: 1.5, spitfire9: 1.5, mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, me262u4: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5, canberra: 1.5, il28: 1.5 };
+const HIRES: Record<string, number> = { b29: 1.25, a26: 1.35, lancaster: 1.25, b17: 1.25, b25: 1.3, ju88: 1.3, he111: 1.3, blenheim: 1.4, pe2: 1.4, p38: 1.4, mosquito: 1.4, bf110: 1.4, ad4: 1.5, sb2c: 1.5, sbd: 1.5, ju87d: 1.5, ju87b: 1.5, il10: 1.5, il2m3: 1.5, il2: 1.5, seafury: 1.5, a6m: 1.5, i16: 1.5, f8f: 1.5, f4u: 1.5, f6f: 1.5, p40: 1.5, la7: 1.5, yak3: 1.5, p47: 1.5, typhoon: 1.5, fw190: 1.5, p51d: 1.5, bf109g: 1.5, bf109f: 1.5, bf109e: 1.5, hurricane: 1.5, spitfire: 1.5, spitfire5: 1.5, spitfire9: 1.5, mig15: 2.4, sabre: 1.6, f84: 1.6, p80: 1.6, me262: 1.6, me262u4: 1.6, meteor: 1.6, vampire: 1.6, he162: 1.6, ar234: 1.5, canberra: 1.5, il28: 1.5, ar234c: 1.5, b57b: 1.5, tu14: 1.5 };
 /** Dönel parçaların kenar sayısı ayrıntıya göre. */
 const sg = (n: number) => (DETAIL ? Math.round(n * 2.25 * RES) : n);
 
@@ -423,7 +423,8 @@ const mirror = (x: number, make: (x: number) => Geo) => [make(x), make(-x)];
  */
 let frameSink: Geo[] = [];
 /** Kanopiler ve dikey kuyruk tepeleri (pilot, anten direği ve teli için); cached() her model için boşaltır. */
-interface CanopyRec { z: number; len: number; h: number; y: number; w: number; bubble: boolean }
+/** İlk kanopiye mürettebat oturur; crew işaretli ek kayıtlara da (ikinci koltuk, navigatör, kuyruk nişancısı). */
+interface CanopyRec { z: number; len: number; h: number; y: number; w: number; bubble: boolean; crew?: boolean }
 /** Dikey kuyruk: uç x'i, tepe ve kök yüksekliği, tepe noktasının z'si, orta yükseklikte veter ortası ve veter. */
 interface FinRec { x: number; yTop: number; yRoot: number; zTop: number; zMid: number; chordMid: number }
 let canopySink: CanopyRec[] = [];
@@ -992,7 +993,7 @@ const SKIN_KINDS = new Set([
   'hurricane', 'ju87b', 'bf109e', 'spitfire', 'bf110', 'he111', 'i16', 'a6m', 'blenheim',
   'spitfire5', 'spitfire9', 'bf109f', 'bf109g', 'p47', 'il2', 'il2m3', 'typhoon', 'il10', 'sbd', 'ju87d', 'sb2c', 'ju88', 'b25', 'b17',
   'p40', 'pe2', 'yak3', 'la7', 'p38', 'f6f', 'lancaster', 'mosquito', 'seafury', 'f8f', 'f4u', 'ad4', 'a26', 'b29', 'fw190', 'p51d',
-  'me262', 'me262u4', 'meteor', 'sabre', 'f84', 'he162', 'p80', 'vampire', 'ar234', 'canberra', 'il28',
+  'me262', 'me262u4', 'meteor', 'sabre', 'f84', 'he162', 'p80', 'vampire', 'ar234', 'canberra', 'il28', 'ar234c', 'b57b', 'tu14',
 ]);
 const glbSkin = new Map<string, { geos: Map<string, Geo>; albedo: THREE.Texture; normal: THREE.Texture; aos: THREE.Texture }>();
 let glbMig: { geo: Geo; part: Part; joint: JointTag | null }[] | null = null;
@@ -1481,7 +1482,11 @@ function jetGear(o: JetGearOpts): Geo[] {
       rod(v(x, m.axle, m.z), v(x - s * (m.dx + m.tw * 0.55), m.axle, m.z), 0.04, 6),
       rod(v(x, low - 0.02, m.z - 0.05), v(x, low - 0.22, m.z - 0.16), 0.02, 4),
       rod(v(x, low - 0.22, m.z - 0.16), v(x, m.axle + 0.05, m.z - 0.05), 0.02, 4),
-      rod(v(x, low + 0.1, m.z), v(x - s * 0.42, m.top + 0.03, m.z + 0.06), 0.028, 5),
+      // Destek: içe katlanan bacakta arkaya (menteşe ekseni boyunca); içe giden destek toplanınca 0,4 m yukarı dönüp
+      // kanadın üstünden çıkıyordu (F-86, 2026-11-22). Dışa ve öne katlananlarda eskisi gibi içe
+      m.out || m.fore
+        ? rod(v(x, low + 0.1, m.z), v(x - s * 0.42, m.top + 0.03, m.z + 0.06), 0.028, 5)
+        : rod(v(x, low + 0.1, m.z - 0.02), v(x, m.top - 0.02, m.z - 0.42), 0.028, 5),
       ...wheelParts(m.rw, m.tw, x - s * m.dx, m.axle, m.z),
     ];
     const door = gearDoor(x + s * m.door.dx, m.door.top, m.door.bot, m.z, m.door.w, m.door.r);
@@ -1631,6 +1636,39 @@ function beagleGear(gh: number): Geo[] {
 }
 
 /**
+ * Ar 234 C takımı: B serisinin dar izli ana bacakları (1,4 m) gövdeye toplanır, ağırlaşan uçak için daha büyük ana
+ * lastikler; 630 × 220 mm burun tekerleği (airpages).
+ */
+function blitzCGear(gh: number): Geo[] {
+  return jetGear({
+    main: { x: 0.71, z: -0.5, top: -0.33, axle: -gh + 0.4, rw: 0.4, tw: 0.2, dx: -0.03, door: { dx: 0.12, top: -0.4, bot: -0.98, w: 0.47, r: 0.12 } },
+    nose: { topY: -0.58, topZ: 3.85, axle: -gh + 0.315, z: 4.0, rw: 0.315, tw: 0.22 },
+    belly: { x: 0.2, y: -0.62, z0: 3.8, z1: 2.75, h: 0.2 },
+  });
+}
+
+/** B-57B takımı: ana bacaklar naselin içinden iner ve dışa toplanır, büyük lastikler; burunda çift tekerlek. */
+function martinGear(gh: number): Geo[] {
+  return jetGear({
+    main: { out: true, x: 2.45, z: -0.95, top: -0.25, axle: -gh + 0.47, rw: 0.47, tw: 0.24, dx: 0.05, door: { dx: 0.15, top: -0.33, bot: -1.02, w: 0.74, r: 0.16 } },
+    nose: { topY: -0.86, topZ: 4.15, axle: -gh + 0.3, z: 4.27, rw: 0.3, tw: 0.13, twin: 0.15 },
+    belly: { x: 0.27, y: -0.9, z0: 4.4, z1: 3.3, h: 0.25 },
+  });
+}
+
+/**
+ * Tu-14 takımı (çizimden): ana bacaklar nasel altındaki bölmeden iner ve öne toplanır, tek büyük tekerlek (1150 mm);
+ * burun gondolundan inen tek tekerlekli burun bacağı arkaya toplanır.
+ */
+function tu14Gear(gh: number): Geo[] {
+  return jetGear({
+    main: { fore: true, x: 3.05, z: 0.59, top: -1.05, axle: -gh + 0.59, rw: 0.59, tw: 0.34, dx: -0.28, door: { dx: -0.12, top: -1.12, bot: -1.62, w: 0.9, r: 0.15 } },
+    nose: { topY: -0.92, topZ: 7.77, axle: -gh + 0.385, z: 7.89, rw: 0.385, tw: 0.2, door: { top: -0.96, bot: -1.5, w: 0.4 } },
+    belly: { x: 0.26, y: -0.92, z0: 8.0, z1: 6.6, h: 0.3 },
+  });
+}
+
+/**
  * Kanopi: gövde üstünde yarı gömülü damla. Çerçeve: ön cam kenarında ince koyu bant; kabarcık olmayan (çerçeveli)
  * kanopide ortada ve arkada da birer bant.
  */
@@ -1695,6 +1733,11 @@ interface ModelDef {
   ownMast?: boolean;
   /** Kanat silahları gömülü: namlu çıkmaz (ağızlar modelde). */
   flushGuns?: boolean;
+  /**
+   * Motor çıkışları (model ekseninde, motor sırasıyla): yoğuşma izi, hasarlı motorun dumanı ve alevi buradan çıkar.
+   * Yoksa uçağın boyutundan tahmin edilir (iki motorlu jette kanat açıklığının %20'si).
+   */
+  emitters?: V3[];
 }
 
 
@@ -4055,6 +4098,409 @@ function defineModel(key: string): ModelDef {
         ],
       };
     }
+    case 'ar234c': {
+      // Ar 234 C-3: gövde, kanat ve kuyruk B serisinin çiziminden; değişenler kabarık, 8 camlı kokpit (B'de 13) ve
+      // periskopun geriye yatık kaportası, burun altında iki MG 151/20'lik top yuvası, her kanadın altında yan yana iki
+      // BMW 003A-1'li çift nasel (B'nin motor bağlantılarında). BMW 003'ün girişinde Riedel marş göbeği, arkada ayarlı
+      // lülenin "soğan" konisi. Dış kanat altında Walter HWK 109-500 kalkış roketleri: kafes askı, burnunda paraşüt
+      // paketi; kalkıştan sonra atılır (oyun gizler, paraşütle düşürür).
+      const FRONT: JetSec[] = [[5.6, 0.01, -0.06, -0.13, -0.1], [5.57, 0.15, 0.08, -0.28, -0.1], [5.44, 0.32, 0.3, -0.46, -0.09], [5.13, 0.51, 0.53, -0.6, -0.08], [4.6, 0.65, 0.69, -0.66, -0.06], [3.95, 0.71, 0.72, -0.66, -0.05], [3.45, 0.72, 0.64, -0.66, -0.05]];
+      const GL = new JetHull(FRONT, 2.3);
+      const H = new JetHull([
+        [3.45, 0.72, 0.64, -0.66, -0.05], [2.6, 0.71, 0.66, -0.6, 0], [0.1, 0.69, 0.66, -0.53, 0.04], [-2.36, 0.58, 0.74, -0.28, 0.2], [-4.83, 0.36, 0.82, -0.03, 0.38],
+        [-6.2, 0.2, 0.66, 0.16, 0.4], [-6.8, 0.1, 0.5, 0.24, 0.38], [-7.3, 0.004, 0.42, 0.38, 0.4],
+      ], 2.2);
+      const W: WingOpts = { x0: 0.67, z: 1.07, root: 2.5, y: 0.52, tipX: 6.84, tip: 0.91, sweep: 0.85, dihedral: 0, t: 0.33 };
+      const T: WingOpts = { x0: 0.12, z: -5.6, root: 1.14, y: 0.95, tipX: 2.32, tip: 0.66, sweep: 0.38, dihedral: 0, t: 0.12 };
+      // Çift nasel: iki motor yan yana (eksenler 0,8 m arayla), üstte kanada bağlanan ortak kaporta
+      const E1 = 1.6;
+      const E2 = 2.4;
+      const NY = -0.12;
+      const engine = (x: number): Geo[] => {
+        const o = { x, y: NY };
+        return [
+          body([[1.92, 0.3], [2.04, 0.33], [2.1, 0.37], [2.07, 0.41], [1.9, 0.43], [1.4, 0.44], [0.2, 0.44], [-0.7, 0.42], [-1.2, 0.35], [-1.52, 0.28], [-1.6, 0.27]], 12, { ...o, smooth: true }),
+          tag(body([[1.3, 0.27], [1.94, 0.3]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.27, sg(12)).translate(x, NY, 1.3), 'dark'),
+          // Riedel marş motoru göbeği ve dört kollu ön yatak
+          body([[2.12, 0.001], [2.04, 0.07], [1.86, 0.12], [1.5, 0.13]], 8, { ...o, smooth: true }),
+          ...[0, 1, 2, 3].map((i) => {
+            const an = Math.PI / 4 + (i * Math.PI) / 2;
+            return tag(rod(new THREE.Vector3(x + Math.cos(an) * 0.1, NY + Math.sin(an) * 0.1, 1.7), new THREE.Vector3(x + Math.cos(an) * 0.29, NY + Math.sin(an) * 0.29, 1.7), 0.016, 4), 'dark');
+          }),
+          tag(body([[-1.6, 0.25], [-1.25, 0.23]], 12, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.23, sg(12)).rotateY(Math.PI).translate(x, NY, -1.25), 'dark'),
+          // Ayarlı lülenin soğan konisi (öne arkaya kayarak çıkışı daraltır)
+          tag(body([[-1.18, 0.001], [-1.3, 0.12], [-1.55, 0.15], [-1.78, 0.08], [-1.86, 0.001]], 8, { ...o, smooth: true }), 'dark'),
+        ];
+      };
+      const pair = (sd: number): Geo[] => [
+        ...engine(sd * E1),
+        ...engine(sd * E2),
+        // İki motoru kanada bağlayan ortak üst kaporta ve aralarındaki perde
+        body([[1.75, 0.001], [1.55, 0.3], [0.9, 0.42], [-0.6, 0.42], [-1.15, 0.28], [-1.35, 0.001]], 10, { x: sd * (E1 + E2) / 2, y: NY + 0.32, sx: 1.25, sy: 0.55, smooth: true }),
+        new THREE.BoxGeometry(0.28, 0.5, 2.7).translate(sd * (E1 + E2) / 2, NY - 0.02, 0.15),
+      ];
+      // Walter 109-500 kalkış roketleri: kafes askı, gövde, paraşüt paketi, lüle (ayrı eklem: atılınca gizlenir)
+      const RX = 3.85;
+      const rato = joint('rato', [0, 0, 0], [1, -1].flatMap((sd) => {
+        const x = sd * RX;
+        const yTop = W.y - 0.14;
+        return [
+          body([[1.25, 0.001], [1.12, 0.17], [0.9, 0.24], [-0.7, 0.24], [-0.85, 0.19]], 10, { x, y: -0.12, smooth: true }),
+          // Paraşüt paketi: bez torba, üstünde çapraz iki kayış
+          new THREE.SphereGeometry(1, sg(8), sg(6)).scale(0.23, 0.23, 0.26).translate(x, -0.12, 1.25),
+          ...[0.7, -0.7].map((r) => tag(new THREE.TorusGeometry(0.235, 0.012, 4, sg(10)).rotateZ(r).translate(x, -0.12, 1.25), 'dark')),
+          tag(new THREE.CylinderGeometry(0.11, 0.15, 0.26, sg(8)).rotateX(Math.PI / 2).translate(x, -0.12, -0.96), 'dark'),
+          // Kafes: iki yanda çaprazlı dikmeler
+          ...[-0.35, 0.35].flatMap((dz) => [
+            tag(rod(new THREE.Vector3(x - 0.12, yTop, dz + 0.2), new THREE.Vector3(x - 0.1, 0.08, dz), 0.014, 4), 'dark'),
+            tag(rod(new THREE.Vector3(x + 0.12, yTop, dz + 0.2), new THREE.Vector3(x + 0.1, 0.08, dz), 0.014, 4), 'dark'),
+            tag(rod(new THREE.Vector3(x - 0.12, yTop, dz + 0.2), new THREE.Vector3(x + 0.1, 0.08, dz), 0.01, 3), 'dark'),
+          ]),
+        ];
+      }));
+      canopySink.push({ z: 4.15, len: 1.6, h: 0.52, y: 0.16, w: 0.5, bubble: false });
+      // C serisinin kabarık, sac tavanlı kokpiti (B'de bütün burun camdı, 13 cam): 8 cam: önde ortadan bölünmüş kubbe,
+      // her yanda iki dikdörtgen pencere, tavanda ortadan bölünmüş dar pencere; gerisi boyalı sac. Burun yüzeyi (z, açı)
+      // ızgarasında karolara bölünür (açı 0 yan, π/2 tepe); sac karolar gövde boyasını alır, camların çevresinde koyu çerçeve.
+      const P2 = Math.PI / 2;
+      const [ZA, ZB, ZC, ZD, ZT] = [4.35, 4.66, 4.7, 5.08, 5.6];
+      const [A1, A2, A3, A4] = [-0.35, 0.15, 0.9, 1.2];
+      type Tile = [number, number, number, number];
+      const sheet: Tile[] = [[3.45, ZA, -P2, P2], [ZA, ZD, -P2, A2], [ZA, ZD, A3, A4], [ZB, ZC, A2, A3], [ZD, ZT, -P2, A1]];
+      const panes: Tile[] = [[ZA, ZB, A2, A3], [ZC, ZD, A2, A3], [ZA, ZD, A4, P2], [ZD, ZT, A1, P2]];
+      const along = (s: number, pts: [number, number][]): Geo[] => pts.slice(1).map(([z, a], i) =>
+        tag(rod(new THREE.Vector3(...GL.pt(pts[i][0], pts[i][1], 0.008, s)), new THREE.Vector3(...GL.pt(z, a, 0.008, s)), 0.015, DETAIL ? 2 : 3), 'dark'));
+      // Kavisli kenar kısa düz çubuklarla
+      const steps = (f: (t: number) => [number, number]) => {
+        const n = DETAIL ? 3 : 2;
+        return Array.from({ length: n + 1 }, (_, i) => f(i / n));
+      };
+      const paneFrame = (s: number, [z0, z1, a0, a1]: Tile): Geo[] => [
+        ...along(s, steps((t) => [z0 + (z1 - z0) * t, a0])),
+        ...(a1 < P2 || s > 0 ? along(s, steps((t) => [z0 + (z1 - z0) * t, a1])) : []),
+        ...along(s, steps((t) => [z0, a0 + (a1 - a0) * t])),
+        ...(z1 < ZT ? along(s, steps((t) => [z1, a0 + (a1 - a0) * t])) : []),
+      ];
+      const nose = [1, -1].flatMap((s) => [
+        ...sheet.map(([z0, z1, a0, a1]) => GL.patch(s, z0, z1, a0, a1, 0)),
+        ...panes.map(([z0, z1, a0, a1]) => tag(GL.patch(s, z0, z1, a0, a1, 0), 'glass')),
+        ...panes.flatMap((p) => paneFrame(s, p)),
+      ]);
+      return {
+        solids: [
+          ...nose,
+          H.geo(14),
+          tag(H.disc(3.45, 1, 14), 'dark'),
+          // Periskop ve geriye yatık kaportası
+          body([[4.3, 0.001], [4.15, 0.07], [3.8, 0.08], [3.55, 0.001]], 8, { y: 0.72, sx: 1, sy: 0.9, smooth: true }),
+          tag(new THREE.CylinderGeometry(0.035, 0.05, 0.36, sg(6)).rotateX(-0.35).translate(0, 0.86, 4.06), 'dark'),
+          tag(new THREE.SphereGeometry(0.05, sg(5), sg(3)).scale(1, 1.3, 1).translate(0, 1.04, 4.0), 'dark'),
+          // Burun altı top yuvası: iki MG 151/20, öne bakan namlular
+          body([[3.55, 0.001], [3.35, 0.16], [2.9, 0.2], [1.95, 0.2], [1.6, 0.001]], 10, { y: -0.68, sx: 1.6, sy: 0.6, smooth: true }),
+          ...[1, -1].flatMap((sd) => [
+            tag(rod(new THREE.Vector3(sd * 0.13, -0.7, 3.3), new THREE.Vector3(sd * 0.13, -0.7, 3.95), 0.022, 6), 'dark'),
+            portAt(sd * 0.13, -0.7, 3.34, 0.04, 0.06),
+          ]),
+          // Kanat: gövdeden flap, sonra kanatçık, uç yuvarlak
+          ...controlWing(W, 0.78, [[-0.1, 0.56, 'flap'], [0.56, 0.57, null], [0.57, 0.97, 'aileron'], [0.97, 1, null]], 6),
+          ...pair(1),
+          ...pair(-1),
+          ...rato,
+          ...controlWing(T, 0.7, [[0, 0.96, 'elevator'], [0.96, 1, null]], 4),
+          ...jetFin([[0.6, -4.7, 2.8], [0.82, -4.91, 2.52], [1.3, -5.27, 2.1], [1.9, -5.72, 1.53], [2.4, -6.1, 1.02], [2.68, -6.31, 0.74], [2.78, -6.55, 0.45]], 0.16, 0.77, 1, 4),
+          body([[-5.4, 0.01], [-5.6, 0.07], [-6.6, 0.07], [-6.9, 0.01]], 8, { y: 0.95, sy: 0.7, smooth: true }),
+          // Anten direği ve kuyruğa tel
+          tag(rod(new THREE.Vector3(0, 0.66, 0.6), new THREE.Vector3(0, 0.95, 0.45), 0.012, 4), 'dark'),
+          tag(rod(new THREE.Vector3(0, 0.95, 0.45), new THREE.Vector3(0, 2.6, -6.25), 0.005, 3), 'dark'),
+        ],
+        props: [],
+        markZ: -4.0,
+        emitters: [[E1, NY, -1.65], [E2, NY, -1.65], [-E1, NY, -1.65], [-E2, NY, -1.65]],
+        lights: [
+          { p: [W.tipX + 0.38, W.y, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.38, W.y, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, 2.0, -7.1], kind: 'white' },
+          { p: [1.2, 0.33, 0.9], kind: 'landing' },
+        ],
+      };
+    }
+    case 'b57b': {
+      // Martin B-57B: Canberra'nın gövde arkası, kanadı, kuyruğu ve nasel yerleri (gerçek ölçüler: boy 19,96 m, açıklık
+      // 19,51 m); önde yeni burun ve tandem kokpit. NMUSAF fotoğrafı: küt, kapalı burun; düz panelli ön cam ve iki
+      // koltuğu örten savaş uçağı kanopisi (arka koltuk yüksekte). J65 (Sapphire) naselinde büyük merkez konisi ve dört
+      // kol. Kanat uçlarında yakıt tankları, dış kanatta dört askı, kanatta M39 ağızları; iç kanatta parmak frenleri,
+      // arka gövdenin iki yanında üçgen hava frenleri. Dönen bomba kapağı: bombalar kapağın iç yüzünde, kapak boyuna
+      // ekseninde 180° döner, bombalar gövdenin altına çıkar (XB-51'den).
+      const H = new JetHull([
+        [8.45, 0.01, -0.06, -0.16, -0.12], [8.32, 0.3, 0.12, -0.44, -0.14], [8.0, 0.54, 0.34, -0.66, -0.14], [7.5, 0.74, 0.55, -0.83, -0.12],
+        [6.9, 0.87, 0.72, -0.92, -0.09], [6.2, 0.95, 0.85, -0.97, -0.05], [5.4, 0.98, 0.93, -0.98, -0.02], [4.77, 0.99, 0.96, -0.99, 0],
+        [-0.23, 1.0, 0.98, -0.98, 0], [-4.52, 0.98, 0.98, -0.79, 0.08], [-7.4, 0.5, 1.02, 0.17, 0.6], [-8.8, 0.45, 1.0, 0.4, 0.7],
+        [-10.4, 0.25, 0.95, 0.55, 0.75], [-11.5, 0.06, 0.85, 0.7, 0.77],
+      ], 2.05);
+      const Wi: WingOpts = { x0: 0.4, z: 1.81, root: 5.75, y: 0.0, tipX: 3.5, tip: 5.55, sweep: 0.03, dihedral: 3, t: 0.75 };
+      const W: WingOpts = { x0: 3.78, z: 1.76, root: 5.44, y: 0.2, tipX: 9.62, tip: 1.66, sweep: 1.43, dihedral: 4.5, t: 0.68 };
+      const T: WingOpts = { x0: 0.3, z: -8.35, root: 2.3, y: 0.72, tipX: 3.78, tip: 1.27, sweep: 1.55, dihedral: 9.5, t: 0.2 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const tipZ = W.z - W.sweep - W.tip * 0.45;
+      const NX = 3.17;
+      const NY = 0.15;
+      // J65 naseli: büyük giriş dudağı, dört kollu merkez konisi; kanadın ortasından geçer
+      const nacelle = (sd: number): Geo[] => {
+        const o = { x: sd * NX, y: NY };
+        return [
+          body([[2.25, 0.36], [2.75, 0.4], [2.95, 0.46], [2.98, 0.52], [2.88, 0.57], [2.45, 0.64], [1.5, 0.66], [0, 0.64], [-2, 0.57], [-3.6, 0.39], [-4.3, 0.31], [-4.42, 0.3]], 13, { ...o, smooth: true }),
+          tag(body([[1.8, 0.33], [2.27, 0.36]], 13, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.33, sg(13)).translate(o.x, o.y, 1.8), 'dark'),
+          body([[3.1, 0.001], [2.98, 0.1], [2.72, 0.19], [2.2, 0.22], [1.85, 0.22]], 9, { ...o, smooth: true }),
+          ...[0, 1, 2, 3].map((i) => {
+            const an = Math.PI / 4 + (i * Math.PI) / 2;
+            return tag(rod(new THREE.Vector3(o.x + Math.cos(an) * 0.2, o.y + Math.sin(an) * 0.2, 2.35), new THREE.Vector3(o.x + Math.cos(an) * 0.38, o.y + Math.sin(an) * 0.38, 2.35), 0.024, 4), 'dark');
+          }),
+          tag(body([[-4.42, 0.27], [-3.95, 0.25]], 13, o), 'dark'),
+          tag(new THREE.CircleGeometry(0.25, sg(13)).rotateY(Math.PI).translate(o.x, o.y, -3.95), 'dark'),
+          tag(new THREE.ConeGeometry(0.13, 0.32, sg(8)).rotateX(-Math.PI / 2).translate(o.x, o.y, -4.1), 'dark'),
+        ];
+      };
+      // Uç tankları (kanat ucuna bağlı), dış kanatta iki askı
+      const tank = (sd: number): Geo[] => [
+        body([[2.15, 0.001], [1.9, 0.18], [1.4, 0.33], [0.4, 0.37], [-1.6, 0.36], [-2.5, 0.25], [-2.85, 0.08], [-2.95, 0.001]], 12, { x: sd * (W.tipX + 0.18), y: tipY - 0.02, z: tipZ + 0.2, smooth: true }),
+      ];
+      const pylonAt = (x: number) => {
+        const f = (x - W.x0) / (W.tipX - W.x0);
+        const le = W.z - W.sweep * f;
+        const c = W.root + (W.tip - W.root) * f;
+        const y = W.y + (x - W.x0) * tanD(W.dihedral);
+        return new THREE.BoxGeometry(0.1, 0.28, c * 0.55).translate(x, y - 0.24, le - c * 0.4);
+      };
+      // Dönen bomba kapağı: kapağın dış yüzü gövde altının parçası, iç yüzünde kiriş ve 8 × 500 lb (kapak dönünce altta)
+      const BZ0 = 1.5;
+      const BZ1 = -3.4;
+      const BZ = (BZ0 + BZ1) / 2;
+      const BA = 0.72;
+      const PY = -0.84;
+      const bombs: Geo[] = [];
+      for (const bx of [0.22, -0.22]) for (let k = 0; k < 4; k++) bombs.push(tag(bombAt(bx, PY + 0.28, BZ0 - 0.75 - k * 1.15, 0.82), 'dark'));
+      // Üçgen gövde hava frenleri (ön kenarından menteşeli, dışa açılır)
+      const brake = (sd: number): Geo[] => {
+        const z0 = -5.2;
+        const y0 = 0.15;
+        const sh = new THREE.Shape();
+        sh.moveTo(0, -0.42);
+        sh.lineTo(0, 0.42);
+        sh.lineTo(-1.35, 0);
+        sh.closePath();
+        const g = new THREE.ExtrudeGeometry(sh, { depth: 0.025, bevelEnabled: false }).rotateY(-Math.PI / 2);
+        const x = sd * (H.sideX(z0 - 0.5, y0) + 0.02);
+        g.translate(x, y0, z0);
+        return [
+          tag(new THREE.ShapeGeometry(sh).rotateY(-Math.PI / 2).translate(sd * (H.sideX(z0 - 0.5, y0) + 0.004), y0, z0), 'dark'),
+          ...joint(sd > 0 ? 'airbrakeL' : 'airbrakeR', [x, y0, z0], [g], false, [0, 1, 0]),
+        ];
+      };
+      // Tandem kokpit: düz panelli ön cam, iki koltuğu örten alçak kanopi (ortada çerçeve), arkasında sırta inen kaporta.
+      // Kanopi gövde sırtından ~0,45 m yükselir (yan görünüş çizimi ve NMUSAF fotoğrafı; gövde kokpitte ~1,9 m).
+      const cockpit = jetCanopy({
+        screen: [[6.55, 0.32, 0.84, 0.7, 0.8], [6.15, 0.5, 1.2, 0.7, 0.92]],
+        glass: [[6.15, 0.5, 1.2, 0.7, 0.92], [5.6, 0.56, 1.34, 0.7, 0.96], [4.6, 0.58, 1.4, 0.7, 0.98], [3.7, 0.56, 1.41, 0.7, 0.98], [3.05, 0.48, 1.33, 0.7, 0.96]],
+        aft: [[3.07, 0.48, 1.33, 0.7, 0.96], [2.4, 0.36, 1.2, 0.7, 0.97], [1.1, 0.08, 1.02, 0.7, 0.98]],
+        frames: [4.3],
+        posts: [[0.25, 0.86, 6.52], [0.42, 1.2, 6.17]],
+        pilot: { z: 5.15, len: 1.4, h: 0.44, y: 0.9, w: 0.48 },
+      });
+      // Arka koltuk (navigatör) biraz yüksekte
+      canopySink.push({ z: 3.75, len: 1.4, h: 0.44, y: 0.98, w: 0.48, bubble: true, crew: true });
+      return {
+        solids: [
+          H.geo(15),
+          ...cockpit,
+          // Burun: radyo kaporta çizgisi ve iki yanda statik basınç ağzı
+          tag(H.patch(1, 7.75, 7.73, -0.4, 1.9, 0.004), 'dark'),
+          ...[1, -1].map((sd) => portAt(sd * H.sideX(7.0, 0.1), 0.1, 7.0, 0.03, 0.05)),
+          // Dönen bomba kapağının yeri: koyu bölme, üstünde dönen kapak ve iç yüzündeki bombalar
+          tag(H.patch(1, BZ0, BZ1, -Math.PI / 2 - BA, -Math.PI / 2 + BA, 0.004), 'dark'),
+          ...joint('bayRot', [0, PY, BZ], [
+            H.patch(1, BZ0, BZ1, -Math.PI / 2 - BA, -Math.PI / 2 + BA, 0.012, -0.03),
+            tag(new THREE.BoxGeometry(0.95, 0.06, BZ0 - BZ1 - 0.2).translate(0, PY + 0.1, BZ), 'dark'),
+            ...[0.22, -0.22].map((bx) => tag(new THREE.BoxGeometry(0.05, 0.12, BZ0 - BZ1 - 0.4).translate(bx, PY + 0.16, BZ), 'dark')),
+          ], false, [0, 0, 1]),
+          ...joint('bayBombs', [0, PY, BZ], bombs, false, [0, 0, 1]),
+          ...brake(1),
+          ...brake(-1),
+          // İç kanat flaplı, dış kanat flaplı ve kanatçıklı
+          ...controlWing(Wi, 0.85, [[0, 0.75, 'flap'], [0.75, 1, null]]),
+          ...controlWing(W, 0.8, [[-0.15, 0, null], [0, 0.36, 'flapD'], [0.36, 0.37, null], [0.37, 0.98, 'aileron'], [0.98, 1, null]]),
+          // Parmak frenleri (iç kanadın üstünde, çıkınca dik durur)
+          ...[1, -1].flatMap((sd) => [
+            tag(new THREE.BoxGeometry(1.4, 0.008, 0.6).translate(sd * 1.9, 0.46, -0.2), 'dark'),
+            ...joint(sd > 0 ? 'fingerL' : 'fingerR', [sd * 1.9, 0.47, -0.5], Array.from({ length: 6 }, (_, i) =>
+              new THREE.BoxGeometry(0.13, 0.02, 0.6).translate(sd * (1.3 + i * 0.24), 0.47, -0.2)), false, [sd, 0, 0]),
+          ]),
+          ...nacelle(1),
+          ...nacelle(-1),
+          ...tank(1),
+          ...tank(-1),
+          ...[4.9, 6.6, -4.9, -6.6].map((x) => pylonAt(Math.abs(x)).translate(x < 0 ? -2 * Math.abs(x) : 0, 0, 0)),
+          ...controlWing(T, 0.7, [[0, 0.96, 'elevator'], [0.96, 1, null]], 3),
+          ...jetFin([[0.85, -6.8, 4.6], [1.25, -7.38, 3.95], [1.7, -7.85, 3.4], [2.4, -8.6, 2.6], [3.0, -9.1, 2.05], [3.12, -9.3, 1.8], [3.19, -9.75, 1.25]], 0.24, 0.68, 2, 4),
+          // Sırtta UHF anteni, karında ADF kubbesi
+          tag(new THREE.BoxGeometry(0.02, 0.32, 0.22).translate(0, 1.12, -2.8), 'dark'),
+          new THREE.SphereGeometry(1, sg(10), sg(5)).scale(0.3, 0.09, 0.5).translate(0, -0.6, -5.0),
+        ],
+        props: [],
+        markZ: -7.3,
+        emitters: [[NX, NY, -4.45], [-NX, NY, -4.45]],
+        lights: [
+          { p: [W.tipX + 0.18, tipY + 0.36, tipZ + 0.6], kind: 'red' },
+          { p: [-W.tipX - 0.18, tipY + 0.36, tipZ + 0.6], kind: 'green' },
+          { p: [0, 2.2, -11.28], kind: 'white' },
+          { p: [1.6, -0.36, 1.6], kind: 'landing' },
+        ],
+      };
+    }
+    case 'tu14': {
+      // Tu-14 (Tu-81), üç görünüş çiziminden (29,6 px/m; boy 21,95 m, açıklık 21,69 m). Daire kesitli gövde (1,8 m),
+      // ucunda çerçeveli cam nişancı burnu ve yanlarında küçük pencereler, üstte çok camlı pilot kabini ve arkasına inen
+      // sırt kaportası. Orta kanat: iç bölüm sabit veterli (4,16 m), dış bölüm 1,56 m'ye daralır. Derin VK-1 naselleri
+      // kanadın içinden geçer: yuvarlak giriş ve marş göbeği, altta öne toplanan ana takımın bölmesi. Karında radar
+      // kubbesi ve 5,8 m'lik iki kapaklı bomba bölmesi; ok açılı kuyruk, yatay kuyruk dikey kuyruğun üstünde. Kuyrukta
+      // pencereli, basınçlı nişancı kabini ve KDU-81 tareti (iki NR-23, nişancının hedefine döner).
+      const FRONT: JetSec[] = [[10.74, 0.01, 0.22, 0.18, 0.2], [10.62, 0.2, 0.4, 0.0, 0.18], [10.4, 0.38, 0.56, -0.2, 0.15], [10.15, 0.5, 0.66, -0.32, 0.13], [9.95, 0.58, 0.73, -0.4, 0.12]];
+      const GL = new JetHull(FRONT, 2.2);
+      const H = new JetHull([
+        [9.95, 0.58, 0.73, -0.4, 0.12], [9.19, 0.75, 0.95, -0.54, 0.1], [8.31, 0.83, 1.06, -0.6, 0.1], [7.16, 0.89, 1.06, -0.66, 0.08],
+        [5.81, 0.91, 0.99, -0.72, 0.06], [4.46, 0.9, 0.92, -0.8, 0.04], [3.45, 0.87, 0.89, -0.85, 0.02], [1.76, 0.85, 0.88, -0.87, 0],
+        [0, 0.82, 0.86, -0.88, 0], [-1.62, 0.77, 0.82, -0.88, 0], [-3.65, 0.7, 0.78, -0.85, -0.02], [-5.68, 0.64, 0.75, -0.79, -0.02],
+        [-7.03, 0.62, 0.8, -0.77, 0], [-8.4, 0.62, 1.04, -0.74, 0.08], [-9.7, 0.61, 1.1, -0.73, 0.1], [-10.45, 0.57, 1.02, -0.7, 0.08],
+        [-10.85, 0.48, 0.62, -0.67, -0.04], [-11.12, 0.38, 0.28, -0.64, -0.18], [-11.2, 0.3, 0.16, -0.6, -0.22],
+      ], 2.2);
+      // Kanat: orta kanat, iç bölüm düz, dış bölüm 2° dihedral; uç yuvarlak
+      const Wi: WingOpts = { x0: 0.5, z: 2.03, root: 4.16, y: 0.08, tipX: 3.6, tip: 4.0, sweep: 0.05, dihedral: 0, t: 0.62, tTaper: 0.1 };
+      const W: WingOpts = { x0: 3.6, z: 1.98, root: 4.0, y: 0.08, tipX: 10.85, tip: 1.56, sweep: 0.83, dihedral: 2, t: 0.56 };
+      const T: WingOpts = { x0: 0.1, z: -7.43, root: 1.69, y: 1.75, tipX: 3.09, tip: 0.91, sweep: 2.97, dihedral: 0, t: 0.17 };
+      const tipY = W.y + (W.tipX - W.x0) * tanD(W.dihedral);
+      const NX = 3.05;
+      const NY = -0.36;
+      // VK-1 naseli: giriş dudağı, kanadın içinden geçen gövde, karında ana takım bölmesi, arkada egzoz borusu
+      const pod = new JetHull([
+        [4.38, 0.46, NY + 0.46, NY - 0.46, NY], [4.6, 0.5, NY + 0.5, NY - 0.5, NY], [4.68, 0.55, NY + 0.55, NY - 0.55, NY], [4.63, 0.6, NY + 0.6, NY - 0.6, NY],
+        [4.32, 0.64, NY + 0.64, NY - 0.65, NY], [3.2, 0.66, NY + 0.66, NY - 0.68, NY], [2.15, 0.66, NY + 0.66, NY - 0.82, NY - 0.02], [0.3, 0.65, NY + 0.65, NY - 0.82, NY - 0.04],
+        [-0.45, 0.63, NY + 0.63, NY - 0.7, NY - 0.02], [-1.6, 0.56, NY + 0.56, NY - 0.58, NY], [-2.65, 0.45, NY + 0.45, NY - 0.46, NY], [-3.28, 0.38, NY + 0.38, NY - 0.38, NY],
+      ], 2.25);
+      const duct = new JetHull([[3.85, 0.42, NY + 0.42, NY - 0.42, NY], [4.42, 0.46, NY + 0.46, NY - 0.46, NY]], 2.1, false);
+      const pipe = new JetHull([[-3.27, 0.34, NY + 0.34, NY - 0.34, NY], [-2.85, 0.32, NY + 0.32, NY - 0.32, NY]], 2.05, false);
+      const vk1 = (sd: number): Geo[] => {
+        const x = sd * NX;
+        return [
+          pod.geo(14).translate(x, 0, 0),
+          tag(duct.geo(13).translate(x, 0, 0), 'dark'),
+          tag(duct.disc(3.85, 1, 13).translate(x, 0, 0), 'dark'),
+          // Marş göbeği ve dört kollu ön destek (VK-1'in girişinde)
+          body([[4.42, 0.001], [4.3, 0.1], [4.05, 0.17], [3.86, 0.18]], 8, { x, y: NY, smooth: true }),
+          ...[0, 1, 2, 3].map((i) => {
+            const an = Math.PI / 4 + (i * Math.PI) / 2;
+            return tag(rod(new THREE.Vector3(x + Math.cos(an) * 0.12, NY + Math.sin(an) * 0.12, 4.0), new THREE.Vector3(x + Math.cos(an) * 0.42, NY + Math.sin(an) * 0.42, 4.0), 0.022, 4), 'dark');
+          }),
+          tag(pipe.geo(13).translate(x, 0, 0), 'dark'),
+          tag(pipe.disc(-2.85, -1, 13).translate(x, 0, 0), 'dark'),
+          tag(new THREE.ConeGeometry(0.14, 0.34, sg(8)).rotateX(-Math.PI / 2).translate(x, NY, -3.02), 'dark'),
+          // Takım bölmesinin boyuna kapak çizgisi ve yanlarda soğutma ağızları
+          tag(new THREE.BoxGeometry(0.012, 0.012, 2.4).translate(x, NY - 0.83, 0.85), 'dark'),
+          ...[1, -1].map((ss) => portAt(x + ss * 0.64, NY - 0.1, 3.4, 0.07, 0.18)),
+        ];
+      };
+      // Bomba bölmesi: iki uzun kapak, yan kenarlarından menteşeli; açılınca altta koyu bölme görünür
+      const BZ0 = 3.9;
+      const BZ1 = -1.9;
+      const BA = 0.62;
+      const BOT = -Math.PI / 2;
+      const bay: Geo[] = [
+        tag(H.patch(1, BZ0, BZ1, BOT - BA, BOT + BA, 0.004), 'dark'),
+        ...[1, -1].flatMap((sd) => {
+          const a0 = sd > 0 ? BOT : BOT - BA;
+          const a1 = sd > 0 ? BOT + BA : BOT;
+          const edge = sd > 0 ? a1 : a0;
+          const hp = H.pt((BZ0 + BZ1) / 2, edge, 0.01, 1);
+          return joint(sd > 0 ? 'bayL' : 'bayR', [hp[0], hp[1], (BZ0 + BZ1) / 2], [H.patch(1, BZ0, BZ1, a0, a1, 0.012, -0.03)], false, [0, 0, sd]);
+        }),
+      ];
+      // KDU-81 tareti: yuvarlak gövde, iki NR-23 ve namlu kovanları; nişancının hedefine döner (oyun çevirir)
+      const TZ = -11.2;
+      const TY = -0.24;
+      // Pilot kabini: çok çerçeveli sera, arkasında sırta inen kaporta
+      const cockpit = jetCanopy({
+        screen: [[8.38, 0.34, 1.04, 0.85, 0.92], [8.05, 0.46, 1.33, 0.85, 1.04]],
+        glass: [[8.05, 0.46, 1.33, 0.85, 1.04], [7.6, 0.5, 1.43, 0.85, 1.08], [6.85, 0.5, 1.44, 0.85, 1.08], [6.42, 0.47, 1.38, 0.85, 1.07]],
+        aft: [[6.44, 0.47, 1.38, 0.85, 1.07], [5.6, 0.38, 1.22, 0.85, 1.0], [4.4, 0.18, 1.0, 0.85, 0.92], [3.5, 0.02, 0.9, 0.85, 0.88]],
+        frames: [7.75, 7.35, 6.95, 6.6],
+        rails: [0.5, 1.15],
+        posts: [[0.22, 1.06, 8.36], [0.36, 1.32, 8.06]],
+        pilot: { z: 7.2, len: 1.6, h: 0.45, y: 1.02, w: 0.46 },
+        p: 2.6,
+      });
+      // Mürettebat: pilot kanopide (ilk kayıt), navigatör camlı burunda, nişancı kuyruk kabininde
+      canopySink.push({ z: 9.7, len: 1.0, h: 0.42, y: 0.12, w: 0.46, bubble: false, crew: true }, { z: -9.6, len: 1.0, h: 0.42, y: 0.5, w: 0.46, bubble: false, crew: true });
+      const turret = joint('taret0', [0, TY, TZ], [
+        new THREE.SphereGeometry(1, sg(10), sg(7)).scale(0.36, 0.34, 0.32).translate(0, TY, TZ - 0.05),
+        tag(new THREE.CylinderGeometry(0.34, 0.34, 0.04, sg(10)).rotateX(Math.PI / 2).translate(0, TY, TZ + 0.1), 'dark'),
+        // Namluların çıktığı yuva ve nişan kamerası penceresi
+        tag(new THREE.BoxGeometry(0.42, 0.13, 0.08).translate(0, TY, TZ - 0.34), 'dark'),
+        tag(new THREE.SphereGeometry(0.06, sg(6), sg(4)).translate(0, TY + 0.22, TZ - 0.24), 'glass'),
+        ...[1, -1].flatMap((sd) => [
+          tag(new THREE.CylinderGeometry(0.055, 0.06, 0.4, sg(7)).rotateX(Math.PI / 2).translate(sd * 0.13, TY, TZ - 0.5), 'dark'),
+          tag(new THREE.CylinderGeometry(0.022, 0.026, 1.05, sg(6)).rotateX(Math.PI / 2).translate(sd * 0.13, TY, TZ - 1.12), 'dark'),
+          tag(new THREE.CylinderGeometry(0.035, 0.03, 0.12, sg(6)).rotateX(Math.PI / 2).translate(sd * 0.13, TY, TZ - 1.66), 'dark'),
+        ]),
+      ]);
+      return {
+        solids: [
+          tag(GL.geo(14), 'glass'),
+          H.geo(15),
+          tag(H.disc(9.95, 1, 14), 'dark'),
+          ...glassFrames(GL, [10.7, 10.55, 10.35, 10.12, 9.97], [9.97, 10.4]),
+          // Burnun yanlarında nişancının küçük pencereleri (iki sıra, üçer)
+          ...[1, -1].flatMap((sd) => [[9.75, 0.52], [9.5, 0.52], [9.25, 0.52], [9.75, 0.28], [9.5, 0.28], [9.25, 0.28]].map(([z, y]) =>
+            tag(new THREE.BoxGeometry(0.02, 0.15, 0.19).translate(sd * (H.sideX(z, y) + 0.004), y, z), 'glass'))),
+          // Burun altındaki iki sabit NR-23: ağız ve kısa namlu
+          ...[1, -1].flatMap((sd) => [
+            portAt(sd * H.sideX(9.4, -0.3), -0.3, 9.4, 0.05, 0.3),
+            tag(rod(new THREE.Vector3(sd * (H.sideX(9.4, -0.3) - 0.03), -0.3, 9.6), new THREE.Vector3(sd * (H.sideX(9.4, -0.3) - 0.05), -0.3, 10.05), 0.026, 6), 'dark'),
+          ]),
+          ...cockpit,
+          // Burun gondolu: burun takımı yuvası ve top beşiği (karında)
+          body([[8.1, 0.001], [7.95, 0.2], [7.4, 0.3], [6.2, 0.3], [5.75, 0.18], [5.6, 0.001]], 10, { y: -0.68, sx: 1.6, sy: 0.75, smooth: true }),
+          // Radar kubbesi (PSBN-M) bomba bölmesinin önünde
+          new THREE.SphereGeometry(1, sg(12), sg(7)).scale(0.56, 0.28, 0.88).translate(0, -0.84, 4.85),
+          ...bay,
+          // Anten direği ve kuyruğa tel
+          tag(rod(new THREE.Vector3(0, 0.92, 9.05), new THREE.Vector3(0, 1.26, 8.95), 0.016, 4), 'dark'),
+          tag(rod(new THREE.Vector3(0, 1.43, 6.6), new THREE.Vector3(0, 3.78, -8.35), 0.006, 3), 'dark'),
+          // Nişancı kabini: yan pencereler ve arkaya eğik cam; kuyruk tamponu
+          ...[1, -1].flatMap((sd) => [[-9.15, 0.62], [-9.62, 0.62], [-10.1, 0.6]].map(([z, y]) =>
+            tag(new THREE.BoxGeometry(0.02, 0.3, 0.36).translate(sd * (H.sideX(z, y) + 0.004), y, z), 'glass'))),
+          tag(H.patch(1, -10.5, -10.95, Math.PI / 2 - 0.55, Math.PI / 2 + 0.55, 0.006), 'glass'),
+          ...[1, -1].map((sd) => tag(rod(new THREE.Vector3(sd * 0.08, -0.78, -7.0), new THREE.Vector3(0, -1.05, -7.15), 0.02, 4), 'dark')),
+          ...turret,
+          // Kanat: iç bölümde naselin iki yanında flap, dış bölümde flap ve kanatçık
+          ...controlWing(Wi, 0.74, [[0, 0.6, 'flap'], [0.6, 1, null]]),
+          ...controlWing(W, 0.76, [[0, 0.37, 'flapD'], [0.37, 0.38, null], [0.38, 0.96, 'aileron'], [0.96, 1, null]], 1.4),
+          ...vk1(1),
+          ...vk1(-1),
+          ...controlWing(T, 0.68, [[0, 0.96, 'elevator'], [0.96, 1, null]], 1.2),
+          ...jetFin([[0.7, -3.4, 6.3], [1.0, -5.0, 4.9], [1.42, -6.35, 3.85], [1.72, -7.3, 2.85], [2.53, -7.87, 2.1], [3.0, -8.07, 1.8], [3.6, -8.2, 1.55], [3.86, -8.45, 1.12]], 0.3, 0.7, 2, 7),
+        ],
+        props: [],
+        markZ: -6.4,
+        emitters: [[NX, NY, -3.3], [-NX, NY, -3.3]],
+        lights: [
+          { p: [W.tipX + 0.2, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'red' },
+          { p: [-W.tipX - 0.2, tipY, W.z - W.sweep - W.tip * 0.45], kind: 'green' },
+          { p: [0, 1.12, -10.4], kind: 'white' },
+          { p: [0, -0.62, 9.6], kind: 'landing' },
+        ],
+      };
+    }
     case 'il28': {
       // Il-28, boyutlar gerçek ölçülerde, biçim üç görünüş çiziminden. Silindirik gövde, ucunda camlı nişancı burnu,
       // karnında radar kubbesi, önde damla kanopi ve anten direği. Kanat düz hücum kenarlı ve omuzda; altında derin
@@ -4719,6 +5165,9 @@ function landingGear(probe: Probe, bb: THREE.Box3, spec: AircraftSpec | undefine
   if (kind === 'ar234') return blitzGear(gearHeight(spec));
   if (kind === 'canberra') return canberraGear(gearHeight(spec));
   if (kind === 'il28') return beagleGear(gearHeight(spec));
+  if (kind === 'ar234c') return blitzCGear(gearHeight(spec));
+  if (kind === 'b57b') return martinGear(gearHeight(spec));
+  if (kind === 'tu14') return tu14Gear(gearHeight(spec));
   const gh = spec.span > 25 ? 3.4 : spec.engines > 1 ? 2.6 : 1.9;
   const half = bb.max.x;
   const tricycle = !spec.tailDragger;
@@ -4887,7 +5336,7 @@ function smallParts(
     }
   }
   const c0 = canopies[0];
-  if (c0) {
+  for (const c0 of canopies.filter((c, i) => i === 0 || c.crew)) {
     const s = Math.min(1, c0.h / 0.45);
     const seats: [number, number][] = c0.w > 0.62
       ? [[c0.w * 0.32, c0.z], [-c0.w * 0.32, c0.z]]
@@ -5024,7 +5473,7 @@ function cached(kind: string, detail: number): CachedModel {
     skin: bakedSkin(kind, detail, skinMaterial(info, detail)),
     gear: opt(gear),
     props: def.props,
-    emitters: contrailEmitters(bb, spec, def.props),
+    emitters: def.emitters ? def.emitters.map((e) => new THREE.Vector3(...e)) : contrailEmitters(bb, spec, def.props),
     lights: def.lights ?? [],
     length: bb.max.z - bb.min.z,
     radius: all.boundingSphere!.radius,
@@ -5573,6 +6022,24 @@ function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, ra
   return out;
 }
 
+/**
+ * Yükün üstündeki askı (raf, pilon): yük uçağın yüzeyinden gap kadar aşağıda durur, arası boş kalınca havada asılı
+ * görünüyordu (2026-11-22). Ünite uzayında (yarıçap 0,12, boy 1) yükün sırtından yüzeyin biraz içine uzanan ince kutu.
+ */
+const pylonGeos = new Map<string, Geo>();
+function withPylon(geo: Geo, name: string, rad: number, gap: number): Geo {
+  const top = 0.12 + ((gap + 0.05) * 0.12) / rad;
+  const key = name + '|' + top.toFixed(3);
+  let g = pylonGeos.get(key);
+  if (!g) {
+    const bottom = 0.1;
+    const box = new THREE.BoxGeometry(0.05, top - bottom, 0.42).translate(0, (top + bottom) / 2, 0.02);
+    g = mergeGeometries([cleanGeo(geo), cleanGeo(box)])!;
+    pylonGeos.set(key, g);
+  }
+  return g;
+}
+
 /** Uçağın askılarındaki mühimmat: askı (yuva) başına örnekli ağ; count kalan adede eşitlenir. */
 export function buildStoreMeshes(
   kind: string, spec: AircraftSpec, slots: { hp: string; store: StoreDef; n0: number }[], detail = 1,
@@ -5612,6 +6079,8 @@ export function buildStoreMeshes(
     }
     const pos = hardpointSlots(c, h, perPylon, len, rad);
     if (!pos.length) return null;
+    // Kanat ucu tankı dışında her yükün üstünde askısı (merkez yükte boşluk 0,12, kanat altı ve rayda 0,1 m)
+    if (h.kind !== 'tip') geo = withPylon(geo, st.kind, rad, h.kind === 'center' ? 0.12 : 0.1);
     const mesh = new THREE.InstancedMesh(geo, STORE_MAT[st.kind], pos.length);
     // Ünite geometrisi: uzunluk 1, yarıçap ~0.12 → gerçek boyuta ölçek
     pos.forEach((p, i) => {

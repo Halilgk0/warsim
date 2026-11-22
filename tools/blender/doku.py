@@ -88,8 +88,15 @@ STYLES.update({
     'f84': dict(scheme='metal', demarc=-2, spec=0.55, antiglare=(2.98, 4.6)),
     'p80': dict(scheme='metal', demarc=-2, spec=0.55, antiglare=(2.48, 4.6)),
     'il28': dict(scheme='metal', demarc=-2, spec=0.55, walk_both=True),
+    # Ar 234 C-3: savaşın son ayları, 81/82 üstü 76; nacelle ayrımı motor ekseninin biraz altında
+    'ar234c': dict(scheme='soft', camo=(0x5C5644, 0x4B5B3C), under=0xB7C4CC, demarc=0.3, ndemarc=-0.15, sy=0.0, feather=0.06, cell=1.5, walk_both=True),
+    # B-57B: Güneydoğu Asya üç tonu (FS 30219 ten, 34102 orta yeşil, 34079 koyu yeşil), gece taarruzu için siyah alt; ayrım
+    # gövde yanının alt üçte birinde (NMUSAF fotoğrafı)
+    'b57b': dict(scheme='raf', camo=(0x9B8565, 0x5E6A40, 0x3F4835), camo_w=(0.38, 0.34, 0.28), under=0x222325, demarc=-0.3, ndemarc=-0.25, cell=2.6, walk_both=True),
+    # Tu-14: Deniz Havacılığında çıplak metal
+    'tu14': dict(scheme='metal', demarc=-2, spec=0.55, walk_both=True),
 })
-for _k in ('me262', 'he162', 'ar234', 'meteor', 'vampire', 'canberra', 'sabre', 'f84', 'p80', 'il28'):
+for _k in ('me262', 'he162', 'ar234', 'meteor', 'vampire', 'canberra', 'sabre', 'f84', 'p80', 'il28', 'ar234c', 'b57b', 'tu14'):
     STYLES[_k]['jet'] = True
 STYLES['me262u4'] = STYLES['me262']
 STYLES['fw190'] = dict(scheme='soft', camo=(0x4A5158, 0x6F7276), under=0xB7C4CC, demarc=0.45, sy=0.0, feather=0.05, cell=1.3, cowl=0.75,
@@ -100,6 +107,16 @@ _tan = lambda deg: math.tan(math.radians(deg))
 _fwZ = lambda d: (920.9 - d) / 85.4
 _p5Z = lambda d: (316.5 - d) / 74.5
 META_FIX = {
+    # Ar 234 C: çift nacelle, iki BMW 003 yan yana (models.ts ar234c engine profili; dış motor 0,8 m dışarıda)
+    'ar234c': dict(
+        NR=[[z, r, r, -r, 0] for z, r in [[2.1, 0.37], [2.07, 0.41], [1.9, 0.43], [1.4, 0.44], [0.2, 0.44], [-0.7, 0.42], [-1.2, 0.35], [-1.52, 0.28], [-1.6, 0.27]]],
+        pods=[dict(x=1.6, dy=-0.12, dz=0), dict(x=2.4, dy=-0.12, dz=0)], nacX=1.6),
+    # Tu-14: VK-1 nacellesi (models.ts tu14 pod kesitleri, NY = −0,36 eklenmiş; dudaktan sonrası)
+    'tu14': dict(
+        NR=[[4.68, 0.55, 0.19, -0.91, -0.36], [4.63, 0.6, 0.24, -0.96, -0.36], [4.32, 0.64, 0.28, -1.01, -0.36], [3.2, 0.66, 0.3, -1.04, -0.36],
+            [2.15, 0.66, 0.3, -1.18, -0.38], [0.3, 0.65, 0.29, -1.18, -0.4], [-0.45, 0.63, 0.27, -1.06, -0.38], [-1.6, 0.56, 0.2, -0.94, -0.36],
+            [-2.65, 0.45, 0.09, -0.82, -0.36], [-3.28, 0.38, 0.02, -0.74, -0.36]],
+        pods=[dict(x=3.05, dy=0, dz=0)], nacX=3.05),
     'fw190': dict(
         hull=[[_fwZ(d), w, t, b, wy] for d, w, t, b, wy in [[740, 0.5, 0.47, -0.47, 0], [760, 0.55, 0.585, -0.64, -0.03], [850, 0.57, 0.667, -0.667, 0], [955, 0.5, 0.56, -0.67, -0.05],
                                                               [1090, 0.45, 0.5, -0.6, -0.05], [1180, 0.38, 0.47, -0.5, -0.03], [1300, 0.22, 0.27, -0.35, -0.02], [1412, 0.05, 0.15, -0.24, -0.04]]],
@@ -995,8 +1012,13 @@ else:
     n_ = int(np.clip(2 * span_ * (Z1 - Z0) / ST.get('cell', 1.8) ** 2, 60, 260))
     seeds = np.stack([rng.uniform(-span_, span_, n_), rng.uniform(float(HZ[:, 3].min()) - 0.3, float(HZ[:, 2].max()) + 1.5, n_), rng.uniform(Z0 - 0.3, Z1 + 0.6, n_)], -1)
     cls = (rng.random(n_) < 0.5).astype(np.float32)
+    # Üç tonlu desen (B-57B Güneydoğu Asya): hücre sınıfı üç renkten biri, ağırlıklar camo_w
+    CAMO3 = None
+    if len(ST.get('camo', ())) == 3:
+        CAMO3 = np.stack([lin(c) for c in ST['camo']])
+        cls = rng.choice(3, n_, p=ST.get('camo_w', (0.4, 0.35, 0.25))).astype(np.float32)
     if sch == 'raf':
-        C0, C1 = (lin(c) for c in ST['camo'])
+        C0, C1 = (lin(c) for c in ST['camo'][:2])
         wx = x2 + 0.22 * (fbm(x2 * 0.7, y2 * 0.7, z2 * 0.7) - 0.5)
         wz = z2 + 0.22 * (fbm(x2 * 0.7 + 9, y2 * 0.7, z2 * 0.7) - 0.5)
         wy = y2 * 0.35
@@ -1040,6 +1062,10 @@ else:
     if ST.get('jet'):
         OIL = (-999.0, -999.0)  # jette motor yağı izi yok (egzoz isi gölgelendiriciden)
 camo = np.zeros((TEX, TEX), np.float32)
+if CAMO3 is not None:
+    cA = np.zeros((TEX, TEX), np.int32)
+    cB = np.zeros((TEX, TEX), np.int32)
+    cW = np.zeros((TEX, TEX), np.float32)
 for r0 in range(0, TEX, 256):
     sl = slice(r0, r0 + 256)
     d = (wx[sl, :, None] - seeds[:, 0]) ** 2 + (wy[sl, :, None] * sy_ - seeds[:, 1] * sy_) ** 2 + (wz[sl, :, None] - seeds[:, 2]) ** 2
@@ -1049,7 +1075,12 @@ for r0 in range(0, TEX, 256):
     c1, c2 = cls[o[..., 0]], cls[o[..., 1]]
     edge = np.clip((d2 - d1) / feather, 0, 1)
     camo[sl] = np.where(c1 == c2, c1, c1 * (0.5 + 0.5 * edge) + c2 * (0.5 - 0.5 * edge))
+    if CAMO3 is not None:
+        cA[sl], cB[sl] = c1.astype(np.int32), c2.astype(np.int32)
+        cW[sl] = np.where(c1 == c2, 1.0, 0.5 + 0.5 * edge)
 col = C0 * (1 - camo[..., None]) + C1 * camo[..., None]
+if CAMO3 is not None:
+    col = CAMO3[cA] * cW[..., None] + CAMO3[cB] * (1 - cW[..., None])
 col = col * upper[..., None] + UNDER * (1 - upper[..., None])
 if KIND == 'ju87b':
     col = np.where(((z2 > 2.33) & fus2)[..., None], C0 * 0.95, col)

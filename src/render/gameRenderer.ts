@@ -26,7 +26,7 @@ import { bombGeometry } from './munitions';
 import { computeLandcover, setClearings } from './landcover';
 import { Debris, Effects, ParachuteViews, RocketViews, Tracers, type TrailKind } from './effects';
 import { PALETTE } from './palette';
-import { Atmosphere, FIXED_HOUR, dayHour } from './atmosphere';
+import { Atmosphere, FIXED_HOUR, WIND, dayHour } from './atmosphere';
 import { ShadowRig } from './shadows';
 import { Contrails, contrailAmount } from './contrails';
 import { Clouds } from './clouds';
@@ -67,7 +67,12 @@ interface AircraftView {
   /** Türün Blender modeli yüklü mü (değilse yüklenince model yerinde yenilenir; düşük ayrıntıda hep evet). */
   skinReady: boolean;
   /** Hareketli parçaların o anki konumu (rad; takım 0 kalkık … 1 inik): kumandaya yumuşakça yaklaşır. */
-  surf: { ail: number; ele: number; rud: number; flap: number; brake: number; gear: number; chk: number };
+  /**
+   * Kumanda yüzeyleri ve hareketli parçaların anlık açıları. bay: bomba kapakları (0 kapalı, 1 açık); drop: son bombadan
+   * bu yana süre; bombs: önceki karedeki bomba sayısı. rato: kalkış roketlerinin durumu (0 takılı, 1 yanıyor, 2 atıldı),
+   * ratoT yanma süresi.
+   */
+  surf: { ail: number; ele: number; rud: number; flap: number; brake: number; gear: number; chk: number; bay: number; drop: number; bombs: number; rato: number; ratoT: number };
   /** Parçalanmış uçak (kanadı ya da kuyruğu koptu): ana ağlar parçalara bölündü, kopanlar gizli. */
   broken?: Set<WreckPart>;
   parts?: Partial<Record<WreckPart, THREE.Group>>;
@@ -75,6 +80,21 @@ interface AircraftView {
 
 const _jq = new THREE.Vector3(0, 1, 0);
 /** Eklemi menteşe ekseninde döndür (eksen yoksa dikey). */
+const _tAim = new THREE.Vector3();
+const _tLoc = new THREE.Vector3();
+const _tRest = new THREE.Vector3(0, 0, -1);
+const _tInv = new THREE.Quaternion();
+const _tGoal = new THREE.Quaternion();
+const _rp = new THREE.Vector3();
+/** Paraşütle sarkan kapsülün duruşu: dikey, paraşüt üstte (yerel y yukarı). */
+const _ratoUp = new THREE.Quaternion();
+/** Askıdayken kapsülün ekseni (yerel y) uçağın burnuna (yerel z) bakar. */
+const _podFwd = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+/** Ar 234 C'nin kalkış roketi nozulları ve askıları (model ekseninde; models.ts ar234c ile aynı). */
+const RATO_NOZZLE: [number, number, number][] = [[3.85, -0.12, -1.05], [-3.85, -0.12, -1.05]];
+/** Walter HWK 109-500'ün yanma süresi (sn). */
+const RATO_BURN = 30;
+
 function hinge(j: THREE.Object3D | undefined, a: number): void {
   if (j) j.quaternion.setFromAxisAngle((j.userData.axis as THREE.Vector3 | undefined) ?? _jq, a);
 }
@@ -199,6 +219,9 @@ export class GameRenderer {
   private tracers = new Tracers();
   private rockets = new RocketViews();
   private debris = new Debris();
+  /** Atılmış kalkış roketleri: paraşütle süzülerek düşer (yalnız görüntü). */
+  private ratoDrops: { g: THREE.Group; vel: THREE.Vector3; t: number }[] = [];
+  private ratoGeo: { pod: THREE.BufferGeometry; chute: THREE.BufferGeometry; podMat: THREE.Material; chuteMat: THREE.Material } | null = null;
   /** Parçalanan uçakların düşen parçaları (uçağın kendi modelinden). */
   private wrecks = new Wrecks();
   private contrails = new Contrails();
@@ -412,6 +435,8 @@ export class GameRenderer {
     this.effects.clear();
     this.contrails.clear();
     this.debris.clear();
+    for (const d of this.ratoDrops) this.scene.remove(d.g);
+    this.ratoDrops.length = 0;
     this.wrecks.clear();
     this.coverageKey = '';
     this.aaKey = '';
@@ -483,6 +508,7 @@ export class GameRenderer {
     this.syncBombs(w, ms);
     this.consumeEvents(w, vis);
     this.debris.update(simDt, this.effects, simDt > 0 && settings.map.effects, ms);
+    this.updateRatoDrops(simDt);
     this.wrecks.group.visible = settings.map.effects;
     this.wrecks.update(simDt, this.effects, settings.map.effects, ms, vis);
     this.chutes.update(w.parachutes, ms);
@@ -766,6 +792,39 @@ export class GameRenderer {
     hinge(j.rudderR, s.rud);
     hinge(j.airbrakeL, -s.brake);
     hinge(j.airbrakeR, s.brake);
+    // Parmak frenleri (B-57B iç kanadı) hava frenleriyle birlikte dikilir
+    hinge(j.fingerL, -s.brake * 1.5);
+    hinge(j.fingerR, s.brake * 1.5);
+    // Bomba kapakları: kol bomba koşusuna başlayınca açılır (1,5 sn), son bombadan 5 sn sonra kapanır. Tu-14'te iki
+    // kapak yanlara açılır; B-57B'nin dönen kapağı 180° döner, iç yüzündeki bombalar gövdenin altına çıkar (kapakta
+    // bomba kalmayınca gizlenir)
+    if (j.bayL || j.bayRot) {
+      if (ac.bombCount < s.bombs) s.drop = 0;
+      else s.drop += dt;
+      s.bombs = ac.bombCount;
+      const run = ac.flight?.bomb;
+      const open = (!!run?.started && !run.released && ac.bombCount > 0) || s.drop < 5;
+      s.bay = clampN(s.bay + ((open ? 1 : -1) * dt) / 1.5, 0, 1);
+      const e = s.bay * s.bay * (3 - 2 * s.bay);
+      hinge(j.bayL, e * 1.5);
+      hinge(j.bayR, e * 1.5);
+      hinge(j.bayRot, e * Math.PI);
+      hinge(j.bayBombs, e * Math.PI);
+      if (j.bayBombs) j.bayBombs.visible = ac.bombCount > 0 && v.fine;
+    }
+    // Kuyruk tareti (Tu-14 KDU-81): nişancının hedefine döner, hedef yokken yavaşça geriye bakar
+    const tj = j.taret0;
+    if (tj) {
+      const t = ac.turrets[0];
+      _tAim.set(0, 0, -1);
+      if (t && t.targetId !== null && fly) {
+        _tLoc.copy(t.aim).applyQuaternion(_tInv.copy(v.iq).invert()).normalize();
+        if (_tLoc.z < 0.1) _tAim.copy(_tLoc);
+      }
+      _tGoal.setFromUnitVectors(_tRest, _tAim);
+      tj.quaternion.slerp(_tGoal, 1 - Math.exp(-dt * 5));
+    }
+    if (j.rato) this.rato(v, dt);
     const up = (1 - s.gear) * (Math.PI / 2);
     hinge(j.takimL, -up);
     hinge(j.takimR, up);
@@ -805,7 +864,7 @@ export class GameRenderer {
       trailColor: this.teamColors[ac.team] ?? this.teamColors[0],
       label, visible: true, fine: true, lod: false,
       skinReady: this.modelDetail ? requestSkin(ac.spec.model) : true,
-      surf: { ail: 0, ele: 0, rud: 0, flap: 0, brake: 0, gear: ac.onGround ? 1 : 0, chk: 0 },
+      surf: { ail: 0, ele: 0, rud: 0, flap: 0, brake: 0, gear: ac.onGround ? 1 : 0, chk: 0, bay: 0, drop: 99, bombs: ac.bombCount, rato: ac.onGround ? 0 : 2, ratoT: 0 },
     };
   }
 
@@ -1367,6 +1426,87 @@ export class GameRenderer {
    * ortadan. Düşen uçak gövdesiyle birlikte yanar. Her kaynak kendi izi (yuva: 0 yangın, 1 düşen gövde, 2+ motorlar,
    * 10 gövde hasarı, 11 sızıntı); alev uçağın hızından geriye uzanır.
    */
+  /**
+   * Ar 234 C'nin Walter 109-500 kalkış roketleri: kalkış koşusunda tam gazla ateşlenir, 30 sn yanar (beyaz duman ve
+   * alev), uçak havadayken atılır ve paraşütle düşer; uçak yere inip durunca yenisi takılır. Yalnız görüntü:
+   * simülasyonda ek itki yok.
+   */
+  private rato(v: AircraftView, dt: number): void {
+    const s = v.surf;
+    const ac = v.ac;
+    const j = v.model.joints.rato;
+    if (s.rato === 0 && ac.onGround && ac.status === 'flying' && ac.controls.throttle > 0.6 && ac.speed > 3) {
+      s.rato = 1;
+      s.ratoT = 0;
+    }
+    if (s.rato === 2 && ac.onGround && ac.speed < 2) s.rato = 0;
+    j.visible = s.rato !== 2;
+    if (s.rato !== 1 || dt <= 0) return;
+    s.ratoT += dt;
+    const m = v.root.matrixWorld;
+    const vel = ac.velocity(_acVel);
+    if (s.ratoT < RATO_BURN && settings.map.effects) {
+      const size = Math.max(v.root.scale.x, Math.min(this.rig.fxScale, 6) * 0.6);
+      RATO_NOZZLE.forEach((n, i) => {
+        _rp.set(n[0], n[1], n[2]).applyMatrix4(m);
+        this.effects.trail(v, 20 + i, _rp, size * 1.4, 'rocket', vel);
+        this.effects.muzzle(_rp, size * 0.55);
+      });
+    }
+    // Yanma bitti, uçak havada: askıdan atılır
+    if (s.ratoT >= RATO_BURN + 2 && !ac.onGround) {
+      s.rato = 2;
+      if (!settings.map.effects) return;
+      this.ratoGeo ??= {
+        pod: new THREE.CylinderGeometry(0.24, 0.24, 2.0, 10),
+        chute: new THREE.SphereGeometry(2.2, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+        podMat: new THREE.MeshLambertMaterial({ color: 0x7d8178 }),
+        chuteMat: new THREE.MeshLambertMaterial({ color: 0xe8e4d8, side: THREE.DoubleSide }),
+      };
+      for (const n of RATO_NOZZLE) {
+        const g = new THREE.Group();
+        const pod = new THREE.Mesh(this.ratoGeo.pod, this.ratoGeo.podMat);
+        const chute = new THREE.Mesh(this.ratoGeo.chute, this.ratoGeo.chuteMat);
+        chute.position.y = 5;
+        chute.scale.setScalar(0.01);
+        g.add(pod, chute);
+        g.position.set(n[0], n[1], n[2] + 1).applyMatrix4(m);
+        // Kapsül ekseni (yerel y) uçuş yönünde; paraşüt açılınca dikey sarkar
+        g.quaternion.copy(v.iq).multiply(_podFwd);
+        g.scale.setScalar(v.root.scale.x);
+        this.scene.add(g);
+        this.ratoDrops.push({ g, vel: vel.clone().multiplyScalar(0.92).add(new THREE.Vector3(Math.sign(n[0]) * 3, -1, 0).applyQuaternion(v.iq)), t: 0 });
+      }
+    }
+  }
+
+  /** Atılan kalkış roketleri: 1,5 sn serbest düşer, paraşüt açılır, ~7 m/s ile rüzgârla süzülür; yere değince kalkar. */
+  private updateRatoDrops(dt: number): void {
+    if (dt <= 0) return;
+    for (let i = this.ratoDrops.length - 1; i >= 0; i--) {
+      const d = this.ratoDrops[i];
+      d.t += dt;
+      const chute = d.g.children[1];
+      if (d.t < 1.5) {
+        d.vel.multiplyScalar(Math.exp(-0.25 * dt));
+        d.vel.y -= 9.81 * dt;
+      } else {
+        const k = 1 - Math.exp(-dt * 1.6);
+        d.vel.x += (WIND.x - d.vel.x) * k;
+        d.vel.z += (WIND.z - d.vel.z) * k;
+        d.vel.y += (-7 - d.vel.y) * k;
+        chute.scale.setScalar(Math.min(1, (d.t - 1.5) / 1.2));
+        // Kapsül paraşütün altında sarkar: dikleşir
+        d.g.quaternion.slerp(_ratoUp, 1 - Math.exp(-dt * 1.2));
+      }
+      d.g.position.addScaledVector(d.vel, dt);
+      if (d.g.position.y < groundLevel(d.g.position.x, d.g.position.z) || d.t > 300) {
+        this.scene.remove(d.g);
+        this.ratoDrops.splice(i, 1);
+      }
+    }
+  }
+
   private damageSmoke(v: AircraftView, scale: number, size: number, burning: boolean, leak: boolean): void {
     const ac = v.ac;
     const d = ac.damage;

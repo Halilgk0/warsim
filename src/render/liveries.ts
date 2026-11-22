@@ -135,6 +135,8 @@ export const LIVERIES: Record<string, Livery> = {
   me262u4: two(RLM81, RLM82, RLM76, { camo: 'soft', worn: 1, tone: 0.92, mottle: 1 }),
   he162: two(RLM81, RLM82, RLM76, { camo: 'soft' }),
   ar234: two(RLM81, RLM82, RLM76, { camo: 'soft' }),
+  // Ar 234 C-3: savaşın son aylarının 81/82 üstü 76, kullanılmış
+  ar234c: two(RLM81, RLM82, RLM76, { camo: 'soft', worn: 1 }),
   // ABD: geç dönem çıplak metal; erken dönem zeytin yeşili; donanma lacivert
   p51d: metal({ nose: { color: OLIVE_DRAB, len: 2.6, top: true } }),
   p47: metal({ nose: { color: OLIVE_DRAB, len: 3.0, top: true } }),
@@ -145,6 +147,8 @@ export const LIVERIES: Record<string, Livery> = {
   sabre: metal(),
   p80: metal(),
   f84: metal(),
+  // B-57B: Güneydoğu Asya üç tonu (ten, iki yeşil), gece taarruzu için siyah alt
+  b57b: { top: [FS30219, FS34102, FS34079], under: 0x222325, finish: 'matte', camo: 'wavy' },
   b25: { top: [OLIVE_DRAB], under: NEUTRAL_GREY, finish: 'matte' },
   p40: { top: [OLIVE_DRAB], under: NEUTRAL_GREY, finish: 'matte' },
   sbd: { top: [BLUE_GRAY], under: LIGHT_GRAY, finish: 'matte' },
@@ -163,6 +167,8 @@ export const LIVERIES: Record<string, Livery> = {
   i16: { top: [AII_GREEN], under: AMT7, finish: 'matte', skin: 'wood' },
   mig15: metal(),
   il28: metal(),
+  // Tu-14: Deniz Havacılığında çıplak metal
+  tu14: metal(),
   // Japon: erken Sıfır açık gri (ameiro), yarı parlak
   a6m: { top: [AMEIRO], under: AMEIRO, finish: 'gloss' },
   // Sonraki aşama: MiG-21 çıplak metal; F-4E Vietnam üç tonu; F-15A Compass Ghost; Rafale ve F-22A iki ton gri

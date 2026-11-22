@@ -34,6 +34,36 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'uc-bombardiman',
+    date: '2026-11-22',
+    title: 'Üç yeni jet bombardıman uçağı: Tu-14, B-57B ve Ar 234 C-3',
+    summary: 'Araştırma ağacına üç jet bombardıman uçağı geldi. Üçü de gerçek çizim ve fotoğraflardan kuruldu; bomba kapakları, frenleri ve taretleri oyunda çalışıyor.',
+    cover: img('3ucak-kapak.webp'),
+    images: [],
+    sections: [
+      {
+        heading: 'Yeni uçaklar',
+        bullets: [
+          'Tu-14: Il-28\'den sonra açılır. Bomba koşusunda bölme kapakları açılır, kuyruktaki nişancının çift toplu tareti hedefini izler.',
+          'B-57B: Canberra ve eksenel kompresörden sonra açılır. Döner bomba kapısı 8 bombayı dışarı çevirir, hava freniyle kanatlardan parmak frenleri kalkar.',
+          'Ar 234 C-3: Ar 234\'ten sonra açılır, dört motorludur. Kalkış roketleri 30 saniye yanar, havada atılıp paraşütle düşer.',
+        ],
+      },
+      {
+        heading: 'Düzeltmeler',
+        bullets: [
+          'Uçakların altındaki bombalar ve tanklar artık askılarında; havada asılı durmuyor.',
+          'Jetlerin iniş takımı katlanırken kanadın üstünden çıkmıyor.',
+          'Ağır bombardıman uçakları iniş için alçalırken tırmanmıyor; daha kısa sürede iniyorlar.',
+          'İki ve üç kişilik mürettebatın hepsi kokpitte görünüyor.',
+        ],
+      },
+      {
+        video: { src: img('3ucak.mp4'), poster: img('3ucak-poster.webp'), caption: '' },
+      },
+    ],
+  },
+  {
     id: 'hasar-duman',
     date: '2026-11-22',
     title: 'Uçaklar artık parçalanıyor: hasar, duman ve patlamalar yenilendi',

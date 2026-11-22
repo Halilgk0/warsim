@@ -15,6 +15,32 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'uc-bombardiman': {
+    title: 'Three new jet bombers: Tu-14, B-57B and Ar 234 C-3',
+    summary: 'Three jet bombers join the research tree. All three were built from real drawings and photos, and their bomb bay doors, brakes and turrets work in the game.',
+    sections: [
+      {
+        heading: 'New aircraft',
+        bullets: [
+          'Tu-14: unlocks after the Il-28. The bomb bay doors open on the bomb run, and the tail gunner\'s twin-cannon turret tracks its target.',
+          'B-57B: unlocks after the Canberra and the axial-flow compressor. The rotating bomb door swings its 8 bombs out, and finger brakes rise from the wings with the airbrakes.',
+          'Ar 234 C-3: unlocks after the Ar 234 and has four engines. Its takeoff rockets burn for 30 seconds, then drop away on parachutes.',
+        ],
+      },
+      {
+        heading: 'Fixes',
+        bullets: [
+          'Bombs and drop tanks now hang from their pylons instead of floating under the aircraft.',
+          'Jet landing gear no longer pokes through the top of the wing as it retracts.',
+          'Heavy bombers no longer climb while descending to land, so they land sooner.',
+          'Every member of two- and three-seat crews now shows in the cockpit.',
+        ],
+      },
+      {
+        video: { src: img('3ucak.mp4'), poster: img('3ucak-poster.webp'), caption: '' },
+      },
+    ],
+  },
   'hasar-duman': {
     title: 'Aircraft now break apart: new damage, smoke and explosions',
     summary: 'An aircraft that loses a wing or its tail now breaks apart along its own model, and an aircraft that explodes in mid-air scatters its pieces. Smoke leaves an unbroken trail, flak bursts hang in the sky and downed aircraft burn on the ground. Problems reported by players are fixed too.',
