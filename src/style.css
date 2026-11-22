@@ -1909,6 +1909,16 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   .timebar, .top-actions { padding: 3px; gap: 2px; }
   .top-actions [data-open="settings"] { display: none; }
   .money-chip { min-width: 0; }
+  /* Üst çubuk ekrandan taşmasın (oyuncu bildirimi 2026-11-22: para göstergesi genişleyince, İngilizcede ve dar telefonda
+     sağdaki düğmeler ekran dışında kalıyordu): saat ve para sabit, düğme grubu daralır ve yana kaydırılır */
+  .timebar { flex-shrink: 0; }
+  .top-actions { min-width: 0; flex-shrink: 1; overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain; }
+  .top-actions::-webkit-scrollbar { display: none; }
+  .top-actions button { flex-shrink: 0; }
+}
+/* Dar telefonda günün saati gizlenir (oyun süresi kalır): düğmelere yer */
+@media (max-width: 820px) {
+  .dayclock { display: none; }
   .panel { top: calc(48px * var(--ui)); max-height: calc(100% - calc(56px * var(--ui))); width: calc(270px * var(--ui)); }
   #left, #planner { left: max(6px, env(safe-area-inset-left)); }
   #right { right: max(6px, env(safe-area-inset-right)); width: calc(290px * var(--ui)); }
