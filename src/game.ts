@@ -559,6 +559,28 @@ export class Game {
     }
   }
 
+  /** Oyuncunun kollarının evresi: dönüşe geçen kol kısa bildirimle söylenir (neden panelde de yazar; 2026-11-21 oyuncu bildirimi). */
+  private flightPhases = new Map<number, string>();
+  private flightWatchAt = 0;
+
+  private watchFlights(): void {
+    const now = performance.now();
+    if (now < this.flightWatchAt) return;
+    this.flightWatchAt = now + 500;
+    const seen = new Set<number>();
+    for (const f of this.world.flights) {
+      if (f.team !== this.playerTeam) continue;
+      seen.add(f.id);
+      const prev = this.flightPhases.get(f.id);
+      if (prev !== undefined && prev !== f.phase && f.phase === 'egress') {
+        const why = f.rtbReason ? `: ${f.rtbReason}` : '';
+        this.toast(L(`${f.name} kolu üsse dönüyor${why}`, `${f.name} flight is returning to base${why}`));
+      }
+      this.flightPhases.set(f.id, f.phase);
+    }
+    for (const id of this.flightPhases.keys()) if (!seen.has(id)) this.flightPhases.delete(id);
+  }
+
   toast(text: string, bad = false): void {
     const el = $('toast');
     el.textContent = text;
@@ -1318,7 +1340,10 @@ export class Game {
       const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
       const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
       if (draw) this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, scale, listener, (ac) => this.renderer.isVisible(ac));
-      if (this.mode === 'play') this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
+      if (this.mode === 'play') {
+        this.alerts.update(this.world, this.playerTeam, (p) => this.battle.loudness(p));
+        this.watchFlights();
+      }
     } catch (e) {
       this.reportError(e);
     }

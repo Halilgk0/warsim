@@ -34,6 +34,49 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'hasar-duman',
+    date: '2026-11-22',
+    title: 'Uçaklar artık parçalanıyor: hasar, duman ve patlamalar yenilendi',
+    summary: 'Kanadı ya da kuyruğu kopan uçak kendi modelinden parçalara ayrılıyor, havada infilak eden uçağın parçaları dört bir yana dağılıyor. Duman kesintisiz bir iz bırakıyor, flak bulutları gökte asılı kalıyor, düşen uçak yerde yanıyor. Oyuncularımızın bildirdiği sorunlar da düzeltildi.',
+    cover: img('hasar-kapak.webp'),
+    images: [
+      { src: img('hasar-kiyas.webp'), caption: 'Havada infilak: solda eski, sağda yeni.' },
+      { src: img('hasar-kanat.webp'), caption: 'Kanadı kopan He 111: kanat motoru ve pervanesiyle ayrı düşüyor.' },
+      { src: img('hasar-motor.webp'), caption: 'Motoru yanan He 111: alev geriye uzanıyor, duman kahverengiden karaya dönüyor.' },
+      { src: img('hasar-flak.webp'), caption: 'Bombardıman kolunun çevresinde asılı kalan flak bulutları.' },
+    ],
+    sections: [
+      {
+        heading: 'Parçalanma',
+        bullets: [
+          'Kanadı kopan uçağın kanadı motoru ve pervanesiyle ayrı düşüyor, uçak öbür yana yuvarlanıyor. Kuyruğu kopanın kuyruk takımı ayrılıyor.',
+          'Havada infilak eden uçağın gövdesi, kanatları, kuyruğu ve pervanesi ayrı ayrı dağılıyor. Yanan parçalar arkalarında duman kolları bırakıyor.',
+          'Parçalar uçağın kendi boyasını taşıyor; gövde hızlı, kanat yaprak gibi süzülerek düşüyor ve yere çarpınca patlıyor.',
+        ],
+      },
+      {
+        heading: 'Duman, alev ve patlamalar',
+        bullets: [
+          'Duman artık aralıklı toplar değil, kesintisiz bir iz. Alev motordan ya da kanat kökünden geriye uzanıp titriyor; yakıt sızıntısının beyaz izi ayrı görünüyor.',
+          'Havada infilak: flaş, ateş topu, kıvılcımlar ve yarım dakika asılı kalan bir bulut.',
+          'Flak bulutları 20 saniyeye kadar gökte kalıyor. Flak isabet edince uçakta kıvılcım çıkıyor, küçük parçalar kopuyor.',
+          'Yere çakılan uçak bir süre yanıyor, duman sütunu rüzgârla yatıyor. Enkaz parçaları kutu değil, bükük sac.',
+          'Bulut ve yangınların süresi grafik kalitesine bağlı; telefonlarda kare hızı korunuyor.',
+        ],
+      },
+      {
+        heading: 'Oyuncu bildirimleriyle düzeltilenler',
+        text: ['Bize yazan oyuncularımıza teşekkür ederiz.'],
+        bullets: [
+          'Kollar artık bütünüyle geri dönmüyor: yakıtı azalan uçak tek başına üsse dönüyor, kolun kalanı görevde kalıyor. Hedef düşünce kol bölgesinde 3 dakika devriye geziyor. Dönüşün nedeni ekranda yazıyor.',
+          'Uçaksavar bataryasının panelinde isabet ettirdiği ve düşürdüğü uçak sayısı görünüyor.',
+          'Hedefini uçaksavarla koruyan düşmana giden kollar artık bataryanın çevresinde daire çizmiyor, hedefe varıyor.',
+          'Jetler birbirine karşı daha çok dönüş savaşına giriyor ve daha sık düşürüyor. Jetler savunmalı bombardıman uçaklarına dalıp geçerek saldırıyor, kuyruk nişancısının önünde oturmuyor.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'modeller-doku',
     date: '2026-11-20',
     title: 'Uçaklar ve uçaksavar topları yeniden dokulandı',

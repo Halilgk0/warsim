@@ -2,6 +2,11 @@
 //
 // - Rota: intikal ve dönüşte bilinen düşman bataryalarının menzili dolanılır. Bataryanın tavanının üstünden geçen ya da
 //   görev hedefinin dibindeki (kaçınılamaz; bastırma kolunun işi) bataryalar hesaba katılmaz.
+//   Hedefi ya da bu bacağın varış noktasını (rota noktası, dönüş üssü) menziline alan batarya da dolanılmaz: oraya
+//   varmak için menzile girmek zorunlu. Eskiden yalnız hedefin 4 km yakınındakiler sayılmıyordu; hedefini 5–8 km öteden
+//   ağır toplar koruyan pike ve taarruz kolları menzilin kenarında sonsuza dek daire çiziyordu (2026-11-21, oyuncu
+//   bildirimi; ölçüm tools/sim/ucaksavar_daire: Ju 87 ve Il-2 25 dakikada hedefe hiç varamıyordu).
+//   Güvenlik: AVOID_MAX boyunca kesintisiz dolanan uçak PRESS süresince dolanmayı bırakıp doğrudan gider.
 // - Flak altında zikzak: ağır flak mermisi ~10 sn uçar ve atış o anki rotaya göre kestirilir; kol 8 sn'de bir 14°
 //   yön ve biraz irtifa değiştirirse patlama yüzlerce metre öteye düşer. Bombalama koşusunda yapılmaz (nişan bozulur).
 // - Kaçamak: hafif uçaksavarın izli mermileri gelirken taarruz uçağı hedeften çıkarken yön değiştirir.
@@ -11,6 +16,10 @@ import type { Aircraft } from '../aircraft/aircraft';
 import type { World } from '../world';
 import { DEG, clamp } from '../../core/math';
 
+/** Kesintisiz dolanma sınırı (sn) ve sonra doğrudan gidilen süre (sn). */
+const AVOID_MAX = 240;
+const PRESS = 180;
+
 function rotateH(dir: Vector3, a: number): void {
   const c = Math.cos(a);
   const s = Math.sin(a);
@@ -19,10 +28,14 @@ function rotateH(dir: Vector3, a: number): void {
   dir.x = x;
 }
 
-/** Rota üstündeki düşman bataryalarının menzilinden yana sap. `keep`: görev hedefi (yakınındaki bataryalar dolanılmaz). */
-export function avoidAA(ac: Aircraft, world: World, dir: Vector3, keep: Vector3 | null): boolean {
+/**
+ * Rota üstündeki düşman bataryalarının menzilinden yana sap. `keep`: görev hedefi (yakınındaki ya da onu menziline alan
+ * bataryalar dolanılmaz); `dest`: bu bacağın varış noktası (rota noktası, dönüş üssü; onu menziline alan batarya da).
+ */
+export function avoidAA(ac: Aircraft, world: World, dir: Vector3, keep: Vector3 | null, dest: Vector3 | null = null): boolean {
   const hl = Math.hypot(dir.x, dir.z);
   if (hl < 1e-3) return false;
+  if (world.time < ac.aaPressUntil) return false;
   const hx = dir.x / hl;
   const hz = dir.z / hl;
   let px = 0;
@@ -31,10 +44,11 @@ export function avoidAA(ac: Aircraft, world: World, dir: Vector3, keep: Vector3 
     if (s.kind !== 'aa' || s.team === ac.team || s.destroyed || !s.active || !s.aa) continue;
     const env = s.aa.envelope();
     if (env.range <= 0 || ac.pos.y - s.pos.y > env.ceiling + 300) continue;
-    if (keep && Math.hypot(s.pos.x - keep.x, s.pos.z - keep.z) < 4000) continue;
+    const R = env.range + 800;
+    if (keep && Math.hypot(s.pos.x - keep.x, s.pos.z - keep.z) < Math.max(4000, R)) continue;
+    if (dest && Math.hypot(s.pos.x - dest.x, s.pos.z - dest.z) < R) continue;
     const rx = s.pos.x - ac.pos.x;
     const rz = s.pos.z - ac.pos.z;
-    const R = env.range + 800;
     const along = rx * hx + rz * hz;
     if (along < -R) continue;
     // Önümüzdeki 9 km'lik yolun bataryaya en yakın noktası
@@ -60,7 +74,16 @@ export function avoidAA(ac: Aircraft, world: World, dir: Vector3, keep: Vector3 
       pz -= (rz / d) * ((R - d) / R);
     }
   }
-  if (px === 0 && pz === 0) return false;
+  if (px === 0 && pz === 0) {
+    ac.aaAvoidSince = -1;
+    return false;
+  }
+  if (ac.aaAvoidSince < 0) ac.aaAvoidSince = world.time;
+  else if (world.time - ac.aaAvoidSince > AVOID_MAX) {
+    ac.aaAvoidSince = -1;
+    ac.aaPressUntil = world.time + PRESS;
+    return false;
+  }
   const nx = hx + px * 1.6;
   const nz = hz + pz * 1.6;
   const nl = Math.hypot(nx, nz) || 1;

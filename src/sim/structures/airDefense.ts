@@ -134,6 +134,9 @@ export class AASite {
   private crewMul = 1;
   private ammoMul = 1;
   shotsFired = 0;
+  /** İsabet ettirdiği uçak sayısı (mermi ya da patlama parçası; panel ve kayıt) ve düşürdüğü uçak sayısı. */
+  hits = 0;
+  kills = 0;
   /** Ateş anında hedefin bataryaya göre açısal hızı (rad/sn): takip gecikmesi. */
   private omega = 0;
 
@@ -441,7 +444,7 @@ export class AASite {
       burst.x += gauss() * err;
       burst.y += gauss() * err * 0.7;
       burst.z += gauss() * err;
-      world.scheduleFlak(burst, flightTime(w, d), s.team, w.damage * this.ammoMul, w.burstRadius * (prox ? 1.5 : 1), s.name);
+      world.scheduleFlak(burst, flightTime(w, d), s.team, w.damage * this.ammoMul, w.burstRadius * (prox ? 1.5 : 1), s.name, s.id);
       return;
     }
     // İzli mermi: nişan yönüne açısal hata ekle

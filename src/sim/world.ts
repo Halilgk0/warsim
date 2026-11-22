@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { type Quaternion, Vector3 } from 'three';
 import { QUEUE_MAX } from './structures/factory';
 import { AA_WEAPONS, type AAWeaponId } from './structures/airDefense';
 import { Aircraft, type AircraftOptions } from './aircraft/aircraft';
@@ -184,6 +184,8 @@ interface FlakShell {
   damage: number;
   radius: number;
   sourceName: string;
+  /** Atan batarya (isabet ve düşürme sayacı). */
+  structId: number | null;
 }
 
 /** Paraşütle atlayan mürettebat. */
@@ -200,7 +202,12 @@ export interface Parachute {
 }
 
 export type SimEvent =
-  | { kind: 'airExplosion'; pos: Vector3; size: number }
+  | { kind: 'airExplosion'; pos: Vector3; size: number; vel?: Vector3 }
+  /**
+   * Uçak parçalanması (çizim kendi modelini böler; 2026-11-21): havada infilakta bütün parçalar ayrılır, kanat koptuğunda
+   * o kanat, gövde dağıldığında kuyruk. side: kopan kanat (+1 sol, −1 sağ; model ekseni +x sol kanat).
+   */
+  | { kind: 'breakup'; id: number; model: string; pos: Vector3; quat: Quaternion; vel: Vector3; mode: 'explode' | 'wing' | 'tail'; side: number; fire: boolean }
   | { kind: 'debris'; pos: Vector3; vel: Vector3; count: number; size: number; burning: boolean }
   | { kind: 'groundExplosion'; pos: Vector3; size: number }
   | { kind: 'crash'; pos: Vector3 }
@@ -1569,8 +1576,29 @@ export class World {
     this.bullets.push({ ...b, prev: b.pos.clone() });
   }
 
-  scheduleFlak(pos: Vector3, t: number, team: number, damage: number, radius: number, sourceName: string): void {
-    this.flak.push({ pos, t, team, damage, radius, sourceName });
+  scheduleFlak(pos: Vector3, t: number, team: number, damage: number, radius: number, sourceName: string, structId: number | null = null): void {
+    this.flak.push({ pos, t, team, damage, radius, sourceName, structId });
+  }
+
+  /** Uçaksavar karnesi: bataryanın isabet ettirdiği ve düşürdüğü uçaklar (panelde; oyuncu uçaksavarın etkisini görsün). */
+  private creditAA(structId: number | null, ac: Aircraft): void {
+    const aa = structId !== null ? this.structureById(structId)?.aa : undefined;
+    if (!aa) return;
+    aa.hits++;
+    if (ac.status !== 'flying') aa.kills++;
+  }
+
+  /**
+   * Patlama parçacığının uçakta görünür izi: kıvılcım ve (büyük isabette) kopan küçük parçalar. Eskiden flak hasarı
+   * uçakta hiç iz bırakmıyordu; oyuncu uçaksavarın hiçbir şeyi vurmadığını sanıyordu (2026-11-21).
+   */
+  private markSplash(ac: Aircraft, dir: Vector3, heavy: boolean): void {
+    const at = dir.clone().normalize().multiplyScalar(-ac.spec.span * 0.15).add(ac.pos);
+    this.events.push({ kind: 'hit', pos: at });
+    if (heavy || Math.random() < 0.35) {
+      const vel = ac.velocity(new Vector3()).multiplyScalar(0.85);
+      this.events.push({ kind: 'debris', pos: ac.pos.clone(), vel, count: heavy ? 3 : 2, size: Math.max(0.25, ac.spec.size * 0.05), burning: false });
+    }
   }
 
   /**
@@ -1704,13 +1732,15 @@ export class World {
         target.fallMode = 'roll';
         target.spin = side * rand(4, 6.5);
         bail = 0.45;
-        target.velocity(_v);
-        this.events.push({ kind: 'debris', pos: target.pos.clone(), vel: _v.clone().multiplyScalar(0.7), count: 1, size: target.spec.span * 0.45, burning: false });
+        // Kopan kanat uçağın kendi modelinden ayrılır (çizim); uçak kanadının koptuğu yana yuvarlanır
+        this.breakup(target, 'wing', side);
         break;
       case 'kumanda kaybı':
         target.fallMode = 'spin';
         target.spin = side * rand(1.6, 3.2);
         bail = 0.6;
+        // Kumandayı çoğu zaman kuyruğa gelen isabetler koparır: bazen kuyruk da ayrılır
+        if (Math.random() < 0.25) this.breakup(target, 'tail', side);
         break;
       case 'motoru durdu, pilot uçağı terk etti':
         target.fallMode = 'glide';
@@ -1728,6 +1758,8 @@ export class World {
         bail = 0.6;
         target.velocity(_v);
         this.events.push({ kind: 'debris', pos: target.pos.clone(), vel: _v.clone().multiplyScalar(0.8), count: 2, size: target.spec.size * 0.25, burning: true });
+        // Gövde dağılınca çoğu zaman kuyruk kopar (yapı kırılması)
+        if (cause === 'parçalandı' && Math.random() < 0.55) this.breakup(target, 'tail', side);
     }
     if (target.damage.pilot === 2) bail = 0;
     if (target.mods.ejectSeat) bail = Math.min(0.95, bail * 1.4 + 0.2);
@@ -1806,14 +1838,23 @@ export class World {
     this.recover(ac, base);
   }
 
-  /** Havada infilak: büyük ateş topu ve yağan enkaz. */
+  /** Havada infilak: büyük ateş topu, uçağın kendi parçaları (kanatlar, kuyruk, gövde) ve yağan küçük enkaz. */
   private disintegrate(ac: Aircraft): void {
     ac.status = 'dead';
     ac.velocity(_v);
-    this.events.push({ kind: 'airExplosion', pos: ac.pos.clone(), size: ac.spec.size });
+    this.events.push({ kind: 'airExplosion', pos: ac.pos.clone(), size: ac.spec.size, vel: _v.clone() });
+    this.breakup(ac, 'explode', 0);
     this.events.push({
-      kind: 'debris', pos: ac.pos.clone(), vel: _v.clone().multiplyScalar(0.75), count: 4 + Math.round(ac.spec.size * 0.6),
-      size: ac.spec.size * 0.22, burning: true,
+      kind: 'debris', pos: ac.pos.clone(), vel: _v.clone().multiplyScalar(0.75), count: 2 + Math.round(ac.spec.size * 0.3),
+      size: ac.spec.size * 0.16, burning: true,
+    });
+  }
+
+  /** Parçalanma olayı (yalnız çizim; simülasyonda uçak tek parça düşer). */
+  private breakup(ac: Aircraft, mode: 'explode' | 'wing' | 'tail', side: number): void {
+    this.events.push({
+      kind: 'breakup', id: ac.id, model: ac.spec.model, pos: ac.pos.clone(), quat: ac.quat.clone(), vel: ac.velocity(new Vector3()),
+      mode, side: side >= 0 ? 1 : -1, fire: mode === 'explode' || ac.damage.fire > 0,
     });
   }
 
@@ -2242,6 +2283,7 @@ export class World {
           _v.copy(ac.pos).add(_re.lerp(_rs, 1 - hit.t));
           this.events.push({ kind: 'hit', pos: _v.clone() });
           this.hitAircraft(ac, b.damage, b.caliber, b.vel, owner, owner?.callsign ?? b.sourceName, b.team, b.belt ?? null, hit.zone);
+          if (b.ownerId < 0) this.creditAA(-b.ownerId, ac);
           alive = false;
           break;
         }
@@ -2271,7 +2313,9 @@ export class World {
       const d = ac.pos.distanceTo(b.pos);
       if (d < b.burstRadius) {
         _dir.subVectors(ac.pos, b.pos);
+        this.markSplash(ac, _dir, false);
         this.hitAircraft(ac, b.damage * (1 - d / b.burstRadius) * 0.8, 'cannon', _dir, null, b.sourceName, b.team);
+        if (b.ownerId < 0) this.creditAA(-b.ownerId, ac);
       }
     }
   }
@@ -2414,9 +2458,11 @@ export class World {
           _dir.subVectors(ac.pos, sh.pos);
           // Parçacıklar: birkaç ayrı isabet
           const hits = d < sh.radius * 0.4 ? 3 : 1;
+          this.markSplash(ac, _dir, hits > 1);
           for (let k = 0; k < hits; k++) {
             this.hitAircraft(ac, (sh.damage * (1 - d / sh.radius)) / hits, 'cannon', _dir, null, sh.sourceName, sh.team);
           }
+          this.creditAA(sh.structId, ac);
         }
       }
     }

@@ -35,6 +35,9 @@ const _est = new Vector3();
 const _to = new Vector3();
 /** Bağlılık uzaklığı: bu kadar yakındaki hedef düşürülmeden bırakılmaz (yukarıdaki sebepler dışında). */
 const COMMIT_RANGE = 2500;
+/** Önleme bitince bölgede devriye süresi (s) ve devriye için kendi bölgesine en çok uzaklık (m; tasma yoksa). */
+const LOITER_S = 180;
+const LOITER_RANGE = 30000;
 
 let nextId = 1;
 
@@ -63,6 +66,8 @@ export class FlightGroup {
   /** Görevden dönüp inen uçak sayısı. */
   landed = 0;
   rtbReason: string | null = null;
+  /** Önleme bittikten sonra devriyeye geçti (bir kez). */
+  private loitered = false;
   /** Üye → atanan hedef. */
   readonly assigned = new Map<number, number>();
   private assignTimer = 0;
@@ -240,6 +245,8 @@ export class FlightGroup {
   setPhase(p: FlightPhase, world: World, note?: string): void {
     if (this.phase === p) return;
     this.phase = p;
+    // Dönüşün nedeni panelde görünür (brain.ts durum satırı); oyuncuya ayrıca kısa bildirim (game.ts watchFlights)
+    if (p === 'egress' && note) this.rtbReason = note;
     this.phaseStart = world.time;
     if (p === 'action') {
       this.actionStart = world.time;
@@ -272,7 +279,11 @@ export class FlightGroup {
     const p = this.plan;
 
     if (this.phase === 'enroute' || this.phase === 'action') {
-      if (alive.some((m) => !m.brain.detached && world.isBingo(m))) {
+      // Yakıtı azalan uçak koldan ayrılıp tek başına döner; kolun kalanı görevde kalır (2026-11-21, oyuncu bildirimi: eskiden
+      // tek uçağın yakıtı azalınca bütün kol dönüyordu, hasarsız kol "nedensiz" eve gidiyor görünüyordu). Formda kimse
+      // kalmazsa kol döner.
+      for (const m of alive) if (!m.brain.detached && world.isBingo(m)) m.brain.detach(m, world, L('yakıt azaldı', 'low on fuel'));
+      if (alive.length > 0 && alive.every((m) => m.brain.detached)) {
         this.rtbReason = L('yakıt azaldı', 'low on fuel');
         this.setPhase('egress', world, this.rtbReason);
       } else if (this.isFighterFlight() && p.type !== 'ferry') {
@@ -374,6 +385,25 @@ export class FlightGroup {
     for (const m of this.alive) if (m.airborne) m.brain.beginLanding(base);
   }
 
+  /**
+   * Önleme bitti (hedef düştü ya da kayboldu, yakında başka düşman yok): kol hemen dönmez, olduğu yerde LOITER_S devriye gezer
+   * (görev devriyeye döner; radar yeni temasa yönlendirebilir). Kendi savunma bölgesinin dışındaysa (kovalamaca düşman
+   * tarafına uzadıysa) devriye yok. Bir kez. Devriyeye geçtiyse true.
+   */
+  private loiter(world: World, prev: string): boolean {
+    const lead = this.leader();
+    if (this.loitered || !lead || world.distToTeam(this.team, lead.pos) > (this.leash ?? LOITER_RANGE)) return false;
+    this.loitered = true;
+    const p = this.plan;
+    p.type = 'cap';
+    p.targetPos = lead.pos.clone();
+    p.stationTime = LOITER_S;
+    p.patrolRadius = Math.max(p.patrolRadius, 4000);
+    this.stationStart = world.time;
+    world.log(L(`${this.name}: ${prev}, bölgede ${LOITER_S / 60} dk devriye geziyor`, `${this.name}: ${prev}, patrolling the area for ${LOITER_S / 60} min`), this.team, 'ops');
+    return true;
+  }
+
   private endRoute(world: World): void {
     if (this.plan.type === 'ferry') {
       const base = world.airbaseById(this.plan.targetBaseId ?? -1);
@@ -402,7 +432,7 @@ export class FlightGroup {
           const prev = tgt ? `${tgt.callsign} ${tgt.status === 'flying' ? L('indi', 'landed') : L('düştü', 'went down')}` : L('hedef kayboldu', 'target lost');
           const next = this.retarget(world);
           if (next) world.log(L(`${this.name}: ${prev}, ${next.callsign} (${next.spec.abbr}) uçağına yöneliyor`, `${this.name}: ${prev}, turning onto ${next.callsign} (${next.spec.abbr})`), this.team, 'ops');
-          else this.setPhase('egress', world, L(`${prev}, bölgede başka düşman yok`, `${prev}, no other enemies in the area`));
+          else if (!this.loiter(world, prev)) this.setPhase('egress', world, L(`${prev}, bölgede başka düşman yok`, `${prev}, no other enemies in the area`));
           break;
         }
         this.updateTrack(world);

@@ -55,6 +55,18 @@ export function tacticVs(ac: Aircraft, opp: Aircraft): 'turn' | 'energy' {
   const o = opp.spec;
   if (o.turnTime < s.turnTime * 0.88) return 'energy';
   if (s.turnTime < o.turnTime * 0.92) return 'turn';
+  // İki jet: dal-vur ancak hız ya da tırmanış üstünlüğüyle ayrılık yaratır. Denk iki jetin ikisi de aynı hızla kaçıp
+  // aynı hızla dalınca çatışma uzaklaşma ve tırmanışlarla geçiyordu (4'e 4'te koşuların yarısı düşürmesiz; zamanın
+  // üçte biri ayrılmada; 2026-11-21, oyuncu bildirimi; ölçüm `tools/sim/jet_dalas`). Rakibi hem belirgin hızlı hem en az
+  // onun kadar iyi dönen jet çatışmanın zamanını seçemez, dönüşe girmez, kendi doktrinini sürer: F-80 MiG-15'e dönüşte
+  // karnenin dışına çıkıyordu (MiG payı %87 → %60, beklenen %70–90). Ölçüm (168 koşu): F-86–MiG-15 koşu başına düşürme
+  // 0,79 → 1,62, sonuçsuz %32 → %7, F-86 payı %44 → %63 (beklenen %50–65). İkisini de dönüşe sokmak düşürmeyi üçe
+  // katlıyor ama karneyi iki eşleşmede de bozuyordu.
+  if (s.engine.kind === 'jet' && o.engine.kind === 'jet') {
+    const edge = s.vMax > o.vMax * 1.08 || perfHere(ac, 'climb') > perfHere(opp, 'climb') * 1.25;
+    const outclassed = o.vMax > s.vMax * 1.08 && o.turnTime <= s.turnTime;
+    return edge || outclassed ? s.tactic : 'turn';
+  }
   // Dönüşler yakın: jette ve 5,5 km üstünde uçağın kendi doktrini (hız ve tırmanış belirleyici), alçak ve orta
   // irtifada pervaneli dönüş savaşı
   return s.engine.kind === 'jet' || ac.pos.y > 5500 ? s.tactic : 'turn';
@@ -159,6 +171,15 @@ const _p = new Vector3();
 /** Savunma taretlerinin toplam atış hızı (mermi/sn): B-17 ~120, B-25 ve B-29 ~67, He 111 ~42. */
 function defensiveFire(spec: Aircraft['spec']): number {
   return spec.turrets.reduce((t, x) => t + x.gun.rate, 0);
+}
+
+/**
+ * Jet savunmalı bombardıman uçağına dalıp geçer (hızını kesmeden yakından geçip uzaklaşır). 2026-11-21'e kadar yalnız ağır
+ * savunmalı kutuya (saniyede ≥60 mermi: B-17, B-29) yapılıyordu; He 111 ve Ju 88'in arkasında jet hızını hedefinkine
+ * indirip kuyruk nişancısının önünde oturuyordu: 4 Me 262 6 He 111'e saldırınca dördü de iki dakikada ağır hasar alıyordu.
+ */
+function jetSlashes(ac: Aircraft, tgt: Aircraft): boolean {
+  return ac.spec.engine.kind === 'jet' && tgt.spec.role === 'bomber' && defensiveFire(tgt.spec) > 0 && !isCrippled(tgt);
 }
 
 /** Kafa kafaya üstünlük: rakibi düşürme hızımızın (ateş gücü / onun dayanıklılığı) onunkine oranı. */
@@ -391,8 +412,7 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
   // Taretleri ateş eden ağır savunmalı bombardıman uçağı jet için savunmasız değildir (2026-11-18): avcı silahı yok diye
   // savunmasız sayılınca Me 262 dalıp geçme saldırısını hiç yapmıyor, kutunun arkasında yavaşlayıp kuyruk nişancılarının
   // önünde oturuyordu (4 jet 9 B-17'ye koşu başına 19 mermi atıp 2,4 jet kaybediyordu)
-  const slashTarget = s.engine.kind === 'jet' && tgt.spec.role === 'bomber' && defensiveFire(tgt.spec) >= 60 && !isCrippled(tgt) &&
-    tgt.turrets.some((t) => t.ammo > 0);
+  const slashTarget = jetSlashes(ac, tgt) && tgt.turrets.some((t) => t.ammo > 0);
   const helpless = !slashTarget && (isCrippled(tgt) || !tgt.armed || (tactic !== 'energy' && tgt.speed < ac.speed * 0.6 && eAdv > 300) ||
     (tgt.speed < stallSpeed(tgt) * 1.5 && eAdv > 600));
   const prefersEnergy = tactic === 'energy' || s.vMax > tgt.spec.vMax * 1.15;
@@ -627,7 +647,7 @@ function offensive(ac: Aircraft, brain: Brain, tgt: Aircraft, dt: number, cmd: F
     const keep = wingGuns ? CONVERGENCE * 0.8 : 150;
     // Jet ağır savunmalı bombardıman kutusuna hızını kesmeden dalar, yakından geçip uzaklaşır (Me 262: nişancının
     // izleyemeyeceği yaklaşma hızı; kuyruk nişancısının önünde yavaşlayıp oturmak ölümdü)
-    const slashing = s.engine.kind === 'jet' && tgt.spec.role === 'bomber' && defensiveFire(tgt.spec) >= 60 && !isCrippled(tgt);
+    const slashing = jetSlashes(ac, tgt);
     if (R < 800 && !energyFighter && !(fortress && headOn)) throttle = Math.min(throttle, clamp(0.55 + (R - keep) / 600 - closure * 0.008, 0.15, 1));
     else if (energyFighter && !slashing && R < keep * 2 && tailAspect > 0.3) throttle = Math.min(throttle, clamp(0.55 + (R - keep) / 400 - closure * 0.01, 0.2, 1));
     // Enerji avcısı arkadan saldırıda yaklaşma hızını sınırlar (≈150 km/sa): çok hızlı gelen ateş edecek zaman bulamaz.

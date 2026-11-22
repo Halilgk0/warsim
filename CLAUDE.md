@@ -140,6 +140,24 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       sayılmaz, jet dalıp geçme saldırısını kutunun 3,2 km arkasından başlatır. Eskiden 1,5 km'de, arka uçakların
       nişancı menzilinde dönüp ateş edemeden ağır hasar alıyordu: 4 Me 262 / 9 B-17'de düşen B-17 0,83 → 3,2, mermi
       19 → 46 (jet kaybı ~2,5 aynı). Ölçüm scratchpad `gorev/jet.ts`.
+      2026-11-21'den beri jet her savunmalı bombardıman uçağına dalıp geçer (`jetSlashes`; eskiden yalnız saniyede ≥60 mermi
+      atan kutuya): He 111'in arkasında yavaşlayıp kuyruk nişancısının önünde oturuyordu. 4 Me 262 / 6 He 111: düşen 4,3 → 5,8,
+      ağır hasar alan jet 1,6 → 0,1 (`tools/sim/jet_bombaci`).
+    - İki jet (`combat.ts` `tacticVs`, 2026-11-21): belirgin hız (%8) ya da tırmanış (%25) üstünlüğü yoksa dönüş savaşı;
+      denk iki jet ikisi de dal-vur yapınca çatışma ayrılmalarla geçiyordu (koşuların yarısı düşürmesiz; teşhis
+      `tools/sim/jet_dalas`: evre, uzaklık ve arkada geçen süre). Rakibi hem belirgin hızlı hem en az onun kadar iyi dönen
+      jet dönüşe girmez (F-80, MiG-15'e karşı). F-86–MiG-15 koşu başına düşürme 0,79 → 1,62 (168 koşu). İki tarafı da
+      dönüşe sokmak düşürmeyi üçe katlıyor ama F-86 ve MiG–F-80 karnesini aralık dışına itiyordu. Jet ile pervaneli
+      arasında dal-vur aynen.
+    - Oyuncu bildirimi düzeltmeleri (2026-11-21):
+      - Kol dönüşü (`flightGroup.ts`): yakıtı azalan uçak koldan ayrılıp tek başına döner, kolun kalanı görevde kalır (eskiden
+        bütün kol dönüyordu). Önleme bitince (hedef düştü, yakında başka düşman yok) kol kendi bölgesinde `LOITER_S` (3 dk)
+        devriye gezer (`loiter`: görev devriyeye döner). Dönüşün nedeni `rtbReason`'da (panelde) ve oyuncuya kısa bildirim
+        (`game.ts` `watchFlights`). Ölçüm `tools/sim/onleme_donus`.
+      - Uçaksavardan kaçınma (`aaEvade.ts` `avoidAA`): hedefi ya da bacağın varış noktasını (rota noktası, dönüş üssü; `dest`)
+        menziline alan batarya dolanılmaz; 240 sn kesintisiz dolanan uçak 180 sn doğrudan gider (`aaAvoidSince`,
+        `aaPressUntil`). Hedefi 5–8 km öteden ağır toplar koruyan Ju 87 ve Il-2 kolları menzilin kenarında 25 dk daire
+        çiziyordu (0/3 → 3/3 vurdu; `tools/sim/ucaksavar_daire <koşu> <uçak> <görev>`).
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
     - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
       alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana
@@ -217,6 +235,32 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `gameRenderer.ts`: sahne ve senkron.
   - `camera.ts`: strateji kamerası; `director` kancası sinematik kayıt içindir.
   - `effects.ts`: iki ponpon katmanı var: ışıkla gölgelenen duman/ateş ve ışıktan etkilenmeyen parlama.
+    Gerçekçi duman ve patlama (2026-11-21):
+    - Duman izi mesafeyle atılır (`trail(kaynak, yuva, …)`, her karede çağrılır): kaynağın son topağından eşit
+      aralıkla, topaklar üst üste biner (eskiden saniyede 10 topak: 100 m/sn'de 10 m arayla boncuk dizisi). Aralık topak
+      boyuyla orantılı, çağrı başına en çok 6. Kaynaklar: uçağın yangını ve motorları (`gameRenderer.ts` `damageSmoke`,
+      yuvalar), düşen parça (`wreck.ts`), sac parçası (`Debris`), roket. Yeni duman kaynağı da `trail` kullanmalı.
+    - Alev her karede: küçük beyaz çekirdek, hava akımıyla geriye uzanan yırtık iki dil, dumanın içinde soluk parıltı.
+      Parçacık doğrultusunda uzar (`stretch`, `dir`; yoksa hız: kıvılcım çizgisi). Renk saniyeyle soğur (`cool`).
+    - Havada infilak evreli: flaş, karışık renkli ateş topu, kıvılcım çizgileri, ateşin aydınlattığı ve uçuş yönünde uzayan,
+      yarım dakika asılı kalan bulut (olay uçağın hızını taşır, `airExplosion` `vel`). Yanan sac parçaları (en çok üç) ince
+      duman kolları çizer.
+    - Flak bulutu bombardıman uçağı boyunda, 16–24 sn asılı kalır (eskiden 2–3 sn). Yere çakılan uçak 30–60 sn yanar
+      (`burn`; alev ve rüzgârla yatan sütun; uzaktan bakışta büyür; suda yanmaz).
+    - Kalıcılık kaliteye bağlı (`persist`: Yüksek 1, Orta 0,7, Düşük 0,4): parçacık sınırı yeni efektlere yer bıraksın.
+    - Enkaz kutu değil, bükük sac (`shardGeometry`, renkli). Görsel denetim scratchpad `hasar/cek.cjs` (tür başına çekim,
+      `PORT`/`OUT` ile eski kodla), ölçüm `hasar/olc.mjs` (eski ve yeni derleme aynı koşuda).
+  - **Uçak hasarı görselleri** (2026-11-21):
+    - Parçalanma: `world.ts` `breakup` olayı (havada infilakta bütün parçalar, "kanat koptu"da o kanat, gövde dağılınca ya da
+      kumanda kaybında bazen kuyruk). Uçağın kendi modeli `models.ts` `fractureModel` ile dört parçaya bölünür (gövde,
+      kuyruk: boyun arka %30'u, sol ve sağ kanat motorlarıyla; üçgen ağırlık merkezine göre, köşe öznitelikleri paylaşılır:
+      Blender dokulu model kendi boyasıyla kırılır). Kanadı ya da kuyruğu kopan uçağın görüntüsü parçalara bölünür, kopan parça
+      ve eklemleri gizlenir (`gameRenderer.ts` `breakView`). Düşen parçalar `wreck.ts`: ağırlık merkezi çevresinde döner,
+      parçaya göre hava direnci (gövde ~100 m/sn, kanat yaprak gibi), yanarken alev ve duman, yere çarpınca patlama ya da toz.
+    - Duman ve alev gerçek yerinden (`gameRenderer.ts` `damageSmoke`): motor yangını ve hasarlı motor kendi egzozundan
+      (`emitters`, motor başına), depo yangını ve sızıntı kanat kökünden.
+    - Flak ve kendini imha eden mermi parçası uçakta kıvılcım ve bazen küçük parça bırakır (`world.ts` `markSplash`; eskiden
+      flak hasarı hiç görünmüyordu). Bataryanın isabet ettirdiği ve düşürdüğü uçak sayısı panelde (`AASite.hits/kills`, kayıtta).
   - `atmosphere.ts`: gök kubbesi, güneş, yükseklik sisi (three.js sis parçalarının yerine). Kendi `onBeforeCompile`'ı
     olan malzeme `linkAtmosphere` çağırmalı, yoksa sisi bozulur.
   - `arch.ts`: yapı yüzeyleri tek gölgelendiricide yordamsal (doku dosyası yok). İnce ayrıntı `aFade` ile yalnız
@@ -531,7 +575,8 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - `tools/sfx/`: sesleri gerçek kayıtlardan üretir (`fetch → build → verify`). Bkz. README.
 - `tools/rec/`: tanıtım videoları (`record.mjs`, `probe.mjs`, `ui.mjs`, `edit.mjs`) ve grafik önce/sonra denetimi
   (`audit/stills.mjs`, `audit/perf.mjs`; taban `audit/taban-2026-10-23.json`). Bkz. README.
-- `tools/sim/`: başsız simülasyon betikleri.
+- `tools/sim/`: başsız simülasyon betikleri; radar, jet dönüşü ve iniş ölçümleri dahil (`node tools/sim/calistir.mjs <ad>`, bkz. README).
+- `tools/denetim/`: tarayıcıda görsel ve arayüz denetimi (radar paneli, ansiklopedi, haber e-postası, bina önce/sonra, push öncesi oyun denemesi; bkz. README).
 - `tools/uretim/`: üretim listesi resimleri (`public/uretim/ac-*.webp`, `gun-*.webp`) ve araştırma siluetleri (`plan/`), oyunun modellerinden.
 - `release/` (git dışı):
   - itch.io paketi;

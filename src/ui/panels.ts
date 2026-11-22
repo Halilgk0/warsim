@@ -432,6 +432,8 @@ export class LeftPanel {
         <span>${L('Tahkimat', 'Fortification')}</span><span>${L(`seviye ${aa.level}`, `level ${aa.level}`)}</span>
         <span>${L('Mürettebat', 'Crew')}</span><span>${aa.crew > 1.1 ? L('deneyimli', 'veteran') : aa.crew > 0.95 ? L('eğitimli', 'trained') : L('yeni', 'green')}</span>
         <span>${L('Atılan', 'Rounds fired')}</span><span>${nf.format(aa.shotsFired)}</span>
+        <span>${L('İsabet ettirdiği uçak', 'Aircraft hit')}</span><span>${nf.format(aa.hits)}</span>
+        <span>${L('Düşürdüğü uçak', 'Aircraft shot down')}</span><span>${nf.format(aa.kills)}</span>
       </div>
       <h3>${L('Silah yuvaları', 'Gun pits')}</h3>
       <div class="pits">${pits}</div>

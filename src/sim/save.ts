@@ -89,6 +89,9 @@ interface StructureSave {
     job: { key: string; label: string; left: number; total: number } | null;
     crew: number;
     shotsFired: number;
+    /** Uçağa isabet ve düşürme sayısı (2026-11-21; eski kayıtlarda yok). */
+    hits?: number;
+    kills?: number;
   };
   radar?: { level: 1 | 2 };
   /** İtfaiye merkezi: seviye ve süren yükseltme (ekipler kayıtta merkeze dönmüş sayılır). */
@@ -179,6 +182,7 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
       o.aa = {
         level: s.aa.level, weapons: s.aa.mounts.map((m) => m.weapon), installs: s.aa.mounts.map((m) => m.install), sensors: [...s.aa.sensors],
         job: s.aa.job ? { ...s.aa.job } : null, crew: s.aa.crew, shotsFired: s.aa.shotsFired,
+        hits: s.aa.hits, kills: s.aa.kills,
       };
     }
     if (s.radar) o.radar = { level: s.radar.level };
@@ -307,6 +311,8 @@ export function deserializeWorld(d: SaveData): World {
       aa.job = o.aa.job ? { ...o.aa.job } : null;
       aa.crew = o.aa.crew;
       aa.shotsFired = o.aa.shotsFired;
+      aa.hits = o.aa.hits ?? 0;
+      aa.kills = o.aa.kills ?? 0;
     }
     if (s.radar && o.radar) s.radar.level = o.radar.level;
     if (s.fire && o.fire) {

@@ -5273,6 +5273,8 @@ export interface AircraftModel {
   length: number;
   /** Sınır küresi yarıçapı (kanat açıklığı dahil). */
   radius: number;
+  /** Eklem dışı ana ağlar (boyalı gövde, cam, küçük parçalar): uçak parçalanınca bölünmüş parçalarla değişir. */
+  base: THREE.Mesh[];
 }
 
 /** Uçak modeli. detail: 1 yüksek çözünürlük ve küçük parçalar (varsayılan), 0 low-poly (düşük kalite). */
@@ -5291,7 +5293,11 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     into.add(mesh);
     return mesh;
   };
-  for (const m of [add(root, c.glass, GLASS[detail]), add(root, c.detail, DETAIL_MAT[detail])]) if (m) fine.push(m);
+  const base: THREE.Mesh[] = [body];
+  for (const m of [add(root, c.glass, GLASS[detail]), add(root, c.detail, DETAIL_MAT[detail])]) if (m) {
+    fine.push(m);
+    base.push(m);
+  }
   const gear = add(root, c.gear, DARK[detail]);
   if (gear) gear.visible = !!opts.gear;
   // Eklemler: dış grup pivotta (döndürülen), iç grup −pivotta (geometri model ekseninde kalır)
@@ -5346,7 +5352,121 @@ export function buildAircraftModel(kind: string, opts: { gear?: boolean; detail?
     landing.visible = false;
     root.add(landing);
   }
-  return { root, props, disc, joints, fine, lods, emitters: c.emitters, gear, landing, landingPool, length: c.length, radius: c.radius };
+  return { root, props, disc, joints, fine, lods, emitters: c.emitters, gear, landing, landingPool, length: c.length, radius: c.radius, base };
+}
+
+/** Uçağın kırılabilen parçaları: gövde (burun, kokpit, orta gövde), kuyruk (arka gövde ve kuyruk yüzeyleri), kanatlar. */
+export type WreckPart = 'body' | 'tail' | 'wingL' | 'wingR';
+export const WRECK_PARTS: WreckPart[] = ['body', 'tail', 'wingL', 'wingR'];
+
+export interface WreckPiece {
+  /** Parçanın ağları (model ekseninde; cam ve küçük parçalar fine). */
+  meshes: { geo: Geo; mat: THREE.Material; fine: boolean; joint: boolean }[];
+  /** Parçanın ağırlık merkezi ve yarıçapı (model ekseninde, m). */
+  center: THREE.Vector3;
+  radius: number;
+}
+
+export interface ModelFracture {
+  parts: Partial<Record<WreckPart, WreckPiece>>;
+  /** Eklemin ait olduğu parça (parça kopunca eklemi de gizlenir). */
+  jointPart: Record<string, WreckPart>;
+}
+
+const fractureCache = new Map<string, ModelFracture>();
+
+/**
+ * Geometriyi üçgenlerinin ağırlık merkezine göre parçalara ayırır. Köşe öznitelikleri paylaşılır, yalnız dizin yeni:
+ * doku, UV ve normal aynen kalır (Blender dokulu model de kendi boyasıyla kırılır).
+ */
+function splitGeo(geo: Geo, classify: (x: number, z: number) => WreckPart): Partial<Record<WreckPart, Geo>> {
+  const pos = geo.attributes.position;
+  const idx = geo.index;
+  const tris = idx ? idx.count / 3 : pos.count / 3;
+  const lists: Partial<Record<WreckPart, number[]>> = {};
+  for (let t = 0; t < tris; t++) {
+    const a = idx ? idx.getX(t * 3) : t * 3;
+    const b = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+    const c = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+    const x = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
+    const z = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+    (lists[classify(x, z)] ??= []).push(a, b, c);
+  }
+  const out: Partial<Record<WreckPart, Geo>> = {};
+  for (const part of WRECK_PARTS) {
+    const list = lists[part];
+    if (!list?.length) continue;
+    const g = new THREE.BufferGeometry();
+    for (const name of Object.keys(geo.attributes)) g.setAttribute(name, geo.attributes[name]);
+    g.setIndex(pos.count > 65535 ? new THREE.Uint32BufferAttribute(list, 1) : new THREE.Uint16BufferAttribute(list, 1));
+    // Sınır küresi yalnız bu parçanın köşelerinden (paylaşılan dizide öbür parçaların köşeleri de var)
+    const box = new THREE.Box3();
+    const p = new THREE.Vector3();
+    for (const i of list) box.expandByPoint(p.fromBufferAttribute(pos, i));
+    g.boundingBox = box;
+    g.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+    out[part] = g;
+  }
+  return out;
+}
+
+/**
+ * Parçalanma (2026-11-21): uçağın kendi modeli dört parçaya bölünür. Model ekseninde +x sol kanat, burun +z. Gövdenin
+ * yarı genişliği kanat açıklığından kestirilir; kuyruk boyun arka %30'u (yatay kuyruk dahil). Motor naselleri kanatla
+ * gider. Hareketli yüzeyler ve pervaneler eklem noktasının düştüğü parçaya katılır. Tür ve ayrıntı başına bir kez.
+ */
+export function fractureModel(kind: string, detail: number): ModelFracture {
+  const key = `${kind}|${detail}|${skinVersion}`;
+  const hit = fractureCache.get(key);
+  if (hit) return hit;
+  const c = cached(kind, detail);
+  const bb = c.bb;
+  const half = Math.max(bb.max.x, -bb.min.x, 1);
+  const rf = Math.min(1.6, Math.max(0.45, half * 0.11));
+  const zTail = bb.min.z + (bb.max.z - bb.min.z) * 0.3;
+  const classify = (x: number, z: number): WreckPart => {
+    if (z < zTail && Math.abs(x) < half * 0.45) return 'tail';
+    if (x > rf) return 'wingL';
+    if (x < -rf) return 'wingR';
+    return 'body';
+  };
+  const parts: Partial<Record<WreckPart, WreckPiece>> = {};
+  const add = (part: WreckPart, geo: Geo, mat: THREE.Material, fine: boolean, joint = false) => {
+    (parts[part] ??= { meshes: [], center: new THREE.Vector3(), radius: 0 }).meshes.push({ geo, mat, fine, joint });
+  };
+  const addSplit = (geo: Geo | null, mat: THREE.Material, fine: boolean) => {
+    if (!geo) return;
+    const sp = splitGeo(geo, classify);
+    for (const part of WRECK_PARTS) if (sp[part]) add(part, sp[part]!, mat, fine);
+  };
+  addSplit(c.solid, c.skin, false);
+  addSplit(c.glass, GLASS[detail], true);
+  addSplit(c.detail, DETAIL_MAT[detail], true);
+  const jointPart: Record<string, WreckPart> = {};
+  for (const j of c.joints) {
+    // İniş takımı uçuşta zaten içeride
+    if (/^(takim|kapak)/.test(j.name)) continue;
+    const part = classify(j.pivot.x, j.pivot.z);
+    jointPart[j.name] = part;
+    if (j.solid) add(part, j.solid, c.skin, false, true);
+    if (j.glass) add(part, j.glass, GLASS[detail], true, true);
+    if (j.detail) add(part, j.detail, DETAIL_MAT[detail], true, true);
+  }
+  for (const part of WRECK_PARTS) {
+    const pc = parts[part];
+    if (!pc) continue;
+    const box = new THREE.Box3();
+    for (const m of pc.meshes) {
+      // Bölünen geometrinin kutusu kendi köşelerinden kuruldu (paylaşılan diziden yeniden hesaplanmasın)
+      if (!m.geo.boundingBox) m.geo.computeBoundingBox();
+      box.union(m.geo.boundingBox!);
+    }
+    box.getCenter(pc.center);
+    pc.radius = box.getSize(new THREE.Vector3()).length() / 2;
+  }
+  const f = { parts, jointPart };
+  fractureCache.set(key, f);
+  return f;
 }
 
 const parkedCache = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material }[]>();

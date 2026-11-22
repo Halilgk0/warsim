@@ -8,11 +8,23 @@
 // Kare dokunun köşe normalleri küre gibi dışa açılır: duman topu düz bir kart gibi değil, güneşe bakan yanı aydınlık
 // görünür. Yere yakın kareler zemine gömülüp düz kesik vermesin diye biraz kameraya doğru çekilir; kamera dumanın
 // içine girince parçacık söner (ekranı kaplayan saydam kareler telefonda pahalı). Duman rüzgârla sürüklenir.
+//
+// Gerçekçilik (2026-11-21):
+// - Duman izi mesafeyle atılır (`trail`): kaynağın son bıraktığı yerden bu yere eşit aralıkla, topaklar üst üste biner,
+//   kesintisiz şerit olur. Eskiden saniyede 10 topak atılıyordu: 100 m/sn'de 10 m arayla boncuk dizisi gibiydi. Aralık
+//   topak boyuyla orantılı: uzaktan bakışta (büyük topak) seyrek, toplam sayı aynı sınırda.
+// - Parçacık hız ya da verilen yön doğrultusunda uzayabilir (`stretch`): alev dili rüzgârla geriye uzanır, kıvılcım çizgi.
+// - Renk saniyeyle soğuyabilir (`cool`): ateşin aydınlattığı kahverengi duman bir saniyede griye döner.
+// - Yanan alev beyaz çekirdekten turuncuya, kora; arkasındaki dumanın içinde soluk turuncu parıltı.
+// - Havada infilak evreli: flaş, ateş topu, kıvılcım çizgileri, ateşin aydınlattığı ve yarım dakika asılı kalan bulut.
+// - Flak bulutu 20 sn'ye kadar asılı kalır, yavaş genişler, rüzgârla kayar ("flak dolu gök").
+// - Düşen uçak yerde 30–60 sn yanar: dipte alev, rüzgârla yatan duman sütunu (`burns`).
+// - Kalıcılık kaliteye bağlı (`persist`): Düşükte bulutlar ve yangınlar kısa sürer, parçacık sınırı yeni efekte yer bıraksın.
 
 import * as THREE from 'three';
 import type { Bullet, Parachute, Rocket } from '../sim/world';
 import { PALETTE } from './palette';
-import { groundLevel } from '../sim/terrain';
+import { groundLevel, terrainHeight } from '../sim/terrain';
 import { G, rand, smoothstep } from '../core/math';
 import { WIND, linkAtmosphere } from './atmosphere';
 import { canopyGeometry, jumperGeometry, rocketGeometry } from './munitions';
@@ -39,6 +51,11 @@ interface Puff {
   spin: number;
   /** Doğduğu yerdeki zemin yüksekliği: kare zemine yaklaştıkça saydamlaşır. */
   ground: number;
+  /** Uzama (1 yuvarlak): kare `dir` (yoksa hız) doğrultusunda bu kat uzun çizilir. */
+  stretch: number;
+  dir: THREE.Vector3 | null;
+  /** Renk ömür yerine bu kadar saniyede sona döner (0: ömür boyunca). */
+  cool: number;
 }
 
 export interface PuffOpts {
@@ -66,7 +83,44 @@ export interface PuffOpts {
   fadeOut?: number;
   /** Yumuşak yuvarlak doku (parlama); yoksa topak topak duman. */
   soft?: boolean;
+  /** Uzama katı: alev dili ve kıvılcım çizgisi. Yön `dir`, yoksa parçacığın o anki hızı (yerçekimiyle eğilen çizgi). */
+  stretch?: number;
+  dir?: THREE.Vector3;
+  /** Renk sona kaç saniyede döner (ateşin aydınlattığı dumanın griye dönmesi); yoksa ömür boyunca. */
+  cool?: number;
 }
+
+/**
+ * Kesintisiz iz türleri: topak boyu (efekt büyütmesi başına) ve topaklar arası aralık (boyun katı). Topak doğduktan
+ * ~0,1 sn sonra boyunun iki katı çapında, sonra büyür: boy kadar aralık şeridi kesintisiz tutar. (Yarım boy aralık
+ * yoğun savaşta parçacığı yedi katına çıkarıyordu: telefon benzetiminde Ortada kare başına +6 ms.)
+ */
+export type TrailKind = 'burning' | 'damaged' | 'leak' | 'rocket';
+const TRAIL: Record<TrailKind, { size: number; gap: number }> = {
+  burning: { size: 2.4, gap: 1.1 },
+  damaged: { size: 1.8, gap: 1.2 },
+  leak: { size: 0.9, gap: 1.0 },
+  rocket: { size: 1.2, gap: 1.2 },
+};
+/** Bir çağrıda en çok kaç iz topağı (düşük kare hızında aralık açılır, sayı patlamaz). */
+const TRAIL_MAX = 6;
+
+interface TrailSlot {
+  p: THREE.Vector3;
+  t: number;
+}
+
+/** Yerde yanan enkaz. */
+interface Burn {
+  pos: THREE.Vector3;
+  age: number;
+  life: number;
+  /** Sonraki alev ve duman topağına kalan süre. */
+  fire: number;
+  smoke: number;
+}
+/** Aynı anda en çok kaç enkaz yangını (eskisi söner). */
+const BURN_MAX = 14;
 
 /** Kare kenarı (birim boy başına): yumuşak doku karenin ~%75'ini kaplar, eski ponponla aynı görünen boy. */
 const QUAD = 2.6;
@@ -81,6 +135,14 @@ const _c = new THREE.Color();
 const _z = new THREE.Vector3(0, 0, 1);
 const _dir = new THREE.Vector3();
 const _v = new THREE.Vector3();
+const _qi = new THREE.Quaternion();
+const _tv = new THREE.Vector3();
+const _tp = new THREE.Vector3();
+const _fb = new THREE.Vector3();
+const _fp = new THREE.Vector3();
+const _bp = new THREE.Vector3();
+const _bv = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
 
 /**
  * Örnekli ağın yalnız kullanılan kısmını yükle (kare başına). Eskiden her karede bütün kapasite yükleniyordu
@@ -290,6 +352,7 @@ class PuffLayer {
     list.length = w;
     const cp = cam.position;
     const fx = this.fx.array as Float32Array;
+    _qi.copy(cam.quaternion).invert();
     for (let i = 0; i < w; i++) {
       const p = list[i];
       const t = p.age / p.life;
@@ -299,12 +362,28 @@ class PuffLayer {
       _d.subVectors(cp, p.pos);
       const dist = _d.length();
       _p.copy(p.pos).addScaledVector(_d, Math.min(sc * 0.9, dist * 0.5) / Math.max(dist, 1e-3));
-      _qz.setFromAxisAngle(_z, p.rot + p.spin * p.age);
+      let ang = p.rot + p.spin * p.age;
+      let sx = sc;
+      if (p.stretch > 1) {
+        // Uzayan parçacık: kare, doğrultunun ekrandaki izdüşümüne döner; doğrultu bakış eksenine yaklaştıkça kısalır
+        const dv = p.dir ?? p.vel;
+        const n = dv.length();
+        if (n > 1e-4) {
+          _dir.copy(dv).applyQuaternion(_qi);
+          const l = Math.hypot(_dir.x, _dir.y) / n;
+          if (l > 1e-3) {
+            ang = Math.atan2(_dir.y, _dir.x);
+            sx = sc * (1 + (p.stretch - 1) * l);
+          }
+        }
+      }
+      _qz.setFromAxisAngle(_z, ang);
       _q.copy(cam.quaternion).multiply(_qz);
-      _s.setScalar(sc);
+      _s.set(sx, sc, sc);
       _m.compose(_p, _q, _s);
       this.mesh.setMatrixAt(i, _m);
-      this.mesh.setColorAt(i, p.end ? _c.copy(p.color).lerp(p.end, Math.pow(t, 0.6)) : p.color);
+      const tc = p.cool > 0 ? Math.min(1, p.age / p.cool) : t;
+      this.mesh.setColorAt(i, p.end ? _c.copy(p.color).lerp(p.end, Math.pow(tc, 0.6)) : p.color);
       fx[i * 4] = p.alpha * fi * (1 - smoothstep(p.fadeOut, 1, t)) * smoothstep(sc * 0.4, sc * 1.6, dist);
       fx[i * 4 + 1] = p.opaque;
       fx[i * 4 + 2] = p.shape;
@@ -325,6 +404,13 @@ export class Effects {
   readonly mesh = new THREE.Group();
   private readonly lit: PuffLayer;
   private readonly glow: PuffLayer;
+  /** İz kaynaklarının son topak yeri (kaynak silinince kendiliğinden düşer). */
+  private readonly trails = new WeakMap<object, (TrailSlot | undefined)[]>();
+  /** Efekt saati (oyun saatiyle akar; duraklatınca durur). */
+  private clock = 0;
+  private burns: Burn[] = [];
+  /** Uzun süren bulut ve yangınların süre katı (kaliteye bağlı: Yüksek 1, Orta 0,7, Düşük 0,4). */
+  private persist = 1;
 
   constructor(max = 5000) {
     const atlas = puffTexture();
@@ -346,11 +432,13 @@ export class Effects {
   setLimit(n: number): void {
     this.lit.limit = Math.min(this.lit.max, n);
     this.glow.limit = Math.min(this.glow.max, Math.round(n * 0.32));
+    this.persist = n >= 4000 ? 1 : n >= 2000 ? 0.7 : 0.4;
   }
 
   clear(): void {
     this.lit.clear();
     this.glow.clear();
+    this.burns.length = 0;
   }
 
   spawn(pos: THREE.Vector3, o: PuffOpts): void {
@@ -375,36 +463,226 @@ export class Effects {
       rot: Math.random() * Math.PI * 2,
       spin: rand(-0.4, 0.4),
       ground: groundLevel(pos.x, pos.z),
+      stretch: o.stretch ?? 1,
+      dir: o.dir ? o.dir.clone() : null,
+      cool: o.cool ?? 0,
     });
   }
 
-  update(dt: number, cam: THREE.Camera): void {
+  /**
+   * emit: efektler açık ve oyun akıyor (yerdeki yangınlar yeni topak atar). vis: efekt büyütmesi (kamera uzaklığı;
+   * yangının alevi ve sütunu uzaktan da seçilsin).
+   */
+  update(dt: number, cam: THREE.Camera, emit = true, vis = 1): void {
+    this.clock += dt;
+    if (emit) this.updateBurns(dt, vis);
     this.lit.update(dt, cam);
     this.glow.update(dt, cam);
   }
 
+  // --- Kesintisiz iz ----------------------------------------------------------
+
+  /**
+   * Kaynağın (nesne + yuva: uçağın motoru, düşen parça, roket) izi: son bıraktığı yerden bu yere eşit aralıkla topak.
+   * Her karede çağrılır. vel: kaynağın hızı (alev dili ondan geriye uzanır, duman biraz sürüklenir).
+   */
+  trail(src: object, slot: number, pos: THREE.Vector3, vis: number, kind: TrailKind, vel?: THREE.Vector3): void {
+    if (kind === 'burning') this.flame(pos, vis, vel);
+    let slots = this.trails.get(src);
+    if (!slots) this.trails.set(src, (slots = []));
+    const st = slots[slot];
+    // Düşük ve Orta kalitede aralık biraz açılır (topak daha az, şerit yine kesintisiz)
+    const gap = Math.max(0.3, TRAIL[kind].size * vis * TRAIL[kind].gap * (this.persist >= 1 ? 1 : this.persist >= 0.7 ? 1.2 : 1.4));
+    // İlk topak, uzun aradan (duraklatma değil: oyun durunca saat de durur) ya da sıçramadan sonra baştan başla
+    if (!st || this.clock - st.t > 0.5 || st.p.distanceToSquared(pos) > (gap * 40) ** 2) {
+      slots[slot] = { p: pos.clone(), t: this.clock };
+      this.smokePuff(pos, vis, kind, vel);
+      return;
+    }
+    const d = st.p.distanceTo(pos);
+    let n = Math.floor(d / gap);
+    if (n < 1) {
+      // Yavaş kaynak (yaprak gibi süzülen parça) yine de ara sıra topak bırakır
+      if (this.clock - st.t > 0.25) {
+        st.p.copy(pos);
+        st.t = this.clock;
+        this.smokePuff(pos, vis, kind, vel);
+      }
+      return;
+    }
+    const capped = n > TRAIL_MAX;
+    if (capped) n = TRAIL_MAX;
+    const step = capped ? d / n : gap;
+    _tv.subVectors(pos, st.p).divideScalar(d);
+    for (let i = 1; i <= n; i++) this.smokePuff(_tp.copy(st.p).addScaledVector(_tv, step * i), vis, kind, vel);
+    if (capped) st.p.copy(pos);
+    else st.p.addScaledVector(_tv, step * n);
+    st.t = this.clock;
+  }
+
+  /** İzin tek topağı. Yanan izin dumanı ateşin aydınlattığı kahverengiden bir saniyede koyu griye döner. */
+  private smokePuff(pos: THREE.Vector3, vis: number, kind: TrailKind, vel?: THREE.Vector3): void {
+    const burn = kind === 'burning';
+    const leak = kind === 'leak';
+    const rocket = kind === 'rocket';
+    const size = TRAIL[kind].size * vis;
+    // Yer ve boy oynar: şerit düz bir boru değil, kenarları kabaran duman
+    _bp.copy(pos).addScaledVector(randDir(), size * rand(0, 0.3));
+    this.spawn(_bp, {
+      // Uçağın arkasındaki hava akımı dumanı bir an sürükler, sonra durgun havada kalır
+      vel: vel ? _v.copy(vel).multiplyScalar(0.2) : undefined,
+      size: size * rand(0.7, 1.3),
+      life: burn ? rand(2.8, 3.6) : leak ? 1.2 : rocket ? 1.6 : rand(1.8, 2.2),
+      color: burn ? 0x735442 : leak ? 0xeef1f2 : rocket ? 0xe9e6ea : PALETTE.smoke,
+      end: burn ? PALETTE.smokeDark : undefined,
+      cool: burn ? 0.9 : 0,
+      tint: 0.08,
+      grow: burn ? 1.9 : leak ? 2.2 : rocket ? 1.8 : 1.6,
+      drag: vel ? 2.5 : 1.5,
+      rise: 0.5 * vis,
+      // Topaklar üst üste bindiği için tek tek biraz daha saydam (eskiden 0,85 / 0,6 / 0,45; aralıklıydı)
+      alpha: burn ? 0.65 : leak ? 0.35 : rocket ? 0.6 : 0.5,
+      fadeIn: 0.04,
+    });
+  }
+
+  /**
+   * Yanan kaynağın alevi (her karede): dipte küçük, beyaza yakın çekirdek; hava akımıyla geriye uzanan, yana savrulan
+   * iki dil (biri sarı, biri turuncu; boyları ve saydamlıkları her karede oynar: düzgün bir egzoz alevi değil, yırtık
+   * ve titreyen yangın); ucunda dumanın içini aydınlatan soluk parıltı. Hızı olmayan kaynakta alev yukarı uzanır.
+   */
+  private flame(pos: THREE.Vector3, vis: number, vel?: THREE.Vector3): void {
+    const speed = vel ? vel.length() : 0;
+    const back = speed > 1 ? _fb.copy(vel!).divideScalar(-speed) : _fb.copy(_up);
+    const s = vis;
+    const L = Math.min(2 + speed * 0.05, 7) * vis;
+    this.spawn(_fp.copy(pos).addScaledVector(back, L * 0.08), {
+      vel, size: 0.35 * s * rand(0.8, 1.2), life: 0.06, color: PALETTE.fire[0], bright: 1.6, glow: true, opaque: 0.3, soft: true,
+      stretch: 1.5, dir: back, drag: 4, fadeIn: 0,
+    });
+    for (let j = 0; j < 2; j++) {
+      _fp.copy(pos).addScaledVector(back, L * rand(0.2, 0.7)).addScaledVector(randDir(), 0.3 * s);
+      this.spawn(_fp, {
+        vel, size: rand(0.45, 0.8) * s, life: rand(0.12, 0.22), color: j ? PALETTE.fire[1] : 0xffc46b, end: PALETTE.fire[2],
+        bright: 1.35, tint: 0.15, glow: true, opaque: 0.7, alpha: rand(0.6, 0.9), stretch: rand(1.8, 3), dir: back, drag: 4,
+        fadeIn: 0, fadeOut: 0.4,
+      });
+    }
+    if (Math.random() < 0.5) {
+      this.spawn(_fp.copy(pos).addScaledVector(back, L * 0.8), {
+        vel, size: 1.4 * s, life: 0.5, color: PALETTE.fire[1], end: PALETTE.fire[2], bright: 1.1, glow: true, opaque: 0,
+        soft: true, alpha: 0.3, drag: 3, fadeIn: 0.1, fadeOut: 0.3,
+      });
+    }
+  }
+
+  // --- Yerde yanan enkaz -----------------------------------------------------
+
+  /** Enkaz yangını başlat (düşen uçağın ya da gövde parçasının yere çarptığı yer; suda yanmaz). */
+  burn(pos: THREE.Vector3): void {
+    if (terrainHeight(pos.x, pos.z) < 0) return;
+    if (this.burns.length >= BURN_MAX) this.burns.shift();
+    this.burns.push({ pos: pos.clone(), age: 0, life: rand(30, 60) * Math.max(0.5, this.persist), fire: 0, smoke: 0 });
+  }
+
+  /**
+   * Yangınlar: dipte yükselip kora dönen alev dilleri, üstünde rüzgârla yatan duman sütunu (sıcak duman ~10 m/sn
+   * yükselir, yapı dumanı gibi 200 m'yi bulur). Son %45'inde söner: alevler küçülür, duman açılıp incelir.
+   */
+  private updateBurns(dt: number, vis: number): void {
+    if (dt <= 0) return;
+    const rate = Math.max(0.5, this.persist);
+    // Uzaktan bakışta büyür (yakında gerçek boy; 2,5 km'de ~2,3 kat, en çok 4 kat)
+    const g = Math.min(Math.max(Math.sqrt(vis), 1), 4);
+    for (let i = this.burns.length - 1; i >= 0; i--) {
+      const b = this.burns[i];
+      b.age += dt;
+      if (b.age >= b.life) {
+        this.burns.splice(i, 1);
+        continue;
+      }
+      const k = 1 - smoothstep(0.55, 1, b.age / b.life);
+      b.fire -= dt;
+      b.smoke -= dt;
+      if (b.fire <= 0) {
+        b.fire = rand(0.06, 0.12) / rate;
+        // Başta 5–10 m'lik alevler (yakıt), sönerken küçülür
+        _bp.set(b.pos.x + rand(-4, 4), b.pos.y + rand(0.3, 1.5), b.pos.z + rand(-4, 4));
+        this.spawn(_bp, {
+          vel: _bv.set(rand(-0.5, 0.5), rand(3, 6), rand(-0.5, 0.5)), size: rand(2.5, 4.5) * (0.35 + 0.65 * k) * g, life: rand(0.5, 0.9),
+          color: PALETTE.fire[Math.random() < 0.3 ? 0 : 1], end: PALETTE.fire[2], bright: 1.4, tint: 0.1, glow: true, opaque: 0.85,
+          stretch: 1.7, dir: _up, rise: 2, drag: 1.5, grow: 0.3, fadeIn: 0.08, fadeOut: 0.4,
+        });
+      }
+      if (b.smoke <= 0) {
+        b.smoke = rand(0.22, 0.32) / rate;
+        _bp.set(b.pos.x + rand(-2, 2), b.pos.y + 2.5, b.pos.z + rand(-2, 2));
+        this.spawn(_bp, {
+          vel: _bv.set(rand(-1, 1), rand(7, 10) * (0.5 + 0.5 * k), rand(-1, 1)), size: rand(3, 4.5) * (0.6 + 0.4 * k) * g,
+          life: rand(14, 20) * rate, color: k > 0.5 ? PALETTE.smokeDark : PALETTE.smoke, tint: 0.1, grow: 3, rise: 2.5, drag: 0.25,
+          alpha: 0.5 + 0.35 * k, fadeIn: 0.03,
+        });
+      }
+    }
+  }
+
   // --- Hazır efektler -------------------------------------------------------
 
-  /** Havada infilak: parlama, sıcaktan kora dönen ateş topu ve arkasından kara duman bulutu. */
-  airExplosion(pos: THREE.Vector3, vis: number, size = 6): void {
+  /**
+   * Havada infilak, evreleriyle (vel: uçağın hızı; ateş topu ve bulut bir an onunla sürüklenir):
+   * 1. Flaş: göz kamaştıran kısa beyaz parlama (0,12 sn), ardından turuncu parıltı.
+   * 2. Ateş topu: yakıt ve cephane; beyaz-sarı çekirdekten turuncuya, kora döner; çabuk genişler, yavaşlayıp yükselir.
+   * 3. Kıvılcım ve yanan küçük parçalar: hız yönünde uzayan çizgiler, yerçekimiyle eğilir.
+   * 4. Bulut: ateşin aydınlattığı kahverengiden iki saniyede koyu griye; yavaş genişler, rüzgârla kayar, yarım dakika
+   *    kadar asılı kalır (eskiden tek düze koyu yığın 3–6 sn'de kayboluyordu). İçinde bir süre soluk turuncu parıltı.
+   * Yanan büyük parçaların duman izleri (`Debris`, `Wrecks`) bulutun dışına kollar gibi uzanır.
+   */
+  airExplosion(pos: THREE.Vector3, vis: number, size = 6, vel?: THREE.Vector3): void {
     const k = Math.max(1, size / 6);
     const s = Math.max(vis, 1);
+    const carry = (f: number) => (vel ? _bv.copy(vel).multiplyScalar(f) : _bv.set(0, 0, 0));
     this.spawn(pos, {
-      size: 8 * k + 3 * s, life: 0.28, color: PALETTE.fire[0], bright: 1.6, glow: true, opaque: 0, soft: true, grow: 0.6,
-      fadeIn: 0, fadeOut: 0.1,
+      size: 11 * k + 4 * s, life: 0.12, color: PALETTE.fire[0], bright: 2, glow: true, opaque: 0, soft: true, grow: 0.8,
+      fadeIn: 0, fadeOut: 0.05,
     });
-    for (let i = 0; i < 12; i++) {
-      this.spawn(pos, {
-        vel: randDir().multiplyScalar(rand(8, 22) * k + rand(2, 6) * s),
-        size: rand(2.5, 4.5) * k + rand(1, 2.5) * s, life: rand(0.5, 1.0),
-        color: PALETTE.fire[i % 2], end: PALETTE.fire[2], bright: 1.5, glow: true, grow: 1.2, drag: 2.5, fadeIn: 0.04, fadeOut: 0.3,
+    this.spawn(pos, {
+      vel: carry(0.5), size: 6 * k + 2 * s, life: 0.3, color: 0xffb35a, end: PALETTE.fire[2], bright: 1.4, glow: true, opaque: 0,
+      alpha: 0.7, soft: true, grow: 1, drag: 3, fadeIn: 0, fadeOut: 0.2,
+    });
+    // Ateş topu çok sayıda küçük, renkleri karışık dilden: tek düze turuncu top değil, sarı çekirdekler ve kızıl kenarlar
+    const balls = [PALETTE.fire[0], PALETTE.fire[1], PALETTE.fire[1], 0xe0642a];
+    for (let i = 0; i < 18; i++) {
+      const d = randDir();
+      this.spawn(_bp.copy(pos).addScaledVector(d, rand(0, 2.5) * k), {
+        vel: d.multiplyScalar(rand(6, 18) * k + rand(1, 4) * s).add(carry(0.5)),
+        size: rand(1.8, 3.2) * k + rand(0.6, 1.4) * s, life: rand(0.6, 1.3),
+        color: balls[i % 4], end: PALETTE.fire[2], bright: 1.5, tint: 0.2, glow: true, opaque: rand(0.6, 1), grow: 1.6, drag: 3,
+        rise: 3, fadeIn: 0.03, fadeOut: 0.35,
       });
     }
     for (let i = 0; i < 12; i++) {
       this.spawn(pos, {
-        vel: randDir().multiplyScalar(rand(5, 14) * k + s),
-        size: rand(2.5, 5) * k + rand(1, 2.5) * s, life: rand(3, 6),
-        color: i % 3 ? PALETTE.smokeDark : PALETTE.smoke, grow: 1.5, rise: 1.2, drag: 1.2, alpha: 0.8, fadeIn: 0.12,
+        vel: randDir().multiplyScalar(rand(25, 60) * Math.sqrt(k)).add(carry(0.6)),
+        size: rand(0.25, 0.45) * Math.sqrt(k) * Math.min(s, 4), life: rand(0.5, 1.2), color: 0xffc070, end: PALETTE.fire[2], bright: 1.6,
+        glow: true, opaque: 0, soft: true, stretch: 6, drag: 1.2, rise: -G * 0.8, grow: 0, fadeIn: 0, fadeOut: 0.5,
+      });
+    }
+    // Bulut: çok sayıda küçük topak; her biri uçağın hızından farklı pay alır, bulut uçuş yönünde uzar (havada infilak
+    // eden uçak yolunda uzun bir is lekesi bırakır). Kimi topak hemen belirir: kara duman ateş topunun içinden çıkar.
+    const life = 20 * this.persist;
+    for (let i = 0, n = this.persist >= 1 ? 22 : 16; i < n; i++) {
+      const d = randDir();
+      this.spawn(_bp.copy(pos).addScaledVector(d, rand(0, 3) * k), {
+        vel: d.multiplyScalar(rand(3, 10) * k + s).add(carry(rand(0.05, 0.7))),
+        size: rand(2.2, 4) * k + rand(0.8, 1.6) * s, life: life * rand(0.8, 1.4),
+        color: 0x6e4a36, end: i % 3 ? PALETTE.smokeDark : PALETTE.smoke, cool: rand(1.5, 2.5), tint: 0.12, grow: 2.6, rise: 0.8,
+        drag: 1.4, alpha: 0.8, fadeIn: (i % 4 ? 0.03 : 0.005) / Math.max(this.persist, 0.4), fadeOut: 0.45,
+      });
+    }
+    for (let i = 0; i < 3; i++) {
+      this.spawn(_bp.copy(pos).addScaledVector(randDir(), rand(0, 3) * k), {
+        vel: carry(0.35), size: (6 + i * 2) * k + 2 * s, life: rand(1.2, 1.8), color: PALETTE.fire[1], end: PALETTE.fire[2],
+        bright: 1.1, glow: true, opaque: 0, soft: true, alpha: 0.4, drag: 1.4, grow: 0.8, fadeIn: 0.1, fadeOut: 0.3,
       });
     }
   }
@@ -459,19 +737,38 @@ export class Effects {
     }
   }
 
+  /** Uçak yere çakıldı: patlama, sonra enkaz yarım dakika ile bir dakika yanar. */
   crash(pos: THREE.Vector3, vis: number): void {
     this.groundExplosion(pos, 10 * Math.min(Math.max(vis, 2), 6));
+    this.burn(pos);
   }
 
-  /** size: 1 ağır flak, 0.5 orta kalibre kendini imha. Patlayan mermi bir anda kara bir duman topu bırakır. */
+  /**
+   * size: 1 ağır flak, 0.5 orta kalibre kendini imha. Patlayan mermi: bir an kırmızı-turuncu flaş, sıcak parça
+   * çizgileri ve keskin kenarlı kara bulut. Bulut ağır topta 20 sn'ye kadar asılı kalır, yavaşça genişleyip incelir ve
+   * rüzgârla kayar (eskiden 2–3 sn'de sönüyordu; bombardıman kolunun geçtiği gök hiç dolmuyordu). Orta kalibrenin
+   * bulutu küçük ve açık gri, 6–9 sn.
+   */
   flak(pos: THREE.Vector3, vis: number, size = 1): void {
+    const heavy = size >= 1;
     const s = Math.min(Math.max(vis, 1), 4) * size;
-    this.spawn(pos, { size: 3 * s, life: 0.15, color: PALETTE.fire[0], bright: 1.5, glow: true, opaque: 0.2, soft: true, fadeIn: 0 });
-    const n = size >= 1 ? 3 : 1;
-    for (let i = 0; i < n; i++) {
-      this.spawn(pos.clone().add(randDir().multiplyScalar(2.5 * s)), {
-        size: rand(3, 5) * s, life: rand(2.2, 3.2) * (size >= 1 ? 1 : 0.6), color: PALETTE.flak, grow: 0.7, drag: 1,
-        alpha: 0.9, fadeIn: 0.02,
+    this.spawn(pos, { size: 3 * s, life: 0.08, color: PALETTE.fire[0], bright: 1.8, glow: true, opaque: 0, soft: true, fadeIn: 0 });
+    // Kırmızı-turuncu parıltı eklemeli: sönerken kahverengi bir leke bırakmasın
+    this.spawn(pos, {
+      size: 3.6 * s, life: 0.2, color: 0xff7a3a, end: PALETTE.fire[2], bright: 1.4, glow: true, opaque: 0, alpha: 0.8, soft: true, fadeIn: 0,
+    });
+    for (let i = 0; i < (heavy ? 5 : 2); i++) {
+      this.spawn(pos, {
+        vel: randDir().multiplyScalar(rand(120, 180)), size: 0.22 * s, life: rand(0.08, 0.14), color: 0xffb060, bright: 1.5,
+        glow: true, opaque: 0, soft: true, stretch: 8, drag: 0.5, grow: 0, fadeIn: 0, fadeOut: 0.3,
+      });
+    }
+    const life = (heavy ? rand(16, 24) : rand(6, 9)) * this.persist;
+    // Ağır topun bulutu bir bombardıman uçağı boyunda (çapı ~8 m, ömür sonunda ~25 m)
+    for (let i = 0, n = heavy ? (this.persist >= 1 ? 4 : 3) : 2; i < n; i++) {
+      this.spawn(_bp.copy(pos).addScaledVector(randDir(), 1.8 * s), {
+        vel: randDir().multiplyScalar(rand(4, 9) * s), drag: 2.5, size: (heavy ? rand(3.6, 5) : rand(2.4, 3.4)) * s, life: life * rand(0.85, 1.15),
+        color: heavy ? PALETTE.flak : 0x8d8a8e, tint: 0.08, grow: heavy ? 2.2 : 1.6, alpha: 0.9, fadeIn: 0.004, fadeOut: 0.35,
       });
     }
   }
@@ -534,22 +831,6 @@ export class Effects {
       _v.set(Math.sin(a), 0.25, Math.cos(a)).multiplyScalar(rand(2, 4) * s);
       this.spawn(_p, { vel: _v, size: 1.4 * s, life: 1.8, color: PALETTE.dust, grow: 2.2, drag: 1.6, rise: 0.2, alpha: 0.4, tint: 0.1, fadeIn: 0.05 });
     }
-  }
-
-  rocketTrail(pos: THREE.Vector3, vis: number): void {
-    this.spawn(pos, { size: 1.2 * Math.min(vis, 5), life: 1.2, color: 0xe9e6ea, grow: 1.5, drag: 2, alpha: 0.7 });
-  }
-
-  smokeTrail(pos: THREE.Vector3, vis: number, kind: 'burning' | 'damaged' | 'leak'): void {
-    if (kind === 'burning') {
-      this.spawn(pos, { size: 2.2 * vis, life: 0.35, color: PALETTE.fire[1], end: PALETTE.fire[2], bright: 1.4, glow: true, fadeIn: 0 });
-    }
-    const leak = kind === 'leak';
-    this.spawn(pos, {
-      size: (kind === 'burning' ? 2.4 : leak ? 0.9 : 1.8) * vis, life: kind === 'burning' ? 2.6 : leak ? 1.1 : 1.6,
-      color: kind === 'burning' ? PALETTE.smokeDark : leak ? 0xeef1f2 : PALETTE.smoke,
-      grow: leak ? 2 : 1.4, rise: 0.5 * vis, alpha: kind === 'burning' ? 0.85 : leak ? 0.45 : 0.6, fadeIn: 0.05,
-    });
   }
 
   /**
@@ -709,7 +990,7 @@ export class RocketViews {
       _s.set(sc, sc, sc);
       _m.compose(r.pos, _q, _s);
       this.mesh.setMatrixAt(i, _m);
-      if (emit) effects.rocketTrail(r.pos, vis);
+      if (emit) effects.trail(r, 0, r.pos, Math.min(vis, 5), 'rocket', r.vel);
     }
     this.mesh.count = n;
     markUsed(this.mesh, n);
@@ -722,12 +1003,41 @@ interface DebrisPiece {
   rot: THREE.Euler;
   spin: THREE.Vector3;
   size: THREE.Vector3;
-  burning: boolean;
-  smoke: number;
+  /** Kalan yanma süresi (sn): yanarken alev ve kara duman izi, sonra bir süre yalnız duman. */
+  burn: number;
+  /** Yanması bittikten sonra duman bırakacağı süre. */
+  smolder: number;
   age: number;
   /** Kopan kanat parçası (ayrı biçim ve renk). */
   wing: boolean;
+  /** Hava direnci (1/sn): ince sac yaprak gibi yavaş düşer. */
+  drag: number;
+  /** Renk (SHARD_COLORS sırası; yanan parça kararmış). */
+  tint: number;
 }
+
+/**
+ * Sac parçası: düzensiz altıgen levha, ortasından bükük (kopmuş kaplama). İki yüzlü, düz gölgeli; boy birim, ölçek örnekte.
+ * Eskiden birim kutuydu: yakından karton kutu gibi duruyordu.
+ */
+function shardGeometry(): THREE.BufferGeometry {
+  const rim: [number, number][] = [[0.5, 0.05], [0.28, 0.42], [-0.12, 0.5], [-0.5, 0.18], [-0.38, -0.36], [0.1, -0.5], [0.42, -0.3]];
+  const pos: number[] = [];
+  // Bükülme: x > 0 yarısı yukarı kalkar
+  const y = (x: number, z: number) => (x > 0 ? x * 0.45 : 0) + z * z * 0.12;
+  for (let i = 0; i < rim.length; i++) {
+    const [ax, az] = rim[i];
+    const [bx, bz] = rim[(i + 1) % rim.length];
+    pos.push(0, 0, 0, ax, y(ax, az), az, bx, y(bx, bz), bz);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Parça renkleri: çıplak alüminyum, boyalı (koyu yeşil, mavi-gri), yanmış koyu. */
+const SHARD_COLORS = [0xb8bcc0, 0x9a9ea3, 0x5f6a48, 0x7d8a96, 0x3d3836].map((c) => new THREE.Color(c));
 
 /**
  * Kopan kanat: uca doğru daralan, incelen ve geriye açılı yassı parça (x açıklık, z veter, y kalınlık; kök x = −0,5).
@@ -769,7 +1079,9 @@ export class Debris {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       return m;
     };
-    this.bits = make(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x77727c, flatShading: true }), max);
+    this.bits = make(shardGeometry(), new THREE.MeshLambertMaterial({ flatShading: true, side: THREE.DoubleSide }), max);
+    this.bits.setColorAt(0, SHARD_COLORS[0]);
+    this.bits.instanceColor!.setUsage(THREE.DynamicDrawUsage);
     // Kanat: boyalı ya da çıplak metal ortalaması, açık gri; iki yüz de görünsün (ince parça döner)
     this.wings = make(wingPieceGeometry(), new THREE.MeshLambertMaterial({ color: 0xb4b7ba, side: THREE.DoubleSide }), WING_MAX);
     this.mesh.add(this.bits, this.wings);
@@ -785,18 +1097,26 @@ export class Debris {
    * count parça; size ≈ parça boyu (m). count = 1 ise kopan kanat: tek büyük levha yerine birkaç ince kanat paneli. Uçağın
    * modeli kanadını yitirmediği için kanat boyunda tek levha (B-17'de 14 × 5 m) gökte koyu bir dikdörtgen gibi duruyordu.
    */
+  /**
+   * Sac parçaları: verilen sayının üç katı, boyun yarısı (çok sayıda küçük parça büyük kutulardan gerçekçi). Yanan
+   * patlamada en çok üç parça yanar ve kollar gibi uzanan duman izi bırakır (hepsi yansa gök dumanla dolardı).
+   */
   spawn(pos: THREE.Vector3, vel: THREE.Vector3, count: number, size: number, burning: boolean): void {
     const wingPiece = count === 1;
-    const n = wingPiece ? 3 + Math.floor(Math.random() * 2) : count;
+    const n = wingPiece ? 3 + Math.floor(Math.random() * 2) : count * 3;
+    let fires = burning ? (wingPiece ? n : Math.min(3, Math.ceil(n * 0.3))) : 0;
     for (let i = 0; i < n && this.pieces.length < this.max; i++) {
-      const v = vel.clone().add(randDir().multiplyScalar(rand(5, 22)));
+      const lit = fires-- > 0;
+      // Yanan parça ağır ve hızlı (yakıtlı gövde parçası), sac hafif
+      const v = vel.clone().add(randDir().multiplyScalar(lit ? rand(18, 35) : rand(5, 22)));
       const s = wingPiece
         ? new THREE.Vector3(size * rand(0.16, 0.28), Math.max(0.06, size * 0.008), size * rand(0.09, 0.15))
-        : new THREE.Vector3(rand(0.5, 1.3), rand(0.2, 0.6), rand(0.5, 1.5)).multiplyScalar(size);
+        : new THREE.Vector3(rand(0.6, 1.4), rand(0.6, 1.2), rand(0.5, 1.1)).multiplyScalar(size * (lit ? 0.7 : 0.5));
       this.pieces.push({
         pos: pos.clone().add(randDir().multiplyScalar(size * 0.3)), vel: v, rot: new THREE.Euler(rand(0, 6), rand(0, 6), rand(0, 6)),
-        spin: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), size: s, burning: burning && (wingPiece || Math.random() < 0.6),
-        smoke: Math.random() * 0.1, age: 0, wing: wingPiece,
+        spin: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), size: s,
+        burn: lit ? rand(3, 8) : 0, smolder: lit ? rand(2, 5) : 0, age: 0, wing: wingPiece,
+        drag: wingPiece ? 0.5 : lit ? 0.3 : 0.9, tint: lit ? 4 : Math.floor(Math.random() * 4),
       });
     }
   }
@@ -806,21 +1126,21 @@ export class Debris {
     for (const p of this.pieces) {
       p.age += dt;
       // Parçalar hızla yavaşlar (yüksek sürükleme), sonra düşer
-      p.vel.multiplyScalar(Math.exp(-0.5 * dt));
+      p.vel.multiplyScalar(Math.exp(-p.drag * dt));
       p.vel.y -= G * dt;
       p.pos.addScaledVector(p.vel, dt);
       p.rot.x += p.spin.x * dt;
       p.rot.y += p.spin.y * dt;
       p.rot.z += p.spin.z * dt;
-      if (emit && p.burning) {
-        p.smoke -= dt;
-        if (p.smoke <= 0) {
-          p.smoke = 0.12;
-          effects.smokeTrail(p.pos, Math.min(scale, 6) * 0.7, p.age < 6 ? 'burning' : 'damaged');
-        }
+      if (emit && (p.burn > 0 || p.smolder > 0)) {
+        if (p.burn > 0) p.burn -= dt;
+        else p.smolder -= dt;
+        // İnce kol: ana bulutun yanında yanan parçanın izi ince kalır
+        effects.trail(p, 0, p.pos, Math.min(scale, 6) * 0.4, p.burn > 0 ? 'burning' : 'damaged', p.vel);
       }
       if (p.pos.y <= groundLevel(p.pos.x, p.pos.z) || p.age > 90) {
-        if (emit) effects.groundHit(p.pos, Math.min(scale, 4), false);
+        // Küçük sac sessizce düşer; büyük ve yanan parça toz kaldırır
+        if (emit && (p.wing || p.tint === 4 || Math.random() < 0.3)) effects.groundHit(p.pos, Math.min(scale, 4), false);
         continue;
       }
       this.pieces[w++] = p;
@@ -837,7 +1157,10 @@ export class Debris {
       _m.compose(p.pos, _q, _s);
       if (p.wing) {
         if (nw < WING_MAX) this.wings.setMatrixAt(nw++, _m);
-      } else this.bits.setMatrixAt(nb++, _m);
+      } else {
+        this.bits.setColorAt(nb, SHARD_COLORS[p.tint]);
+        this.bits.setMatrixAt(nb++, _m);
+      }
     }
     this.bits.count = nb;
     this.wings.count = nw;

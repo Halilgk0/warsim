@@ -16,13 +16,15 @@ import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
 import { TerrainView, waterU } from './terrain';
 import { StructureView, placeKeyOf, structureRing, viewRadius } from './structures';
-import { buildAircraftModel, buildStoreMeshes, propU, requestSkin, type AircraftModel } from './models';
+import { WRECK_PARTS, buildAircraftModel, buildStoreMeshes, fractureModel, propU, requestSkin, type AircraftModel, type WreckPart } from './models';
+import { Wrecks } from './wreck';
+import type { SimEvent } from '../sim/world';
 import { Scenery } from './scenery';
 import { DecorLayer } from './decor';
 import { FarmLayer } from './farms';
 import { bombGeometry } from './munitions';
 import { computeLandcover, setClearings } from './landcover';
-import { Debris, Effects, ParachuteViews, RocketViews, Tracers } from './effects';
+import { Debris, Effects, ParachuteViews, RocketViews, Tracers, type TrailKind } from './effects';
 import { PALETTE } from './palette';
 import { Atmosphere, FIXED_HOUR, dayHour } from './atmosphere';
 import { ShadowRig } from './shadows';
@@ -54,7 +56,6 @@ interface AircraftView {
   trailHead: number;
   trailCount: number;
   lastSample: number;
-  lastSmoke: number;
   lastMuzzle: number;
   trailColor: THREE.Color;
   label: HTMLDivElement;
@@ -67,6 +68,9 @@ interface AircraftView {
   skinReady: boolean;
   /** Hareketli parçaların o anki konumu (rad; takım 0 kalkık … 1 inik): kumandaya yumuşakça yaklaşır. */
   surf: { ail: number; ele: number; rud: number; flap: number; brake: number; gear: number; chk: number };
+  /** Parçalanmış uçak (kanadı ya da kuyruğu koptu): ana ağlar parçalara bölündü, kopanlar gizli. */
+  broken?: Set<WreckPart>;
+  parts?: Partial<Record<WreckPart, THREE.Group>>;
 }
 
 const _jq = new THREE.Vector3(0, 1, 0);
@@ -109,6 +113,7 @@ export interface Ghost {
 
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
+const _acVel = new THREE.Vector3();
 const _aaDir = new THREE.Vector3();
 const _aaGround = new THREE.Vector3();
 const _m = new THREE.Matrix4();
@@ -194,6 +199,8 @@ export class GameRenderer {
   private tracers = new Tracers();
   private rockets = new RocketViews();
   private debris = new Debris();
+  /** Parçalanan uçakların düşen parçaları (uçağın kendi modelinden). */
+  private wrecks = new Wrecks();
   private contrails = new Contrails();
   private chutes = new ParachuteViews();
   /** Uzak görünümde uçak simgeleri (takım renginde yön okları). */
@@ -252,7 +259,7 @@ export class GameRenderer {
     this.farms = new FarmLayer(this.scene);
     this.scene.add(this.structGroup, this.effects.mesh, this.tracers.mesh, this.rockets.mesh, this.ghostGroup, this.aaRings);
     this.scene.add(this.roadLayer.mesh, this.roadGhostView.mesh, this.buildGrid.mesh, this.footprint.mesh, this.fireRing.line, this.traffic.group);
-    this.scene.add(this.debris.mesh, this.chutes.group, this.contrails.mesh);
+    this.scene.add(this.debris.mesh, this.wrecks.group, this.chutes.group, this.contrails.mesh);
     // Ok biçimli simge: burun +Z, XZ düzleminde
     const arrow = new THREE.Shape();
     arrow.moveTo(0, 1);
@@ -405,6 +412,7 @@ export class GameRenderer {
     this.effects.clear();
     this.contrails.clear();
     this.debris.clear();
+    this.wrecks.clear();
     this.coverageKey = '';
     this.aaKey = '';
     this.world = world;
@@ -475,12 +483,14 @@ export class GameRenderer {
     this.syncBombs(w, ms);
     this.consumeEvents(w, vis);
     this.debris.update(simDt, this.effects, simDt > 0 && settings.map.effects, ms);
+    this.wrecks.group.visible = settings.map.effects;
+    this.wrecks.update(simDt, this.effects, settings.map.effects, ms, vis);
     this.chutes.update(w.parachutes, ms);
     this.tracers.mesh.visible = settings.map.tracers;
     if (settings.map.tracers) this.tracers.update(w.bullets, settings.tracerScale, this.camera, this.renderer.domElement.clientHeight);
     this.rockets.update(w.rockets, vis, this.effects, simDt > 0 && settings.map.effects);
     this.effects.mesh.visible = settings.map.effects;
-    this.effects.update(simDt, this.camera);
+    this.effects.update(simDt, this.camera, simDt > 0 && settings.map.effects, vis);
     this.syncOverlays(w);
     this.updateLabels(ms);
     if (!draw) return;
@@ -791,7 +801,7 @@ export class GameRenderer {
     return {
       ac, root, model, stores, shadow, trail, ip: ac.pos.clone(), iq: ac.quat.clone(),
       trailBuf: new Float32Array(TRAIL_N * 3), trailHead: 0, trailCount: 0,
-      lastSample: -1, lastSmoke: -1, lastMuzzle: -1,
+      lastSample: -1, lastMuzzle: -1,
       trailColor: this.teamColors[ac.team] ?? this.teamColors[0],
       label, visible: true, fine: true, lod: false,
       skinReady: this.modelDetail ? requestSkin(ac.spec.model) : true,
@@ -801,6 +811,11 @@ export class GameRenderer {
 
   /** Blender modeli yüklenince uçağın modelini yerinde yenile (iz, etiket ve gölge kalır). */
   private remodel(v: AircraftView): void {
+    // Parçalanmış uçak yeni modelle bütünlenmesin
+    if (v.broken) {
+      v.skinReady = true;
+      return;
+    }
     v.root.remove(v.model.root);
     const model = buildAircraftModel(v.ac.spec.model, { detail: this.modelDetail });
     const stores = buildStoreMeshes(v.ac.spec.model, v.ac.spec, v.ac.stores.slots, this.modelDetail);
@@ -912,13 +927,8 @@ export class GameRenderer {
         const burning = ac.status === 'falling' || d.fire > 0;
         const damaged = Math.max(...d.engines) > 0.3 || ac.hp < ac.hpMax * 0.5 || d.heat > 0.6;
         const leak = d.fuelLeak > 0.4;
-        if (burning || damaged || leak) {
-          const interval = burning ? 0.1 : 0.16;
-          if (w.time - v.lastSmoke > interval) {
-            v.lastSmoke = w.time;
-            this.effects.smokeTrail(ac.pos, Math.max(ms, Math.min(vis, 8) * 0.6), burning ? 'burning' : damaged ? 'damaged' : 'leak');
-          }
-        }
+        // Her karede: iz mesafeyle atılır (effects.ts trail), alev titrer
+        if (burning || damaged || leak) this.damageSmoke(v, scale, Math.max(ms, Math.min(vis, 8) * 0.6), burning, leak);
         if (w.time - v.lastMuzzle > 0.07) {
           if (ac.firing) {
             // Çizilen uçağın (ara konum ve yön) burnunda: simülasyon konumu bir adım önde olabilir, alev burnun önünde kalıyordu
@@ -1351,13 +1361,131 @@ export class GameRenderer {
     }
   }
 
+  /**
+   * Hasarlı uçağın dumanı ve alevi gerçek yerinden (2026-11-21; eskiden hep gövdenin ortasından): yanan ya da hasarlı
+   * motor kendi egzozundan (çok motorluda o motordan), depo yangını ve yakıt sızıntısı kanat kökünden, gövde hasarı
+   * ortadan. Düşen uçak gövdesiyle birlikte yanar. Her kaynak kendi izi (yuva: 0 yangın, 1 düşen gövde, 2+ motorlar,
+   * 10 gövde hasarı, 11 sızıntı); alev uçağın hızından geriye uzanır.
+   */
+  private damageSmoke(v: AircraftView, scale: number, size: number, burning: boolean, leak: boolean): void {
+    const ac = v.ac;
+    const d = ac.damage;
+    const vel = ac.velocity(_acVel);
+    const trail = (slot: number, p: THREE.Vector3, s: number, kind: TrailKind) => this.effects.trail(v, slot, p, s, kind, vel);
+    const em = v.model.emitters;
+    const half = ac.spec.span / 2;
+    // Model ekseninde nokta → dünya (model büyütmesiyle)
+    const at = (x: number, y: number, z: number) => _w.set(x, y, z).multiplyScalar(scale).applyQuaternion(v.iq).add(v.ip);
+    const engineAt = (i: number) => {
+      const e = em.length === d.engines.length ? em[i] : em[0];
+      return e ? at(e.x, e.y, e.z + (em.length > 1 ? 1.5 : 0)) : at(0, 0, 0);
+    };
+    // Yanan parçanın yanı (sol +x): uçak kimliğinden, hep aynı kanat
+    const wingSide = ac.id % 2 ? 1 : -1;
+    let worst = 0;
+    d.engines.forEach((e, i) => {
+      if (e > d.engines[worst]) worst = i;
+    });
+    if (d.fire > 0) trail(0, d.fireSource === 'engine' ? engineAt(worst) : at(wingSide * half * 0.22, 0, 0), size, 'burning');
+    else if (burning) trail(1, at(0, 0, 0), size, 'burning');
+    let engineSmoke = false;
+    d.engines.forEach((e, i) => {
+      if (e <= 0.3) return;
+      engineSmoke = true;
+      trail(2 + i, engineAt(i), size * (0.7 + 0.3 * e), 'damaged');
+    });
+    if (!engineSmoke && !burning && (ac.hp < ac.hpMax * 0.5 || d.heat > 0.6)) trail(10, at(0, 0, 0), size, 'damaged');
+    if (leak) trail(11, at(-wingSide * half * 0.3, 0, -0.5), size, 'leak');
+  }
+
+  /**
+   * Uçak parçalanması (world.ts breakup): kanat ya da kuyruk kopunca uçağın görüntüsü parçalara bölünür ve kopan parça
+   * ayrı düşer; havada infilakta bütün parçalar dağılır. Parçalar uçağın kendi modelinden (models.ts fractureModel).
+   */
+  private breakup(e: Extract<SimEvent, { kind: 'breakup' }>): void {
+    const v = this.views.get(e.id);
+    const pos = v ? v.ip : e.pos;
+    const quat = v ? v.iq : e.quat;
+    const scale = this.rig.modelScale;
+    const detail = this.modelDetail;
+    const fr = fractureModel(e.model, detail);
+    const r = () => Math.random() * 2 - 1;
+    const kick = (part: WreckPart, out: number) => {
+      const pc = fr.parts[part];
+      const dir = pc && pc.center.lengthSq() > 0.25 ? _w.copy(pc.center).normalize().applyQuaternion(quat) : _w.set(r(), r(), r()).normalize();
+      return e.vel.clone().multiplyScalar(0.85).addScaledVector(dir, out).add(new THREE.Vector3(r(), r(), r()).multiplyScalar(4));
+    };
+    const spinOf = (part: WreckPart, k: number) => new THREE.Vector3(r(), r(), r()).normalize().multiplyScalar((part === 'body' ? 0.5 + Math.random() : 1.5 + 2.5 * Math.random()) * k);
+    if (e.mode === 'explode') {
+      for (const part of WRECK_PARTS) {
+        this.wrecks.spawn(e.model, detail, part, pos, quat, scale, kick(part, 6 + Math.random() * 12), spinOf(part, 1), part === 'body' ? 6 + Math.random() * 6 : 2 + Math.random() * 5);
+      }
+      return;
+    }
+    const part: WreckPart = e.mode === 'tail' ? 'tail' : e.side > 0 ? 'wingL' : 'wingR';
+    if (v) this.breakView(v, part);
+    this.wrecks.spawn(e.model, detail, part, pos, quat, scale, kick(part, 3 + Math.random() * 4), spinOf(part, 1.3), e.fire ? 4 + Math.random() * 4 : 0);
+  }
+
+  /** Uçağın görüntüsünden bir parçayı çıkar: ana ağlar parçalara bölünür (ilk kırılmada), kopan parça ve eklemleri gizlenir. */
+  private breakView(v: AircraftView, lost: WreckPart): void {
+    if (v.broken?.has(lost)) return;
+    const m = v.model;
+    const fr = fractureModel(v.ac.spec.model, this.modelDetail);
+    if (!v.broken) {
+      const base = new Set<THREE.Object3D>(m.base);
+      for (const b of m.base) m.root.remove(b);
+      m.fine = m.fine.filter((o) => !base.has(o));
+      m.lods = m.lods.filter((l) => !base.has(l.mesh));
+      v.parts = {};
+      for (const part of WRECK_PARTS) {
+        const pc = fr.parts[part];
+        if (!pc) continue;
+        const g = new THREE.Group();
+        for (const mm of pc.meshes) {
+          if (mm.joint) continue;
+          const mesh = new THREE.Mesh(mm.geo, mm.mat);
+          if (mm.fine) {
+            mesh.visible = v.fine;
+            m.fine.push(mesh);
+          }
+          g.add(mesh);
+        }
+        m.root.add(g);
+        v.parts[part] = g;
+      }
+      // Pervane diski bütün motorları tek ağda taşır: kırık uçakta palalar görünür (motorlar zaten yavaşladı)
+      if (m.disc) {
+        m.root.remove(m.disc);
+        m.disc = null;
+      }
+      v.broken = new Set();
+    }
+    v.broken.add(lost);
+    const g = v.parts?.[lost];
+    if (g) g.visible = false;
+    const gone = new Set<THREE.Object3D>();
+    for (const [name, part] of Object.entries(fr.jointPart)) {
+      const j = m.joints[name];
+      if (part === lost && j) {
+        j.visible = false;
+        gone.add(j);
+      }
+    }
+    m.props = m.props.filter((p) => !gone.has(p));
+    m.fine = m.fine.filter((o) => !gone.has(o));
+  }
+
   private consumeEvents(w: World, vis: number): void {
     const fx = settings.map.effects;
     for (const e of w.events) {
       if (!fx) continue;
       switch (e.kind) {
+        case 'breakup':
+          this.breakup(e);
+          break;
         case 'airExplosion':
-          this.effects.airExplosion(e.pos, Math.min(vis, 12), e.size);
+          this.effects.airExplosion(e.pos, Math.min(vis, 12), e.size, e.vel);
           break;
         case 'debris':
           this.debris.spawn(e.pos, e.vel, e.count, e.size, e.burning);

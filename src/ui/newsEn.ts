@@ -15,6 +15,47 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'hasar-duman': {
+    title: 'Aircraft now break apart: new damage, smoke and explosions',
+    summary: 'An aircraft that loses a wing or its tail now breaks apart along its own model, and an aircraft that explodes in mid-air scatters its pieces. Smoke leaves an unbroken trail, flak bursts hang in the sky and downed aircraft burn on the ground. Problems reported by players are fixed too.',
+    files: ['hasar-kiyas-en.webp', 'hasar-kanat.webp', 'hasar-motor.webp', 'hasar-flak.webp'],
+    captions: [
+      'Mid-air explosion: old on the left, new on the right.',
+      'A He 111 loses a wing: the wing falls away with its engine and propeller.',
+      'A He 111 with a burning engine: the flame streams back, the smoke turns from brown to black.',
+      'Flak bursts hanging around a bomber formation.',
+    ],
+    sections: [
+      {
+        heading: 'Breaking apart',
+        bullets: [
+          'When a wing comes off, it falls away with its engine and propeller and the aircraft rolls the other way. When the tail comes off, the tail unit separates.',
+          'An aircraft that explodes in mid-air scatters its fuselage, wings, tail and propeller. Burning pieces leave smoke trails behind them.',
+          'The pieces keep the aircraft’s own paint. The fuselage falls fast, a wing flutters down like a leaf, and pieces explode when they hit the ground.',
+        ],
+      },
+      {
+        heading: 'Smoke, fire and explosions',
+        bullets: [
+          'Smoke is now an unbroken trail instead of separate puffs. Flames stream back and flicker from the engine or the wing root; a fuel leak leaves its own white trail.',
+          'Mid-air explosions: a flash, a fireball, sparks and a cloud that hangs for half a minute.',
+          'Flak bursts stay in the sky for up to 20 seconds. A flak hit throws sparks and small pieces off the aircraft.',
+          'A crashed aircraft burns for a while and its smoke column leans with the wind. Debris pieces are bent metal sheets, not boxes.',
+          'How long clouds and fires last depends on graphics quality, so phones keep their frame rate.',
+        ],
+      },
+      {
+        heading: 'Fixed after player reports',
+        text: ['Thank you to the players who wrote to us.'],
+        bullets: [
+          'Flights no longer turn back as a whole: an aircraft low on fuel returns alone and the rest stay on the mission. After the target goes down, the flight patrols its area for 3 minutes. The reason for returning is shown on screen.',
+          'An anti-aircraft battery’s panel shows how many aircraft it has hit and shot down.',
+          'Flights heading for a target guarded by anti-aircraft guns no longer circle the battery; they reach the target.',
+          'Jets now turn-fight other jets more often and shoot them down more often. Jets attack defended bombers in slashing passes instead of sitting in front of the tail gunner.',
+        ],
+      },
+    ],
+  },
   'modeller-doku': {
     title: 'Aircraft and flak guns get new textures',
     summary: 'All 51 aircraft in the research tree and all 15 anti-aircraft guns are now textured, with paint, rivets and wear. When the guns fire, flame and smoke leave the muzzle and dust rises around the heavy guns.',

@@ -175,6 +175,9 @@ export class Aircraft {
   flakTime = -1e9;
   /** Hafif uçaksavarın izli mermileriyle son ateş altında kalma (kaçamak için). */
   aaFireTime = -1e9;
+  /** Uçaksavar menzilini kesintisiz dolanmaya başladığı an (yoksa −1) ve dolanmayı bırakıp doğrudan gideceği son an. */
+  aaAvoidSince = -1;
+  aaPressUntil = -1e9;
   airframe: Airframe | null = null;
   flight: FlightGroup | null = null;
   /** Kol içindeki sıra (0 = lider). */

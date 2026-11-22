@@ -314,7 +314,7 @@ export class Brain {
       return;
     }
     headingWithAlt(cmd.dir, ac, dx, dz, Math.max(base.s.pos.y + 900, Math.min(ac.pos.y, 2500)));
-    avoidAA(ac, world, cmd.dir, null);
+    avoidAA(ac, world, cmd.dir, null, base.s.pos);
     flakWeave(ac, world, cmd.dir);
     cmd.speed = ac.spec.cruiseSpeed;
     cmd.maxG = 2.5;
@@ -403,7 +403,7 @@ export class Brain {
       terrainFollow(cmd.dir, ac, dx, dz, p.agl);
       cmd.minAlt = p.agl * 0.6;
     } else headingWithAlt(cmd.dir, ac, dx, dz, p.altitude);
-    avoidAA(ac, world, cmd.dir, world.planTargetPos(p));
+    avoidAA(ac, world, cmd.dir, world.planTargetPos(p), wp);
     flakWeave(ac, world, cmd.dir);
     cmd.speed = this.flightSpeed(ac, fl, world);
     cmd.maxG = 2.5;
@@ -431,7 +431,7 @@ export class Brain {
       terrainFollow(cmd.dir, ac, dx, dz, p.agl);
       cmd.minAlt = p.agl * 0.6;
     } else headingWithAlt(cmd.dir, ac, dx, dz, Math.max(base.s.pos.y + 1200, Math.min(p.altitude, 3500)));
-    avoidAA(ac, world, cmd.dir, null);
+    avoidAA(ac, world, cmd.dir, null, base.s.pos);
     flakWeave(ac, world, cmd.dir);
     cmd.speed = this.flightSpeed(ac, fl);
     cmd.maxG = 2.5;
