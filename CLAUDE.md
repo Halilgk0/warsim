@@ -178,6 +178,9 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       - Taşıma ve döndürme: belediye dışındaki şehir binaları (`structure.ts` `MOVABLE_KINDS`), panelde "Taşı / döndür"
         (`game.beginMove`, `world.checkMove` / `moveStructure`). Bedel kuruluşun beşte biri; durum aynen kalır. Taşırken R
         tam tur döner. Görünüm yer ya da yön değişince yeniden kurulur (`render/structures.ts` `placeKeyOf`).
+    - Yıkım (2026-11-23, `world.demolishStructure`, panelde iki dokunuşla "Yık" / "Yıkıntıyı kaldır"): hava üssü, fabrika ve
+      belediye dışındaki kendi yapısı listeden çıkar, yeri boşalır; sağlamsa bedelin dörtte biri (inşaat ve sağlamlık oranıyla)
+      döner (`demolishRefund`). Kimlikle tutulan bağlar yapıyı bulamayınca bırakır; görünüm, halka ve etiketi `syncStructures` temizler.
     - Fabrika teslim üssü (2026-11-20, `factory.ts` `deliverTo`, kayda yazılır): üretim penceresinde fabrika başına seçilir
       (birden çok üs varken). Seçilmemişse bağlı olduğu üs, o da yoksa en yakın üs; hangar doluysa en yakın boş üs. Üst
       çubuktaki Üretim seçili fabrikayı ya da seçili üssün fabrikasını açar (`modals.ts` `toggleFactory`).

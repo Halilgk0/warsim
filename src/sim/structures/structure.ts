@@ -22,6 +22,8 @@ export const CITY_KINDS: StructureKind[] = ['townhall', 'firestation', 'smallhou
  * madenin damarı, bataryanın yuvaları ve üssün pisti yerine bağlı olduğu için onlar taşınmaz.
  */
 export const MOVABLE_KINDS: ReadonlySet<StructureKind> = new Set<StructureKind>(['firestation', 'smallhouse', 'midhouse', 'house', 'apartment', 'park']);
+/** Oyuncunun yıkamayacağı yapılar (2026-11-23): hava üssü, fabrika ve kasabanın kökü belediye. Ötekiler yıkılıp kaldırılır. */
+export const KEEP_KINDS: ReadonlySet<StructureKind> = new Set<StructureKind>(['airbase', 'factory', 'townhall']);
 export const ROAD_KINDS: ReadonlySet<StructureKind> = new Set<StructureKind>(['smallhouse', 'midhouse', 'house', 'apartment', 'firestation']);
 export const MILITARY_KINDS: StructureKind[] = ['airbase', 'aa', 'radar', 'factory'];
 export const ECONOMY_KINDS: StructureKind[] = ['mine'];

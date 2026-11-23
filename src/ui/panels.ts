@@ -3,7 +3,7 @@
 
 import type { Game } from '../game';
 import type { Structure } from '../sim/structures/structure';
-import { MOVABLE_KINDS, STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
+import { KEEP_KINDS, MOVABLE_KINDS, STRUCTURE_DEFS, STRUCT_GLYPH } from '../sim/structures/structure';
 import { AA_WEAPONS, AA_SENSORS, type AASensorId, type AAWeaponId, type UpgradeOption } from '../sim/structures/airDefense';
 import { BASE_UPGRADES, type BaseUpgrade } from '../sim/structures/airbase';
 import { RADAR_LEVELS } from '../sim/structures/radar';
@@ -26,6 +26,8 @@ export class LeftPanel {
   private el = $('left');
   private next = 0;
   private lastKey = '';
+  /** Yıkım iki dokunuşla: ilki sorar, aynı yapıda ikincisi yıkar. */
+  private demolishAsk: { id: number; at: number } | null = null;
 
   constructor(private readonly game: Game) {
     this.el.addEventListener('click', (e) => this.onClick(e));
@@ -218,7 +220,18 @@ export class LeftPanel {
       ${s.build < 1 ? bar(s.build * 100, 'var(--warn)') : bar((s.hp / s.maxHp) * 100, hpColor((s.hp / s.maxHp) * 100))}
       ${this.repairRow(s)}
       ${s.team === this.game.playerTeam && !s.destroyed && MOVABLE_KINDS.has(s.kind)
-    ? `<button class="wide" data-act="move-struct" title="${L('Binayı başka yere taşı ya da yönünü değiştir (ızgara kapalıyken R ile döner)', 'Move the building or change its facing (with the grid off it turns with R)')}">⇄ ${L('Taşı / döndür', 'Move / rotate')}${this.game.world.economyEnabled ? ` · ${fmtMoney(this.game.world.moveCost(s))}` : ''}</button>` : ''}`;
+    ? `<button class="wide" data-act="move-struct" title="${L('Binayı başka yere taşı ya da yönünü değiştir (ızgara kapalıyken R ile döner)', 'Move the building or change its facing (with the grid off it turns with R)')}">⇄ ${L('Taşı / döndür', 'Move / rotate')}${this.game.world.economyEnabled ? ` · ${fmtMoney(this.game.world.moveCost(s))}` : ''}</button>` : ''}
+      ${this.demolishRow(s)}`;
+  }
+
+  /** Yık / kaldır (hava üssü, fabrika ve belediye hariç): ilk dokunuş sorar, ikincisi yıkar; sağlam binada bedelin bir kısmı döner. */
+  private demolishRow(s: Structure): string {
+    if (s.team !== this.game.playerTeam || KEEP_KINDS.has(s.kind)) return '';
+    const back = this.game.world.demolishRefund(s);
+    const ask = this.demolishAsk?.id === s.id;
+    const label = s.destroyed ? L('Yıkıntıyı kaldır', 'Clear the ruins') : L('Yık', 'Demolish');
+    const money = back > 0 ? ` · +${fmtMoney(back)}` : '';
+    return `<button class="wide ${ask ? 'danger' : ''}" data-act="demolish" title="${L('Yapıyı kaldırır, yeri boşalır. Geri alınamaz.', 'Removes the structure and frees its spot. Cannot be undone.')}">${ask ? L('Emin misin? Yeniden dokun', 'Sure? Tap again') : `✕ ${label}${money}`}</button>`;
   }
 
   /** Kendi hasarlı yapımız: onarım düğmesi ya da sürüp giden onarımın durumu. */
@@ -586,6 +599,16 @@ export class LeftPanel {
         break;
       case 'move-struct':
         if (s) g.beginMove(s);
+        break;
+      case 'demolish':
+        if (!s) break;
+        if (this.demolishAsk?.id === s.id) {
+          this.demolishAsk = null;
+          if (g.world.demolishStructure(s)) g.selectStructure(null);
+        } else {
+          this.demolishAsk = { id: s.id, at: performance.now() };
+          this.lastKey = '';
+        }
         break;
       case 'fire-up':
         if (s?.fire) g.world.startFireUpgrade(s);

@@ -14,7 +14,7 @@ import { FlightGroup } from './ai/flightGroup';
 import { MISSION_NAMES, TASK_NAMES, TASK_SPLIT, defaultLoadout, type FlightTask, type MissionPlan, type MissionType, type Roe } from './ai/missions';
 import type { FormationType } from './ai/formation';
 import type { BeltId } from './aircraft/ammo';
-import { MOVABLE_KINDS, ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
+import { KEEP_KINDS, MOVABLE_KINDS, ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
 import {
   GRID, LOT_LINE, ROAD_MAX, ROAD_MIN, ROAD_REACH, ROAD_SLOPE, ROAD_VERGE, TOWN_ROAD, lotAt, nearestRoad, projectOnRoad, roadComponents, roadHitsRect, type Road,
 } from './roads';
@@ -1215,6 +1215,30 @@ export class World {
     s.pos.set(x, chk.elevation, z);
     s.heading = headingRad;
     this.log(L(`${s.name} taşındı`, `${s.name} moved`), s.team, 'build');
+    return true;
+  }
+
+  /** Yıkımda geri dönen para: kuruluş bedelinin dörtte biri, inşaat oranı ve sağlamlıkla; yıkıntıda yok. */
+  demolishRefund(s: Structure): number {
+    if (!this.economyEnabled || s.destroyed) return 0;
+    return Math.round((STRUCTURE_COST[s.kind] * 0.25 * s.build * (s.hp / s.maxHp)) / 10) * 10;
+  }
+
+  canDemolish(s: Structure): boolean {
+    return !KEEP_KINDS.has(s.kind) && this.structures.includes(s);
+  }
+
+  /**
+   * Yapıyı yık ve kaldır (2026-11-23; hava üssü, fabrika ve belediye hariç): listeden çıkar, yeri boşalır (arazi düz
+   * kalır). Kimlikle tutulan bağlar (görev hedefi, itfaiye ekibi) yapıyı bulamayınca kendiliğinden bırakır; ev kapasitesi
+   * ve kadro her adımda yapılardan sayılır.
+   */
+  demolishStructure(s: Structure): boolean {
+    if (!this.canDemolish(s)) return false;
+    const back = this.demolishRefund(s);
+    this.structures.splice(this.structures.indexOf(s), 1);
+    if (back > 0) this.earn(s.team, back, `${L('Yıkım', 'Demolition')}: ${s.def.name}`, 'refund');
+    this.log(L(`${s.name} yıkıldı`, `${s.name} demolished`), s.team, 'build');
     return true;
   }
 

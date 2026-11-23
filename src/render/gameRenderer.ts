@@ -697,6 +697,22 @@ export class GameRenderer {
       }
       if (!v && this.wantsView(s, pxPerM)) missing.push(s);
     }
+    // Yıkılıp kaldırılan yapı (oyuncunun yıkımı, world.demolishStructure): görünümü, halkası ve etiketi gider
+    if (this.knownStructs.size > w.structures.length) {
+      const alive = new Set(w.structures.map((s) => s.id));
+      for (const id of this.knownStructs) {
+        if (alive.has(id)) continue;
+        this.knownStructs.delete(id);
+        const v = this.structViews.get(id);
+        if (v) this.structGroup.remove(v.group);
+        this.structViews.delete(id);
+        const r = this.structRings.get(id);
+        if (r) this.scene.remove(r);
+        this.structRings.delete(id);
+        this.structLabels.get(id)?.remove();
+        this.structLabels.delete(id);
+      }
+    }
     if (missing.length) {
       const t0 = performance.now();
       missing.sort((a, b) => cam.position.distanceToSquared(a.pos) - cam.position.distanceToSquared(b.pos));
