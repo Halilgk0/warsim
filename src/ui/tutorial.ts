@@ -163,6 +163,8 @@ const TOPICS: Topic[] = [
       ['bHomes', () => L('Ev çeşitleri ve personel', 'Home types and personnel')],
       ['bRoad', () => L('Yol çizme', 'Drawing roads')],
       ['bPark', () => L('Park ve ızgara', 'Parks and the grid')],
+      ['bHome', () => L('Bir evini seçme', 'Selecting one of your homes')],
+      ['bDemolish', () => L('Taşıma ve yıkım', 'Moving and demolishing')],
       ['town', () => L('Belediye ve kasaba', 'Town hall and town')],
     ],
   },
@@ -784,6 +786,12 @@ export class Tutorial {
   }
 
   /** Oyuncunun bu türden ilk sağlam yapısı. */
+  /** Oyuncunun ilk ev türü (yıkım adımı için); evi yoksa 'house'. */
+  private homeKind(): string {
+    for (const k of ['house', 'midhouse', 'smallhouse', 'apartment']) if (this.own(k)) return k;
+    return 'house';
+  }
+
   private own(kind: string): import('../sim/structures/structure').Structure | null {
     const g = this.game;
     return g.world.structures.find((s) => s.team === g.playerTeam && s.kind === kind && !s.destroyed) ?? null;
@@ -1237,6 +1245,30 @@ export class Tutorial {
         text: () => L(
           'Park kira getirmez ama 300 m yakınındaki evlerin kirasını %10 artırır. Yerleştirirken alttaki Izgara düğmesi (X) ızgarayı açıp kapatır: kapalıyken bina serbest konur.',
           'A park pays no rent but raises the rent of homes within 300 m by 10%. While placing, the Grid button at the bottom (X) turns the grid on and off: with it off, buildings go anywhere.',
+        ),
+      },
+      {
+        // Yıkım (2026-11-23): kamera oyuncunun evlerinden birine gider, panelde Taşı / döndür ve Yık
+        id: 'bHome', ch: 'grow', deep: true,
+        enter: () => this.flyToOwn(this.homeKind(), 320),
+        target: () => {
+          const h = this.own(this.homeKind());
+          return h ? this.worldRect(h.pos, 25) : null;
+        },
+        done: () => !this.own(this.homeKind()) || g.selectedStructureId === this.own(this.homeKind())?.id,
+        text: () => this.own(this.homeKind())
+          ? L(`Bu senin evlerinden biri: üstüne ${tap()}.`, `This is one of your homes: ${tap()} it.`)
+          : L('Henüz evin yok. Kasabana ev kurunca bir sonraki adımda anlattığımız düğmeler panelinde olur.', 'You have no homes yet. Once you build one, its panel has the buttons the next step explains.'),
+      },
+      {
+        id: 'bDemolish', ch: 'grow', deep: true,
+        enter: () => {
+          if (this.own(this.homeKind())) g.layout.reveal('left');
+        },
+        target: () => (this.own(this.homeKind()) ? visible('#left [data-act="demolish"]') ?? visible('#left') : null),
+        text: () => L(
+          'Panelde iki düğme var. "Taşı / döndür" binayı başka yere taşır. "Yık" binayı kaldırır ve yerini boşaltır: ilk dokunuş sorar, ikincisi yıkar. Sağlam binada bedelin dörtte biri geri döner. Ev yıkılınca personelin de azalır. Hava üssü, fabrika ve belediye yıkılamaz.',
+          'The panel has two buttons. "Move / rotate" moves the building elsewhere. "Demolish" removes it and frees its spot: the first tap asks, the second demolishes. An intact building returns a quarter of its cost. Demolishing a home also lowers your personnel. Airbases, factories and the town hall cannot be demolished.',
         ),
       },
       {

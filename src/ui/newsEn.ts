@@ -15,6 +15,36 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'katki-puani': {
+    title: 'Report bugs, send suggestions: earn contribution points and ranks',
+    summary: 'The feedback window is new. Choose whether your message is a bug report or a suggestion and ask for it to be reviewed. Verified bug reports and accepted suggestions earn you contribution points, and your points take you up through the ranks.',
+    files: ['katki-tur-en.webp', 'katki-soru-en.webp'],
+    captions: [
+      'First choose the type of your message: bug report or suggestion.',
+      'When you tap Send, you are asked whether you want it reviewed.',
+    ],
+    sections: [
+      {
+        heading: 'How it works',
+        bullets: [
+          'Open Feedback from the main menu or the in-game menu and choose the type of your message: Bug report or Suggestion.',
+          'When you tap Send, you are asked "Should we review it?". Say yes and we read your message and decide.',
+          'If the bug is verified or your suggestion is accepted, you earn contribution points. You keep earning when the bug is fixed or the suggestion makes it into the game.',
+          'The result comes to you by email, and you can see the status of your messages in your Profile.',
+          'You need to be logged in with an account that has an email to send feedback.',
+        ],
+      },
+      {
+        heading: 'Ranks',
+        bullets: [
+          'Your first approved message gives you your first rank badge: Hangar apprentice.',
+          'There are 13 ranks, each with its own badge. The next rank is a surprise: its name and badge only appear when you reach it.',
+          'Your badge shows in your Profile and next to your name on the leaderboards. The bar in your Profile shows how far the next rank is.',
+          'If several players report the same bug or suggestion, the points go to whoever sent it first.',
+        ],
+      },
+    ],
+  },
   'uc-bombardiman': {
     title: 'Three new jet bombers: Tu-14, B-57B and Ar 234 C-3',
     summary: 'Three jet bombers join the research tree. All three were built from real drawings and photos, and their bomb bay doors, brakes and turrets work in the game.',

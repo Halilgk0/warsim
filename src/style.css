@@ -1673,7 +1673,12 @@ button.danger:hover { background: #ecc7bf; }
 .fb-actions { flex-wrap: wrap; }
 .fb-actions button[data-fb="back"] { margin-right: auto; }
 .fb-sup { margin: calc(8px * var(--ui)) 0 0 !important; padding-top: calc(10px * var(--ui)); border-top: 1px solid var(--line); font-size: calc(12.5px * var(--ui)); color: var(--muted); font-weight: 700; line-height: 1.45; }
-.fb-sup .link { font-weight: 800; }
+.fb-sup { display: flex; align-items: center; gap: calc(10px * var(--ui)); }
+.fb-sup > span { flex: 1; min-width: 0; }
+.fb-sup-btn { flex: none; display: inline-flex; align-items: center; gap: calc(6px * var(--ui)); min-height: max(32px, calc(36px * var(--ui))); padding: calc(6px * var(--ui)) calc(13px * var(--ui)); border: 1.5px solid #d9b45f; border-radius: calc(12px * var(--ui)); background: linear-gradient(180deg, #fbefd2, #f1dca6); color: #6e4c0c; font-weight: 800; font-size: calc(13px * var(--ui)); white-space: nowrap; box-shadow: 0 2px 0 #d9b45f; }
+.fb-sup-btn:hover { background: linear-gradient(180deg, #fdf3dc, #f5e2b3); }
+.fb-sup-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #d9b45f; }
+.fb-sup-btn svg { width: calc(17px * var(--ui)); height: calc(17px * var(--ui)); flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
 .fb-lock { display: flex; align-items: center; gap: calc(10px * var(--ui)); font-size: calc(13px * var(--ui)); font-weight: 700; line-height: 1.4; color: var(--accent-ink); background: var(--accent-soft); border-radius: calc(12px * var(--ui)); padding: calc(10px * var(--ui)) calc(12px * var(--ui)); }
 .fb-lock span { flex: 1; }
 .fb-lock button { flex: none; }

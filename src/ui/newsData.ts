@@ -34,6 +34,38 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'katki-puani',
+    date: '2026-11-24',
+    title: 'Hata bildir, öneri gönder: katkı puanı ve rütbe kazan',
+    summary: 'Geri bildirim penceresi yenilendi. Mesajının hata raporu mu öneri mi olduğunu seç ve incelenmesini iste. Doğrulanan hata raporları ve kabul edilen öneriler sana katkı puanı kazandırır; puanların seni rütbe rütbe yükseltir.',
+    cover: img('katki-kapak.webp'),
+    images: [
+      { src: img('katki-tur.webp'), caption: 'Önce mesajının türünü seç: hata raporu ya da öneri.' },
+      { src: img('katki-soru.webp'), caption: 'Gönder’e basınca incelenmesini isteyip istemediğin sorulur.' },
+    ],
+    sections: [
+      {
+        heading: 'Nasıl çalışır',
+        bullets: [
+          'Ana menüden ya da oyundaki menüden Geri bildirim’i aç ve mesajının türünü seç: Hata raporu ya da Öneri.',
+          'Gönder’e basınca "İncelensin mi?" diye sorulur. Evet dersen mesajını okuyup karar veririz.',
+          'Hata doğrulanır ya da önerin kabul edilirse katkı puanı kazanırsın. Hata düzeltilince ya da öneri oyuna eklenince puan kazanmaya devam edersin.',
+          'Sonuç sana e-postayla gelir; mesajlarının durumunu Profil’inde de görürsün.',
+          'Geri bildirim için e-postalı bir hesapla giriş yapman gerekir.',
+        ],
+      },
+      {
+        heading: 'Rütbeler',
+        bullets: [
+          'İlk onaylanan mesajınla ilk rütbe rozetini alırsın: Hangar çırağı.',
+          'Toplam 13 rütbe var ve her birinin kendi rozeti. Sıradaki rütbe sürpriz: adı ve rozeti ancak ona ulaşınca açılır.',
+          'Rozetin Profil’inde ve skor tablolarında adının yanında görünür. Profil’deki çubuk sıradaki rütbeye ne kadar kaldığını gösterir.',
+          'Aynı hatayı ya da öneriyi önce kim bildirdiyse puan onundur.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'uc-bombardiman',
     date: '2026-11-22',
     title: 'Üç yeni jet bombardıman uçağı: Tu-14, B-57B ve Ar 234 C-3',

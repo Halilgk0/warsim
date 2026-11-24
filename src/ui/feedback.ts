@@ -9,7 +9,7 @@ import { api, apiMessage } from '../net/api';
 import { FEEDBACK_MAX, type FeedbackKind } from '../net/shared';
 import { $, esc, focusField } from './dom';
 import { L, LANG } from '../i18n';
-import { SUPPORT_ON } from './support';
+import { SUPPORT_ICON, SUPPORT_ON } from './support';
 
 /** Eski sürümde gönderilemeyen geri bildirimlerin deposu: artık kullanılmaz. */
 const OLD_OUTBOX_KEY = 'warsim.feedback.v1';
@@ -140,7 +140,7 @@ export class FeedbackBox {
     const acc = currentAccount();
     const canWrite = acc?.hasEmail === true;
     const sup = SUPPORT_ON
-      ? `<p class="fb-sup">${L('Oyunu sevdiysen destekçi paketiyle gelişmesine katkı verebilirsin.', 'If you enjoy the game, you can help it grow with the supporter pack.')} <button type="button" class="link" data-fb="support">${L('Destekçi paketi ›', 'Supporter pack ›')}</button></p>`
+      ? `<p class="fb-sup"><span>${L('Oyunu sevdiysen destekçi paketiyle gelişmesine katkı verebilirsin.', 'If you enjoy the game, you can help it grow with the supporter pack.')}</span><button type="button" class="fb-sup-btn" data-fb="support">${SUPPORT_ICON}${L('Destekçi paketi', 'Supporter pack')}</button></p>`
       : '';
     const kindBtn = (k: FeedbackKind, label: string, hint: string) =>
       `<button type="button" class="fb-kind ${this.kind === k ? 'active' : ''}" data-fb="kind" data-k="${k}" aria-pressed="${this.kind === k}"><b>${label}</b><span>${hint}</span></button>`;
