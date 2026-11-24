@@ -13,7 +13,7 @@ import type { World } from '../world';
 import type { Structure } from '../structures/structure';
 import { DEG, G, angleBetween, gauss } from '../../core/math';
 import { headingWithAlt, orbitDir } from './nav';
-import { aaJink, avoidAA } from './aaEvade';
+import { AVOID_FINAL, aaJink, avoidAA } from './aaEvade';
 import { groundLevel } from '../terrain';
 import { habitOf } from './habit';
 import { L } from '../../i18n';
@@ -134,7 +134,7 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
   switch (st.phase) {
     case 'ingress': {
       headingWithAlt(cmd.dir, ac, dx, dz, cruiseAlt);
-      avoidAA(ac, world, cmd.dir, tp);
+      avoidAA(ac, world, cmd.dir, tp, null, AVOID_FINAL);
       cmd.speed = ac.spec.cruiseSpeed;
       cmd.maxG = 2.5;
       cmd.turnGain = 1.2;

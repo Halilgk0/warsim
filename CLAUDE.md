@@ -161,6 +161,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         menziline alan batarya dolanılmaz; 240 sn kesintisiz dolanan uçak 180 sn doğrudan gider (`aaAvoidSince`,
         `aaPressUntil`). Hedefi 5–8 km öteden ağır toplar koruyan Ju 87 ve Il-2 kolları menzilin kenarında 25 dk daire
         çiziyordu (0/3 → 3/3 vurdu; `tools/sim/ucaksavar_daire <koşu> <uçak> <görev>`).
+        Dolanma sayacı kısa serbest anlarda sıfırlanmaz (60 sn serbest kalınca sıfırlanır; 2026-11-24): sıkı halkada dönerken
+        bataryalar bir an arkada kalıp sayacı sıfırlıyordu. Hedefe son yaklaşmada (taarruz, pike) sınır 60 sn (`AVOID_FINAL`; evre
+        320 sn'de biter). Üssü saran 12 bataryalık halkada Il-2 0/3 → 3/3 (`tools/sim/ucaksavar_halka`). Süre dolan kolun dönüş
+        nedeni "süre aşıldı".
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
     - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
       alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana

@@ -487,7 +487,8 @@ export class FlightGroup {
       case 'diveBomb':
       case 'attack': {
         const busy = alive.some((m) => !m.brain.detached && !m.brain.attack.done);
-        if (!busy || t - this.actionStart > 320) this.setPhase('egress', world, L('saldırı tamamlandı', 'attack complete'));
+        if (!busy) this.setPhase('egress', world, L('saldırı tamamlandı', 'attack complete'));
+        else if (t - this.actionStart > 320) this.setPhase('egress', world, L('süre aşıldı', 'time limit reached'));
         break;
       }
       case 'ferry':

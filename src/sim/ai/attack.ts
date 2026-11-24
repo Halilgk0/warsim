@@ -11,7 +11,7 @@ import type { Structure } from '../structures/structure';
 import { DEG, angleBetween, clamp } from '../../core/math';
 import { headingWithAlt, orbitDir, terrainFollow } from './nav';
 import { flakTarget, holdPoint, mayStartAttack, predictImpact, rally } from './strike';
-import { aaJink, avoidAA } from './aaEvade';
+import { AVOID_FINAL, aaJink, avoidAA } from './aaEvade';
 import { attackYawOf } from './habit';
 import { L } from '../../i18n';
 
@@ -106,7 +106,8 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       if (low) terrainFollow(cmd.dir, ac, dx, dz, agl);
       else headingWithAlt(cmd.dir, ac, dx, dz, p?.altitude ?? 1200);
       // Hedefe giderken yoldaki (hedefin dibinde olmayan) bataryaları dolan
-      avoidAA(ac, world, cmd.dir, tp);
+      // Son yaklaşma: evre 320 sn'de biter; sıkı halkada dakikalarca dolanmasın (AVOID_FINAL)
+      avoidAA(ac, world, cmd.dir, tp, null, AVOID_FINAL);
       cmd.speed = ac.spec.vMax * 0.92;
       cmd.minAlt = Math.min(agl * 0.7, 120);
       brain.status = `${L('Alçaktan sızma', 'Low-level ingress')}: ${(dh / 1000).toFixed(1)} km`;
