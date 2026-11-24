@@ -15,10 +15,10 @@ import { badgeName, badgeSvg } from './badges';
 import { esc } from './dom';
 
 /**
- * Polar hesabı ödeme almaya açık mı. 2026-11-21: Polar hesabı "test mode"da (inceleme bitmeden gerçek ödeme yok), paket
- * gizli. Polar onaylayınca true yapılır; kayıt yeri kuralı (3 yer) paketten bağımsız olarak geçerli.
+ * Polar hesabı ödeme almaya açık mı. 2026-11-24: Polar onayladı, canlıda 1 $ ödeme ve bildirim denendi; paket herkese açık.
+ * Kayıt yeri kuralı (3 yer) paketten bağımsız olarak geçerli.
  */
-const PAYMENTS_LIVE = false;
+const PAYMENTS_LIVE = true;
 
 /**
  * Herkese açılmadan canlıda deneme (2026-11-24, Polar onaylandı): adrese `?destek=1` eklenen tarayıcıda paket görünür ve
