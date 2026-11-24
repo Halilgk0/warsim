@@ -48,7 +48,7 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-21';
+export const LEGAL_VERSION = '2026-11-24';
 
 /**
  * Kayıt yerleri (2026-11-10; 2026-11-21'de 4 → 3): hesap başına SAVE_SLOTS_BASE yer, destekçi paketiyle bir ya da iki fazla
@@ -90,6 +90,59 @@ export const extraSlots = (tier: number): number => EXTRA_SLOTS[tier as 0 | 1 | 
 export const FEEDBACK_MAX = 2000;
 export const PRICE_MAX = 1000000;
 
+/**
+ * Katkı puanı (2026-11-24): oyuncu geri bildirimini "incelensin" diye gönderirse yönetici e-postadaki düğmelerle karar verir.
+ * Hata raporu doğrulanırsa 50, öneri kabul edilirse 30, sonra yapılınca 20 daha (toplam 70 / 50). Uygun değil ve tekrar
+ * (aynısını başkası önce bildirdi) 0. Puan savaş skorlarından ayrı; rütbe rozeti profilde ve skor tablolarında görünür.
+ */
+export type FeedbackKind = 'bug' | 'idea';
+export type FeedbackStatus = 'review' | 'verified' | 'accepted' | 'done' | 'rejected' | 'duplicate';
+export type FeedbackAct = 'verify' | 'accept' | 'done' | 'reject' | 'dup';
+export const FEEDBACK_ACTS: readonly FeedbackAct[] = ['verify', 'accept', 'done', 'reject', 'dup'];
+export const CONTRIB_VERIFIED = 50;
+export const CONTRIB_ACCEPTED = 30;
+export const CONTRIB_DONE = 20;
+
+/** Yönetici işlemi bu durumda geçerli mi; geçerliyse yeni durum ve eklenecek puan. "Yapıldı" incelemedeki mesaja onayı da verir. */
+export function feedbackStep(kind: FeedbackKind, status: FeedbackStatus, act: FeedbackAct): { status: FeedbackStatus; add: number } | null {
+  const base = kind === 'bug' ? CONTRIB_VERIFIED : CONTRIB_ACCEPTED;
+  const open = status === 'review' || status === 'rejected' || status === 'duplicate';
+  if (act === 'verify' && kind === 'bug' && open) return { status: 'verified', add: base };
+  if (act === 'accept' && kind === 'idea' && open) return { status: 'accepted', add: base };
+  if (act === 'done' && (status === 'verified' || status === 'accepted')) return { status: 'done', add: CONTRIB_DONE };
+  if (act === 'done' && open) return { status: 'done', add: base + CONTRIB_DONE };
+  if (act === 'reject' && status === 'review') return { status: 'rejected', add: 0 };
+  if (act === 'dup' && status === 'review') return { status: 'duplicate', add: 0 };
+  return null;
+}
+
+/** Rütbe eşikleri (puan): sıra rozetin numarasıdır (1 Hangar çırağı … 13 Efsane test pilotu). İlk puan 1. rütbeyi verir. */
+export const CONTRIB_RANKS = [1, 300, 400, 500, 600, 700, 800, 900, 1000, 1150, 1300, 1500, 1750] as const;
+
+/** Rütbe adları (Türkçe, İngilizce); sunucu da okur (durum e-postası), bu yüzden L() değil. */
+export const CONTRIB_RANK_NAMES: readonly (readonly [string, string])[] = [
+  ['Hangar çırağı', 'Hangar apprentice'],
+  ['Yer personeli', 'Ground crew'],
+  ['Mekanisyen', 'Mechanic'],
+  ['Kıdemli mekanisyen', 'Senior mechanic'],
+  ['Test teknisyeni', 'Test technician'],
+  ['Uçuş mühendisi', 'Flight engineer'],
+  ['Test pilotu', 'Test pilot'],
+  ['Kıdemli test pilotu', 'Senior test pilot'],
+  ['Baş test pilotu', 'Chief test pilot'],
+  ['Tasarım mühendisi', 'Design engineer'],
+  ['Baş mühendis', 'Chief engineer'],
+  ['Uçuş müfettişi', 'Flight inspector'],
+  ['Efsane test pilotu', 'Legendary test pilot'],
+];
+
+/** Puandan rütbe (0: henüz puan yok). */
+export function contribRank(points: number): number {
+  let r = 0;
+  for (let i = 0; i < CONTRIB_RANKS.length; i++) if (points >= CONTRIB_RANKS[i]) r = i + 1;
+  return r;
+}
+
 /** Skor tablosu ölçütleri (veritabanı sütunu). */
 export const METRICS = ['kills', 'wins', 'earned', 'peak', 'play_sec'] as const;
 export type Metric = (typeof METRICS)[number];
@@ -118,4 +171,6 @@ export interface LeaderRow {
   hidden?: boolean;
   /** Destekçi rozeti (1–3; yoksa yok). */
   badge?: number;
+  /** Katkı puanı (yoksa yok): rütbe rozeti bundan. */
+  contrib?: number;
 }

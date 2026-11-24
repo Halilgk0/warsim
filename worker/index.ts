@@ -24,11 +24,12 @@
 //   (order.paid, order.refunded, order.updated) siparişi yazar, hesabın toplamı iadeler düşülerek yeniden hesaplanır. Rozet ve
 //   kayıt yeri sayısı toplamdan çıkar (shared.ts supportTier, slotsFor).
 
-import { FEEDBACK_MAX, LEGAL_VERSION, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
+import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
-import { feedbackMail } from './feedbackMail';
+import { feedbackMail, reviewPage } from './feedbackMail';
+import { feedbackStatusMail } from './feedbackStatusMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
 interface Env extends MailEnv {
@@ -72,6 +73,8 @@ interface AccountRow {
   support_cents?: number;
   support_tier?: number;
   support_count?: number;
+  /** Katkı puanı (migration 0011): incelenen geri bildirimlerin toplamı. */
+  contrib?: number;
 }
 
 const NEWS_SEEN_MAX = 200;
@@ -177,7 +180,7 @@ function newsSeenList(a: AccountRow): string[] {
 /** Hesabın sahibine dönen bilgi (tarayıcıda saklanır; skor tablosuna gitmez). */
 const publicAccount = (a: AccountRow) => {
   const cents = a.support_cents ?? 0;
-  return { name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang, newsSeen: newsSeenList(a), support: cents, supportCount: a.support_count ?? 0, badge: supportTier(cents), slots: slotsFor(cents) };
+  return { name: a.name, key: a.name_key, created: a.created, lastLogin: a.last_login, noTutorial: !!a.no_tutorial, hasEmail: !!a.email, lang: a.lang, newsSeen: newsSeenList(a), support: cents, supportCount: a.support_count ?? 0, badge: supportTier(cents), slots: slotsFor(cents), contrib: a.contrib ?? 0 };
 };
 
 /** Geçerli dil kodu ya da yok. */
@@ -233,16 +236,21 @@ async function limited(env: Env, list: { key: string; max: number; ms: number }[
 
 const clientIp = (req: Request): string => req.headers.get('cf-connecting-ip') ?? 'yerel';
 
-/** Geri bildirim: görüş için e-postalı hesap, yalnız fiyat için misafire komutan adı yeter. warsimbox@gmail.com'a e-posta olur. */
+/**
+ * Geri bildirim: hata raporu ya da öneri, e-postalı hesapla (ad hesaptan; oyuncu değiştiremez). warsimbox@gmail.com'a e-posta
+ * olur. Oyuncu "incelensin" derse mesaj saklanır, e-postada karar düğmeleri olur (katkı puanı, 2026-11-24). Eski sürümlerin
+ * "Steam'de _ $ veririm" fiyatı (misafir de) hâlâ kabul edilir: önbellekteki eski paket bir süre daha çalışır.
+ */
 async function sendFeedback(req: Request, env: Env): Promise<Response> {
   const a = await authed(req, env);
-  const b = await body<{ message?: string; price?: number | null; name?: string; lang?: string }>(req);
+  const b = await body<{ message?: string; price?: number | null; name?: string; lang?: string; kind?: string; review?: boolean }>(req);
   const message = String(b?.message ?? '').trim().slice(0, FEEDBACK_MAX);
   const price = b?.price === null || b?.price === undefined ? null : Number(b.price);
   if (price !== null && (!Number.isFinite(price) || price < 0 || price > PRICE_MAX)) return fail(400, 'bad_price');
   if (!message && price === null) return fail(400, 'feedback_empty');
   if (message && !a) return fail(401, 'need_account');
   if (message && !a!.email) return fail(403, 'need_email');
+  const kind: FeedbackKind | null = b?.kind === 'bug' || b?.kind === 'idea' ? b.kind : null;
   const name = a?.name ?? cleanName(String(b?.name ?? ''));
   const problem = nameProblem(name);
   if (problem) return fail(400, `name_${problem}`);
@@ -252,14 +260,83 @@ async function sendFeedback(req: Request, env: Env): Promise<Response> {
     ? { key: `fb:hesap:${a.id}`, ...LIMIT_FB_ACCOUNT }
     : { key: `fb:ip:${await sha256(clientIp(req))}`, ...LIMIT_FB_GUEST };
   if (await limited(env, [who, { key: 'fb:all', ...LIMIT_FB_ALL }], now)) return fail(429, 'feedback_limit');
+  // İnceleme: yalnız türü seçilmiş, hesapla yazılmış mesaj
+  let id: number | null = null;
+  if (b?.review && message && kind && a && env.ADMIN_KEY) {
+    const row = await env.DB.prepare("INSERT INTO feedback (account_id, kind, message, status, points, created, updated) VALUES (?, ?, ?, 'review', 0, ?, ?) RETURNING id")
+      .bind(a.id, kind, message, now, now).first<{ id: number }>();
+    id = row?.id ?? null;
+  }
   try {
     const email = a?.email ?? null;
-    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price }), email);
+    const links = id !== null && kind ? await reviewLinks(env, id, kind) : null;
+    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price, kind, id, links }), email);
   } catch (e) {
     console.error(e);
+    if (id !== null) await env.DB.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
     return fail(502, 'mail_failed');
   }
-  return json({ ok: true });
+  return json({ ok: true, review: id !== null });
+}
+
+/** Karar bağlantısının imzası: yönetici anahtarıyla, mesaj ve işlem başına (tahmin edilemez, başka işleme taşınamaz). */
+const reviewToken = (env: Env, id: number, act: FeedbackAct): Promise<string> => sha256(`fb-review:${id}:${act}:${env.ADMIN_KEY ?? ''}`);
+
+/** Yöneticinin e-postasındaki karar düğmeleri (türe göre): işlem ve adres. */
+async function reviewLinks(env: Env, id: number, kind: FeedbackKind): Promise<{ act: FeedbackAct; url: string }[]> {
+  const site = (env.SITE_URL ?? 'https://warsimbox.com').replace(/\/$/, '');
+  const acts: FeedbackAct[] = kind === 'bug' ? ['verify', 'done', 'reject', 'dup'] : ['accept', 'done', 'reject', 'dup'];
+  return Promise.all(acts.map(async (act) => ({ act, url: `${site}/api/feedback/review?id=${id}&a=${act}&t=${await reviewToken(env, id, act)}` })));
+}
+
+interface FeedbackRow { id: number; account_id: number; kind: FeedbackKind; message: string; status: FeedbackStatus; points: number; created: number; name: string | null; email: string | null; lang: string | null }
+
+/**
+ * Yöneticinin kararı (e-postadaki düğme): GET onay sayfasını gösterir (Gmail ve tarayıcılar bağlantıyı kendiliğinden açabilir,
+ * puan yalnız sayfadaki "Onayla" ile verilir), POST uygular: durum ve puan değişir, hesabın toplamı yeniden hesaplanır, oyuncuya
+ * durum e-postası gider (hizmet bildirimi: yenilik izninden bağımsız).
+ */
+async function reviewFeedback(req: Request, env: Env, url: URL): Promise<Response> {
+  const page = (status: number, html: string) => new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
+  const id = Number(url.searchParams.get('id'));
+  const act = url.searchParams.get('a') as FeedbackAct;
+  if (!env.ADMIN_KEY || !Number.isInteger(id) || !FEEDBACK_ACTS.includes(act) || !same(url.searchParams.get('t') ?? '', await reviewToken(env, id, act))) {
+    return page(400, reviewPage({ state: 'bad' }));
+  }
+  const f = await env.DB.prepare('SELECT f.*, a.name AS name, a.email AS email, a.lang AS lang FROM feedback f LEFT JOIN accounts a ON a.id = f.account_id WHERE f.id = ?')
+    .bind(id).first<FeedbackRow>();
+  if (!f) return page(404, reviewPage({ state: 'gone' }));
+  const step = feedbackStep(f.kind, f.status, act);
+  if (req.method !== 'POST') return page(200, reviewPage({ state: step ? 'ask' : 'stale', f, act, add: step?.add ?? 0 }));
+  if (!step) return page(409, reviewPage({ state: 'stale', f, act, add: 0 }));
+  const now = Date.now();
+  // Aynı anda iki onay gelirse yalnız biri geçer (durum hâlâ okunduğu gibiyse)
+  const upd = await env.DB.prepare('UPDATE feedback SET status = ?, points = points + ?, updated = ? WHERE id = ? AND status = ?')
+    .bind(step.status, step.add, now, id, f.status).run();
+  if (!upd.meta.changes) return page(409, reviewPage({ state: 'stale', f, act, add: 0 }));
+  const sum = await env.DB.prepare('UPDATE accounts SET contrib = (SELECT COALESCE(SUM(points), 0) FROM feedback WHERE account_id = ?1) WHERE id = ?1 RETURNING contrib')
+    .bind(f.account_id).first<{ contrib: number }>();
+  const total = sum?.contrib ?? 0;
+  let mailed = false;
+  if (f.email && mailReady(env)) {
+    try {
+      await sendMail(env, f.email, feedbackStatusMail({ name: f.name ?? '', lang: f.lang, kind: f.kind, status: step.status, add: step.add, total, message: f.message }));
+      mailed = true;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return page(200, reviewPage({ state: 'done', f: { ...f, status: step.status }, act, add: step.add, total, mailed }));
+}
+
+/** Yönetici aracı: kararı ve "yapıldı"yı bekleyen mesajlar, karar bağlantılarıyla. */
+async function adminFeedback(req: Request, env: Env): Promise<Response> {
+  if (!env.ADMIN_KEY || !same(req.headers.get('x-admin-key') ?? '', env.ADMIN_KEY)) return fail(403, 'forbidden');
+  const { results } = await env.DB.prepare(
+    "SELECT f.id, f.kind, f.status, f.points, f.created, substr(f.message, 1, 300) AS text, a.name AS name FROM feedback f LEFT JOIN accounts a ON a.id = f.account_id WHERE f.status IN ('review', 'verified', 'accepted') ORDER BY f.created ASC LIMIT 100",
+  ).all<{ id: number; kind: FeedbackKind; status: FeedbackStatus; points: number; created: number; text: string; name: string | null }>();
+  const list = await Promise.all(results.map(async (r) => ({ ...r, created: new Date(r.created).toISOString(), links: await reviewLinks(env, r.id, r.kind) })));
+  return json({ open: list });
 }
 
 /** Doğrulama kodu gönder. Hesap açarken ad da gelir: alınmışsa kod gönderilmeden söylenir. */
@@ -326,7 +403,7 @@ async function emailTaken(env: Env, email: string, accountId = 0): Promise<boole
 /** Hesabı ve ona bağlı bütün verileri siler. Hesaba bağlı yeni tablo eklenirse buraya da eklenmeli. */
 async function eraseAccount(env: Env, a: AccountRow): Promise<{ sessions: number; saves: number; campaigns: number; stats: number }> {
   const done = await env.DB.batch([
-    ...['sessions', 'saves', 'campaigns', 'stats', 'support_orders'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE account_id = ?`).bind(a.id)),
+    ...['sessions', 'saves', 'campaigns', 'stats', 'support_orders', 'feedback'].map((t) => env.DB.prepare(`DELETE FROM ${t} WHERE account_id = ?`).bind(a.id)),
     env.DB.prepare('DELETE FROM email_codes WHERE email = ?').bind(a.email ?? ''),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(a.id),
   ]);
@@ -467,16 +544,18 @@ async function setEmail(req: Request, env: Env, a: AccountRow): Promise<Response
 async function profile(env: Env, a: AccountRow): Promise<Response> {
   const week = isoWeek(Date.now());
   const ranks = METRICS.map((m) => `(SELECT COUNT(*) FROM stats x JOIN accounts b ON b.id = x.account_id WHERE x.period = 'all' AND b.score_public = 1 AND x.${m} > s.${m}) + 1 AS ${m}`).join(', ');
-  const [all, wk, rank, saves] = await env.DB.batch([
+  const [all, wk, rank, saves, fb] = await env.DB.batch([
     env.DB.prepare("SELECT kills, wins, earned, peak, play_sec FROM stats WHERE account_id = ? AND period = 'all'").bind(a.id),
     env.DB.prepare('SELECT kills, wins, earned, peak, play_sec FROM stats WHERE account_id = ? AND period = ?').bind(a.id, week),
     env.DB.prepare(`SELECT ${ranks} FROM stats s WHERE s.account_id = ? AND s.period = 'all'`).bind(a.id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM saves WHERE account_id = ?').bind(a.id),
+    env.DB.prepare('SELECT id, kind, substr(message, 1, 160) AS text, status, points, created, updated FROM feedback WHERE account_id = ? ORDER BY created DESC LIMIT 20').bind(a.id),
   ]);
   return json({
     account: publicAccount(a), all: all.results[0] ?? null, week: wk.results[0] ?? null, ranks: rank.results[0] ?? null,
     saves: (saves.results[0] as { n: number } | undefined)?.n ?? 0,
     email: a.email, news: !!a.news_opt, accepted: !!a.legal_version, scorePublic: !!a.score_public,
+    feedback: fb.results,
   });
 }
 
@@ -675,20 +754,20 @@ async function leaderboard(url: URL, env: Env, a: AccountRow | null): Promise<Re
   const period = url.searchParams.get('period') === 'week' ? isoWeek(Date.now()) : 'all';
   // Sütun adı yalnız beyaz listeden (METRICS): sorguya kullanıcı girdisi girmez
   const { results } = await env.DB.prepare(
-    `SELECT a.name AS name, s.${metric} AS value, a.support_cents AS cents FROM stats s JOIN accounts a ON a.id = s.account_id
+    `SELECT a.name AS name, s.${metric} AS value, a.support_cents AS cents, a.contrib AS contrib FROM stats s JOIN accounts a ON a.id = s.account_id
      WHERE s.period = ? AND s.${metric} > 0 AND a.score_public = 1 ORDER BY s.${metric} DESC, a.name_key ASC LIMIT 200`,
-  ).bind(period).all<{ name: string; value: number; cents: number }>();
+  ).bind(period).all<{ name: string; value: number; cents: number; contrib: number }>();
   // Tutar tabloya gitmez, yalnız rozetin basamağı
   const badge = (cents: number | undefined) => supportTier(cents ?? 0) || undefined;
-  const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value, badge: badge(r.cents) }));
+  const rows: LeaderRow[] = results.map((r, i) => ({ rank: i + 1, name: r.name, value: r.value, badge: badge(r.cents), contrib: r.contrib || undefined }));
   let me: LeaderRow | null = null;
   if (a) {
     const mine = await env.DB.prepare(`SELECT ${metric} AS value FROM stats WHERE account_id = ? AND period = ?`).bind(a.id, period).first<{ value: number }>();
     if (mine && mine.value > 0) {
       if (a.score_public) {
         const above = await env.DB.prepare(`SELECT COUNT(*) AS n FROM stats s JOIN accounts b ON b.id = s.account_id WHERE s.period = ? AND b.score_public = 1 AND s.${metric} > ?`).bind(period, mine.value).first<{ n: number }>();
-        me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value, badge: badge(a.support_cents) };
-      } else me = { rank: 0, name: a.name, value: mine.value, hidden: true, badge: badge(a.support_cents) };
+        me = { rank: (above?.n ?? 0) + 1, name: a.name, value: mine.value, badge: badge(a.support_cents), contrib: a.contrib || undefined };
+      } else me = { rank: 0, name: a.name, value: mine.value, hidden: true, badge: badge(a.support_cents), contrib: a.contrib || undefined };
     }
   }
   return json({ metric, period, rows, me });
@@ -891,10 +970,12 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   if (path === '/news/unsubscribe') return newsUnsubscribe(req, env, url);
   if (m === 'POST' && path === '/email/code') return emailCode(req, env);
   if (m === 'POST' && path === '/feedback') return sendFeedback(req, env);
+  if (path === '/feedback/review') return reviewFeedback(req, env, url);
   if (m === 'POST' && path === '/register') return register(req, env);
   if (m === 'POST' && path === '/login') return login(req, env);
   if (m === 'POST' && path === '/recover') return recover(req, env);
   if (m === 'POST' && path === '/logout') return logout(req, env);
+  if (path === '/admin/feedback') return adminFeedback(req, env);
   if (path === '/admin') return admin(req, env, url);
   if (m === 'POST' && path === '/support/webhook') return supportWebhook(req, env);
   if (m === 'GET' && path === '/leaderboard') return leaderboard(url, env, await authed(req, env));

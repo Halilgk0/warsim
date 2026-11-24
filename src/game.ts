@@ -48,7 +48,8 @@ import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
 import { L, count } from './i18n';
-import { SAVE_SLOTS_BASE } from './net/shared';
+import { SAVE_SLOTS_BASE, contribRank } from './net/shared';
+import { rankName } from './ui/badges';
 import { overText } from './ui/savesList';
 import { SupportBox } from './ui/support';
 import { Tutorial } from './ui/tutorial';
@@ -110,6 +111,7 @@ export class Game {
       else if (this.pause.isOpen) this.pause.render();
     }),
     addEmail: () => this.login.askEmail(),
+    support: () => this.support.open(),
   });
   readonly menu: MainMenu;
   readonly pause: PauseMenu;
@@ -206,6 +208,7 @@ export class Game {
         void syncPending(acc.key).catch(() => {});
         // İnternetsiz oynanan harekâtların skorları: bağlantı varsa şimdi gönderilir
         void this.stats.flushPending();
+        this.noteContrib(acc.key, acc.contrib ?? 0);
       }
       // E-postası olmayan eski hesaba her açılışta sorulur (adres bağlanana kadar; pencere kapatılabilir)
       if (shouldAskEmail() && this.mode === 'menu' && !this.login.isOpen) this.login.askEmail();
@@ -490,6 +493,27 @@ export class Game {
     if (s < 60) return L('az önce', 'just now');
     const m = Math.round(s / 60);
     return m < 60 ? L(`${m} dk önce`, `${m} min ago`) : L(`${Math.floor(m / 60)} sa ${m % 60} dk önce`, `${Math.floor(m / 60)} h ${m % 60} min ago`);
+  }
+
+  /**
+   * Katkı puanı arttıysa (incelenen geri bildirim onaylandı; 2026-11-24) ana menüde kısa bildirim: bu cihazda görülen son puan
+   * hesaba göre saklanır (warsim.katki.<ad anahtarı>). Yeni rütbede rütbenin adı söylenir.
+   */
+  private noteContrib(key: string, points: number): void {
+    const store = `warsim.katki.${key}`;
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem(store) ?? '0') || 0;
+      localStorage.setItem(store, String(points));
+    } catch {
+      return;
+    }
+    if (points <= seen || this.mode !== 'menu') return;
+    const rank = contribRank(points);
+    const name = rankName(rank);
+    this.menu.note(rank > contribRank(seen)
+      ? L(`Yeni rütbe: ${name}! Geri bildirimin onaylandı, katkı puanın ${points} oldu.`, `New rank: ${name}! Your feedback was approved; you now have ${points} contribution points.`)
+      : L(`Geri bildirimin onaylandı: +${points - seen} katkı puanı (toplam ${points}).`, `Your feedback was approved: +${points - seen} contribution points (${points} in total).`));
   }
 
   /**

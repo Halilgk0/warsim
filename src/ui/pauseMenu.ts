@@ -124,7 +124,7 @@ export class PauseMenu {
         g.modals.open('settings');
         return;
       case 'feedback':
-        g.feedback.open(g.world.playerName || acc?.name || '');
+        g.feedback.open();
         return;
       case 'tutorial':
         // Konu listesi: istenen konu bu harekâtın içinde (2026-11-13; eskiden baştan başlardı)

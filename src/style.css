@@ -1157,6 +1157,20 @@ svg.sbadge { stroke: none; flex: none; vertical-align: -0.25em; }
 .pf-sup > span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .pf-sup button.link { align-self: center; margin-left: auto; }
 .pf-who svg.sbadge { margin-left: calc(2px * var(--ui)); }
+/* Profildeki katkı puanı: rütbe, sıradaki rütbeye ilerleme (gizli), incelenen mesajlar (2026-11-24) */
+.pf-contrib { display: flex; flex-direction: column; gap: calc(6px * var(--ui)); padding: calc(10px * var(--ui)) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.pf-cbar { height: calc(8px * var(--ui)); border-radius: 99px; background: var(--chip, #e9e4da); overflow: hidden; }
+.pf-cbar > div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #c49e58, #e8bb48); transition: width 0.4s ease; }
+.pf-contrib > b { font-size: calc(14px * var(--ui)); }
+.pf-cnext { display: flex; align-items: center; gap: calc(6px * var(--ui)); margin: 0; }
+.pf-fb { list-style: none; margin: calc(2px * var(--ui)) 0 0; padding: 0; display: flex; flex-direction: column; gap: calc(4px * var(--ui)); max-height: calc(150px * var(--ui)); overflow: auto; }
+.pf-fb li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: calc(8px * var(--ui)); font-size: calc(12.5px * var(--ui)); }
+.pf-fk { font-weight: 800; color: var(--muted); }
+.pf-ft { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pf-fs { font-weight: 800; white-space: nowrap; padding: calc(1px * var(--ui)) calc(7px * var(--ui)); border-radius: 99px; background: var(--chip, #e9e4da); }
+.pf-fs.s-verified, .pf-fs.s-accepted, .pf-fs.s-done { background: #d6ecdf; color: #2f6b4c; }
+.pf-fs.s-rejected, .pf-fs.s-duplicate { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .pf-cbar > div { transition: none; } }
 .mm-user svg.sbadge { width: calc(18px * var(--ui)); height: calc(18px * var(--ui)); }
 .lb-name { display: flex; align-items: center; gap: calc(5px * var(--ui)); min-width: 0; }
 .lb-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1648,8 +1662,18 @@ button.danger:hover { background: #ecc7bf; }
 }
 .fb-card textarea { resize: vertical; min-height: calc(96px * var(--ui)); line-height: 1.45; }
 .fb-card textarea:focus, .fb-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.fb-price { display: flex; align-items: center; gap: calc(8px * var(--ui)); font-size: calc(15px * var(--ui)); font-weight: 800; margin: calc(8px * var(--ui)) 0 calc(10px * var(--ui)); }
-.fb-card .fb-price input { width: calc(96px * var(--ui)); text-align: center; font-weight: 800; font-size: calc(15px * var(--ui)); padding: calc(6px * var(--ui)) calc(8px * var(--ui)); }
+/* Tür seçimi (hata raporu / öneri), inceleme sorusu, destekçi paketi satırı (2026-11-24) */
+.fb-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: calc(8px * var(--ui)); margin: 0 0 calc(4px * var(--ui)); }
+.fb-kind { display: flex; flex-direction: column; align-items: flex-start; gap: calc(2px * var(--ui)); text-align: left; min-height: max(32px, calc(52px * var(--ui))); padding: calc(8px * var(--ui)) calc(11px * var(--ui)); border: 1.5px solid var(--line); border-radius: calc(12px * var(--ui)); background: #fff; }
+.fb-kind b { font-size: calc(14px * var(--ui)); }
+.fb-kind span { font-size: calc(11.5px * var(--ui)); color: var(--muted); font-weight: 700; line-height: 1.3; }
+.fb-kind.active { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 -3px 0 var(--accent); }
+.fb-ask h3 { margin: calc(2px * var(--ui)) 0 calc(6px * var(--ui)); font-size: calc(17px * var(--ui)); }
+.fb-ask p { font-size: calc(14px * var(--ui)); line-height: 1.5; }
+.fb-actions { flex-wrap: wrap; }
+.fb-actions button[data-fb="back"] { margin-right: auto; }
+.fb-sup { margin: calc(8px * var(--ui)) 0 0 !important; padding-top: calc(10px * var(--ui)); border-top: 1px solid var(--line); font-size: calc(12.5px * var(--ui)); color: var(--muted); font-weight: 700; line-height: 1.45; }
+.fb-sup .link { font-weight: 800; }
 .fb-lock { display: flex; align-items: center; gap: calc(10px * var(--ui)); font-size: calc(13px * var(--ui)); font-weight: 700; line-height: 1.4; color: var(--accent-ink); background: var(--accent-soft); border-radius: calc(12px * var(--ui)); padding: calc(10px * var(--ui)) calc(12px * var(--ui)); }
 .fb-lock span { flex: 1; }
 .fb-lock button { flex: none; }

@@ -5,14 +5,14 @@
 
 import { type Profile, changePassword, deleteAccount, fetchProfile, requestEmailCode, saveEmail, saveScorePublic } from '../persist';
 import { apiMessage } from '../net/api';
-import { METRICS, PASS_MAX, PASS_MIN, type Metric, cleanEmail, validEmail } from '../net/shared';
+import { CONTRIB_RANKS, METRICS, PASS_MAX, PASS_MIN, type FeedbackStatus, type Metric, cleanEmail, contribRank, validEmail } from '../net/shared';
 import { $, esc, focusField } from './dom';
 import { HINT, LABEL, fmtValue } from './leaderboard';
 import { codeInput, codeSentText, consentBoxes, emailInput } from './loginBox';
 import { L, LANG, LOCALE } from '../i18n';
 import { type PendingSummary, pendingSummary } from '../net/statsOutbox';
 import { legalUrl } from '../yasal/liste';
-import { badgeName, badgeSvg } from './badges';
+import { badgeName, badgeSvg, lockedRankSvg, rankName, rankSvg } from './badges';
 import { SUPPORT_ON } from './support';
 
 /** Bekleyen skorun kısa dökümü: "3 düşürme, 12.400 kr, 1 zafer, 25 dk". */
@@ -26,6 +26,16 @@ function pendingText(p: PendingSummary): string {
 }
 
 const dateFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** İncelenen geri bildirimin durumu (Profil listesi). */
+const STATUS: Record<FeedbackStatus, () => string> = {
+  review: () => L('İncelemede', 'Under review'),
+  verified: () => L('Doğrulandı', 'Verified'),
+  accepted: () => L('Kabul edildi', 'Accepted'),
+  done: () => L('Yapıldı', 'Done'),
+  rejected: () => L('Uygun değil', 'Not accepted'),
+  duplicate: () => L('Tekrar', 'Duplicate'),
+};
 
 export class ProfileBox {
   isOpen = false;
@@ -322,6 +332,30 @@ export class ProfileBox {
     )}</span></span>${btn}</div>`;
   }
 
+  /**
+   * Katkı puanı (2026-11-24): rütbe rozeti, sıradaki rütbeye ilerleme (adı ve rozeti gizli) ve incelemeye gönderilen mesajların
+   * durumu.
+   */
+  private contribRow(p: Profile): string {
+    const pts = p.account.contrib ?? 0;
+    const rank = contribRank(pts);
+    const items = (p.feedback ?? []).map((f) => `<li><span class="pf-fk">${f.kind === 'bug' ? L('Hata', 'Bug') : L('Öneri', 'Idea')}</span>
+        <span class="pf-ft">${esc(f.text)}</span>
+        <span class="pf-fs s-${f.status}">${STATUS[f.status]?.() ?? ''}${f.points ? ` · +${f.points}` : ''}</span></li>`).join('');
+    const list = items ? `<ul class="pf-fb">${items}</ul>` : '';
+    // Puanı olmayan hesapta rütbe ve rozet yok (ilk rütbe ilk puanla görünür); incelemeye gönderdiği mesaj varsa yalnız durumları
+    if (!rank) return list ? `<div class="pf-contrib"><b>${L('Geri bildirimlerin', 'Your feedback')}</b>${list}</div>` : '';
+    const next: number | undefined = CONTRIB_RANKS[rank];
+    const prev = CONTRIB_RANKS[rank - 1];
+    const head = `${rankSvg(rank, '2.2em', pts)}<span><b>${rankName(rank)}</b><span class="muted small">${L(`${pts} katkı puanı`, `${pts} contribution points`)}</span></span>`;
+    const fill = next === undefined ? 100 : Math.min(100, Math.round(((pts - prev) / (next - prev)) * 100));
+    const progress = next === undefined
+      ? `<p class="muted small pf-cnext">${L('En yüksek rütbedesin. Teşekkürler!', 'You hold the highest rank. Thank you!')}</p>`
+      : `<div class="pf-cbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${fill}"><div style="width:${fill}%"></div></div>
+        <p class="muted small pf-cnext">${lockedRankSvg('1.25em')}<span>${L(`Sıradaki rütbe gizli: ${next - pts} puan kaldı`, `Next rank is hidden: ${next - pts} points to go`)}</span></p>`;
+    return `<div class="pf-contrib"><div class="pf-sup">${head}</div>${progress}${list}</div>`;
+  }
+
   private render(): void {
     const p = this.profile;
     const head = `<div class="login-head"><b>${L('Profil', 'Profile')}</b><button type="button" class="icon" data-pf="close" title="${L('Kapat (Esc)', 'Close (Esc)')}">✕</button></div>`;
@@ -377,11 +411,12 @@ export class ProfileBox {
         </form>`
       : '';
     this.el.innerHTML = `<div class="login-card pf-card" role="dialog" aria-modal="true">${head}
-      <div class="pf-who"><b>${esc(a.name)}${a.badge ? ` ${badgeSvg(a.badge, '1.3em')}` : ''}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)}${p.offline ? '' : ` · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}`} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
+      <div class="pf-who"><b>${esc(a.name)}${a.badge ? ` ${badgeSvg(a.badge, '1.3em')}` : ''}${contribRank(a.contrib ?? 0) ? ` ${rankSvg(contribRank(a.contrib ?? 0), '1.3em', a.contrib)}` : ''}</b><span class="muted small">${L('Hesap açılışı', 'Joined')} ${dateFmt.format(a.created)}${p.offline ? '' : ` · ${L('bulutta', 'in the cloud')} ${p.saves} ${L('kayıt', p.saves === 1 ? 'save' : 'saves')}`} · ${L('Dil', 'Language')}: ${LANG === 'en' ? 'English' : 'Türkçe'}</span></div>
       ${p.offline ? '' : `<div class="pf-email"><span class="small ${p.email ? '' : 'muted'}">${p.email ? esc(p.email) : L('E-posta eklenmemiş', 'No email added')}</span>
         <button type="button" class="link" data-pf="mail">${this.mailOpen ? L('Vazgeç', 'Cancel') : p.email ? L('Düzenle', 'Edit') : L('Ekle', 'Add')}</button></div>`}
       ${mail}
       ${this.supportRow(p)}
+      ${this.contribRow(p)}
       <table class="pf-stats">
         <thead><tr><th></th><th>${L('Tüm zamanlar', 'All time')}</th><th>${L('Sıra', 'Rank')}</th><th>${L('Bu hafta', 'This week')}</th></tr></thead>
         <tbody>${rows}</tbody>

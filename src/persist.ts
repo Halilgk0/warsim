@@ -8,7 +8,7 @@
 import type { SaveData } from './sim/save';
 import { L, LANG } from './i18n';
 import { ApiError, api, authToken, clientHash, gunzip, gzip, storeAuth, storedAccount } from './net/api';
-import { NAME_MAX, SAVE_SLOTS_BASE, cleanName, nameKey, nameProblem } from './net/shared';
+import { NAME_MAX, SAVE_SLOTS_BASE, cleanName, nameKey, nameProblem, type FeedbackKind, type FeedbackStatus } from './net/shared';
 import { dropAccountStats } from './net/statsOutbox';
 
 export { NAME_MAX, cleanName, nameKey };
@@ -38,6 +38,8 @@ export interface Account {
   supportCount?: number;
   badge?: number;
   slots?: number;
+  /** Katkı puanı: incelenen geri bildirimlerden (rütbe rozeti). */
+  contrib?: number;
 }
 
 export type SaveKind = 'manual' | 'auto';
@@ -170,6 +172,18 @@ export interface Profile {
   scorePublic: boolean;
   /** Bağlantı yok: son bilinen profil (bu cihazda saklanan) gösteriliyor. */
   offline?: boolean;
+  /** İnceleme istenen geri bildirimler (en yeni 20; metnin başı). */
+  feedback?: FeedbackItem[];
+}
+
+export interface FeedbackItem {
+  id: number;
+  kind: FeedbackKind;
+  text: string;
+  status: FeedbackStatus;
+  points: number;
+  created: number;
+  updated: number;
 }
 
 /** Son açılan profil (internetsizken gösterilir). */

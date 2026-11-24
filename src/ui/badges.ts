@@ -7,6 +7,7 @@
 // Ödeme öncesi pencerede rozetler gösterilmez, yerinde "Özel rozet" ve kilitli bir işaret durur (support.ts lockedBadge).
 
 import { L } from '../i18n';
+import { CONTRIB_RANK_NAMES } from '../net/shared';
 
 type Tone = [light: string, mid: string, dark: string, deep: string];
 
@@ -128,4 +129,113 @@ export function badgeSvg(tier: number, size = '1.2em'): string {
   if (!art) return '';
   const name = badgeName(tier);
   return `<svg class="sbadge b${tier}" viewBox="0 0 64 64" width="${size}" height="${size}" role="img" aria-label="${name}"><title>${name}</title>${art}</svg>`;
+}
+
+// ---------------------------------------------------------------- katkı rütbeleri (2026-11-24)
+// Geri bildirimin incelenmesiyle kazanılan katkı puanından (shared.ts CONTRIB_RANKS): 13 rütbe. Destekçi rozetlerinden
+// ayrılsın diye kalkan biçiminde. Kalkanın metali rütbeyle ilerler (çelik, bronz, bakır, gümüş, altın, kızıl, lacivert),
+// ortada amblem (anahtar, dişli, pervane, kanat, yıldız, kanatlı yıldız), alttaki şerit sayısı aynı amblemdeki sırayı söyler.
+// Profil'de sıradaki rütbe gizlidir (lockedRankSvg).
+
+const STEEL: Tone = ['#c9d3cf', '#94a39d', '#66756f', '#3f4a46'];
+const COPPER: Tone = ['#f0a07a', '#c96b45', '#94462a', '#5e2a17'];
+const CRIMSON: Tone = ['#f08a7a', '#c4473a', '#8c2a22', '#561510'];
+const NAVY: Tone = ['#7fa3d6', '#3d63a3', '#26406f', '#152542'];
+
+type Emblem = 'wrench' | 'gear' | 'prop' | 'wings' | 'star' | 'starwings';
+/** Rütbe başına: metal, amblem, şerit sayısı, amblem rengi. */
+const RANKS: [Tone, Emblem, number, string][] = [
+  [STEEL, 'wrench', 0, '#f4f7f5'],
+  [STEEL, 'wrench', 1, '#f4f7f5'],
+  [BRONZE, 'gear', 0, '#fff1dc'],
+  [BRONZE, 'gear', 1, '#fff1dc'],
+  [COPPER, 'prop', 0, '#4a1e0c'],
+  [COPPER, 'prop', 1, '#4a1e0c'],
+  [SILVER, 'wings', 0, '#3f4a50'],
+  [SILVER, 'wings', 1, '#3f4a50'],
+  [SILVER, 'wings', 2, '#3f4a50'],
+  [GOLD, 'star', 0, '#5e3f0a'],
+  [GOLD, 'star', 1, '#5e3f0a'],
+  [CRIMSON, 'starwings', 0, '#ffd66b'],
+  [NAVY, 'starwings', 2, '#ffd66b'],
+];
+
+const pt = (x: number, y: number) => `${x.toFixed(1)},${y.toFixed(1)}`;
+/** Merkez çevresinde düzgün çokgen ya da yıldız (r1, r2 sırayla). */
+function ring(cx: number, cy: number, n: number, r1: number, r2: number, rot = -Math.PI / 2): string {
+  const out: string[] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const a = rot + (i * Math.PI) / n;
+    const r = i % 2 ? r2 : r1;
+    out.push(pt(cx + Math.cos(a) * r, cy + Math.sin(a) * r));
+  }
+  return out.join(' ');
+}
+
+/** Kalkan: dış kenar koyu, yüz sol yarı açık, sağ yarı gölgede. */
+function shield(c: Tone): string {
+  const outer = '32,3 9,9 9,30 13,44 21,54 32,61 43,54 51,44 55,30 55,9';
+  return [
+    poly(outer, c[3]),
+    poly('32,7 13,12 13,30 17,42 24,51 32,56.5', c[0]),
+    poly('32,7 51,12 51,30 47,42 40,51 32,56.5', c[1]),
+    poly('32,7 13,12 15,13 32,9', c[1]),
+  ].join('');
+}
+
+function emblem(e: Emblem, ink: string): string {
+  const f = (pts: string) => poly(pts, ink);
+  const cy = 28;
+  switch (e) {
+    case 'wrench':
+      // Çapraz sap ve açık ağızlı baş
+      return f('23,37 27,41 39,27 35,23') + f('34,22 33,16 37,12 42,11 39,15 42,18 46,15 45,20 41,24 36,25');
+    case 'gear':
+      return f(ring(32, cy, 8, 12, 9.5, -Math.PI / 2 + Math.PI / 16)) + poly(ring(32, cy, 6, 4.2, 4.2), '#00000033');
+    case 'prop':
+      // Üç kürek: göbekte dar, ortada geniş, uçta sivri
+      return [0, 1, 2].map((i) => {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / 3;
+        const at = (r: number, d: number) => pt(32 + Math.cos(a + d) * r, cy + Math.sin(a + d) * r);
+        return f(`${at(3, -0.6)} ${at(9, -0.34)} ${at(13, -0.12)} ${at(14.5, 0)} ${at(13, 0.16)} ${at(9, 0.3)} ${at(3, 0.6)}`);
+      }).join('') + poly(ring(32, cy, 6, 3.6, 3.6), '#2f1206');
+    case 'wings':
+      return f('29,24 12,20 15,26 20,27 17,30 29,31') + f('35,24 52,20 49,26 44,27 47,30 35,31') + f(ring(32, 27.5, 6, 4.5, 4.5));
+    case 'star':
+      return f(ring(32, cy, 5, 12.5, 5.2));
+    case 'starwings':
+      return f('26,26 11,22 14,28 18,29 15,32 26,33') + f('38,26 53,22 50,28 46,29 49,32 38,33') + f(ring(32, 28.5, 5, 10, 4.2));
+  }
+}
+
+/** Alttaki şeritler (0–2). */
+function chevrons(n: number, ink: string): string {
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const y = 42 + i * 6;
+    s += poly(`22,${y} 32,${y + 5} 42,${y} 42,${y + 3} 32,${y + 8} 22,${y + 3}`, ink);
+  }
+  return s;
+}
+
+/** Rütbenin adı (1–13). */
+export function rankName(rank: number): string {
+  const n = CONTRIB_RANK_NAMES[rank - 1];
+  return n ? L(n[0], n[1]) : '';
+}
+
+/** Katkı rütbesi rozeti (1–13; 0 ise boş). points: ipucunda puan. */
+export function rankSvg(rank: number, size = '1.2em', points?: number): string {
+  const r = RANKS[rank - 1];
+  if (!r) return '';
+  const [tone, em, chev, ink] = r;
+  const name = rankName(rank);
+  const tip = points === undefined ? name : `${name} · ${L(`${points} katkı puanı`, `${points} contribution points`)}`;
+  return `<svg class="sbadge cbadge r${rank}" viewBox="0 0 64 64" width="${size}" height="${size}" role="img" aria-label="${tip}"><title>${tip}</title>${shield(tone)}${emblem(em, ink)}${chevrons(chev, ink)}</svg>`;
+}
+
+/** Sıradaki (gizli) rütbe: soru işaretli boş kalkan. */
+export function lockedRankSvg(size = '1.2em'): string {
+  const name = L('Gizli rütbe', 'Hidden rank');
+  return `<svg class="sbadge cbadge locked" viewBox="0 0 64 64" width="${size}" height="${size}" role="img" aria-label="${name}"><title>${name}</title>${shield(['#4a524e', '#3a413d', '#2c322f', '#1e2320'])}<text x="32" y="40" text-anchor="middle" font-size="26" font-weight="800" fill="#9aa49f" font-family="Nunito, sans-serif">?</text></svg>`;
 }

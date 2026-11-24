@@ -127,6 +127,12 @@ export class MainMenu {
     });
   }
 
+  /** Açık menüye kısa bildirim (ör. katkı puanı arttı). */
+  note(text: string): void {
+    this.notice = text;
+    if (this.isOpen) this.render();
+  }
+
   open(notice = ''): void {
     this.isOpen = true;
     // Arka plandaki harita (son oynanan) seçili gelsin
@@ -391,7 +397,7 @@ export class MainMenu {
         this.game.news.open();
         return;
       case 'feedback':
-        this.game.feedback.open(cleanName(this.name) || currentAccount()?.name || '');
+        this.game.feedback.open();
         return;
       case 'fullscreen':
         toggleFullscreen();

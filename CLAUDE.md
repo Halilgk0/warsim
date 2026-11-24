@@ -411,9 +411,18 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - `alerts.ts`: oyuncuya uyarılar.
   - Ses dosyaları `public/sounds`; künye `credits.ts`.
 - **`src/ui/`:** DOM arayüzü: HUD, paneller, planlayıcı, araştırma, pazar, inşa, ana menü, haberler, geri bildirim
-  (`feedback.ts`; sunucudan warsimbox@gmail.com'a e-posta: görüş için e-postalı hesap, yalnız fiyat için misafire komutan
-  adı yeter; `worker/index.ts` `sendFeedback`), hesap penceresi (`loginBox.ts`), skor tablosu (`leaderboard.ts`, ana menüde Skorlar sekmesi; ilk 5, "Tüm oyuncuları göster" ile kaydırmalı liste (sunucu ilk 200), oyuncunun kendi satırı sırasına göre renkli), profil
+  (`feedback.ts`; sunucudan warsimbox@gmail.com'a e-posta, e-postalı hesap gerekir, ad hesaptan; `worker/index.ts` `sendFeedback`), hesap penceresi (`loginBox.ts`), skor tablosu (`leaderboard.ts`, ana menüde Skorlar sekmesi; ilk 5, "Tüm oyuncuları göster" ile kaydırmalı liste (sunucu ilk 200), oyuncunun kendi satırı sırasına göre renkli), profil
   (`profile.ts`: ad etiketi ya da Menü → Profil; skorlar, sıra, şifre değiştirme).
+  - **Katkı puanı** (2026-11-24; kurallar `shared.ts` `feedbackStep`, `CONTRIB_RANKS`): geri bildirimde tür seçilir (hata raporu /
+    öneri), "Gönder"de "İncelensin mi?" sorulur. İncelenen mesaj `feedback` tablosuna yazılır (migration 0011), yöneticinin
+    e-postasında imzalı karar düğmeleri (`reviewLinks`; imza ADMIN_KEY ile mesaj ve işlem başına): düğme `/api/feedback/review`
+    onay sayfasını açar (GET yalnız gösterir; Gmail bağlantıları kendiliğinden açabilir), puan "Onayla" (POST) ile verilir.
+    Hata doğrulandı 50, öneri kabul 30, yapıldı +20; uygun değil ve tekrar 0. `accounts.contrib` her kararda mesajlardan yeniden
+    hesaplanır; oyuncuya durum e-postası gider (`worker/feedbackStatusMail.ts`, yenilik izninden bağımsız: kendi isteğinin
+    sonucu). 13 rütbe (`badges.ts` `rankSvg`, kalkan biçimi; destekçi rozetleri yuvarlak): Profil'de rozet, ilerleme çubuğu
+    (sıradaki rütbenin adı ve rozeti gizli) ve mesajların durumu; skor tablolarında adın yanında. Puan artınca ana menüde kısa
+    bildirim (`game.ts` `noteContrib`, `warsim.katki.<ad anahtarı>`). Bekleyenler: `node tools/admin.mjs geri-bildirim`.
+    Eski sürümlerin "Steam'de _ $ veririm" fiyatı sunucuda hâlâ kabul edilir (önbellekteki eski paket); arayüzden kalktı.
   - `news.ts`: haberler (görünüm; verisi `newsData.ts`). Yeni haber `newsData.ts`'te listenin en üstüne yazılır ve izin
     verenlere e-postayla da gider (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
     İngilizce görseli `cover` ve `files` ile verilir). Okunmamış işareti kendiliğinden çıkar: açılan haberin kimliği hesaba

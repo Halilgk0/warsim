@@ -4,6 +4,7 @@
 //   node tools/admin.mjs sifirla "Oyuncu Adı"     yeni kurtarma kodu (oyuncu "Şifremi unuttum"dan yeni şifre belirler)
 //   node tools/admin.mjs sil "Oyuncu Adı"         silinecek hesabı gösterir, bir şey silmez
 //   node tools/admin.mjs sil "Oyuncu Adı" evet    hesabı, kayıtları, skorları ve oturumları siler; GERİ ALINAMAZ
+//   node tools/admin.mjs geri-bildirim            incelenmeyi ya da "yapıldı"yı bekleyen geri bildirimler, karar bağlantılarıyla
 //
 // Ortam değişkenleri: WARSIM_ADMIN_KEY (Cloudflare'de worker'ın ADMIN_KEY sırrı; verilmezse ~/.warsimbox-admin-key
 // dosyasından okunur) ve WARSIM_API (varsayılan https://warsimbox.com/api; yerelde http://localhost:8787/api).
@@ -15,7 +16,8 @@
 // Oyuncu hesabını Profil'den kendi silebilir; bu komut şifresini kaybedenler içindir. Silmeden önce de aynı doğrulamayı
 // yap: başvuru hesaptaki (doğrulanmış) e-posta adresinden geldiyse bu güçlü bir işarettir. Silinen veri veritabanı
 // yedeklerinde en çok 30 gün kalır, sonra kendiliğinden yok olur.
-// Geri bildirimler hesaba bağlı değildir: varsa warsimbox@gmail.com kutusundan ve eski Google Formu yanıtlarından ayrıca silinir.
+// Geri bildirimler: incelenmesi istenenler hesapla birlikte silinir; e-posta kopyaları warsimbox@gmail.com kutusundan ve eski
+// Google Formu yanıtlarından ayrıca silinir.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -25,6 +27,26 @@ const [cmd, name, confirm] = process.argv.slice(2);
 const API = process.env.WARSIM_API ?? 'https://warsimbox.com/api';
 const KEY_FILE = join(homedir(), '.warsimbox-admin-key');
 const KEY = process.env.WARSIM_ADMIN_KEY ?? (existsSync(KEY_FILE) ? readFileSync(KEY_FILE, 'utf8').trim() : undefined);
+
+// node tools/admin.mjs geri-bildirim: incelenmeyi ya da "yapıldı"yı bekleyen geri bildirimler (katkı puanı, 2026-11-24) ve karar
+// bağlantıları. Bağlantı onay sayfası açar; puan orada "Onayla" ile verilir (e-postadaki düğmelerle aynı).
+if (cmd === 'geri-bildirim' && KEY) {
+  const STATUS = { review: 'İncelemede', verified: 'Doğrulandı', accepted: 'Kabul edildi' };
+  const ACT = { verify: 'Doğrulandı', accept: 'Kabul', done: 'Yapıldı', reject: 'Uygun değil', dup: 'Tekrar' };
+  const r = await fetch(`${API}/admin/feedback`, { headers: { 'x-admin-key': KEY } });
+  const j = await r.json().catch(() => ({ error: `yanıt okunamadı (${r.status})` }));
+  if (!r.ok) {
+    console.log(j.error === 'forbidden' ? 'Yönetici anahtarı yanlış.' : `Hata: ${j.error}`);
+    process.exit(1);
+  }
+  if (!j.open.length) console.log('Bekleyen geri bildirim yok.');
+  for (const f of j.open) {
+    console.log(`\n#${f.id} · ${f.kind === 'bug' ? 'Hata raporu' : 'Öneri'} · ${f.name ?? 'silinmiş hesap'} · ${STATUS[f.status]} (${f.points} puan) · ${f.created.slice(0, 10)}`);
+    console.log(`  ${f.text.replace(/\s+/g, ' ')}`);
+    for (const l of f.links) console.log(`  ${ACT[l.act]}: ${l.url}`);
+  }
+  process.exit(0);
+}
 if (!KEY || !name || !['bilgi', 'sifirla', 'sil'].includes(cmd)) {
   console.log('Kullanım: WARSIM_ADMIN_KEY=... node tools/admin.mjs bilgi|sifirla|sil "Oyuncu Adı"');
   process.exit(1);
