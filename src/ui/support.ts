@@ -20,8 +20,23 @@ import { esc } from './dom';
  */
 const PAYMENTS_LIVE = false;
 
+/**
+ * Herkese açılmadan canlıda deneme (2026-11-24, Polar onaylandı): adrese `?destek=1` eklenen tarayıcıda paket görünür ve
+ * bu tarayıcıda kalır (`warsim.destekTest`); `?destek=0` kapatır. Oyunculara bağlantı verilmez.
+ */
+function supportTest(): boolean {
+  try {
+    const q = new URLSearchParams(location.search).get('destek');
+    if (q === '1') localStorage.setItem('warsim.destekTest', '1');
+    if (q === '0') localStorage.removeItem('warsim.destekTest');
+    return localStorage.getItem('warsim.destekTest') === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Destekçi paketi bu sürümde gösterilir mi. */
-export const SUPPORT_ON = PAYMENTS_LIVE && !IN_PLAY_APP && !OLD_SITE;
+export const SUPPORT_ON = (PAYMENTS_LIVE || supportTest()) && !IN_PLAY_APP && !OLD_SITE;
 
 /** Polar'ın ödeme sayfası adresleri (gömülü pencerenin mesajları yalnız buradan kabul edilir). */
 const POLAR_ORIGINS = ['https://polar.sh', 'https://sandbox.polar.sh'];
