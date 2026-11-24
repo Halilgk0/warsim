@@ -51,14 +51,26 @@ export function emailKey(e: string): string {
 export const LEGAL_VERSION = '2026-11-24';
 
 /**
- * Kayıt yerleri (2026-11-10; 2026-11-21'de 4 → 3): hesap başına SAVE_SLOTS_BASE yer, destekçi paketiyle bir ya da iki fazla
+ * Kayıt yerleri (2026-11-10; 2026-11-21'de 4 → 3, 2026-11-25'te 3 → 2): hesap başına SAVE_SLOTS_BASE yer, destekçi paketiyle bir ya da iki fazla
  * (slotsFor). Her yerde bir kayıt. Otomatik kayıt aynı adlı oyunun önceki otomatik kaydının yerine, yoksa son yere, o doluysa
  * boş bir yere yazılır. Kayıt sayısı hesabın yer sayısını aşarsa (yer azalınca: 4 kaydı olan eski hesap, iade) uyarı
  * gösterilir; SAVE_CLEANUP_DAYS içinde inmezse sunucu en eski kayıtları siler.
  */
-export const SAVE_SLOTS_BASE = 3;
+export const SAVE_SLOTS_BASE = 2;
 export const SAVE_SLOTS_MAX = 5;
 export const SAVE_CLEANUP_DAYS = 7;
+/**
+ * 2026-11-25'te yer 3 → 2 (kullanıcı kararı): o günden önce açılmış hesabın üçüncü kaydı silinmez, yüklenir ama üstüne
+ * yazılamaz (yer sayısının dışında). Yalnız bu kadarı tutulur; fazlası eskisi gibi temizlenir.
+ */
+export const SAVE_SLOTS_OLD = 3;
+export const SAVE_SLOTS2_AT = Date.UTC(2026, 10, 25);
+
+/** Hesabın tutabileceği kayıt sayısı (fazlası temizlenir): yer sayısı, eski hesapta en az SAVE_SLOTS_OLD. */
+export function keepFor(created: number, cents: number): number {
+  const n = slotsFor(cents);
+  return created < SAVE_SLOTS2_AT ? Math.max(n, SAVE_SLOTS_OLD) : n;
+}
 /** Yer numarası geçerli mi (1..n; n verilmezse en büyük yer sayısı). */
 export const validSlot = (s: unknown, n = SAVE_SLOTS_MAX): s is number => typeof s === 'number' && Number.isInteger(s) && s >= 1 && s <= n;
 

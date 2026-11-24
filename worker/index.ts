@@ -24,7 +24,7 @@
 //   (order.paid, order.refunded, order.updated) siparişi yazar, hesabın toplamı iadeler düşülerek yeniden hesaplanır. Rozet ve
 //   kayıt yeri sayısı toplamdan çıkar (shared.ts supportTier, slotsFor).
 
-import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
+import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, keepFor, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
@@ -612,6 +612,28 @@ async function placeSaves(env: Env, a: AccountRow, rows: SaveRow[], n: number): 
   if (ups.length) await env.DB.batch(ups);
 }
 
+/** En yeni keep kaydı tutar, öbürlerini siler; kalanları döndürür. */
+async function trimSaves(env: Env, accountId: number, rows: SaveRow[], keep: number): Promise<SaveRow[]> {
+  const kept = new Set([...rows].sort((x, y) => y.created - x.created).slice(0, keep).map((r) => r.id));
+  const gone = rows.filter((r) => !kept.has(r.id));
+  if (gone.length) await env.DB.batch(gone.map((r) => env.DB.prepare('DELETE FROM saves WHERE id = ? AND account_id = ?').bind(r.id, accountId)));
+  return rows.filter((r) => kept.has(r.id));
+}
+
+/**
+ * Süresi dolan fazla kayıtlar (zamanlı görev; 2026-11-24): oyuncu girmese de uyarının yazıldığı andan (kural değişikliğinde
+ * kuralın yayın tarihi, iadede ilk bildirim) SAVE_CLEANUP_DAYS sonra en yeni kayıtlar tutulabilecek sayı kadar kalır.
+ */
+async function cleanupExpiredSaves(env: Env, now: number): Promise<void> {
+  const { results } = await env.DB.prepare('SELECT id, created, support_cents FROM accounts WHERE saves_warned IS NOT NULL AND saves_warned <= ? LIMIT 10')
+    .bind(now - SAVE_CLEANUP_DAYS * DAY_MS).all<{ id: number; created: number; support_cents: number | null }>();
+  for (const a of results) {
+    const saves = await env.DB.prepare('SELECT id, created FROM saves WHERE account_id = ?').bind(a.id).all<{ id: string; created: number }>();
+    await trimSaves(env, a.id, saves.results.map((r) => ({ ...r, meta: {} })), keepFor(a.created, a.support_cents ?? 0));
+    await env.DB.prepare('UPDATE accounts SET saves_warned = NULL WHERE id = ?').bind(a.id).run();
+  }
+}
+
 /**
  * Kayıt listesi, en yenisi önce; hesabın yer sayısıyla (slots). Kayıt sayısı yer sayısını aşıyorsa (yer 4'ten 3'e indi, iade,
  * kayıt yerlerinden önceki fazla kayıtlar): ilk listede uyarı zamanı yazılır ve cleanupBy döner; SAVE_CLEANUP_DAYS sonra en
@@ -621,25 +643,22 @@ async function placeSaves(env: Env, a: AccountRow, rows: SaveRow[], n: number): 
 async function listSaves(env: Env, a: AccountRow): Promise<Response> {
   const now = Date.now();
   const n = slotsFor(a.support_cents ?? 0);
+  // Tutulabilecek kayıt: yer sayısı; 2026-11-25'ten önce açılmış hesapta en az 3 (üçüncüsü yer dışında, yalnız yüklenir)
+  const keep = keepFor(a.created, a.support_cents ?? 0);
   const { results } = await env.DB.prepare('SELECT id, created, meta FROM saves WHERE account_id = ?').bind(a.id).all<{ id: string; created: number; meta: string }>();
   let rows: SaveRow[] = results.map((r) => ({ id: r.id, created: r.created, meta: JSON.parse(r.meta) as Record<string, unknown> }));
   let cleanupBy: number | null = null;
-  if (rows.length > n) {
+  if (rows.length > keep) {
     const warned = a.saves_warned ?? now;
     if (a.saves_warned == null) await env.DB.prepare('UPDATE accounts SET saves_warned = ? WHERE id = ?').bind(now, a.id).run();
     cleanupBy = warned + SAVE_CLEANUP_DAYS * DAY_MS;
     if (now >= cleanupBy) {
-      const keep = new Set([...rows].sort((x, y) => y.created - x.created).slice(0, n).map((r) => r.id));
-      const gone = rows.filter((r) => !keep.has(r.id));
-      if (gone.length) await env.DB.batch(gone.map((r) => env.DB.prepare('DELETE FROM saves WHERE id = ? AND account_id = ?').bind(r.id, a.id)));
-      rows = rows.filter((r) => keep.has(r.id));
+      rows = await trimSaves(env, a.id, rows, keep);
       cleanupBy = null;
     }
   }
-  if (rows.length <= n) {
-    if (a.saves_warned != null) await env.DB.prepare('UPDATE accounts SET saves_warned = NULL WHERE id = ?').bind(a.id).run();
-    await placeSaves(env, a, rows, n);
-  }
+  if (rows.length <= keep && a.saves_warned != null) await env.DB.prepare('UPDATE accounts SET saves_warned = NULL WHERE id = ?').bind(a.id).run();
+  if (rows.length <= n) await placeSaves(env, a, rows, n);
   rows.sort((x, y) => y.created - x.created);
   return json({ saves: rows.map((r) => r.meta), cleanupBy, slots: n });
 }
@@ -659,9 +678,10 @@ async function putSave(req: Request, env: Env, a: AccountRow, id: string): Promi
   const kind = b.meta.kind === 'auto' ? 'auto' : 'manual';
   const created = typeof b.meta.created === 'number' ? b.meta.created : Date.now();
   const slot = validSlot(b.meta.slot) ? b.meta.slot : null;
+  // Yer sayısının dışındaki yere yazılmaz (2026-11-24): eski hesabın üçüncü kaydı yalnız yüklenir ve silinir
+  if (slot !== null && slot > slotsFor(a.support_cents ?? 0)) return fail(409, 'no_slot');
   if (!owner && slot !== null) {
-    // Dolu yerin üstüne yazmak her zaman olur (yer sayısı azalmış hesapta yer sayısının dışındaki kendi yerine de); boş yere
-    // yeni kayıt ancak yer sayısının içindeyse ve kayıt sayısı yer sayısının altındaysa
+    // Dolu yerin üstüne yazmak her zaman olur; boş yere yeni kayıt ancak kayıt sayısı yer sayısının altındaysa
     const n = slotsFor(a.support_cents ?? 0);
     const [taken, count] = await env.DB.batch<{ n: number }>([
       env.DB.prepare("SELECT COUNT(*) AS n FROM saves WHERE account_id = ? AND json_extract(meta, '$.slot') = ?").bind(a.id, slot),
@@ -1112,5 +1132,7 @@ export default {
   },
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(sendNextNewsMail(env, Date.now()).then(() => sendNextThanksMail(env, Date.now())));
+    // Fazla kayıt temizliği e-postadan bağımsız (e-posta hatası onu durdurmasın)
+    ctx.waitUntil(cleanupExpiredSaves(env, Date.now()).catch((e: unknown) => console.error('kayıt temizliği', e)));
   },
 } satisfies ExportedHandler<Env>;

@@ -48,7 +48,7 @@ import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
 import { L, count } from './i18n';
-import { SAVE_SLOTS_BASE, contribRank } from './net/shared';
+import { SAVE_SLOTS_BASE, contribRank, keepFor } from './net/shared';
 import { rankName } from './ui/badges';
 import { overText } from './ui/savesList';
 import { SupportBox } from './ui/support';
@@ -532,13 +532,15 @@ export class Game {
     const c = this.cleanupDue!;
     this.cleanupDue = null;
     const n = saveSlotCount();
-    if (c.count <= n) return;
-    const k = c.count - n;
+    const acc = currentAccount();
+    const keep = acc ? keepFor(acc.created, acc.support ?? 0) : n;
+    if (c.count <= keep) return;
+    const k = c.count - keep;
     this.modals.openNotice(
       k === 1 ? L('Bir kaydını sil', 'Delete one save') : L(`${k} kaydını sil`, `Delete ${k} saves`),
-      // Temel yer sayısı 4'ten 3'e indi (2026-11-21): eski hesaplara nedeni de söylenir
-      `${n === SAVE_SLOTS_BASE ? `<p>${L(`Kayıt yeri sayısı <b>${SAVE_SLOTS_BASE}</b>'e indi.`, `The number of save slots is now <b>${SAVE_SLOTS_BASE}</b>.`)}</p>` : ''}
-      <p>${overText(n, c.count, c.by)}</p>`,
+      // Temel yer sayısı indi (2026-11-21'de 4 → 3, 2026-11-25'te 3 → 2): eski hesaplara nedeni de söylenir
+      `${n === SAVE_SLOTS_BASE ? `<p>${L(`Kayıt yeri sayısı artık <b>${SAVE_SLOTS_BASE}</b>.`, `The number of save slots is now <b>${SAVE_SLOTS_BASE}</b>.`)}${keep > n ? L(` Eski hesaplarda üçüncü kayıt silinmez: yüklenir, üstüne yazılmaz.`, ` Older accounts keep a third save: it can be loaded but not overwritten.`) : ''}</p>` : ''}
+      <p>${overText(n, c.count, c.by, keep)}</p>`,
       [
         { label: L('Kayıtları aç', 'Open saves'), primary: true, run: () => this.menu.openSaves() },
         { label: L('Sonra', 'Later'), run: () => {} },

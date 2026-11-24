@@ -1,9 +1,11 @@
-// Kayıt listesi (ana menü ve duraklatma menüsünde ortak): hesabın kayıt yerleri (3; destekçi paketiyle 4 ya da 5); yükle,
-// sil (onaylı). Duraklatma menüsünde ayrıca "Buraya kaydet" / "Üstüne yaz" (onaylı). Kayıt sayısı yer sayısını aşınca
-// (yer 4'ten 3'e inen eski hesap, iade) uyarı ve silinme tarihi; yer sayısının dışındaki dolu yer "fazla" işaretli.
+// Kayıt listesi (ana menü ve duraklatma menüsünde ortak): hesabın kayıt yerleri (2; destekçi paketiyle 3 ya da 4); yükle,
+// sil (onaylı). Duraklatma menüsünde ayrıca "Buraya kaydet" / "Üstüne yaz" (onaylı; yalnız yer sayısının içinde). Kayıt sayısı
+// tutulabilecek sayıyı aşınca (iade, eski fazla kayıtlar) uyarı ve silinme tarihi; o yerler "fazla" işaretli. 2026-11-25'ten
+// önce açılmış hesabın üçüncü kaydı "eski yer": silinmez, yüklenir, üstüne yazılamaz (shared.ts keepFor).
 // Kayıt yerlerinden önceki fazla kayıtlar ayrı bölümde.
 
-import { type SaveMeta, deleteSave, listSaves, saveSlotCount, savesCleanupBy } from '../persist';
+import { type SaveMeta, currentAccount, deleteSave, listSaves, saveSlotCount, savesCleanupBy } from '../persist';
+import { keepFor } from '../net/shared';
 import { canFill, legacySaves, slotsOf } from '../saveSlots';
 import { fmtMoney } from '../sim/economy';
 import { mapById } from '../sim/maps';
@@ -15,8 +17,8 @@ const dateFmt = new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: 'short'
 const dayFmt = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' });
 
 /** Kayıt sayısı yer sayısını aşınca: kaç kayıt silinmeli, ne zamana kadar (liste ve giriş uyarısı aynı metni kullanır). */
-export function overText(n: number, count: number, by: number): string {
-  const k = count - n;
+export function overText(n: number, count: number, by: number, keep = n): string {
+  const k = count - keep;
   const when = dayFmt.format(by);
   const left = Math.max(0, Math.ceil((by - Date.now()) / 86400000));
   return L(
@@ -77,7 +79,7 @@ export class SavesPanel {
         ? `<span class="sv-confirm">${L('Silinsin mi?', 'Delete it?')} <button class="mini danger" data-sv="del-yes" data-id="${m.id}">${L('Sil', 'Delete')}</button><button class="mini" data-sv="del-no">${L('Vazgeç', 'Cancel')}</button></span>`
         : `<button class="mini" data-sv="del" data-id="${m.id}" title="${L('Kaydı sil', 'Delete save')}" ${dis}>${L('Sil', 'Delete')}</button>`;
     }
-    if (this.saveTo && slot !== null) {
+    if (this.saveTo && slot !== null && slot <= n) {
       if (!m) {
         if (canFill(this.list, n, slot)) acts += `<button class="mini sv-put" data-sv="put" data-slot="${slot}" ${dis}>${L('Buraya kaydet', 'Save here')}</button>`;
       }
@@ -86,13 +88,18 @@ export class SavesPanel {
       } else acts += `<button class="mini sv-put" data-sv="put" data-slot="${slot}" ${dis}>${L('Üstüne yaz', 'Overwrite')}</button>`;
     }
     const head = slot !== null ? `<span class="sv-slot">${slot}</span>` : `<span class="sv-ic">${m?.kind === 'auto' ? '⟳' : '◆'}</span>`;
-    // Yer sayısının dışındaki dolu yer: silinmeyi bekler
+    // Yer sayısının dışındaki dolu yer: eski hesabın tutulabilecek sayısı içindeyse "eski yer" (yalnız yüklenir), değilse silinmeyi bekler
     const extra = slot !== null && slot > n;
+    const acc = currentAccount();
+    const old = extra && this.list.length <= (acc ? keepFor(acc.created, acc.support ?? 0) : n);
+    const tag = old
+      ? ` <span class="sv-extra sv-old" title="${L('Eski kayıt yeri: yüklenebilir, üstüne yazılamaz. Silersen bu yer kalkar.', 'Old save slot: you can load it but not overwrite it. Deleting it removes the slot.')}">${L('eski yer', 'old slot')}</span>`
+      : ` <span class="sv-extra" title="${L('Kayıt yeri sayının dışında: kayıt sayın inmezse silinir', 'Outside your slot count: deleted unless your save count goes down')}">${L('fazla', 'extra')}</span>`;
     const main = m
-      ? `<b>${m.kind === 'auto' ? '<span class="sv-auto">⟳</span> ' : ''}${esc(m.title)}</b>${extra ? ` <span class="sv-extra" title="${L('Kayıt yeri sayının dışında: kayıt sayın inmezse silinir', 'Outside your slot count: deleted unless your save count goes down')}">${L('fazla', 'extra')}</span>` : ''}${m.pending ? ` <span class="sv-pending" title="${L('Bağlantı gelince buluta yüklenecek', 'Will upload to the cloud when online')}">${L('bu cihazda', 'on this device')}</span>` : ''}
+      ? `<b>${m.kind === 'auto' ? '<span class="sv-auto">⟳</span> ' : ''}${esc(m.title)}</b>${extra ? tag : ''}${m.pending ? ` <span class="sv-pending" title="${L('Bağlantı gelince buluta yüklenecek', 'Will upload to the cloud when online')}">${L('bu cihazda', 'on this device')}</span>` : ''}
           <small>${this.info(m)}</small>`
       : `<b class="muted">${L('Boş', 'Empty')}</b>${slot === n ? `<small>${L('Otomatik kayıt önce bu yere yazılır.', 'Autosave goes to this slot first.')}</small>` : ''}`;
-    return `<div class="sv-row ${m ? m.kind : 'empty'}${extra ? ' sv-over' : ''}">${head}<div class="sv-main">${main}</div><div class="sv-act">${acts}</div></div>`;
+    return `<div class="sv-row ${m ? m.kind : 'empty'}${extra && !old ? ' sv-over' : ''}">${head}<div class="sv-main">${main}</div><div class="sv-act">${acts}</div></div>`;
   }
 
   html(): string {
@@ -105,7 +112,9 @@ export class SavesPanel {
     const count = slots.filter(Boolean).length + legacy.length;
     const full = count >= n;
     let out = '';
-    if (by && count > n) out += `<div class="sv-warn">${overText(n, count, by)}</div>`;
+    const acc = currentAccount();
+    const keep = acc ? keepFor(acc.created, acc.support ?? 0) : n;
+    if (by && count > keep) out += `<div class="sv-warn">${overText(n, count, by, keep)}</div>`;
     if (this.saveTo && full) {
       out += `<div class="sv-warn">${L(
         'Bütün kayıt yerleri dolu. Birinin üstüne yazabilir ya da birini silip yer açabilirsin.',

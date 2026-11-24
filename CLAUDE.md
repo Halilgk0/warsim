@@ -448,17 +448,20 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
 - **`src/persist.ts`:** Hesap sunucuda: ad + şifre. Kayıtlar bulutta; her kayıt önce IndexedDB'ye (önbellek ve yedek)
   yazılır, bağlantı yoksa orada bekler ve sonra yüklenir. Eski şifresiz hesabın (`warsim.accounts.v1`) sahibi şifre
   belirleyince bu tarayıcıdaki kayıtları yeni hesaba geçer.
-  - **Kayıt yerleri** (2026-11-10; 2026-11-21'de 4 → 3, `src/saveSlots.ts`, `shared.ts` `SAVE_SLOTS_BASE`, `slotsFor`): hesap
-    başına 3 yer, destekçi paketiyle 4 ya da 5 (sunucu hesaba göre verir: `publicAccount.slots`, `/saves` `slots`; istemci
+  - **Kayıt yerleri** (2026-11-10; 2026-11-21'de 4 → 3, 2026-11-25'te 3 → 2; `src/saveSlots.ts`, `shared.ts` `SAVE_SLOTS_BASE`, `slotsFor`): hesap
+    başına 2 yer, destekçi paketiyle 3 ya da 4 (sunucu hesaba göre verir: `publicAccount.slots`, `/saves` `slots`; istemci
     `persist.ts` `saveSlotCount`). Yerde bir kayıt (`SaveMeta.slot`); yazınca o yerdeki eski kayıt silinir (istemci ve sunucu).
-    Sunucu boş yere yeni kaydı ancak yer sayısının içindeyse ve kayıt sayısı yer sayısının altındaysa alır (`no_slot`); dolu
-    yerin üstüne yazmak hep olur. Otomatik kayıt `autoSlotFor`: aynı adlı (komutan adı, `nameKey`) oyunun otomatik kaydının
+    Sunucu boş yere yeni kaydı ancak yer sayısının içindeyse ve kayıt sayısı yer sayısının altındaysa alır (`no_slot`); yer sayısının
+    içindeki dolu yerin üstüne yazmak hep olur, dışındakine hiç (`no_slot`). 2026-11-25'ten önce açılmış hesap 3 kayıt tutabilir
+    (`keepFor`, `SAVE_SLOTS2_AT`): üçüncüsü "eski yer" (listede `sv-old`), yüklenir ve silinir, üstüne yazılmaz; silinince kalanlar
+    yer sayısına sığar ve yer kalkar. Otomatik kayıt `autoSlotFor`: aynı adlı (komutan adı, `nameKey`) oyunun otomatik kaydının
     yeri, yoksa son yerden geriye ilk boş; yer yoksa alınmaz, ana menü başlamadan ve yüklemeden önce söyler (`mainMenu.ts`
     `warnNoAutoSlot`). Elle kayıtta oyuncu yeri seçer (duraklatma → Kaydet), dolu yere onayla.
-  - Kayıt sayısı yer sayısını aşınca (4 kaydı olan eski hesap, iade): sunucu `listSaves` `accounts.saves_warned`'a (migration
-    0008) ilk uyarı anını yazar, `cleanupBy` döner; oyun her girişte "Bir kaydını sil" penceresini açar (`game.ts`
+  - Kayıt sayısı tutulabilecek sayıyı (`keepFor`) aşınca (eski fazla kayıtlar, iade): sunucu `listSaves` `accounts.saves_warned`'a
+    (migration 0008) ilk uyarı anını yazar (kural değişikliğinde yayın tarihi elle yazılır: 2026-11-21), `cleanupBy` döner; oyun her girişte "Bir kaydını sil" penceresini açar (`game.ts`
     `checkSaveCleanup`, metin `savesList.ts` `overText`). Yer sayısının dışındaki dolu yer listede "fazla". 7 gün sonra en
-    yeniler yer sayısı kadar kalır, en eskiler silinir; sığınca yeri olmayan ya da dışarıda kalan kayıtlar boş yerlere geçer
+    yeniler tutulabilecek sayı kadar kalır, en eskiler silinir: oyuncu girmese de zamanlı görev yapar (`cleanupExpiredSaves`,
+    e-postadan ayrı `waitUntil`; yerelde `wrangler dev --test-scheduled`, tetik `/cdn-cgi/handler/scheduled`); sığınca yeri olmayan ya da dışarıda kalan kayıtlar boş yerlere geçer
     (`placeSaves`: otomatikler sondan, elle olanlar 1'den). Yasal metinler bunu anlatır.
   - **Destekçi paketi** (2026-11-21; plan ve kararlar hafızada `supporter-pack`): oyuncu 1–50 $ seçer (`ui/support.ts`, çelik
     pencere, ana menü üst çubuğu ve Profil), sunucu Polar'da ödeme oturumu açar (`/api/support/checkout`; hesap numarası
