@@ -184,6 +184,8 @@ export interface FeedbackItem {
   points: number;
   created: number;
   updated: number;
+  /** Geliştiricinin notu (ör. reddetme nedeni). */
+  note?: string | null;
 }
 
 /** Son açılan profil (internetsizken gösterilir). */

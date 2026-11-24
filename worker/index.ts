@@ -28,7 +28,7 @@ import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type Feedback
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
-import { feedbackMail, reviewPage } from './feedbackMail';
+import { feedbackListPage, feedbackMail, reviewPage } from './feedbackMail';
 import { feedbackStatusMail } from './feedbackStatusMail';
 import { type MailEnv, mailReady, sendMail } from './mail';
 
@@ -270,7 +270,8 @@ async function sendFeedback(req: Request, env: Env): Promise<Response> {
   try {
     const email = a?.email ?? null;
     const links = id !== null && kind ? await reviewLinks(env, id, kind) : null;
-    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price, kind, id, links }), email);
+    const list = id !== null ? await feedbackListUrl(env) : null;
+    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price, kind, id, links, list }), email);
   } catch (e) {
     console.error(e);
     if (id !== null) await env.DB.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
@@ -282,6 +283,18 @@ async function sendFeedback(req: Request, env: Env): Promise<Response> {
 /** Karar bağlantısının imzası: yönetici anahtarıyla, mesaj ve işlem başına (tahmin edilemez, başka işleme taşınamaz). */
 const reviewToken = (env: Env, id: number, act: FeedbackAct): Promise<string> => sha256(`fb-review:${id}:${act}:${env.ADMIN_KEY ?? ''}`);
 
+/** Tüm geri bildirimler sayfasının imzası ve adresi (her yönetici e-postasında ve onay sayfasında). */
+const listToken = (env: Env): Promise<string> => sha256(`fb-list:${env.ADMIN_KEY ?? ''}`);
+async function feedbackListUrl(env: Env): Promise<string> {
+  const site = (env.SITE_URL ?? 'https://warsimbox.com').replace(/\/$/, '');
+  return `${site}/api/feedback/list?t=${await listToken(env)}`;
+}
+
+/** Bu durumda geçerli karar bağlantıları (sayfada yalnız yapılabilecek düğmeler görünür). */
+async function validLinks(env: Env, f: { id: number; kind: FeedbackKind; status: FeedbackStatus }): Promise<{ act: FeedbackAct; url: string }[]> {
+  return (await reviewLinks(env, f.id, f.kind)).filter((l) => feedbackStep(f.kind, f.status, l.act));
+}
+
 /** Yöneticinin e-postasındaki karar düğmeleri (türe göre): işlem ve adres. */
 async function reviewLinks(env: Env, id: number, kind: FeedbackKind): Promise<{ act: FeedbackAct; url: string }[]> {
   const site = (env.SITE_URL ?? 'https://warsimbox.com').replace(/\/$/, '');
@@ -289,7 +302,10 @@ async function reviewLinks(env: Env, id: number, kind: FeedbackKind): Promise<{ 
   return Promise.all(acts.map(async (act) => ({ act, url: `${site}/api/feedback/review?id=${id}&a=${act}&t=${await reviewToken(env, id, act)}` })));
 }
 
-interface FeedbackRow { id: number; account_id: number; kind: FeedbackKind; message: string; status: FeedbackStatus; points: number; created: number; name: string | null; email: string | null; lang: string | null }
+interface FeedbackRow { id: number; account_id: number; kind: FeedbackKind; message: string; status: FeedbackStatus; points: number; created: number; updated: number; note: string | null; name: string | null; email: string | null; lang: string | null }
+
+/** Yöneticinin notunun en büyük uzunluğu (oyuncunun e-postasına ve Profil'ine gider). */
+const NOTE_MAX = 500;
 
 /**
  * Yöneticinin kararı (e-postadaki düğme): GET onay sayfasını gösterir (Gmail ve tarayıcılar bağlantıyı kendiliğinden açabilir,
@@ -307,26 +323,41 @@ async function reviewFeedback(req: Request, env: Env, url: URL): Promise<Respons
     .bind(id).first<FeedbackRow>();
   if (!f) return page(404, reviewPage({ state: 'gone' }));
   const step = feedbackStep(f.kind, f.status, act);
-  if (req.method !== 'POST') return page(200, reviewPage({ state: step ? 'ask' : 'stale', f, act, add: step?.add ?? 0 }));
-  if (!step) return page(409, reviewPage({ state: 'stale', f, act, add: 0 }));
+  const list = await feedbackListUrl(env);
+  if (req.method !== 'POST') return page(200, reviewPage({ state: step ? 'ask' : 'stale', f, act, add: step?.add ?? 0, links: await validLinks(env, f), list }));
+  if (!step) return page(409, reviewPage({ state: 'stale', f, act, add: 0, links: await validLinks(env, f), list }));
+  const form = await req.formData().catch(() => null);
+  const note = String(form?.get('note') ?? '').trim().slice(0, NOTE_MAX) || null;
   const now = Date.now();
-  // Aynı anda iki onay gelirse yalnız biri geçer (durum hâlâ okunduğu gibiyse)
-  const upd = await env.DB.prepare('UPDATE feedback SET status = ?, points = points + ?, updated = ? WHERE id = ? AND status = ?')
-    .bind(step.status, step.add, now, id, f.status).run();
-  if (!upd.meta.changes) return page(409, reviewPage({ state: 'stale', f, act, add: 0 }));
+  // Aynı anda iki onay gelirse yalnız biri geçer (durum hâlâ okunduğu gibiyse); boş not önceki notu silmez
+  const upd = await env.DB.prepare('UPDATE feedback SET status = ?, points = points + ?, updated = ?, note = COALESCE(?, note) WHERE id = ? AND status = ?')
+    .bind(step.status, step.add, now, note, id, f.status).run();
+  if (!upd.meta.changes) return page(409, reviewPage({ state: 'stale', f, act, add: 0, links: await validLinks(env, f), list }));
   const sum = await env.DB.prepare('UPDATE accounts SET contrib = (SELECT COALESCE(SUM(points), 0) FROM feedback WHERE account_id = ?1) WHERE id = ?1 RETURNING contrib')
     .bind(f.account_id).first<{ contrib: number }>();
   const total = sum?.contrib ?? 0;
   let mailed = false;
   if (f.email && mailReady(env)) {
     try {
-      await sendMail(env, f.email, feedbackStatusMail({ name: f.name ?? '', lang: f.lang, kind: f.kind, status: step.status, add: step.add, total, message: f.message }));
+      await sendMail(env, f.email, feedbackStatusMail({ name: f.name ?? '', lang: f.lang, kind: f.kind, status: step.status, add: step.add, total, message: f.message, note }));
       mailed = true;
     } catch (e) {
       console.error(e);
     }
   }
-  return page(200, reviewPage({ state: 'done', f: { ...f, status: step.status }, act, add: step.add, total, mailed }));
+  const after = { ...f, status: step.status, points: f.points + step.add, updated: now, note: note ?? f.note };
+  return page(200, reviewPage({ state: 'done', f: after, act, add: step.add, total, mailed, links: await validLinks(env, after), list }));
+}
+
+/** Tüm geri bildirimler (yöneticinin imzalı bağlantısı): bekleyenler önce, durum, puan, not ve geçerli karar düğmeleri. */
+async function feedbackList(env: Env, url: URL): Promise<Response> {
+  const page = (status: number, html: string) => new Response(html, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
+  if (!env.ADMIN_KEY || !same(url.searchParams.get('t') ?? '', await listToken(env))) return page(400, reviewPage({ state: 'bad' }));
+  const { results } = await env.DB.prepare(
+    "SELECT f.id, f.kind, f.status, f.points, f.created, f.updated, f.note, substr(f.message, 1, 400) AS message, a.name AS name FROM feedback f LEFT JOIN accounts a ON a.id = f.account_id ORDER BY CASE f.status WHEN 'review' THEN 0 WHEN 'verified' THEN 1 WHEN 'accepted' THEN 1 ELSE 2 END, f.created DESC LIMIT 200",
+  ).all<{ id: number; kind: FeedbackKind; status: FeedbackStatus; points: number; created: number; updated: number; note: string | null; message: string; name: string | null }>();
+  const rows = await Promise.all(results.map(async (r) => ({ ...r, links: await validLinks(env, r) })));
+  return page(200, feedbackListPage(rows));
 }
 
 /** Yönetici aracı: kararı ve "yapıldı"yı bekleyen mesajlar, karar bağlantılarıyla. */
@@ -549,7 +580,7 @@ async function profile(env: Env, a: AccountRow): Promise<Response> {
     env.DB.prepare('SELECT kills, wins, earned, peak, play_sec FROM stats WHERE account_id = ? AND period = ?').bind(a.id, week),
     env.DB.prepare(`SELECT ${ranks} FROM stats s WHERE s.account_id = ? AND s.period = 'all'`).bind(a.id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM saves WHERE account_id = ?').bind(a.id),
-    env.DB.prepare('SELECT id, kind, substr(message, 1, 160) AS text, status, points, created, updated FROM feedback WHERE account_id = ? ORDER BY created DESC LIMIT 20').bind(a.id),
+    env.DB.prepare('SELECT id, kind, substr(message, 1, 160) AS text, status, points, created, updated, note FROM feedback WHERE account_id = ? ORDER BY created DESC LIMIT 20').bind(a.id),
   ]);
   return json({
     account: publicAccount(a), all: all.results[0] ?? null, week: wk.results[0] ?? null, ranks: rank.results[0] ?? null,
@@ -991,6 +1022,7 @@ async function api(req: Request, env: Env, url: URL): Promise<Response> {
   if (m === 'POST' && path === '/email/code') return emailCode(req, env);
   if (m === 'POST' && path === '/feedback') return sendFeedback(req, env);
   if (path === '/feedback/review') return reviewFeedback(req, env, url);
+  if (m === 'GET' && path === '/feedback/list') return feedbackList(env, url);
   if (m === 'POST' && path === '/register') return register(req, env);
   if (m === 'POST' && path === '/login') return login(req, env);
   if (m === 'POST' && path === '/recover') return recover(req, env);

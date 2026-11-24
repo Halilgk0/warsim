@@ -19,6 +19,8 @@ export interface StatusNote {
   /** Hesabın yeni toplam katkı puanı. */
   total: number;
   message: string;
+  /** Yöneticinin notu (ör. reddetme nedeni); yoksa gösterilmez. */
+  note?: string | null;
 }
 
 function lines(n: StatusNote, en: boolean): { subject: string; title: string; lead: string } {
@@ -64,9 +66,10 @@ export function feedbackStatusMail(n: StatusNote): Mail {
   const hello = en ? `Hello ${escHtml(n.name)},` : `Merhaba ${escHtml(n.name)},`;
   const button = en ? 'Open the game' : 'Oyunu aç';
   const plain = t.lead.replace(/<[^>]+>/g, '');
+  const noteHead = en ? 'Note from the developer' : 'Geliştiricinin notu';
   return {
     subject: t.subject,
-    text: `${en ? `Hello ${n.name},` : `Merhaba ${n.name},`}\n\n${t.title}\n${plain}\n\n${totalText}\n\n"${quoteText}"\n\n${button}: ${SITE}\n\n${why}\n\nWarSimBox · ${SITE}`,
+    text: `${en ? `Hello ${n.name},` : `Merhaba ${n.name},`}\n\n${t.title}\n${plain}${n.note ? `\n\n${noteHead}: ${n.note}` : ''}\n\n${totalText}\n\n"${quoteText}"\n\n${button}: ${SITE}\n\n${why}\n\nWarSimBox · ${SITE}`,
     html: `<!doctype html>
 <html lang="${en ? 'en' : 'tr'}">
 <head>
@@ -91,6 +94,7 @@ export function feedbackStatusMail(n: StatusNote): Mail {
       <div style="font-size:15px;color:#bccac2;margin:0 0 6px;">${hello}</div>
       <div style="font-size:22px;font-weight:800;line-height:1.25;margin:0 0 8px;">${t.title}</div>
       <div style="font-size:15px;line-height:1.5;color:#d3ddd7;margin:0 0 14px;">${t.lead}</div>
+      ${n.note ? `<div style="font-size:14px;line-height:1.5;color:#f0e6cf;background:#2b2a22;border-left:3px solid #c49e58;border-radius:6px;padding:10px 12px;margin:0 0 14px;white-space:pre-wrap;"><b>${noteHead}:</b> ${escHtml(n.note)}</div>` : ''}
       <div style="font-size:15px;font-weight:800;color:#e8c77e;margin:0 0 14px;">${escHtml(totalText)}</div>
       <div style="font-size:14px;line-height:1.5;color:#bccac2;white-space:pre-wrap;background:#202a25;border-left:3px solid #5d6a64;border-radius:6px;padding:10px 12px;">${escHtml(quoteText)}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 0;"><tr>

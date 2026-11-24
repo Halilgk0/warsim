@@ -341,7 +341,7 @@ export class ProfileBox {
     const rank = contribRank(pts);
     const items = (p.feedback ?? []).map((f) => `<li><span class="pf-fk">${f.kind === 'bug' ? L('Hata', 'Bug') : L('Öneri', 'Idea')}</span>
         <span class="pf-ft">${esc(f.text)}</span>
-        <span class="pf-fs s-${f.status}">${STATUS[f.status]?.() ?? ''}${f.points ? ` · +${f.points}` : ''}</span></li>`).join('');
+        <span class="pf-fs s-${f.status}">${STATUS[f.status]?.() ?? ''}${f.points ? ` · +${f.points}` : ''}</span>${f.note ? `<span class="pf-fnote">${L('Not', 'Note')}: ${esc(f.note)}</span>` : ''}</li>`).join('');
     const list = items ? `<ul class="pf-fb">${items}</ul>` : '';
     // Puanı olmayan hesapta rütbe ve rozet yok (ilk rütbe ilk puanla görünür); incelemeye gönderdiği mesaj varsa yalnız durumları
     if (!rank) return list ? `<div class="pf-contrib"><b>${L('Geri bildirimlerin', 'Your feedback')}</b>${list}</div>` : '';

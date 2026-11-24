@@ -1167,6 +1167,7 @@ svg.sbadge { stroke: none; flex: none; vertical-align: -0.25em; }
 .pf-fb li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: calc(8px * var(--ui)); font-size: calc(12.5px * var(--ui)); }
 .pf-fk { font-weight: 800; color: var(--muted); }
 .pf-ft { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pf-fnote { grid-column: 1 / -1; font-size: calc(11.5px * var(--ui)); color: var(--muted); line-height: 1.4; margin-top: calc(-2px * var(--ui)); }
 .pf-fs { font-weight: 800; white-space: nowrap; padding: calc(1px * var(--ui)) calc(7px * var(--ui)); border-radius: 99px; background: var(--chip, #e9e4da); }
 .pf-fs.s-verified, .pf-fs.s-accepted, .pf-fs.s-done { background: #d6ecdf; color: #2f6b4c; }
 .pf-fs.s-rejected, .pf-fs.s-duplicate { color: var(--muted); }

@@ -426,6 +426,10 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     sonucu). 13 rütbe (`badges.ts` `rankSvg`, kalkan biçimi; destekçi rozetleri yuvarlak): Profil'de rozet, ilerleme çubuğu
     (sıradaki rütbenin adı ve rozeti gizli) ve mesajların durumu; skor tablolarında adın yanında. Puan artınca ana menüde kısa
     bildirim (`game.ts` `noteContrib`, `warsim.katki.<ad anahtarı>`). Bekleyenler: `node tools/admin.mjs geri-bildirim`.
+    Onay sayfası mesajın şu anki durumunu, tarihlerini ve yalnız geçerli düğmeleri gösterir (`validLinks`); aynı karar ikinci kez
+    uygulanmaz (409). Her yönetici e-postasında ve onay sayfasında "Tüm geri bildirimler" (`/api/feedback/list`, imza `listToken`;
+    bekleyenler önce). Kararla isteğe bağlı not (`feedback.note`, migration 0012, en çok 500 karakter; boş not öncekini silmez):
+    oyuncunun durum e-postasında "Geliştiricinin notu" ve Profil'deki mesaj satırında.
     Eski sürümlerin "Steam'de _ $ veririm" fiyatı sunucuda hâlâ kabul edilir (önbellekteki eski paket); arayüzden kalktı.
   - `news.ts`: haberler (görünüm; verisi `newsData.ts`). Yeni haber `newsData.ts`'te listenin en üstüne yazılır ve izin
     verenlere e-postayla da gider (İngilizcesi `newsEn.ts`; ekran görüntüsünde yazı varsa
