@@ -1944,10 +1944,6 @@ input[name="code"][inputmode="numeric"] { letter-spacing: 4px; text-align: cente
   .top-actions { min-width: 0; flex-shrink: 1; overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain; }
   .top-actions::-webkit-scrollbar { display: none; }
   .top-actions button { flex-shrink: 0; }
-}
-/* Dar telefonda günün saati gizlenir (oyun süresi kalır): düğmelere yer */
-@media (max-width: 820px) {
-  .dayclock { display: none; }
   .panel { top: calc(48px * var(--ui)); max-height: calc(100% - calc(56px * var(--ui))); width: calc(270px * var(--ui)); }
   #left, #planner { left: max(6px, env(safe-area-inset-left)); }
   #right { right: max(6px, env(safe-area-inset-right)); width: calc(290px * var(--ui)); }
@@ -2152,4 +2148,11 @@ button.active, button.active:hover, .seg button.active, .mm-tabs button.active, 
   .mm-acc > * { white-space: nowrap; flex-shrink: 0; }
   .mm-acc .mm-login:not(.mm-lang) { padding-left: calc(9px * var(--ui)); padding-right: calc(9px * var(--ui)); }
   .mm-acc > .mm-user { flex-shrink: 1; }
+}
+
+/* Dar telefonda günün saati gizlenir (oyun süresi kalır): üst çubuktaki düğmelere yer. Ayrı blokta, dosyanın sonunda:
+   telefon kurallarının bloğunu bölmesin (2026-11-24: bloğun ortasına girince 820 px üstü telefonlarda kalan kurallar çalışmıyor,
+   araştırma penceresi masaüstü düzenine düşüyordu) */
+@media (max-width: 820px) {
+  .dayclock { display: none; }
 }
