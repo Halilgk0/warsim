@@ -178,7 +178,8 @@ export class Brain {
     if (fl && isFighter && !this.detached && fl.engaged) {
       const tid = fl.assigned.get(ac.id);
       if (tid !== undefined) this.target = world.aircraftById(tid) ?? null;
-      else if (!fl.wingLeaderOf(ac) || fl.plan.doctrine !== 'cover') this.target = null;
+      // Kapak doktrininde hedef verilmeyen kanat adamı liderin dövüşünü sürdürür; oyuncu kolu geri çağırdıysa sürdürmez
+      else if (!fl.wingLeaderOf(ac) || fl.plan.doctrine !== 'cover' || fl.stats.recalled) this.target = null;
     } else this.target = null;
     if (this.target && !this.target.airborne) this.target = null;
     if (this.target !== this.lastTarget) {

@@ -165,6 +165,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         bataryalar bir an arkada kalıp sayacı sıfırlıyordu. Hedefe son yaklaşmada (taarruz, pike) sınır 60 sn (`AVOID_FINAL`; evre
         320 sn'de biter). Üssü saran 12 bataryalık halkada Il-2 0/3 → 3/3 (`tools/sim/ucaksavar_halka`). Süre dolan kolun dönüş
         nedeni "süre aşıldı".
+      - Geri çağırma (2026-11-24, `flightGroup.ts` `assignTargets`, `brain.ts`): oyuncunun "Üsse dön" emriyle (`stats.recalled`)
+        dönen avcı kolu kimseyi hedef almaz, saldırana karşı yalnız savunma manevrası yapar. Eskiden kendisine saldıran düşman
+        aday kalıyordu; dövüşen iki kol birbirini tehdit sayıp dövüşü bitirmiyordu. Kapak doktrinindeki kanat adamı liderin
+        hedefini geri çağrılınca sürdürmez. Spitfire IX / P-51D 4'e 4: emirden sonra dövüş 300 → 0 sn, üsten
+        uzaklaşma +29 → +0,1 km, emirden sonra kayıp 0 (`tools/sim/geri_cagir`). Normal dalaş değişmedi (`sim:bench` üç tohumla,
+        eski kodla birebir aynı).
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
     - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
       alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana

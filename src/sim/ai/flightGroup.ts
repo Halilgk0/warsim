@@ -499,7 +499,11 @@ export class FlightGroup {
   /** Avcı kolları için angajman kararı ve hedef dağıtımı. */
   private assignTargets(world: World): void {
     this.assigned.clear();
-    if (!this.isFighterFlight()) {
+    // Oyuncunun "Üsse dön" emri (stats.recalled): kol dövüşten kopar, kimseyi kovalamaz; saldırana karşı yalnız savunma
+    // manevrası (Brain.threat). Eskiden kendisine saldıran düşman aday kalıyordu: dövüşen iki kol birbirini "tehdit" sayıp
+    // dövüşü bitirmiyordu, geri çağrılan Spitfire'lar Mustang'leri dakikalarca, üsten 30 km uzağa kovalıyordu (2026-11-24,
+    // oyuncu bildirimi; tools/sim/geri_cagir). Yakıt ya da mühimmat bittiği için dönen kol ve eskort eskisi gibi kendini savunur.
+    if (!this.isFighterFlight() || this.stats.recalled) {
       this.engaged = false;
       return;
     }
