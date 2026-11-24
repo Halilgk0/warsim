@@ -29,7 +29,7 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'need_email': return L('Hata raporu ve öneri göndermek için hesabına e-posta ekle', 'Add an email to your account to send bug reports and suggestions');
     case 'feedback_empty': return L('Göndermeden önce mesajını yaz', 'Write your message before sending');
     case 'bad_price': return L('Fiyat 0 ile 1.000.000 arasında bir sayı olmalı', 'The price must be a number between 0 and 1,000,000');
-    case 'feedback_limit': return L('Çok fazla geri bildirim gönderildi; daha sonra tekrar dene', 'Too much feedback sent; try again later');
+    case 'feedback_limit': return L('Günlük geri bildirim hakkın doldu; 24 saat sonra tekrar dene', "You've used today's feedback limit; try again in 24 hours");
     case 'email_taken': return L('Bu e-posta başka bir hesapta kayıtlı; o hesapla giriş yap ya da başka bir adres yaz', 'This email is already on another account; log in to it or enter another address');
     case 'code_wrong': {
       const left = Number(extra.left ?? 0);

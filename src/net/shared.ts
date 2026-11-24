@@ -90,6 +90,9 @@ export function supportTier(cents: number): 0 | 1 | 2 | 3 {
   return cents >= SUPPORT_TIERS[2] ? 3 : cents >= SUPPORT_TIERS[1] ? 2 : cents >= SUPPORT_TIERS[0] ? 1 : 0;
 }
 
+/** Hesabın günlük geri bildirim hakkı: 3, destekçi basamağı başına +1 (1 $: 4, 5 $: 5, 15 $: 6). */
+export const feedbackPerDay = (cents: number): number => 3 + supportTier(cents);
+
 /** Hesabın kayıt yeri sayısı. */
 export function slotsFor(cents: number): number {
   return SAVE_SLOTS_BASE + EXTRA_SLOTS[supportTier(cents)];

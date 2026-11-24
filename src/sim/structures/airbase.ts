@@ -399,7 +399,9 @@ export class Airbase {
 
     // İniş sırası: yaklaşmadakiler temizlenir, önceki son yaklaşmanın yarısını geçince sıradaki izin alır. İzin 300 sn'de düşer
     // (yaklaşamayan uçak sırayı tutmasın); son yaklaşmadaki ve yerdeki uçağınki düşmez: yavaş tırmanan Lancaster pistin 350 m
-    // önünde, 63 m'de iznini kaybedip bekleme paternine atılıyor, yere çakılıyordu
+    // önünde, 63 m'de iznini kaybedip bekleme paternine atılıyor, yere çakılıyordu. Süre, izin anında ilk yaklaşma noktasının
+    // üstündeki her 8 m için 1 sn uzar: yüksekten yavaşça alçalan bombardıman iznini kaybedip sıranın sonuna düşüyor, kendi
+    // katına yeniden tırmanıyordu (2026-11-24, oyuncu bildirimi)
     for (let i = this.approaching.length - 1; i >= 0; i--) {
       const id = this.approaching[i];
       const a = world.aircraftById(id);
@@ -417,7 +419,9 @@ export class Airbase {
     if (this.landingQueue.length > 0 && this.usable && t - this.lastTakeoffAt > 6 && this.canClearNext(world)) {
       const id = this.landingQueue.shift()!;
       this.approaching.push(id);
-      this.clearedAt.set(id, t);
+      const a = world.aircraftById(id);
+      const iafAlt = this.s.pos.y + this.approach().finalDist * this.approach().glideTan;
+      this.clearedAt.set(id, t + Math.max(0, (a?.pos.y ?? 0) - iafAlt) / 8);
     }
 
     // Kalkış sırası

@@ -24,7 +24,7 @@
 //   (order.paid, order.refunded, order.updated) siparişi yazar, hesabın toplamı iadeler düşülerek yeniden hesaplanır. Rozet ve
 //   kayıt yeri sayısı toplamdan çıkar (shared.ts supportTier, slotsFor).
 
-import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, keepFor, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail } from '../src/net/shared';
+import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, keepFor, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail, feedbackPerDay } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
@@ -93,8 +93,8 @@ const DAY_MS = 86400000;
 const LIMIT_ADDRESS = { max: 6, ms: DAY_MS };
 const LIMIT_IP = { max: 20, ms: 60 * 60 * 1000 };
 const LIMIT_ALL = { max: 400, ms: DAY_MS };
-/** Geri bildirim sınırları: hesap ve misafir (IP) başına, toplam. Kodlarla birlikte Gmail'in günlük sınırının altında kalır. */
-const LIMIT_FB_ACCOUNT = { max: 10, ms: DAY_MS };
+/** Geri bildirim sınırları: hesap (günde shared.ts feedbackPerDay) ve misafir (IP) başına, toplam. Kodlarla birlikte Gmail'in
+ * günlük sınırının altında kalır. */
 const LIMIT_FB_GUEST = { max: 5, ms: 60 * 60 * 1000 };
 const LIMIT_FB_ALL = { max: 50, ms: DAY_MS };
 
@@ -257,7 +257,7 @@ async function sendFeedback(req: Request, env: Env): Promise<Response> {
   if (!mailReady(env)) return fail(503, 'mail_off');
   const now = Date.now();
   const who = a
-    ? { key: `fb:hesap:${a.id}`, ...LIMIT_FB_ACCOUNT }
+    ? { key: `fb:hesap:${a.id}`, max: feedbackPerDay(a.support_cents ?? 0), ms: DAY_MS }
     : { key: `fb:ip:${await sha256(clientIp(req))}`, ...LIMIT_FB_GUEST };
   if (await limited(env, [who, { key: 'fb:all', ...LIMIT_FB_ALL }], now)) return fail(429, 'feedback_limit');
   // İnceleme: yalnız türü seçilmiş, hesapla yazılmış mesaj

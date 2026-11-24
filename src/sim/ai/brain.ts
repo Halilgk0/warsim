@@ -431,7 +431,16 @@ export class Brain {
     if (p.lowLevel && fl.phase === 'egress') {
       terrainFollow(cmd.dir, ac, dx, dz, p.agl);
       cmd.minAlt = p.agl * 0.6;
-    } else headingWithAlt(cmd.dir, ac, dx, dz, Math.max(base.s.pos.y + 1200, Math.min(p.altitude, 3500)));
+    } else {
+      let alt = Math.max(base.s.pos.y + 1200, Math.min(p.altitude, 3500));
+      // Bombardıman dönüşte erkenden, ~6° ile alçalır: iniş kolu üsse 7 km kala başlar, kol bekleme irtifasına orada varmalı. Kol
+      // bekleme yığınının üstüne iner (sıradakiler kendi katlarına alçalır, tırmanmaz)
+      if (ac.spec.role === 'bomber') {
+        const stack = base.holdAltitude(base.landingQueue.length + fl.members.length - 1);
+        alt = Math.min(alt, Math.max(base.s.pos.y + 1200, stack + Math.max(0, Math.hypot(dx, dz) - 7000) * 0.1));
+      }
+      headingWithAlt(cmd.dir, ac, dx, dz, alt);
+    }
     avoidAA(ac, world, cmd.dir, null, base.s.pos);
     flakWeave(ac, world, cmd.dir);
     cmd.speed = this.flightSpeed(ac, fl);

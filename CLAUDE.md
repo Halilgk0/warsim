@@ -116,6 +116,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       - Yatışı sınırlı uçak (bombardıman, `nMax` ≤ 4: 55°) alçalmak isterken dönüşte kaldırmanın dikey payını tutturur, en az 1 G
         (`pilot.ts`); eskiden en az seviyeli dönüş G'sinin üstüne yanal isteği de çekip tırmanıyordu. B-57B paternde 3,5 km'den
         14 km'ye çıkıp inemiyordu (2026-11-22). 13 bombardıman × 12 iniş (`tools/sim/inis`, hasarsız, motor, hepsi): hepsi indi, süre %5–30 kısaldı.
+      - Bombardıman dönüşü (2026-11-24, oyuncu bildirimi: "pistin arkasında dönüp alçalıyor, sonra yeniden tırmanıyor"): bombardıman
+        en çok ~7° ile alçalır (`nav.ts` `headingWithAlt`; 18° ile dalan Lancaster bekleme irtifasının 850 m altına taşıyordu), üsse
+        dönerken erkenden alçalıp bekleme yığınının üstüne varır (`brain.ts` `navHome`). İniş izninin 300 sn'si, izin anında ilk
+        yaklaşma noktasının üstündeki her 8 m için 1 sn uzar (`airbase.ts`): yüksekten alçalan lider iznini kaybedip sıranın sonuna
+        düşüyor, katına yeniden tırmanıyordu. `tools/sim/bombaci_donus`: yeniden tırmanma (Lancaster, Canberra, B-17 kolları) 8/12/1 → 0;
+        yüksekten ve yakından dönen kolun inişi 2–4 dk uzadı (9° denendi, taşma geri geldi). Avcı inişleri aynı.
       Sonuç: zorla pas geçirilen 14 türün neredeyse hepsi iniyor (Lancaster 0/6 → 6/6); tek motorlu He 111 ve B-25, hasarlı Ju 88 0/6 → 6/6.
     - Avcı hedef dağıtımı (2026-11-18, `flightGroup.ts` `assignTargets`), sırayla:
       1. Oyuncunun emri (`brain.order`).
@@ -432,6 +438,7 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     sonucu). 13 rütbe (`badges.ts` `rankSvg`, kalkan biçimi; destekçi rozetleri yuvarlak): Profil'de rozet, ilerleme çubuğu
     (sıradaki rütbenin adı ve rozeti gizli) ve mesajların durumu; skor tablolarında adın yanında. Puan artınca ana menüde kısa
     bildirim (`game.ts` `noteContrib`, `warsim.katki.<ad anahtarı>`). Bekleyenler: `node tools/admin.mjs geri-bildirim`.
+    Hesap başına günde 3 geri bildirim, destekçi basamağı başına +1 (`shared.ts` `feedbackPerDay`; 1 $: 4, 5 $: 5, 15 $: 6).
     Onay sayfası mesajın şu anki durumunu, tarihlerini ve yalnız geçerli düğmeleri gösterir (`validLinks`); aynı karar ikinci kez
     uygulanmaz (409). Her yönetici e-postasında ve onay sayfasında "Tüm geri bildirimler" (`/api/feedback/list`, imza `listToken`;
     bekleyenler önce). Kararla isteğe bağlı not (`feedback.note`, migration 0012, en çok 500 karakter; boş not öncekini silmez):

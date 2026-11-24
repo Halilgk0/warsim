@@ -25,7 +25,9 @@ export function headingWithAlt(
   }
   const vs = stallSpeed(ac);
   const energy = clamp((ac.speed - vs * 1.3) / (vs * 0.9), 0, 1);
-  const slope = clamp((alt - ac.pos.y) * gain, -0.32, 0.36 * energy);
+  // Bombardıman uçağı en çok ~7° ile alçalır: 18° ile dalan ağır uçak hızlanıp hedef irtifanın yüzlerce metre altına taşıyor,
+  // sonra yeniden tırmanıyordu (2026-11-24, oyuncu bildirimi: Lancaster 1.200 m'lik bekleme irtifasına 5 km'den inerken 355 m'ye düştü)
+  const slope = clamp((alt - ac.pos.y) * gain, ac.spec.role === 'bomber' ? -0.12 : -0.32, 0.36 * energy);
   return out.set(hx, slope, hz).normalize();
 }
 
