@@ -34,6 +34,7 @@ import { archU } from './arch';
 import { updateLamps } from './lamps';
 import { onSettingsChange, quality, settings } from '../ui/settings';
 import { L } from '../i18n';
+import { gpuInfo, type GpuInfo } from '../diag';
 
 const TRAIL_N = 90;
 const TRAIL_DT = 0.12;
@@ -147,6 +148,8 @@ const _glow = new THREE.Color();
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
+  /** Ekran kartının adı ve yazılımla çizilip çizilmediği (diag.ts). */
+  readonly gpu: GpuInfo;
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(45, 1, 10, 200000);
   readonly rig: CameraRig;
@@ -262,7 +265,9 @@ export class GameRenderer {
     // Oyun haritayı önceden yükler (main.ts); kayıt kipi ve görsel denetim yüklemez: eskisi gibi ilk harita, 300 km
     if (!terrainMap.key) loadMap(MAPS[0].id);
     // Ölçek 40 m'den 90 km'ye kadar değiştiği için logaritmik derinlik (uzakta z-fighting olmasın)
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer });
+    // İki ekran kartlı bilgisayarda güçlü kart istenir (yoksa tarayıcı çoğu zaman dahili kartı seçer; 2026-11-25)
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: !!opts.preserveBuffer, powerPreference: 'high-performance' });
+    this.gpu = gpuInfo(this.renderer.getContext());
     // İnşaattaki yapı yerden yükselir: malzemenin kendi kırpma düzlemi (structures.ts)
     this.renderer.localClippingEnabled = true;
     this.renderer.setPixelRatio(this.baseRatio);

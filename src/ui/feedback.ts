@@ -10,6 +10,7 @@ import { FEEDBACK_MAX, type FeedbackKind } from '../net/shared';
 import { $, esc, focusField } from './dom';
 import { L, LANG } from '../i18n';
 import { SUPPORT_ICON, SUPPORT_ON } from './support';
+import { diagText } from '../diag';
 
 /** Eski sürümde gönderilemeyen geri bildirimlerin deposu: artık kullanılmaz. */
 const OLD_OUTBOX_KEY = 'warsim.feedback.v1';
@@ -24,6 +25,8 @@ export class FeedbackBox {
   private error = '';
   private done = '';
   private sending = false;
+  /** Hata raporuna teknik bilgi eklensin mi (diag.ts; varsayılan açık, oyuncu kapatabilir). */
+  private withDiag = true;
 
   /** login: giriş penceresini aç; addEmail: e-posta ekleme penceresini aç (ikisi kapanınca oyun refresh çağırır); support: destekçi paketi. */
   constructor(private readonly actions: { login: () => void; addEmail: () => void; support: () => void }) {
@@ -61,6 +64,10 @@ export class FeedbackBox {
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLTextAreaElement;
       if (t.name === 'fbmsg') this.message = t.value;
+      if (t.name === 'fbdiag') {
+        this.withDiag = (t as unknown as HTMLInputElement).checked;
+        return;
+      }
       if (this.error) {
         this.error = '';
         this.el.querySelector('.fb-err')?.remove();
@@ -122,7 +129,8 @@ export class FeedbackBox {
     this.sending = true;
     this.render();
     try {
-      const r = await api<{ ok: boolean; review?: boolean }>('POST', '/feedback', { message: this.message.trim(), kind: this.kind, review, lang: LANG });
+      const diag = this.kind === 'bug' && this.withDiag ? diagText() : undefined;
+      const r = await api<{ ok: boolean; review?: boolean }>('POST', '/feedback', { message: this.message.trim(), kind: this.kind, review, lang: LANG, diag });
       this.done = r.review
         ? L('Teşekkürler! Mesajın incelemede. Sonucu e-postayla ve Profil’inde görürsün.', 'Thank you! Your message is under review. You will see the result by email and in your Profile.')
         : L('Teşekkürler! Geri bildirimin bize ulaştı.', 'Thank you! Your feedback has reached us.');
@@ -173,6 +181,7 @@ export class FeedbackBox {
            ? L('Ne yaparken oldu, ne bekliyordun, ne oldu? Telefon mu bilgisayar mı?', 'What were you doing, what did you expect, what happened? Phone or computer?')
            : L('Neyi beğendin, neyi değiştirelim, ne eklenmeli?', 'What did you like, what should we change, what should we add?')}">${esc(this.message)}</textarea>
          <p class="muted small">${L('Gönderen', 'From')}: <b>${esc(acc!.name)}</b></p>
+         ${this.kind === 'bug' ? `<label class="fb-diag muted small"><input type="checkbox" name="fbdiag" ${this.withDiag ? 'checked' : ''}> ${L('Teknik bilgileri ekle (kare hızı, ekran kartı, tarayıcı, grafik ayarları, oyunun büyüklüğü): sorunu bulmamıza yardım eder', 'Attach technical details (frame rate, graphics card, browser, graphics settings, game size): helps us find the problem')}</label>` : ''}
          ${this.error ? `<div class="fb-err">${esc(this.error)}</div>` : ''}
          <div class="fb-actions"><button data-fb="close">${L('Vazgeç', 'Cancel')}</button><button class="primary" data-fb="send">${L('Gönder', 'Send')}</button></div>`;
     }

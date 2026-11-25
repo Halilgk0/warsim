@@ -21,6 +21,8 @@ export interface Feedback {
   links: { act: FeedbackAct; url: string }[] | null;
   /** Tüm geri bildirimler sayfası (imzalı). */
   list: string | null;
+  /** Hata raporuna oyuncunun eklediği teknik bilgi (src/diag.ts). */
+  diag?: string | null;
 }
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -54,6 +56,7 @@ export function feedbackMail(f: Feedback): Mail {
   const text = [
     ...rows.map(([k, v]) => `${k}: ${v}`),
     ...(f.message ? ['', f.message] : []),
+    ...(f.diag ? ['', `Teknik bilgi: ${f.diag}`] : []),
     ...(links.length ? ['', 'Karar (bağlantı onay sayfası açar):', ...links.map((l) => `${ACT[l.act]}: ${l.url}`)] : []),
     ...(f.list ? ['', `Tüm geri bildirimler: ${f.list}`] : []),
   ].join('\n');
@@ -79,6 +82,7 @@ export function feedbackMail(f: Feedback): Mail {
     <tr><td bgcolor="#fbf8f3" style="background:#fbf8f3;border-radius:0 0 16px 16px;padding:18px 20px;color:#45434f;font-size:15px;line-height:1.5;">
       ${rows.map(([k, v]) => `<div style="margin:0 0 4px;"><span style="color:#8b8797;">${k}:</span> <b>${esc(v)}</b></div>`).join('\n      ')}
       ${f.message ? `<div style="margin:14px 0 0;padding-top:14px;border-top:1px solid #e5ded2;white-space:pre-wrap;">${esc(f.message)}</div>` : ''}
+      ${f.diag ? `<div style="margin:12px 0 0;padding:8px 10px;border-radius:8px;background:#efebe3;color:#5d5a66;font-size:12px;font-family:Consolas,Menlo,monospace;word-break:break-word;">Teknik bilgi: ${esc(f.diag)}</div>` : ''}
       ${buttons}
     </td></tr>
   </table>

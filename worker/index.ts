@@ -243,7 +243,7 @@ const clientIp = (req: Request): string => req.headers.get('cf-connecting-ip') ?
  */
 async function sendFeedback(req: Request, env: Env): Promise<Response> {
   const a = await authed(req, env);
-  const b = await body<{ message?: string; price?: number | null; name?: string; lang?: string; kind?: string; review?: boolean }>(req);
+  const b = await body<{ message?: string; price?: number | null; name?: string; lang?: string; kind?: string; review?: boolean; diag?: string }>(req);
   const message = String(b?.message ?? '').trim().slice(0, FEEDBACK_MAX);
   const price = b?.price === null || b?.price === undefined ? null : Number(b.price);
   if (price !== null && (!Number.isFinite(price) || price < 0 || price > PRICE_MAX)) return fail(400, 'bad_price');
@@ -271,7 +271,7 @@ async function sendFeedback(req: Request, env: Env): Promise<Response> {
     const email = a?.email ?? null;
     const links = id !== null && kind ? await reviewLinks(env, id, kind) : null;
     const list = id !== null ? await feedbackListUrl(env) : null;
-    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price, kind, id, links, list }), email);
+    await sendMail(env, env.MAIL_FROM!, feedbackMail({ name, email, lang: a?.lang ?? langCode(b?.lang), message, price, kind, id, links, list, diag: kind === 'bug' && message ? String(b?.diag ?? '').replace(/[\u0000-\u001f]/g, ' ').slice(0, 900) || null : null }), email);
   } catch (e) {
     console.error(e);
     if (id !== null) await env.DB.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();

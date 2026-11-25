@@ -55,6 +55,7 @@ import { SupportBox } from './ui/support';
 import { Tutorial } from './ui/tutorial';
 import { MAP_BASE, MAP_SCALE } from './sim/mapData';
 import { AutoFast } from './autoFast';
+import { diagText, setDiagProvider } from './diag';
 
 const STEP = 1 / 60;
 /** En yüksek oyun hızı (düğmeler 1×, 2×, 4×). */
@@ -127,6 +128,12 @@ export class Game {
   private readonly perf = new PerfWatch();
   /** Otomatik 2× ilk kez devreye girince bir kez açıklanır. */
   private autoFastTold = false;
+  /** Son 5 saniyenin kare hızı (tanı bilgisi, diag.ts). */
+  private fpsNow = 0;
+  private fpsT = 0;
+  private fpsN = 0;
+  /** Yazılımla çizim uyarısı bu açılışta gösterilecek mi (harekâtta, pencere yokken; tarayıcı başına bir kez). */
+  private gpuWarnDue = false;
   /** Savaş sesleri (yakınlaştıkça) ve oyuncuya uyarılar. */
   private readonly battle = new BattleSound();
   private readonly alerts = new AlertSound();
@@ -168,6 +175,33 @@ export class Game {
 
   constructor() {
     this.renderer = new GameRenderer(document.getElementById('viewport')!, document.getElementById('labels')!);
+    try {
+      this.gpuWarnDue = this.renderer.gpu.software && !localStorage.getItem('warsim.gpuWarn');
+    } catch {
+      /* depolama kapalı */
+    }
+    // Hata raporuna eklenen teknik bilgi (diag.ts)
+    setDiagProvider(() => {
+      const w = this.world;
+      const info = this.renderer.renderer.info;
+      return {
+        kare: Math.round(this.fpsNow),
+        gpu: this.renderer.gpu.name || 'bilinmiyor',
+        yazilim: this.renderer.gpu.software,
+        kalite: `${settings.graphics.quality}/${settings.graphics.resolution}`,
+        kip: this.mode,
+        hiz: this.timeScale,
+        oynanan_dk: Math.round(w.playTime / 60),
+        oyun_dk: Math.round(w.time / 60),
+        harita_km: Math.round(w.mapSize / 1000),
+        bot: w.setup?.enemies ?? 0,
+        ucak: w.aircraft.length,
+        yapi: w.structures.length,
+        yol: w.roads.length,
+        ucgen: info.render.triangles,
+        cagri: info.render.calls,
+      };
+    });
     this.renderer.rig.onClick = (x, y) => this.handleClick(x, y);
     this.renderer.rig.onDoubleClick = (x, y) => this.handleDoubleClick(x, y);
     this.renderer.rig.onRightClick = () => this.cancelStep();
@@ -1324,6 +1358,30 @@ export class Game {
     ]);
   }
 
+  /**
+   * Tarayıcı oyunu ekran kartıyla değil işlemciyle çiziyor (Chrome'da donanım hızlandırma kapalı: SwiftShader). En düşük ayar bile
+   * yavaş kalır; çözüm tarayıcı ayarında. Tarayıcı başına bir kez söylenir (2026-11-25, oyuncu bildirimi: güçlü PC'de 5 kare/sn).
+   */
+  private warnSoftwareGpu(): void {
+    this.gpuWarnDue = false;
+    try {
+      localStorage.setItem('warsim.gpuWarn', '1');
+    } catch {
+      /* depolama kapalı */
+    }
+    this.modals.openNotice(L('Ekran kartı kullanılmıyor', 'Your graphics card is not being used'), `<p>${L('Tarayıcın oyunu ekran kartıyla değil işlemciyle çiziyor. Böyle olunca güçlü bilgisayarda ve en düşük grafik ayarında bile oyun yavaş akar.', 'Your browser is drawing the game with the processor instead of the graphics card. That makes the game slow even on a strong computer and at the lowest graphics settings.')}</p>
+      <p>${L('Chrome ve Edge’de: Ayarlar → Sistem → <b>Mümkün olduğunda grafik hızlandırmayı kullan</b> seçeneğini aç ve tarayıcıyı yeniden başlat.', 'In Chrome and Edge: Settings → System → turn on <b>Use graphics acceleration when available</b> and restart the browser.')}</p>
+      <p>${L('O zamana dek çözünürlüğü düşürmek oyunu biraz rahatlatır.', 'Until then, lowering the resolution helps a little.')}</p>`, [
+      { label: L('Tamam', 'OK'), primary: true, run: () => undefined },
+      { label: L('Çözünürlüğü düşür', 'Lower the resolution'), run: () => this.modals.openSettings('grafik', { set: 'resolution', v: '0.5', fps: this.fpsNow, stutter: false }) },
+    ]);
+  }
+
+  /** Hata raporuna eklenen teknik bilgi satırı (diag.ts; konsoldan denemek için de). */
+  diag(): string {
+    return diagText();
+  }
+
   /** Oyunun önünde pencere var mı (arka plan buğulu ya da örtülü). */
   private get windowOpen(): boolean {
     return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen;
@@ -1391,6 +1449,14 @@ export class Game {
     // sayılır (4×'te yavaş kare simülasyondan gelir, grafikten değil)
     const slow = this.perf.update(raw, this.scenarioId === 'kampanya' && visible && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen && this.timeScale < 4);
     if (slow) this.offerPerfHint(slow);
+    this.fpsT += raw;
+    this.fpsN++;
+    if (this.fpsT >= 5) {
+      this.fpsNow = this.fpsN / this.fpsT;
+      this.fpsT = 0;
+      this.fpsN = 0;
+    }
+    if (this.gpuWarnDue && this.scenarioId === 'kampanya' && visible && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen) this.warnSoftwareGpu();
     // Otomatik kayıt: oyun akarken her 5 dakikada bir (giriş yapılmışsa)
     if (!this.pause.isOpen && this.timeScale > 0) {
       this.autosaveClock += real;

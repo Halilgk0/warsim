@@ -451,6 +451,14 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
   - Ayarlar penceresi (2026-11-20, `settingsMenu.ts`; değerler `settings.ts`): sekmeler (Grafik, Ses, Harita, Bilgi paneli, Oyun),
     gruplu satırlar: simge, ad, kısa açıklama, sağda denetim. Kaliteye bağlı seçenek o kalitede yoksa kilitli. Yeni ayar eklerken
     açıklamasını ve simgesini de yaz. `modals.openSettings(sekme, öneri)` belirli sekmeyi açar.
+  - Performans tanısı (2026-11-25, oyuncu bildirimi: güçlü PC'de büyük haritada 4 saat sonra 5 kare/sn; tekrarlanamadı: 2 botlu
+    büyük haritada 8 saatlik oyun zamanında kare 3–6 ms, birikme yok; ölçüm `tools/sim/gec_oyun`, tarayıcıda `tools/denetim/gec_oyun.cjs`):
+    - Çizici güçlü ekran kartı ister (`powerPreference: 'high-performance'`; iki kartlı dizüstünde tarayıcı dahili kartı seçiyordu).
+    - Tarayıcı yazılımla çiziyorsa (SwiftShader, llvmpipe: Chrome'da donanım hızlandırma kapalı; `diag.ts` `gpuInfo`, `renderer.gpu`)
+      harekâtta bir kez uyarı: hızlandırmanın nasıl açılacağı ve çözünürlüğü düşürme (`game.ts` `warnSoftwareGpu`, `warsim.gpuWarn`).
+    - Hata raporunda "Teknik bilgileri ekle" kutusu (varsayılan işaretli): kare hızı, ekran kartı, tarayıcı, ekran, grafik ayarları,
+      oyun süresi ve dünyanın kalabalığı (`diag.ts` `diagText`, `game.diag()`) yönetici e-postasına gider (`feedbackMail` `diag`).
+      Gizlilik ve KVKK metninde yazar; eklenen bilgi değişirse metni de güncelle.
   - Takılma önerisi (2026-11-20, `perfWatch.ts`): harekâtta 20 sn'lik dilimde ortalama 24 kare/sn altı ya da karelerin dörtte
     birinden fazlası 70 ms üstüyse grafik ayarını bir basamak düşürmeyi önerir (`game.ts` `offerPerfHint`); kabul edilince ayarlar
     Grafik sekmesinde, önerilen seçenek işaretli açılır, oyuncu istediğini seçer. İlk 30 sn, pencere açıkken, sekme gizliyken,
