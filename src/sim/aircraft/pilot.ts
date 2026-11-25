@@ -13,6 +13,7 @@ import { rollRateAt } from './aero';
 import { damageEffects } from './damage';
 import { sigma } from '../atmosphere';
 import { groundLevel } from '../terrain';
+import { MAP_HALF } from '../mapData';
 import { G, UP, clamp } from '../../core/math';
 
 export interface FlyCommand {
@@ -189,6 +190,17 @@ export function fly(ac: Aircraft, cmd: FlyCommand, dt: number): void {
   _d.copy(cmd.dir);
   if (_d.lengthSq() < 1e-8) _d.copy(f);
   _d.normalize();
+  // Görünmez duvar (2026-11-25): harita dışına çıkan uçağın dışa doğru istenen yönü içe çevrilir (pilot geri döner). Kenarın
+  // içinde dokunmaz: kenara yakın kurulan üssün iniş paterni bozulmasın
+  const edge = MAP_HALF;
+  if (Math.abs(ac.pos.x) > edge && _d.x * ac.pos.x > 0) {
+    _d.x = -Math.sign(ac.pos.x) * Math.max(Math.abs(_d.x), 0.6);
+    _d.normalize();
+  }
+  if (Math.abs(ac.pos.z) > edge && _d.z * ac.pos.z > 0) {
+    _d.z = -Math.sign(ac.pos.z) * Math.max(Math.abs(_d.z), 0.6);
+    _d.normalize();
+  }
 
   // --- Arazi koruması: önümüzdeki en yüksek zemine göre
   ac.groundAvoid = false;

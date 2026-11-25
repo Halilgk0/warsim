@@ -29,6 +29,7 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'need_email': return L('Hata raporu ve öneri göndermek için hesabına e-posta ekle', 'Add an email to your account to send bug reports and suggestions');
     case 'feedback_empty': return L('Göndermeden önce mesajını yaz', 'Write your message before sending');
     case 'bad_price': return L('Fiyat 0 ile 1.000.000 arasında bir sayı olmalı', 'The price must be a number between 0 and 1,000,000');
+    case 'have_level': return L('Bu seviye zaten sende', 'You already have this level');
     case 'feedback_limit': return L('Günlük geri bildirim hakkın doldu; 24 saat sonra tekrar dene', "You've used today's feedback limit; try again in 24 hours");
     case 'email_taken': return L('Bu e-posta başka bir hesapta kayıtlı; o hesapla giriş yap ya da başka bir adres yaz', 'This email is already on another account; log in to it or enter another address');
     case 'code_wrong': {
@@ -59,7 +60,7 @@ export function apiMessage(code: string, extra: Record<string, unknown> = {}): s
     case 'no_save': return L('Kayıt bulunamadı', 'Save not found');
     case 'no_slot': return L('Boş kayıt yeri yok; birini silip yer aç', 'No free save slot; delete one to make room');
     case 'support_off': return L('Destekçi paketi şu an alınamıyor; biraz sonra tekrar dene', 'The supporter pack is not available right now; try again later');
-    case 'bad_amount': return L('Tutar 1 ile 50 $ arasında olmalı', 'The amount must be between $1 and $50');
+    case 'bad_amount': return L('Geçersiz seviye; sayfayı yenileyip tekrar dene', 'Invalid level; reload the page and try again');
     case 'support_limit': return L('Çok fazla deneme; biraz sonra tekrar dene', 'Too many attempts; try again later');
     case 'support_failed': return L('Ödeme sayfası açılamadı; biraz sonra tekrar dene', 'Could not open the payment page; try again later');
     case 'offline': return L('Sunucuya ulaşılamadı; bağlantını kontrol et', 'Could not reach the server; check your connection');

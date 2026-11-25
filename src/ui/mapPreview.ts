@@ -21,6 +21,14 @@ function color(h: number): [number, number, number] {
   return [200 + 41 * k, 196 + 43 * k, 168 + 66 * k];
 }
 
+/** Çöl haritası (Kanyonlar): kanyon dibi kızıl, plato devetüyü, yüksek plato açık. */
+function desertColor(h: number): [number, number, number] {
+  if (h < 0) return [150, 196, 210];
+  if (h < 300) return [176 + h * 0.06, 104 + h * 0.08, 72 + h * 0.06];
+  const k = Math.min(1, (h - 300) / 900);
+  return [214 - 6 * k, 168 + 8 * k, 120 + 18 * k];
+}
+
 /** Haritanın küçük resmi (data URL, önbellekli). */
 export function mapPreview(def: MapDef, px = 120): string {
   const key = `${def.id}:${px}`;
@@ -37,7 +45,8 @@ export function mapPreview(def: MapDef, px = 120): string {
     for (let i = 0; i < px; i++) {
       const x = -half + ((i + 0.5) / px) * MAP_BASE;
       const z = -half + ((j + 0.5) / px) * MAP_BASE;
-      const [r, g, b] = color(def.natural(x, z));
+      const h = def.preview ? def.preview(x, z) : def.natural(x, z);
+      const [r, g, b] = def.biome === 'desert' ? desertColor(h) : color(h);
       const o = (j * px + i) * 4;
       img.data[o] = r;
       img.data[o + 1] = g;

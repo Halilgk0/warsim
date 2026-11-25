@@ -24,7 +24,7 @@
 //   (order.paid, order.refunded, order.updated) siparişi yazar, hesabın toplamı iadeler düşülerek yeniden hesaplanır. Rozet ve
 //   kayıt yeri sayısı toplamdan çıkar (shared.ts supportTier, slotsFor).
 
-import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, keepFor, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail, feedbackPerDay } from '../src/net/shared';
+import { FEEDBACK_ACTS, FEEDBACK_MAX, LEGAL_VERSION, feedbackStep, type FeedbackAct, type FeedbackKind, type FeedbackStatus, METRICS, PRICE_MAX, SAVE_CLEANUP_DAYS, SUPPORT_MAX, keepFor, SUPPORT_MIN, validSlot, type LeaderRow, type Metric, type StatsReport, cleanEmail, cleanName, emailKey, nameKey, nameProblem, slotsFor, supportTier, validEmail, feedbackPerDay, levelCost } from '../src/net/shared';
 import { codeMail } from './codeMail';
 import { latestNewsMail, newsMail, unsubPage, unsubUrl } from './newsMail';
 import { THANKS_PLAY_SEC, thanksMail } from './thanksMail';
@@ -835,14 +835,19 @@ const WEBHOOK_TOLERANCE_S = 300;
 const PAID_STATES = ['paid', 'partially_refunded', 'refunded'];
 
 /**
- * Ödeme oturumu: oyuncunun seçtiği tutarla (sent, 1–50 $) Polar'da oturum açılır, ödeme sayfasının adresi döner. Hesap kimliği
- * siparişin metadata'sına yazılır (Polar bunu bildirimde geri yollar); e-posta ve başka hesap bilgisi gönderilmez.
+ * Ödeme oturumu: oyuncunun seçtiği seviye (1–3) için tutar sunucuda hesaplanır (seviyenin fiyatı − şimdiye kadarki toplam;
+ * shared.ts levelCost), Polar'da oturum açılır, ödeme sayfasının adresi döner. Hesap kimliği siparişin metadata'sına yazılır
+ * (Polar bunu bildirimde geri yollar); e-posta ve başka hesap bilgisi gönderilmez. Eski sürümün serbest tutarı (amount) kabul
+ * edilmez (2026-11-25'ten beri sabit fiyat).
  */
 async function supportCheckout(req: Request, env: Env, a: AccountRow): Promise<Response> {
   if (!env.POLAR_TOKEN || !env.POLAR_PRODUCT_ID) return fail(503, 'support_off');
-  const b = await body<{ amount?: number; lang?: string }>(req);
-  const amount = Number(b?.amount);
-  if (!Number.isInteger(amount) || amount < SUPPORT_MIN || amount > SUPPORT_MAX) return fail(400, 'bad_amount');
+  const b = await body<{ level?: number; lang?: string }>(req);
+  const level = Number(b?.level);
+  if (!Number.isInteger(level) || level < 1 || level > 3) return fail(400, 'bad_amount');
+  const amount = levelCost(a.support_cents ?? 0, level);
+  if (!amount) return fail(409, 'have_level');
+  if (amount < SUPPORT_MIN || amount > SUPPORT_MAX) return fail(400, 'bad_amount');
   if (await limited(env, [{ key: `sp:hesap:${a.id}`, ...LIMIT_SUPPORT }], Date.now())) return fail(429, 'support_limit');
   const site = (env.SITE_URL ?? 'https://warsimbox.com').replace(/\/$/, '');
   const l = langCode(b?.lang) === 'en' ? 'en' : 'tr';

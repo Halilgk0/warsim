@@ -10,6 +10,7 @@ import { buildStartSitePool, rollStartSites, startSitesReady } from '../sim/star
 import type { StartLayout } from '../game';
 import type { SiteDef } from '../sim/mapData';
 import { mapPreview } from './mapPreview';
+import { earlyAccess } from '../net/shared';
 import { type Account, NAME_MAX, cleanName, currentAccount, legacyAccountName, logout, nameError, saveSlotCount } from '../persist';
 import { SavesPanel } from './savesList';
 import { autoSlotFor } from '../saveSlots';
@@ -163,10 +164,9 @@ export class MainMenu {
       this.name = d.name || this.name;
       if (d.enemies >= 1 && d.enemies <= MAX_ENEMIES) this.enemies = d.enemies;
       if (d.size && (MAP_SIZES as readonly number[]).includes(d.size)) this.size = d.size;
-      if (MAPS.some((m) => m.id === d.mapId) && d.mapId !== this.mapId) {
-        this.mapId = d.mapId;
-        this.game.previewMap(this.mapId, this.size);
-      }
+      if (MAPS.some((m) => m.id === d.mapId)) this.mapId = d.mapId;
+      // Arka plan taslağın haritası ve büyüklüğüyle yeniden kurulur (başlangıç yerleri yalnız yüklü haritada atılır)
+      if (terrainMap.key !== mapKey(this.mapId, this.size)) this.game.previewMap(this.mapId, this.size);
     } catch {
       /* bozuk taslak: yok say */
     }
@@ -190,7 +190,17 @@ export class MainMenu {
   /** "Oyuna başla": ad geçerliyse öğretici sorulur (sorulmayacaksa oyun hemen başlar). */
   private start(): void {
     if (this.game.tutorial.busy || !this.validName()) return;
+    // Kilitli haritada öğretici sorulmaz: önce erken erişim penceresi
+    if (this.locked()) {
+      this.game.showEarlyAccess(mapById(this.mapId).name);
+      return;
+    }
     if (!this.game.tutorial.ask()) this.launch();
+  }
+
+  /** Seçili harita yapım aşamasında ve hesapta erken erişim yok. */
+  private locked(): boolean {
+    return !!mapById(this.mapId).earlyAccess && !earlyAccess(currentAccount()?.support ?? 0);
   }
 
   /** Komutan adı geçerli mi; değilse hata yazılır ve alana odaklanılır. */
@@ -210,6 +220,11 @@ export class MainMenu {
    */
   launch(force = false, started?: () => void): boolean {
     if (!this.validName()) return false;
+    // Yapım aşamasındaki harita: yalnız 3. seviye destekçi (erken erişim) başlatır
+    if (this.locked()) {
+      this.game.showEarlyAccess(mapById(this.mapId).name);
+      return false;
+    }
     const name = cleanName(this.name);
     if (!force && this.noAutoSlot(name)) {
       this.warnNoAutoSlot(name, L('Otomatik kayıtsız başla', 'Start without autosave'), () => this.launch(true, started));
@@ -353,14 +368,18 @@ export class MainMenu {
         this.game.previewMap(this.mapId, this.size);
         return;
       case 'size':
-        // Arka plan yeniden üretilmez (birkaç saniye sürer); harita oyun başlarken bu büyüklükte kurulur
+        // Arka plan bu büyüklükte yeniden kurulur (işçilerde, birkaç saniye): başlangıç yerleri ve "Yeni yerler" yalnız yüklü
+        // haritada atılabiliyordu, varsayılan dışındaki büyüklüklerde görünmüyordu
+        if (Number(b.dataset.v) === this.size) return;
         this.size = Number(b.dataset.v);
         try {
           localStorage.setItem(SIZE_KEY, String(this.size));
         } catch {
           /* yalnız bu oturum */
         }
+        this.layout = null;
         this.render();
+        this.game.previewMap(this.mapId, this.size);
         return;
       case 'tab':
         this.tab = b.dataset.v as Tab;
@@ -438,7 +457,7 @@ export class MainMenu {
     const foes = TEAM_SITES.slice(1, this.enemies + 1)
       .map((t) => `<span class="mm-foe"><i style="background:${t.color}"></i>${t.name}</span>`).join('');
     const maps = MAPS.map((m) => `<button class="mm-mapcard ${m.id === this.mapId ? 'active' : ''}" data-mm="map" data-v="${m.id}" title="${esc(m.desc)}">
-        <img src="${mapPreview(m, 96)}" alt="" width="96" height="96"><span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></span></button>`).join('');
+        <img src="${mapPreview(m, 96)}" alt="" width="96" height="96"><span><b>${esc(m.name)}${m.earlyAccess ? ` <i class="mm-early">${L('Erken erişim', 'Early access')}</i>` : ''}</b><small>${esc(m.desc)}</small></span></button>`).join('');
     const enemyBtns = Array.from({ length: MAX_ENEMIES }, (_, i) => i + 1)
       .map((n) => `<button class="${n === this.enemies ? 'active' : ''}" data-mm="enemies" data-v="${n}">${n}</button>`).join('');
     // Sekmeler: herkese yeni harekât ve skorlar; hesapla kayıtlar

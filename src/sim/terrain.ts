@@ -5,6 +5,7 @@ import { smoothstep } from '../core/math';
 import { MAP_BASE, MAP_HALF as HALF } from './mapData';
 import { MAPS, mapById, type MapDef } from './maps';
 import { TERRAIN_N, TERRAIN_W, fillRows, prepareMap } from './terrainGen';
+import { pillarTop, setPillars } from './pillars';
 
 export { makeFbm } from '../core/noise';
 export { TERRAIN_N, TERRAIN_W };
@@ -38,6 +39,7 @@ function generate(def: MapDef, size: number): void {
 /** Üretilen araziyi yüklü harita yap. */
 function finish(def: MapDef, size: number): void {
   pristine.set(heights);
+  setPillars(def.pillars ? def.pillars(size) : []);
   edited = [];
   terrainEdits.dirty.length = 0;
   terrainEdits.version++;
@@ -117,7 +119,8 @@ export function terrainHeight(x: number, z: number): number {
 
 /** Çarpışma yüzeyi: kara ya da deniz yüzeyi. */
 export function groundLevel(x: number, z: number): number {
-  const h = terrainHeight(x, z);
+  // Taş sütunlar ızgarada yok (pillars.ts): zemin onların üst yüzeyi
+  const h = Math.max(terrainHeight(x, z), pillarTop(x, z));
   return h > 0 ? h : 0;
 }
 
@@ -171,7 +174,7 @@ export function footprintStats(
       const x = cx + fx * u + rx * v;
       const z = cz + fz * u + rz * v;
       if (Math.abs(x) > HALF * 0.97 || Math.abs(z) > HALF * 0.97) outside = true;
-      const h = terrainHeight(x, z);
+      const h = Math.max(terrainHeight(x, z), pillarTop(x, z));
       if (h < 2) water++;
       min = Math.min(min, h);
       max = Math.max(max, h);

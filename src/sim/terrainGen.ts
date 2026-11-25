@@ -23,7 +23,8 @@ export function prepareMap(def: MapDef, size: number): number {
 export function fillRows(def: MapDef, cell: number, j0: number, j1: number, out: Float32Array): void {
   const k = MAP_SCALE;
   const pts = LAND_POINTS;
-  const targets = pts.map((p) => clamp(def.natural(p.x, p.z, k), 40, 320));
+  const [lo, hi] = def.flat ?? [40, 320];
+  const targets = pts.map((p) => clamp(def.natural(p.x, p.z, k), lo, hi));
   for (let j = j0; j < j1; j++) {
     const z = -HALF + j * cell;
     for (let i = 0; i < TERRAIN_W; i++) {

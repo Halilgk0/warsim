@@ -4,6 +4,7 @@
 
 import { MAP_BASE, MAP_HALF as HALF, TEAM_SITES } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, TERRAIN_W, heights, terrainMap } from '../sim/terrain';
+import { mapById } from '../sim/maps';
 import { clamp, smoothstep } from '../core/math';
 import { type Circle, type LandcoverGrids, type LandcoverMap, fillLandcover } from './landcoverGen';
 
@@ -110,6 +111,7 @@ export function landcoverMap(): LandcoverMap {
     // Haritanın dekor şehirleri 2026-11-13'te kaldırıldı (mapWorker.ts aynı; arazinin düzlükleri yerinde kalır)
     cities: [],
     statics: TEAM_SITES.map((t) => ({ x: t.site.x, z: t.site.z, r: 2600 })),
+    desert: mapById(terrainMap.id).biome === 'desert',
   };
 }
 

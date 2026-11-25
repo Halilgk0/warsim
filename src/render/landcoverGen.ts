@@ -32,6 +32,8 @@ export interface LandcoverMap {
   cities: readonly Circle[];
   /** Ana üs yerleri (orman ve tarla yok). */
   statics: readonly Circle[];
+  /** Çöl haritası (Kanyonlar): seyrek ardıç ve çalı, nehir boyunda yeşil şerit, tarla yok. */
+  desert?: boolean;
 }
 
 function hash(a: number, b: number): number {
@@ -51,7 +53,7 @@ const fbmGrove = makeFbm(9595, 3);
  * kırpılır) da içermeli; out satır j0'dan başlar ve sıfırlanmış olmalı (deniz ve çok alçak köşeler yazılmaz).
  */
 export function fillLandcover(heights: Float32Array, hRow0: number, j0: number, j1: number, map: LandcoverMap, out: LandcoverGrids): void {
-  const { n: N, w: W, cell, half, cellK, cities, statics } = map;
+  const { n: N, w: W, cell, half, cellK, cities, statics, desert } = map;
   for (let j = j0; j < j1; j++) {
     const row = (j - hRow0) * W;
     for (let i = 0; i < W; i++) {
@@ -82,8 +84,16 @@ export function fillLandcover(heights: Float32Array, hRow0: number, j0: number, 
         if (Math.abs(x - c.x) > c.r * 1.6 || Math.abs(z - c.z) > c.r * 1.6) continue;
         site = Math.min(site, smoothstep(c.r * 0.8, c.r * 1.6, Math.hypot(x - c.x, z - c.z)));
       }
-      // Orman: büyük lekeler + küçük ayrıntı; tepelerde daha çok, çok dik yamaçta ve ağaç sınırı üstünde yok
       const n = fbmForest(x / 9000, z / 9000) * 0.8 + fbmForest2(x / 2400, z / 2400) * 0.35;
+      if (desert) {
+        // Çöl: platoda seyrek ardıç ve çam öbekleri, yarda yok; kanyon dibinde nehir boyunca kavaklık (yeşil şerit)
+        const steepD = 1 - smoothstep(0.35, 0.7, slope);
+        const juniper = (0.05 + smoothstep(0.05, 0.4, n) * 0.4) * smoothstep(300, 650, h) * steepD * site;
+        const riparian = (1 - smoothstep(45, 75, h)) * (1 - smoothstep(0.12, 0.3, slope)) * 0.75 * site;
+        out.forest[k] = Math.round(clamp(Math.max(juniper, riparian), 0, 1) * 255);
+        continue;
+      }
+      // Orman: büyük lekeler + küçük ayrıntı; tepelerde daha çok, çok dik yamaçta ve ağaç sınırı üstünde yok
       const hill = 0.45 + 0.55 * smoothstep(120, 650, h);
       const treeLine = 1 - smoothstep(1650, 2050, h);
       const steep = 1 - smoothstep(0.75, 1.15, slope);

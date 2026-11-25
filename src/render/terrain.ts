@@ -8,6 +8,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { smoothstep } from '../core/math';
 import { MAP_HALF as HALF, MAP_SCALE, MAP_SIZE } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, TERRAIN_W, heights, terrainEdits, terrainMap, groundLevel } from '../sim/terrain';
+import { mapById } from '../sim/maps';
+import { kanyonBase, monumentShare, pedestalShare } from '../sim/mapKanyon';
+import { DESERT_GLSL } from './desertRock';
 import { PALETTE } from './palette';
 import { linkAtmosphere } from './atmosphere';
 import { linkCloudShadow } from './clouds';
@@ -36,6 +39,34 @@ function toLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
+/** Çöl haritası (Kanyonlar) zemin tonları; kaya katmanları gölgelendiricide (desertRock.ts). */
+const DESERT_FLAT: [number, number, number] = [196, 160, 118];
+/** Anıt vadisi havzasının tabanı: sönük pas-somon kum (yalnız havzada; plato devetüyü kalır). */
+const MONUMENT_SAND: [number, number, number] = [186, 124, 88];
+const DESERT_HIGH: [number, number, number] = [182, 166, 132];
+const DESERT_FLOOR: [number, number, number] = [192, 128, 92];
+const JUNIPER: [number, number, number] = [92, 100, 66];
+const RIPARIAN: [number, number, number] = [84, 116, 60];
+let desertFor = -1;
+let desert = false;
+
+/**
+ * Çölde köşe rengi yalnız zemin tonu (kanyon dibinde kızıl kum, platoda devetüyü, yüksek platoda grimsi) ve bitki;
+ * kaya katmanları, moloz ve doku piksel başına gölgelendiricide (desertRock.ts).
+ */
+function desertColor(h: number, _k: number, x: number, z: number, out: number[]): void {
+  const a = h < 200 ? DESERT_FLOOR : DESERT_FLAT;
+  const b = h < 200 ? DESERT_FLAT : DESERT_HIGH;
+  const t = h < 200 ? smoothstep(60, 200, h) : smoothstep(900, 1250, h);
+  // Geniş ölçekte ton oynaması (tek renk düzlük olmasın)
+  const v = 0.94 + 0.06 * Math.sin(x / 7300 + Math.sin(z / 5100) * 1.7) * Math.sin(z / 6100 - 0.8);
+  // Anıt vadisi havzası: tabanı pas-somon kum; geçiş havzanın kenar yamacında
+  const m = monumentShare(x, z, MAP_SCALE) * 0.85;
+  out[0] = (a[0] + (b[0] - a[0]) * t + (MONUMENT_SAND[0] - a[0] - (b[0] - a[0]) * t) * m) * v;
+  out[1] = (a[1] + (b[1] - a[1]) * t + (MONUMENT_SAND[1] - a[1] - (b[1] - a[1]) * t) * m) * v;
+  out[2] = (a[2] + (b[2] - a[2]) * t + (MONUMENT_SAND[2] - a[2] - (b[2] - a[2]) * t) * m) * v;
+}
+
 const FOREST: [number, number, number] = [72, 106, 56];
 const FOREST_HIGH: [number, number, number] = [66, 98, 66];
 const URBAN: [number, number, number] = [176, 168, 152];
@@ -46,7 +77,64 @@ const CLIFF: [number, number, number] = [132, 126, 118];
  * k: ızgara köşe indeksi (arazi örtüsü ızgaraları), x/z: dünya konumu (yapı tabanları temizlenir; clear: bu bölgeye değen
  * yapı açıklıkları, clearingsIn ile parça başına bir kez süzülür).
  */
+/** Yüklü harita çöl mü (Kanyonlar); gölgelendiricinin değeri de güncellenir. */
+function isDesert(): boolean {
+  if (desertFor !== terrainMap.version) {
+    desertFor = terrainMap.version;
+    desert = mapById(terrainMap.id).biome === 'desert';
+    waterU.terrDesert.value = desert ? 1 : 0;
+  }
+  return desert;
+}
+
+const AO_DIRS = Array.from({ length: 8 }, (_, d) => [Math.cos((d * Math.PI) / 4), Math.sin((d * Math.PI) / 4)]);
+const AO_STEPS = [1, 2, 4, 7, 11, 16];
+
+/**
+ * Arazinin kendi kapalılığı (çöl haritası): sekiz yönde ~2 km'ye kadar ufkun yüksekliği; kanyon dibi ve duvar dipleri
+ * gökten az ışık alır. Gölgelendiricide rengi koyulaştırır (0 açık … ~0,6 kapalı). Uzaktan bakışta kanyon düz maket
+ * gibi duruyordu: derinliği bu karartma verir.
+ */
+function desertOcc(i: number, j: number): number {
+  const h0 = heights[j * TERRAIN_W + i];
+  let occ = 0;
+  for (const [dx, dz] of AO_DIRS) {
+    let best = 0;
+    for (const s of AO_STEPS) {
+      const ii = Math.round(i + dx * s);
+      const jj = Math.round(j + dz * s);
+      if (ii < 0 || jj < 0 || ii > TERRAIN_N || jj > TERRAIN_N) break;
+      const rise = (heights[jj * TERRAIN_W + ii] - h0) / (s * TERRAIN_CELL);
+      if (rise > best) best = rise;
+    }
+    occ += best / Math.sqrt(1 + best * best);
+  }
+  return Math.min(0.62, (occ / 8) * 1.25);
+}
+
 function colorAt(h: number, out: number[], k = -1, x = 0, z = 0, clear: readonly Circle[] = NO_CLEAR): void {
+  isDesert();
+  if (desert && h > 2) {
+    desertColor(h, k, x, z, out);
+    let r = out[0];
+    let g = out[1];
+    let b = out[2];
+    if (k >= 0) {
+      // Anıt vadisi havzasında ardıç lekesi yok (zemin kızıl kum, çalılar ayrı model)
+      const fo = (forestGrid[k] / 255) * clearFactorIn(clear, x, z) * (1 - monumentShare(x, z, MAP_SCALE));
+      if (fo > 0.02) {
+        const c = h < 110 ? RIPARIAN : JUNIPER;
+        const a = Math.min(1, fo * 1.2) * (h < 110 ? 0.85 : 0.55);
+        r += (c[0] - r) * a;
+        g += (c[1] - g) * a;
+        b += (c[2] - b) * a;
+      }
+    }
+    out[0] = toLinear(Math.min(1, r / 255));
+    out[1] = toLinear(Math.min(1, g / 255));
+    out[2] = toLinear(Math.min(1, b / 255));
+    return;
+  }
   let i = 0;
   while (i < STOPS.length - 1 && h > STOPS[i + 1][0]) i++;
   const [h0, c0] = STOPS[i];
@@ -184,6 +272,8 @@ export const waterU = {
   terrDetail: { value: 1 },
   /** Zemin dokusu (groundTex.ts): her kalitede; iki ölçekte okunur. */
   terrGrass: groundU.terrGrass,
+  /** Çöl haritası (Kanyonlar): kaya ve toprak piksel başına (desertRock.ts), yumuşak gölgelendirme. */
+  terrDesert: { value: 0 },
 };
 
 /**
@@ -195,6 +285,7 @@ const LAND_PARS = /* glsl */ `
   varying vec2 vLand;
   varying vec3 vTN;
   uniform float terrDetail;
+  uniform float terrDesert;
   uniform sampler2D terrGrass;
   float tHash( vec2 c ) { return fract( sin( dot( c, vec2( 41.13, 289.71 ) ) ) * 43758.5453 ); }
   /**
@@ -210,10 +301,33 @@ const LAND_PARS = /* glsl */ `
     i = mod( i, k );
     return mix( mix( tHash( i ), tHash( vec2( i1.x, i.y ) ), f.x ), mix( tHash( vec2( i.x, i1.y ) ), tHash( i1 ), f.x ), f.y );
   }
+${DESERT_GLSL}
 `;
 
 const LAND_FS = /* glsl */ `
-  if ( vWater < 0.5 ) {
+  if ( vWater < 0.5 && terrDesert > 0.5 ) {
+    diffuseColor.rgb = dDesert( diffuseColor.rgb, vCloudW, normalize( vTN ), length( fwidth( vCloudW.xz ) ) );
+    // Taş sütun kaidesi: kızılımsı gri şeyl, yamaçtan aşağı oyuklar, düşmüş kaya benekleri (katman bantları yok)
+    if ( vLand.y > 0.01 ) {
+      vec2 plp = mod( vCloudW.xz, 8192.0 );
+      // Kızıl kum yaygısı (kaidenin çevresi, 0–0,5): zemin kızıla döner
+      vec3 sand = vec3( 0.46, 0.2, 0.1 ) * ( 0.85 + 0.3 * tNoise( plp, 400.0 ) );
+      diffuseColor.rgb = mix( diffuseColor.rgb, sand, smoothstep( 0.0, 0.42, vLand.y ) * 0.6 );
+      // Kaide (0,5–1): kayayla aynı kızıl aile, biraz kahverengi ve sönük; yatay katmanlar, açık çıkıntılar, düşmüş kaya
+      float yb = vCloudW.y + ( tNoise( plp, 180.0 ) - 0.5 ) * 10.0;
+      float band = 0.5 + 0.5 * sin( yb * 0.21 ) * 0.7 + 0.15 * sin( yb * 0.67 );
+      vec3 pr = mix( vec3( 0.34, 0.095, 0.04 ), vec3( 0.46, 0.14, 0.058 ), band );
+      pr *= 0.84 + 0.3 * tNoise( plp + 5.0, 1500.0 );
+      pr = mix( pr, vec3( 0.20, 0.08, 0.045 ), smoothstep( 0.6, 0.85, tNoise( plp + 2.0, 4200.0 ) ) * 0.5 );
+      // İri düşmüş kaya parçaları (10–20 m): koyu gövde, açık tepe
+      float bl = tNoise( plp + 13.0, 620.0 );
+      pr = mix( pr, vec3( 0.17, 0.065, 0.035 ), smoothstep( 0.74, 0.8, bl ) * 0.75 );
+      pr = mix( pr, vec3( 0.46, 0.2, 0.1 ), smoothstep( 0.82, 0.88, bl ) * 0.5 );
+      diffuseColor.rgb = mix( diffuseColor.rgb, pr, smoothstep( 0.45, 0.62, vLand.y ) );
+    }
+    // Arazinin kapalılığı (köşede, terrain.ts desertOcc): kanyon dibi ve duvar dipleri koyu
+    diffuseColor.rgb *= 1.0 - vLand.x;
+  } else if ( vWater < 0.5 ) {
     vec2 lp = mod( vCloudW.xz, 8192.0 );
     float lfw = length( fwidth( vCloudW.xz ) );
     float macro = tNoise( lp, 9.0 ) * 0.6 + tNoise( lp + 113.0, 38.0 ) * 0.4;
@@ -340,7 +454,8 @@ function terrainMaterial(flat: boolean): THREE.MeshLambertMaterial {
         vec3 normal = normalize( vNormal );
         #ifdef TERRAIN_FLAT
           vec3 flatN = normalize( cross( dFdx( vViewPosition ), dFdy( vViewPosition ) ) );
-          float smoothK = max( smoothstep( 2500.0, 12000.0, length( vViewPosition ) ), step( 0.5, vSkirt ) );
+          // Çölde yumuşak: büyük köşeli yüzler kayayı oyuncak gibi gösteriyordu
+          float smoothK = max( max( smoothstep( 2500.0, 12000.0, length( vViewPosition ) ), step( 0.5, vSkirt ) ), terrDesert );
           normal = normalize( mix( flatN, normal, smoothK ) );
         #endif
         vec3 nonPerturbedNormal = normal;
@@ -366,6 +481,150 @@ interface Chunk {
  * parçalar için kare başına birkaç tane üretilir, uzaklaşınca bırakılır (300 km haritada bellek sınırlı kalsın).
  * Yakında simülasyonla aynı üçgenleme. Görüş dışındaki parçalar çizilmez.
  */
+/**
+ * Çöl haritasının (Kanyonlar) ötesi: haritanın devamı gibi görünen kaba arazi halkası (2026-11-25; deniz düzlemi plato 800 m
+ * yukarıdayken boşluk gibi duruyordu). İç kenar, kenar profilinin komşu iki hücre boyunca en alçak noktasında: iki köşe arasındaki
+ * doğru hiçbir yerde haritanın kenarının üstüne çıkmaz (kanyon ağzında boşluk kalmıyordu). Dışa doğru haritanın şekil işlevi
+ * (sütunsuz) kaba ızgarayla devam eder; hücreler dışa doğru büyür, renk uzakta düzleşir (iri hücrede çizgi olmasın), sise karışır.
+ * ~14 bin üçgen, tek çizim. Kamera ve uçaklar harita içinde kalır (camera.ts, pilot.ts).
+ */
+function desertOuter(): THREE.BufferGeometry {
+  const k = MAP_SCALE;
+  const IN = 128;
+  const RINGS = 12;
+  // Eksen koordinatları: içeride eşit, dışarıda büyüyen adımlar (3 harita boyuna kadar)
+  const inner = Array.from({ length: IN + 1 }, (_, i) => -HALF + (i / IN) * MAP_SIZE);
+  const outer: number[] = [];
+  let step = MAP_SIZE / IN;
+  let p = HALF;
+  for (let r = 0; r < RINGS; r++) {
+    step *= 1.3;
+    p += step;
+    outer.push(p);
+  }
+  const axis = [...outer.map((v) => -v).reverse(), ...inner, ...outer];
+  const n = axis.length;
+  const lo = RINGS;
+  const hi = RINGS + IN;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const c = [0, 0, 0];
+  const flat = [0, 0, 0];
+  colorAt(900, flat, -1, HALF * 3, HALF * 3);
+  const cell = MAP_SIZE / IN;
+  const sample = TERRAIN_CELL * 0.5;
+  const edgeMemo = new Map<string, number>();
+  // Kenar profilinin en alçağı: köşenin iki yanındaki hücre boyunca (kenarda) ya da köşede
+  const edgeLow = (ex: number, ez: number): number => {
+    const key = `${ex}|${ez}`;
+    const got = edgeMemo.get(key);
+    if (got !== undefined) return got;
+    let lo = groundLevel(ex, ez);
+    const onX = Math.abs(ex) >= HALF - 2; // doğu ya da batı kenarı: kenar boyunca z değişir
+    const onZ = Math.abs(ez) >= HALF - 2;
+    for (let u = -cell; u <= cell; u += sample) {
+      if (onX) lo = Math.min(lo, groundLevel(ex, clampR(ez + u, -HALF + 1, HALF - 1)));
+      if (onZ) lo = Math.min(lo, groundLevel(clampR(ex + u, -HALF + 1, HALF - 1), ez));
+    }
+    edgeMemo.set(key, lo - 15);
+    return lo - 15;
+  };
+  const at = (i: number, j: number): number => {
+    const x = axis[i];
+    const z = axis[j];
+    // Kenardaki zemin (haritanın içinden, kenara en yakın nokta)
+    const ex = clampR(x, -HALF + 1, HALF - 1);
+    const ez = clampR(z, -HALF + 1, HALF - 1);
+    const edgeH = edgeLow(ex, ez);
+    const d = Math.max(Math.abs(x) - HALF, Math.abs(z) - HALF, 0);
+    // Haritanın şekil işlevi (sütunsuz, ucuz) kenarın ötesinde de tanımlı
+    const far = Math.max(30, kanyonBase(x, z, k));
+    const t = smoothstep(0, MAP_SIZE * 0.12, d);
+    const h = edgeH + (far - edgeH) * t;
+    pos.push(x, h, z);
+    colorAt(h, c, -1, x, z);
+    const f = smoothstep(MAP_SIZE * 0.08, MAP_SIZE * 0.45, d) * 0.85;
+    col.push(c[0] + (flat[0] - c[0]) * f, c[1] + (flat[1] - c[1]) * f, c[2] + (flat[2] - c[2]) * f);
+    return pos.length / 3 - 1;
+  };
+  const idx: number[] = [];
+  const vid = new Int32Array(n * n).fill(-1);
+  const v = (i: number, j: number) => {
+    const q = j * n + i;
+    if (vid[q] < 0) vid[q] = at(i, j);
+    return vid[q];
+  };
+  for (let j = 0; j < n - 1; j++) {
+    for (let i = 0; i < n - 1; i++) {
+      // Haritanın içi (deliğin hücreleri) atlanır
+      if (i >= lo && i < hi && j >= lo && j < hi) continue;
+      const a = v(i, j);
+      const b = v(i + 1, j);
+      const cc = v(i + 1, j + 1);
+      const d = v(i, j + 1);
+      idx.push(a, d, cc, a, cc, b);
+    }
+  }
+  // Kenar perdesi: haritanın kenar profilinden halkanın iç kenarına inen dikey yüz (dışarıdan alçak bakışta boşluk görünmesin)
+  const ring = (u: number, side: number): number => {
+    // side 0: x = -HALF, 1: x = +HALF, 2: z = -HALF, 3: z = +HALF; u kenar boyunca
+    const f = (u + HALF) / cell;
+    const i0 = Math.min(IN - 1, Math.max(0, Math.floor(f)));
+    const a = inner[i0];
+    const b = inner[i0 + 1];
+    const e = side < 2 ? (side === 0 ? -HALF + 1 : HALF - 1) : 0;
+    const la = side < 2 ? edgeLow(e, clampR(a, -HALF + 1, HALF - 1)) : edgeLow(clampR(a, -HALF + 1, HALF - 1), side === 2 ? -HALF + 1 : HALF - 1);
+    const lb = side < 2 ? edgeLow(e, clampR(b, -HALF + 1, HALF - 1)) : edgeLow(clampR(b, -HALF + 1, HALF - 1), side === 2 ? -HALF + 1 : HALF - 1);
+    const t = Math.min(1, Math.max(0, f - i0));
+    return la + (lb - la) * t - 5;
+  };
+  const CSTEP = TERRAIN_CELL * 2;
+  const _a = new THREE.Vector3();
+  const _b = new THREE.Vector3();
+  for (let side = 0; side < 4; side++) {
+    const out = side === 0 ? [-1, 0] : side === 1 ? [1, 0] : side === 2 ? [0, -1] : [0, 1];
+    const point = (u: number): [number, number] => {
+      const w = clampR(u, -HALF + 1, HALF - 1);
+      return side === 0 ? [-HALF + 1, w] : side === 1 ? [HALF - 1, w] : side === 2 ? [w, -HALF + 1] : [w, HALF - 1];
+    };
+    let prev = -1;
+    for (let u = -HALF; u <= HALF + 0.5; u += CSTEP) {
+      const [x, z] = point(u);
+      const top = groundLevel(x, z);
+      const bot = Math.min(top - 1, ring(u, side));
+      const ex = x + out[0];
+      const ez = z + out[1];
+      colorAt(top, c, -1, x, z);
+      pos.push(ex, top, ez, ex, bot, ez);
+      col.push(c[0] * 0.94, c[1] * 0.94, c[2] * 0.94, c[0] * 0.86, c[1] * 0.86, c[2] * 0.86);
+      const cur = pos.length / 3 - 2;
+      if (prev >= 0) {
+        // Sarım: yüz normali dışa baksın
+        _a.set(pos[cur * 3] - pos[prev * 3], 0, pos[cur * 3 + 2] - pos[prev * 3 + 2]);
+        _b.set(0, -1, 0);
+        const nx = _a.y * _b.z - _a.z * _b.y;
+        const nz = _a.x * _b.y - _a.y * _b.x;
+        if (nx * out[0] + nz * out[1] > 0) idx.push(prev, cur, cur + 1, prev, cur + 1, prev + 1);
+        else idx.push(prev, cur + 1, cur, prev, prev + 1, cur + 1);
+      }
+      prev = cur;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const nv = pos.length / 3;
+  g.setAttribute('skirt', new THREE.BufferAttribute(new Float32Array(nv), 1));
+  g.setAttribute('water', new THREE.BufferAttribute(new Float32Array(nv), 1));
+  g.setAttribute('land', new THREE.BufferAttribute(new Float32Array(nv * 2), 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
+const clampR = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v));
+
 export class TerrainView {
   readonly group = new THREE.Group();
   /** Yakın düzey köşeli (low-poly); uzak düzeyler yumuşak gölgeli (düzey değişiminde yüzey parlaklığı zıplamasın). */
@@ -380,7 +639,7 @@ export class TerrainView {
   private editVersion = -1;
   private readonly scene: THREE.Scene;
   private outer: THREE.Mesh | null = null;
-  private outerSize = 0;
+  private outerKey = '';
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -390,11 +649,17 @@ export class TerrainView {
 
   /** Harita dışı açık deniz: harita kadar delikli büyük düzlem (harita büyüklüğü değişince yeniden kurulur). */
   private buildOuter(): void {
-    if (this.outerSize === MAP_SIZE) return;
-    this.outerSize = MAP_SIZE;
+    const key = `${MAP_SIZE}|${terrainMap.version}`;
+    if (this.outerKey === key) return;
+    this.outerKey = key;
     if (this.outer) {
       this.scene.remove(this.outer);
       this.outer.geometry.dispose();
+    }
+    if (isDesert()) {
+      this.outer = new THREE.Mesh(desertOuter(), this.materialFar);
+      this.scene.add(this.outer);
+      return;
     }
     const big = MAP_SIZE * 8;
     const shape = new THREE.Shape();
@@ -611,8 +876,10 @@ export class TerrainView {
       pos[o * 3 + 1] = Math.max(h, 0) - drop;
       pos[o * 3 + 2] = -HALF + j * TERRAIN_CELL - cz;
       water[o] = Math.max(0, -h);
-      land[o * 2] = fieldGrid[k] / 255;
-      land[o * 2 + 1] = forestGrid[k] / 255;
+      // Çölde tarla yok: ilk bileşen arazinin kapalılığı (gölgelendiricide kanyon içi koyulaşır)
+      land[o * 2] = isDesert() ? desertOcc(i, j) : fieldGrid[k] / 255;
+      // Çölde ikinci bileşen taş sütun kaidesinin payı (gölgelendiricide şeyl rengi)
+      land[o * 2 + 1] = isDesert() ? pedestalShare(-HALF + i * TERRAIN_CELL, -HALF + j * TERRAIN_CELL, MAP_SCALE) : forestGrid[k] / 255;
       if (step === 1) {
         c[0] = fineCol[k * 3] / 255;
         c[1] = fineCol[k * 3 + 1] / 255;

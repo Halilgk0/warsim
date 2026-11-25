@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { DEG, clamp } from '../core/math';
 import { rayTerrain } from './terrain';
 import { groundLevel } from '../sim/terrain';
+import { MAP_HALF } from '../sim/mapData';
 
 export class CameraRig {
   readonly target = new THREE.Vector3();
@@ -185,6 +186,10 @@ export class CameraRig {
   }
 
   apply(): void {
+    // Görünmez duvar (2026-11-25): bakılan nokta harita dışına çıkmaz
+    const lim = MAP_HALF * 0.98;
+    this.target.x = clamp(this.target.x, -lim, lim);
+    this.target.z = clamp(this.target.z, -lim, lim);
     const cp = Math.cos(this.pitch);
     const sp = Math.sin(this.pitch);
     const d = this.distance;

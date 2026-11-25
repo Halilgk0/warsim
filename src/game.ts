@@ -42,16 +42,16 @@ import { NewsView } from './ui/news';
 import { FeedbackBox } from './ui/feedback';
 import { installKeyboardFit } from './ui/keyboard';
 import { isFullscreen, onFullscreenChange } from './ui/fullscreen';
-import { $, fmtTime } from './ui/dom';
+import { $, esc, fmtTime } from './ui/dom';
 import { sound } from './audio/sound';
 import { BattleSound } from './audio/battle';
 import { AlertSound } from './audio/alerts';
 import { Vector3 } from 'three';
 import { L, count } from './i18n';
-import { SAVE_SLOTS_BASE, contribRank, keepFor } from './net/shared';
+import { SAVE_SLOTS_BASE, contribRank, earlyAccess, keepFor } from './net/shared';
 import { rankName } from './ui/badges';
 import { overText } from './ui/savesList';
-import { SupportBox } from './ui/support';
+import { SUPPORT_ON, SupportBox } from './ui/support';
 import { Tutorial } from './ui/tutorial';
 import { MAP_BASE, MAP_SCALE } from './sim/mapData';
 import { AutoFast } from './autoFast';
@@ -370,6 +370,11 @@ export class Game {
     try {
       const d = await readSave(id);
       if (d.v !== 2 || !d.mapId) throw new Error(L('bu kayıt eski bir harita sürümüne ait; yeni haritalarda açılamaz', 'this save belongs to an old map version and cannot be opened on the new maps'));
+      // Yapım aşamasındaki haritanın kaydı yalnız erken erişimle açılır (seviye iade edildiyse)
+      if (mapById(d.mapId).earlyAccess && !earlyAccess(currentAccount()?.support ?? 0)) {
+        this.showEarlyAccess(mapById(d.mapId).name);
+        return;
+      }
       // Büyüklüğü olmayan (önceki) kayıtlar 300 km
       await new Promise<void>((resolve, reject) => this.withMap(d.mapId, d.mapSize ?? MAP_BASE, () => {
         try {
@@ -1375,6 +1380,26 @@ export class Game {
       { label: L('Tamam', 'OK'), primary: true, run: () => undefined },
       { label: L('Çözünürlüğü düşür', 'Lower the resolution'), run: () => this.modals.openSettings('grafik', { set: 'resolution', v: '0.5', fps: this.fpsNow, stutter: false }) },
     ]);
+  }
+
+  /**
+   * Erken erişim penceresi (2026-11-25): yapım aşamasındaki harita ya da özellik yalnız 3. seviye destekçiye açık. Destekçi
+   * paketi açıksa seviye yükseltme ekranına götüren düğme; Google Play uygulamasında ve eski adreste (paket kapalı) yalnız bilgi.
+   */
+  showEarlyAccess(what: string): void {
+    const canBuy = SUPPORT_ON;
+    this.modals.openNotice(L('Yapım aşamasında', 'In development'), `<p>${L(
+      `<b>${esc(what)}</b> henüz yapım aşamasında. Haritayı ana menüde inceleyebilirsin; tamamlanınca herkese açılacak ve haberlerde duyuracağız.`,
+      `<b>${esc(what)}</b> is still in development. You can look around it in the main menu; when it is finished it opens to everyone and we announce it in the news.`,
+    )}</p>${canBuy ? `<p>${L(
+      'Erken erişim <b>3. seviye</b> destekçilere açık: yapım aşamasındaki harita ve özellikleri herkesten önce oynarsın.',
+      'Early access is open to <b>level 3</b> supporters: you play maps and features in development before everyone else.',
+    )}</p>` : ''}`, canBuy
+      ? [
+        { label: L('Seviyeni yükselt', 'Upgrade your level'), primary: true, run: () => this.support.open(3) },
+        { label: L('Tamam', 'OK'), run: () => undefined },
+      ]
+      : [{ label: L('Tamam', 'OK'), primary: true, run: () => undefined }]);
   }
 
   /** Hata raporuna eklenen teknik bilgi satırı (diag.ts; konsoldan denemek için de). */

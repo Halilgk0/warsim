@@ -29,6 +29,7 @@ self.onmessage = (e: MessageEvent<MapJob>) => {
     // Haritanın dekor şehirleri 2026-11-13'te kaldırıldı: şehir zemini ve çevresindeki orman açıklığı yok (landcover.ts aynı)
     cities: [],
     statics: TEAM_SITES.map((t) => ({ x: t.site.x, z: t.site.z, r: 2600 })),
+    desert: def.biome === 'desert',
   }, lc);
   const heights = h.slice((j0 - a) * TERRAIN_W, (j1 - a) * TERRAIN_W);
   const part: MapPart = { j0, heights, lc };

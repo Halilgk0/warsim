@@ -9,6 +9,8 @@ import { L } from '../i18n';
 import {
   BLUE_FACTORY, BLUE_FORWARD, BLUE_MAIN, MAP_BASE, RED_FACTORY, RED_FORWARD, RED_MAIN, type CityDef, type LandPoint, type SiteDef,
 } from './mapData';
+import { kanyon, kanyonBase, kanyonPillars } from './mapKanyon';
+import type { Pillar } from './pillars';
 
 export interface MapDef {
   id: string;
@@ -24,6 +26,19 @@ export interface MapDef {
    * kendi adasında, ortadaki tarafsız ada ve adacıklar dışında). Yoksa harita her yerinde serbest.
    */
   startZones?: LandPoint[];
+  /** Sabit yerlerin (üs, şehir) düzleştirileceği yükseklik aralığı (m); yoksa 40–320 (alçak ovalar). */
+  flat?: [number, number];
+  /** İklim: çöl haritasında arazi kaya katmanı renklerinde, bitki seyrek ve çalımsı, tarla yok (render). */
+  biome?: 'desert';
+  /** Taş sütunlar (pillars.ts): harita yüklenince bir kez; render ayrı modelle çizer, sim zemine katar. */
+  pillars?: (size: number) => Pillar[];
+  /** Önizleme için ucuz şekil (yoksa natural). */
+  preview?: (x: number, z: number) => number;
+  /**
+   * Yapım aşamasında (erken erişim): ana menüde seçilip önizlenir, harekât yalnız 3. seviye destekçiyle başlar (shared.ts
+   * earlyAccess; mainMenu.ts launch, game.ts loadSave). 2026-11-25 kullanıcı kararı.
+   */
+  earlyAccess?: boolean;
   /** Düzleştirme öncesi doğal yükseklik (m). k: harita büyüklüğü / 300 km (x, z gerçek konum). */
   natural(x: number, z: number, k?: number): number;
 }
@@ -206,7 +221,29 @@ const TAKIMADA: MapDef = {
   natural: takimada,
 };
 
-export const MAPS: MapDef[] = [ANAKARA, TAKIMADA];
+// ---------------------------------------------------------------- 3. Kanyonlar (mapKanyon.ts)
+
+const KANYON: MapDef = {
+  id: 'kanyon',
+  name: L('Kanyonlar', 'Canyonlands'),
+  desc: L('Platoları derin bir nehir kanyonu ve yan kolları keser; kanyonun içinde alçaktan uçan radara görünmez. Doğuda baraj gölü.',
+    'A deep river canyon and its side branches cut through high plateaus; low inside the canyon, aircraft hide from radar. A reservoir lake to the east.'),
+  sites: [
+    { x: -100000, z: -60000, heading: 80 }, { x: 96000, z: 52000, heading: 260 },
+    { x: 40000, z: -90000, heading: 120 }, { x: -60000, z: 80000, heading: 60 },
+    { x: 110000, z: -70000, heading: 200 }, { x: -120000, z: 100000, heading: 20 },
+  ],
+  cities: [],
+  extraLand: [],
+  flat: [600, 1350],
+  biome: 'desert',
+  pillars: kanyonPillars,
+  preview: (x, z) => kanyonBase(x, z, 1),
+  earlyAccess: true,
+  natural: kanyon,
+};
+
+export const MAPS: MapDef[] = [ANAKARA, TAKIMADA, KANYON];
 
 export function mapById(id: string | undefined): MapDef {
   return MAPS.find((m) => m.id === id) ?? MAPS[0];

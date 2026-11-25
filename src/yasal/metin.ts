@@ -354,8 +354,9 @@ const deletionEn: LegalText = {
 `,
 };
 
-// Destekçi paketi koşulları (2026-11-21, avukat onaylı): satıcı Polar; ne alındığı, teslim, iade (7 gün ve ödemeden sonra
-// 2,5 saatten az oynama), hesap silinince ne olduğu. Polar'daki ürün açıklaması ve oyundaki paket penceresi buraya bağlanır.
+// Destekçi paketi koşulları (2026-11-21, avukat onaylı; 2026-11-25'te sabit fiyatlı üç seviye ve erken erişim eklendi): satıcı
+// Polar; ne alındığı, teslim, iade (7 gün ve ödemeden sonra 2,5 saatten az oynama), hesap silinince ne olduğu. Polar'daki ürün
+// açıklaması ve oyundaki paket penceresi buraya bağlanır.
 const supportTr: LegalText = {
   title: 'Destekçi Paketi Koşulları',
   desc: 'WarSimBox destekçi paketi: ne alırsın, kim satar, nasıl teslim edilir ve iade.',
@@ -363,13 +364,20 @@ const supportTr: LegalText = {
 <p class="legal-date">Yürürlük tarihi: ${date('tr')}</p>
 
 <h2>Teşekkürler</h2>
-<p>Destekçi paketi WarSimBox’ın gelişmesine katkı olur. Katkın için teşekkür ederiz; aldığın paketle hesabına sana özel bir rozet ve fazladan kayıt yeri eklenir.</p>
+<p>Destekçi paketi WarSimBox’ın gelişmesine katkı olur. Katkın için teşekkür ederiz; aldığın seviyeyle hesabına sana özel bir rozet ve seviyesine göre ayrıcalıklar eklenir.</p>
 
 <h2>Ne alıyorsun</h2>
-<p>WarSimBox hesabına bağlı dijital içerik: bir profil rozeti ve toplam ödemene göre fazladan kayıt yeri (toplam 5 $ ve üstünde 1, 15 $ ve üstünde 2). Rozet ve kayıt yeri yalnız bu hesapta geçerlidir, başka hesaba aktarılamaz, paraya çevrilemez.</p>
+<p>WarSimBox hesabına bağlı dijital içerik, üç seviye:</p>
+<ul>
+<li><b>1. seviye:</b> profil rozeti ve günde 1 fazladan geri bildirim hakkı.</li>
+<li><b>2. seviye:</b> 2. seviye rozeti, 1 fazladan kayıt yeri ve günde 2 fazladan geri bildirim hakkı.</li>
+<li><b>3. seviye:</b> 3. seviye rozeti, 2 fazladan kayıt yeri, günde 3 fazladan geri bildirim hakkı ve erken erişim.</li>
+</ul>
+<p>Erken erişim, yapım aşamasındaki harita ve özellikleri herkese açılmadan önce oynayabilmendir. Bu içerik tamamlanmamıştır: değişebilir, hata içerebilir, kayıtları sonraki sürümlerde açılmayabilir; tamamlanınca herkese açılabilir. Erken erişim belirli bir içeriğin ne zaman ya da hangi biçimde geleceğine dair bir taahhüt değildir.</p>
+<p>Rozet, kayıt yeri ve diğer ayrıcalıklar yalnız bu hesapta geçerlidir, başka hesaba aktarılamaz, paraya çevrilemez.</p>
 
 <h2>Fiyat</h2>
-<p>Tutarı sen seçersin (1–50 $). Ülkene göre vergi eklenebilir; son tutar ödeme sayfasında görünür.</p>
+<p>Seviyeler tek seferlik ödemedir, abonelik değildir: 1. seviye 3 $, 2. seviye 7 $, 3. seviye 10 $. Seviyeler birikir: üst seviyeye geçerken yalnız aradaki fark ödenir (ör. 1. seviyeden 3. seviyeye 7 $). Ülkene göre vergi eklenebilir; son tutar ödeme sayfasında görünür.</p>
 
 <h2>Satıcı ve ödeme</h2>
 <p>Satıcı Polar’dır (polar.sh, “merchant of record”). Ödeme Polar’ın sayfasında yapılır; Polar’ın alıcı koşulları geçerlidir. Kart bilgilerin bize gelmez.</p>
@@ -378,10 +386,10 @@ const supportTr: LegalText = {
 <p>İçerik ödemeden hemen sonra hesabına kendiliğinden eklenir. Birkaç dakika içinde gelmezse ${OWNER.email} adresine yaz.</p>
 
 <h2>İade</h2>
-<p>Ödemeden sonraki 7 gün içinde, sipariş numarasıyla ${OWNER.email} adresine yazarak iade isteyebilirsin. Ödemeden sonra toplam 2,5 saat ya da daha fazla oynadıysan iade kabul edilmez: paketin sağladığı kayıt yerleri o süre içinde kullanılmış sayılır. Oynama süresi hesabının harekâtlarda geçen gerçek süresidir ve satın alma anından itibaren sunucumuzda ölçülür. İade edilen ya da bankadan itiraz edilen ödemenin rozeti ve kayıt yeri geri alınır. Kayıt sayın yer sayını aşarsa 7 gün içinde fazlasını silmen istenir; silmezsen en eski kayıtların silinir.</p>
+<p>Ödemeden sonraki 7 gün içinde, sipariş numarasıyla ${OWNER.email} adresine yazarak iade isteyebilirsin. Ödemeden sonra toplam 2,5 saat ya da daha fazla oynadıysan iade kabul edilmez: paketin sağladığı kayıt yerleri o süre içinde kullanılmış sayılır. Oynama süresi hesabının harekâtlarda geçen gerçek süresidir ve satın alma anından itibaren sunucumuzda ölçülür. İade edilen ya da bankadan itiraz edilen ödemenin sağladığı seviye (rozet, kayıt yeri ve diğer ayrıcalıklar) geri alınır. Kayıt sayın yer sayını aşarsa 7 gün içinde fazlasını silmen istenir; silmezsen en eski kayıtların silinir.</p>
 
 <h2>Hesabın silinirse</h2>
-<p>Rozet ve fazladan kayıt yerleri hesapla birlikte silinir ve geri getirilemez.</p>
+<p>Seviye ve sağladığı her şey hesapla birlikte silinir ve geri getirilemez.</p>
 
 <h2>Oyun değişirse</h2>
 <p>Oyun geliştikçe rozetlerin görünüşü değişebilir. Oyun kapanırsa içerik de kullanılamaz hâle gelir.</p>
@@ -398,13 +406,20 @@ const supportEn: LegalText = {
 <p class="legal-date">Effective date: ${date('en')}. This is a translation; the Turkish text prevails.</p>
 
 <h2>Thank you</h2>
-<p>The supporter pack helps WarSimBox grow. Thank you for your contribution; the pack adds a special badge and extra save slots to your account.</p>
+<p>The supporter pack helps WarSimBox grow. Thank you for your contribution; the level you get adds a special badge and perks by level to your account.</p>
 
 <h2>What you get</h2>
-<p>Digital content tied to your WarSimBox account: a profile badge and, depending on your total payments, extra save slots (1 from a $5 total, 2 from a $15 total). The badge and slots are valid only on this account; they cannot be transferred to another account or exchanged for money.</p>
+<p>Digital content tied to your WarSimBox account, in three levels:</p>
+<ul>
+<li><b>Level 1:</b> a profile badge and 1 extra feedback message per day.</li>
+<li><b>Level 2:</b> the level 2 badge, 1 extra save slot and 2 extra feedback messages per day.</li>
+<li><b>Level 3:</b> the level 3 badge, 2 extra save slots, 3 extra feedback messages per day and early access.</li>
+</ul>
+<p>Early access means you can play maps and features in development before they open to everyone. This content is unfinished: it may change, contain bugs, and its saves may not open in later versions; when finished it may open to everyone. Early access is no commitment about when or in what form any particular content arrives.</p>
+<p>The badge, save slots and other perks are valid only on this account; they cannot be transferred to another account or exchanged for money.</p>
 
 <h2>Price</h2>
-<p>You choose the amount ($1–$50). Tax may be added depending on your country; the final amount is shown on the payment page.</p>
+<p>Levels are one-time payments, not a subscription: level 1 is $3, level 2 is $7, level 3 is $10. Levels add up: moving up, you pay only the difference (e.g. $7 from level 1 to level 3). Tax may be added depending on your country; the final amount is shown on the payment page.</p>
 
 <h2>Seller and payment</h2>
 <p>The seller is Polar (polar.sh, the “merchant of record”). You pay on Polar’s page and Polar’s buyer terms apply. Your card details never reach us.</p>
@@ -413,10 +428,10 @@ const supportEn: LegalText = {
 <p>The content is added to your account automatically right after payment. If it has not arrived within a few minutes, write to ${OWNER.email}.</p>
 
 <h2>Refunds</h2>
-<p>You can request a refund within 7 days of payment by writing to ${OWNER.email} with your order number. No refund is given if you have played 2.5 hours or more in total since paying: the save slots the pack provides count as used by then. Play time is the real time your account spends in campaigns and is measured on our server from the moment of purchase. If a payment is refunded or disputed through your bank, its badge and save slots are removed. If you then have more saves than slots, you are asked to delete the extra ones within 7 days; otherwise your oldest saves are deleted.</p>
+<p>You can request a refund within 7 days of payment by writing to ${OWNER.email} with your order number. No refund is given if you have played 2.5 hours or more in total since paying: the save slots the pack provides count as used by then. Play time is the real time your account spends in campaigns and is measured on our server from the moment of purchase. If a payment is refunded or disputed through your bank, the level it provided (badge, save slots and other perks) is removed. If you then have more saves than slots, you are asked to delete the extra ones within 7 days; otherwise your oldest saves are deleted.</p>
 
 <h2>If your account is deleted</h2>
-<p>The badge and extra save slots are deleted with the account and cannot be restored.</p>
+<p>The level and everything it provides are deleted with the account and cannot be restored.</p>
 
 <h2>If the game changes</h2>
 <p>As the game develops, the look of the badges may change. If the game shuts down, the content can no longer be used.</p>

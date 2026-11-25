@@ -34,6 +34,63 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'kanyonlar',
+    date: '2026-11-25',
+    title: 'Yeni harita: Kanyonlar (erken erişim)',
+    summary: 'Üçüncü harita geliyor: basamaklı platolar, derin bir nehir kanyonu, yan kanyon labirenti ve kızıl kaya sütunlarıyla dolu vadiler. Kanyonlar yapım aşamasında; ana menüde herkes inceleyebilir, harekât şimdilik 3. seviye destekçilere açık.',
+    cover: img('kanyon-kapak.webp'),
+    images: [
+      { src: img('kanyon-plato.webp'), caption: 'Plato kenarı: katman katman inen yamaçlar ve ötede ana kanyon.' },
+      { src: img('kanyon-nehir.webp'), caption: 'Ana kanyonun dibinde kıvrılan nehir, doğuda gölde biter.' },
+      { src: img('kanyon-vadi.webp'), caption: 'Anıt vadisi: kızıl kumlu havzada tek başına yükselen kaya sütunları.' },
+    ],
+    sections: [
+      {
+        heading: 'Kanyonlar',
+        text: [
+          'Anakara ve Takımadalar’dan sonra üçüncü harita: kurak, yüksek ve kayalık bir çöl ülkesi.',
+        ],
+        bullets: [
+          'Basamaklı platolar: 820 ile 1.300 m arasında, kenarları katman katman inen yamaçlar.',
+          'Ortadan kıvrılarak geçen derin bir ana kanyon; dibinde nehir, doğuda göl.',
+          'Ana kanyona açılan yan kanyonlardan bir labirent.',
+          'Anıt vadileri: alçak, kızıl kumlu havzalar ve içlerinde yükselen kaya sütunları, mesalar, kule öbekleri.',
+          'Platolarda ardıç, havzalarda adaçayı çalıları.',
+        ],
+      },
+      {
+        heading: 'Arazi savaşı değiştiriyor',
+        bullets: [
+          'Kanyon duvarları alçak uçan uçağı radardan saklayabilir: radar ufkunun altında kalan kol ancak yakına gelince görünür.',
+          'Üs kuracak düz yer sınırlı: platolar ve havzalar arasında seçim yapmak gerekiyor.',
+          'Uçaksavarı tepeye ya da plato kenarına kurmak görüşü ve menzili değiştirir.',
+        ],
+      },
+      {
+        heading: 'Erken erişim',
+        text: [
+          'Kanyonlar henüz yapım aşamasında. Harita ana menüde herkese açık: seçip arka planda inceleyebilirsin. Harekât başlatmak şimdilik 3. seviye destekçilere açık; tamamlanınca herkese açılacak.',
+          'Yapım aşamasında olduğu için harita değişebilir; bu haritadaki kayıtlar sonraki sürümlerde açılmayabilir.',
+        ],
+      },
+      {
+        heading: 'Destekçi seviyeleri',
+        bullets: [
+          'Seviyeler artık sabit fiyatlı ve tek seferlik: 1. seviye 3 $, 2. seviye 7 $, 3. seviye 10 $. Üst seviyeye geçerken yalnız aradaki fark ödenir.',
+          'Destekçi penceresi seviyeleri yan yana karşılaştırıyor: rozet, kayıt yeri, günlük geri bildirim hakkı ve erken erişim.',
+          '3. seviyenin yeni ayrıcalığı erken erişim: yapım aşamasındaki harita ve özellikleri herkesten önce oynarsın.',
+        ],
+      },
+      {
+        heading: 'Düzeltmeler',
+        bullets: [
+          'Ana menüde harita büyüklüğü değişince başlangıç yerleri ve "Yeni yerler" düğmesi artık her büyüklükte görünüyor.',
+          'Kamera ve uçaklar haritanın dışına çıkmıyor.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'katki-puani',
     date: '2026-11-24',
     title: 'Hata bildir, öneri gönder: katkı puanı ve rütbe kazan',

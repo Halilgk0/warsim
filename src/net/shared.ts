@@ -75,13 +75,29 @@ export function keepFor(created: number, cents: number): number {
 export const validSlot = (s: unknown, n = SAVE_SLOTS_MAX): s is number => typeof s === 'number' && Number.isInteger(s) && s >= 1 && s <= n;
 
 /**
- * Destekçi paketi (2026-11-21): ödeme Polar'ın sayfasında (satıcı Polar); kart bilgisi oyuna ve sunucuya gelmez. Basamak
- * hesabın toplam ödemesinden (iade düşülür): 1 $ el sıkışma rozeti, 5 $ kanatlar ve 1 fazla kayıt yeri, 15 $ altın kask ve 2
- * fazla kayıt yeri. Tek ödeme 1–50 $. Tutarlar sent.
+ * Destekçi paketi (2026-11-21; 2026-11-25'ten beri sabit fiyatlı üç seviye): ödeme Polar'ın sayfasında (satıcı Polar); kart
+ * bilgisi oyuna ve sunucuya gelmez. Seviye hesabın toplam ödemesinden (iade düşülür), birikir: üst seviyeye geçerken yalnız
+ * fark ödenir. 1. seviye 3 $ (el sıkışma rozeti), 2. seviye 7 $ (kanatlar, +1 kayıt yeri), 3. seviye 10 $ (altın kask, +2 kayıt
+ * yeri, erken erişim). 1. seviyenin eşiği 1 $: eski serbest tutarlı düzende 1 $ ödeyenlerin rozeti düşmesin (yeni ödemede en
+ * az 3 $). Tutarlar sent.
  */
 export const SUPPORT_MIN = 100;
 export const SUPPORT_MAX = 5000;
-export const SUPPORT_TIERS = [100, 500, 1500] as const;
+export const SUPPORT_TIERS = [100, 700, 1000] as const;
+/** Seviyelerin fiyatı (sent; toplam): 3, 7, 10 $. */
+export const LEVEL_PRICES = [300, 700, 1000] as const;
+/** Erken erişim (yapım aşamasındaki harita ve özellikler) bu seviyeden. */
+export const EARLY_ACCESS_TIER = 3;
+
+/** Bu seviyeye geçmek için ödenecek tutar (sent; toplamdan fark). Zaten varsa 0. */
+export function levelCost(cents: number, level: number): number {
+  const price = LEVEL_PRICES[level - 1];
+  if (price === undefined || supportTier(cents) >= level) return 0;
+  return Math.max(price - cents, SUPPORT_MIN);
+}
+
+/** Hesap erken erişimde mi (3. seviye). */
+export const earlyAccess = (cents: number): boolean => supportTier(cents) >= EARLY_ACCESS_TIER;
 /** Fazla kayıt yeri: basamak 2'de 1, 3'te 2. */
 const EXTRA_SLOTS = [0, 0, 1, 2] as const;
 
@@ -90,7 +106,7 @@ export function supportTier(cents: number): 0 | 1 | 2 | 3 {
   return cents >= SUPPORT_TIERS[2] ? 3 : cents >= SUPPORT_TIERS[1] ? 2 : cents >= SUPPORT_TIERS[0] ? 1 : 0;
 }
 
-/** Hesabın günlük geri bildirim hakkı: 3, destekçi basamağı başına +1 (1 $: 4, 5 $: 5, 15 $: 6). */
+/** Hesabın günlük geri bildirim hakkı: 3, destekçi seviyesi başına +1 (1.: 4, 2.: 5, 3.: 6). */
 export const feedbackPerDay = (cents: number): number => 3 + supportTier(cents);
 
 /** Hesabın kayıt yeri sayısı. */

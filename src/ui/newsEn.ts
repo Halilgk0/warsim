@@ -15,6 +15,60 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  kanyonlar: {
+    title: 'New map: Canyonlands (early access)',
+    summary: 'A third map is coming: stepped plateaus, a deep river canyon, a maze of side canyons and valleys full of red rock pillars. Canyonlands is in development; anyone can look around it in the main menu, and campaigns are open to level 3 supporters for now.',
+    captions: [
+      'A plateau edge: slopes stepping down layer by layer, with the main canyon beyond.',
+      'The river winding along the floor of the main canyon ends in a lake to the east.',
+      'Monument valley: rock pillars rising alone from a red sand basin.',
+    ],
+    sections: [
+      {
+        heading: 'Canyonlands',
+        text: [
+          'After Mainland and Archipelago, the third map: a dry, high and rocky desert country.',
+        ],
+        bullets: [
+          'Stepped plateaus between 820 and 1,300 m, their edges stepping down layer by layer.',
+          'A deep main canyon winding through the middle, with a river on its floor and a lake to the east.',
+          'A maze of side canyons opening onto the main canyon.',
+          'Monument valleys: low red sand basins with rock pillars, mesas and spire clusters rising from them.',
+          'Juniper on the plateaus, sagebrush in the basins.',
+        ],
+      },
+      {
+        heading: 'The terrain changes the fight',
+        bullets: [
+          'Canyon walls can hide low-flying aircraft from radar: a flight below the radar horizon only shows up when it gets close.',
+          'Flat ground for a base is scarce: you have to choose between plateaus and basins.',
+          'Placing anti-aircraft guns on a hill or a plateau edge changes their view and reach.',
+        ],
+      },
+      {
+        heading: 'Early access',
+        text: [
+          'Canyonlands is still in development. The map is open to everyone in the main menu: select it and look around it in the background. Starting a campaign is open to level 3 supporters for now; when it is finished it opens to everyone.',
+          'Because it is in development the map may change, and saves on this map may not open in later versions.',
+        ],
+      },
+      {
+        heading: 'Supporter levels',
+        bullets: [
+          'Levels now have fixed, one-time prices: level 1 is $3, level 2 is $7, level 3 is $10. Moving up, you pay only the difference.',
+          'The supporter window compares the levels side by side: badge, save slots, daily feedback messages and early access.',
+          'Level 3’s new perk is early access: you play maps and features in development before everyone else.',
+        ],
+      },
+      {
+        heading: 'Fixes',
+        bullets: [
+          'In the main menu, start positions and the "New positions" button now show at every map size.',
+          'The camera and aircraft no longer leave the map.',
+        ],
+      },
+    ],
+  },
   'katki-puani': {
     title: 'Report bugs, send suggestions: earn contribution points and ranks',
     summary: 'The feedback window is new. Choose whether your message is a bug report or a suggestion and ask for it to be reviewed. Verified bug reports and accepted suggestions earn you contribution points, and your points take you up through the ranks.',

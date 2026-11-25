@@ -239,8 +239,19 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         olanlar: halka nişangâhlar, kalkanlar, veri alıcı kadranları, M2'nin su kabı, mevzide hazır mermi (pirinç kovan; mermi
         boyası belirsiz olduğu için koyu çelik). Top başına 600–1.750 üçgen.
       Yenileme planı `docs/PLAN.md` "Hava savunması yenileniyor".
-  - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (iki harita: Anakara, Takımadalar),
+  - Diğerleri: `world.ts` (mermi, bomba, flak, olaylar), `terrain.ts` + `maps.ts` (üç harita: Anakara, Takımadalar, Kanyonlar),
     `scenarios.ts` (oyuncuya görünmez; test, video kayıt ve ölçüm için koddan `game.loadScenario`), `campaign.ts`, `commander.ts` (rakip yapay zekâ).
+  - **Kanyonlar** (2026-11-25, `mapKanyon.ts`; erken erişim: `MapDef.earlyAccess`, yalnız 3. seviye destekçi harekât başlatır ya da kaydını
+    açar, ötekiler ana menüde önizler, başlatınca `game.showEarlyAccess` penceresi seviye yükseltmeye götürür): basamaklı platolar
+    (820–1.300 m), kıvrılan derin ana kanyon (nehir, doğuda göl), yan kanyon labirenti, anıt vadisi havzaları (`monumentShare`: ~240 m
+    alçak, kızıl kumlu, sık kaya). Kayalar (`sim/pillars.ts`): kaide yükseklik haritasında (`pedestalAt`), dik kaya ayrı model
+    (`render/pillars.ts`; sim zemine katar: `groundLevel`, `footprintStats`); mesa, kule öbeği, parmak. Çöl görünümü `biome: 'desert'`:
+    kaya ve zemin piksel başına (`desertRock.ts`), arazi kapalılığı (`terrain.ts` `desertOcc`), ardıç ve adaçayı çalıları (`scenery.ts`).
+    Önizleme `MapDef.preview` (sütunsuz; sütun listesi kurmak birkaç saniye). Düzleştirme aralığı `MapDef.flat`. Görüntü aracı
+    `tools/sim/harita_bak`. Haritanın ötesi deniz değil, kaba çöl halkası (`render/terrain.ts` `desertOuter`: ~14 bin üçgen + kenar perdesi;
+    iç kenarı kenar profilinin altında, kanyon ağzında boşluk kalmasın). Görünmez duvar (bütün haritalar): kameranın baktığı nokta
+    harita içinde (`camera.ts` `apply`), haritadan çıkan uçağın dışa yönü içe çevrilir (`pilot.ts`; kenarı en çok ~1 km aşar,
+    `tools/sim/harita_kenari`). Yapılacak: sim denemeleri (başlangıç yeri, alçak uçuş, iniş, radar gölgesi), telefon ölçümü.
   - **Rastgele başlangıç yerleri** (2026-11-10, `startSites.ts`): harekâtta ana üsler haritanın sabit yerlerinde değil,
     yüklü haritada uygun rastgele noktalarda (karada, pist sığar, koridor açık, şehir ve kenardan uzak; arazi değişmez).
     Her tarafın en yakın rakibi sabit yerlerdeki ortalamanın 0,6–1,5 katı, ortalama ±%15. Harita `startZones` verirse
@@ -508,8 +519,12 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     USD sayılır. İade kuralı: ödemeden sonra 7 gün içinde ve toplam 2,5 saatten az oynandıysa; sipariş ilk yazılınca hesabın
     toplam oynama süresi `play_sec_at`'e girer (migration 0010), `tools/admin.mjs` bilgi çıktısı `support.orders[].playedSinceMin`
     verir. Ödeme oyunun üstünde Polar'ın gömülü sayfasında (`support.ts` `embed`, iframe + `POLAR_CHECKOUT` mesajları; oturum
-    `embed_origin` ile açılır, site Polar'da Settings → Embedding listesinde olmalı). Basamak toplamdan (`shared.ts` `supportTier`): 1 $ el sıkışma (bronz), 5 $ kanatlar (gri) ve +1 yer, 15 $
-    altın kask ve +2 yer; rozetler `ui/badges.ts` (sınıf `sbadge`; `.badge` panel etiketidir). Ödemeden önce pencerede
+    `embed_origin` ile açılır, site Polar'da Settings → Embedding listesinde olmalı). 2026-11-25'ten beri sabit fiyatlı üç seviye
+    (`shared.ts` `LEVEL_PRICES`, `levelCost`): 1. seviye 3 $ (el sıkışma, bronz), 2. seviye 7 $ (kanatlar, gri, +1 yer), 3. seviye
+    10 $ (altın kask, +2 yer, erken erişim: `earlyAccess`). Seviye toplamdan (`supportTier`), birikir: üste geçerken fark ödenir; tutarı
+    sunucu seviyeden hesaplar (`supportCheckout` `level`; eski serbest tutar reddedilir). 1. seviyenin eşiği 1 $ (eski düzende 1 $
+    ödeyenler düşmesin). Pencerede seviyeler yan yana karşılaştırılır (`support.ts`, `.sp-cmp`). Polar'daki ürün açıklaması elle
+    güncellenir. Rozetler `ui/badges.ts` (sınıf `sbadge`; `.badge` panel etiketidir). Ödemeden önce pencerede
     rozetler kilitli "Özel rozet". Skor tablosuna yalnız basamak gider, tutar gitmez. Ödeme penceresi kapanınca oyun hesabı
     yeniler, rozet gelince teşekkür penceresi açar (yeni sekmede ödenirse `public/destek/`'e dönülür). Google Play uygulamasında
     (`platform.ts` `IN_PLAY_APP`) ve eski adreste düğmeler yok (Play kuralı). Sırlar Cloudflare'de: `POLAR_TOKEN`,

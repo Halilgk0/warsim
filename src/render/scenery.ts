@@ -3,8 +3,12 @@
 // Ağaç ve kayalar arazi parçası başına, kameraya yakınken üretilir; yollar ve yerleşimler açılışta bir kez.
 
 import * as THREE from 'three';
-import { MAP_HALF as HALF, MAP_SIZE } from '../sim/mapData';
+import { MAP_HALF as HALF, MAP_SCALE, MAP_SIZE } from '../sim/mapData';
 import { TERRAIN_CELL, TERRAIN_N, groundLevel, terrainHeight, terrainMap } from '../sim/terrain';
+import { mapById } from '../sim/maps';
+import { monumentShare } from '../sim/mapKanyon';
+import { pillarList } from '../sim/pillars';
+import { buildPillarGroup, pillarMaterial } from './pillars';
 import { chunkCells } from './terrain';
 import { clamp, mulberry32, smoothstep } from '../core/math';
 import { cleared, clearingsVersion, fieldGrid, forestGrid, sampleGrid, sampleSmooth, slopeGrid, urbanGrid } from './landcover';
@@ -93,6 +97,10 @@ let NC = TERRAIN_N / 64;
 // Gerçekçi tonlar: koyu yaz yeşili ağaçlar, gri kaya
 const TREES_B = [0x5e8c44, 0x54803e, 0x69964c, 0x4c7a3a, 0x709c50];
 const TREES_C = [0x3f6a46, 0x38623f, 0x4a7650];
+/** Çöl ardıcı ve pinyon çamı: tozlu zeytin yeşili (Kanyonlar). */
+const TREES_D = [0x66704a, 0x5c6844, 0x737a52];
+/** Adaçayı ve tavşan çalısı: açık gri yeşil (anıt vadisi havzası). */
+const TREES_SAGE = [0x9aa477, 0x8c9868, 0xa6ad84, 0x7f8c5e, 0x6f7a4c, 0x7d8550, 0xb0a970];
 const ROCKS = [0x8f8a84, 0x847f7a, 0x9a948c, 0x7a7672, 0x86837c, 0x7e8082, 0x8e8a82];
 
 const _m = new THREE.Matrix4();
@@ -209,6 +217,11 @@ function farBlocks(
 }
 
 export class Scenery {
+  /** Çöl haritası (Kanyonlar): ardıç ve kavak (harita değişince güncellenir). */
+  private desert = false;
+  /** Taş sütunların ağları (yalnız sütunlu haritada). */
+  private pillars: THREE.Group | null = null;
+  private readonly pillarMat = pillarMaterial();
   readonly group = new THREE.Group();
   /** Kayalar: yüz yüz ton (köşe rengi) ve taş dokusu. */
   private readonly vegMat = ((): THREE.MeshLambertMaterial => {
@@ -398,6 +411,14 @@ export class Scenery {
   rebuild(): void {
     if (this.mapVersion === terrainMap.version) return;
     this.mapVersion = terrainMap.version;
+    this.desert = mapById(terrainMap.id).biome === 'desert';
+    // Taş sütunlar (Kanyonlar): harita başına bir kez, kaya malzemesiyle
+    if (this.pillars) {
+      this.group.remove(this.pillars);
+      this.pillars.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+      this.pillars = null;
+    }
+    if (pillarList().length) this.group.add((this.pillars = buildPillarGroup(pillarList(), this.pillarMat)));
     // Harita büyüklüğü değişmiş olabilir: parça boyu ve sayısı yeniden (arazi parçalarıyla aynı)
     const cells = chunkCells();
     CHUNK = SETTLE_BLOCK = cells * TERRAIN_CELL;
@@ -526,16 +547,41 @@ export class Scenery {
           let p: number;
           if (forest > 0.06) p = Math.min(1, forest * 1.15);
           else if (sampleGrid(fieldGrid, px, pz) > 0.3) p = 0.005 + smoothstep(-0.35, 0.45, fbmGrove(px / 900, pz / 900)) * 0.04;
-          else p = 0.012;
-          if (r > p) continue;
+          else p = this.desert ? 0.004 : 0.012;
+          // Çöl: havzada sık, platoda öbek öbek çalılar (ardıçların arasında da)
+          let sage = false;
+          if (this.desert) {
+            const basin = monumentShare(px, pz, MAP_SCALE) > 0.5;
+            const bush = basin ? 0.16 : 0.025 + 0.07 * smoothstep(-0.2, 0.45, fbmGrove(px / 700, pz / 700));
+            if (forest <= 0.06 || basin) {
+              if (r < bush) sage = true;
+              else if (basin || r > bush + p) continue;
+            } else if (r > p && r < p + bush * 0.5) sage = true;
+            else if (r > p) continue;
+          } else if (r > p) continue;
           const h = terrainHeight(px, pz);
           if (h < 6 || cleared(px, pz, 60) || this.keptOut(px, pz) || sampleGrid(urbanGrid, px, pz) > 0.05) continue;
           // Açık arazinin ağaçları ağaç sınırının (≈1,7 km) üstüne ve uçurumlara çıkmaz
           if (forest <= 0.06 && (h > 1700 || sampleGrid(slopeGrid, px, pz) > 0.7)) continue;
-          const conifer = rng() < 0.1 + 0.8 * smoothstep(500, 1250, h);
-          const size = (conifer ? 17 : 15) + rng() * 10;
+          // Çölde platoda yalnız ardıç; yapraklı (kavak) yalnız kanyon dibinde, nehir boyunda
+          if (sage) {
+            if (sampleGrid(slopeGrid, px, pz) > 0.25) continue;
+            // Taç yere otursun: gövde (ağaç modelinin alt %40'ı) toprağa gömülür
+            const sz = 2.5 + rng() * 3;
+            tb.push(px, groundLevel(px, pz) - sz * 0.45, pz, sz * 1.3, sz * 0.75, sz * 1.3, rng() * 6.28, TREES_SAGE[Math.floor(rng() * TREES_SAGE.length)]);
+            // Öbek: yanına bir iki küçük çalı
+            for (let q = Math.floor(rng() * 3); q > 0; q--) {
+              const qx = px + (rng() - 0.5) * 14;
+              const qz = pz + (rng() - 0.5) * 14;
+              const qs = 1.8 + rng() * 2.2;
+              tb.push(qx, groundLevel(qx, qz) - qs * 0.45, qz, qs * 1.3, qs * 0.75, qs * 1.3, rng() * 6.28, TREES_SAGE[Math.floor(rng() * TREES_SAGE.length)]);
+            }
+            continue;
+          }
+          const conifer = this.desert ? h > 110 : rng() < 0.1 + 0.8 * smoothstep(500, 1250, h);
+          const size = ((conifer ? 17 : 15) + rng() * 10) * (this.desert && conifer ? 0.6 : 1);
           const y = groundLevel(px, pz) - 0.8;
-          if (conifer) tc.push(px, y, pz, size * 0.75, size, size * 0.75, rng() * 6.28, TREES_C[Math.floor(rng() * TREES_C.length)]);
+          if (conifer) tc.push(px, y, pz, size * (this.desert ? 1.05 : 0.75), size, size * (this.desert ? 1.05 : 0.75), rng() * 6.28, (this.desert ? TREES_D : TREES_C)[Math.floor(rng() * 3)]);
           else tb.push(px, y, pz, size * 1.1, size * (0.85 + rng() * 0.3), size * 1.1, rng() * 6.28, TREES_B[Math.floor(rng() * TREES_B.length)]);
         }
       }
