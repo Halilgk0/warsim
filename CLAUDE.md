@@ -177,6 +177,14 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
         hedefini geri çağrılınca sürdürmez. Spitfire IX / P-51D 4'e 4: emirden sonra dövüş 300 → 0 sn, üsten
         uzaklaşma +29 → +0,1 km, emirden sonra kayıp 0 (`tools/sim/geri_cagir`). Normal dalaş değişmedi (`sim:bench` üç tohumla,
         eski kodla birebir aynı).
+      - Jetin yer hedefine saldırısı (2026-11-25, oyuncu bildirimi: "jetler yapılara çok isabetsiz"; `tools/sim/jet_yer [koşu] [uçak]
+        [attack|diveBomb] [bomba|roket|yok]`): taarruz mesafeleri (pop-up, dalış, bırakma, ateş penceresi, çekiliş) pervaneli
+        hızına göreydi; jette `k = vMax/190` (en çok 1,7) ile büyür, pervanelide 1 (değişmez). Jet dalışa yatarak girer
+        (`FlyCommand.rollIn`: alçakta sırtüstü sınırı tam split-S payını değil 400 m'yi ister; split-S payı jette ~3 km çıkıyor,
+        80° yatışta burun inmiyordu) ve gazı keser. Pike bombardımanında pike freni olmayan jet frenli dalış varsayımıyla uçmaz,
+        burun hedefe gelince düzelir (`rollOut`). Taarruz (madene 2 bomba, 10 koşu): F-84G, F-80C, F-86F, Vampire 0–%15 → 10/10
+        yıkım, MiG-15 %86, Me 262 %41; bomba hedefe 2–4 km'den 10–120 m'ye. Pike: F-84G %0 → %89, F-80C kazası 4 → 0; kalan jetler
+        dalışta Vne'yi aşıp pilotun hız korumasıyla çekiliyor (hava freni simde yok). Dalaş değişmedi (`sim:bench` tohumlu, aynı).
   - `structures/`: üs, uçaksavar, radar, fabrika, şehir yapıları.
     - Zemin: yerleşim, inşaat ve kayıt yükleme aynı işlevle düzleştirir (`structure.ts` `flattenStructure`). Düzleşen
       alan yapının çizilen bütün parçalarını kapsar; hava üssünde yerel x −720…+232, z ±1360 (tel örgü dahil). Tabana

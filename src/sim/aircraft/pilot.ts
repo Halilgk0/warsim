@@ -44,6 +44,13 @@ export interface FlyCommand {
   pushTheta: number;
   /** Büyük açıda da it (eksi G ile dalışa geçiş: yuvarlanmadan burun aşağı). */
   forcePush: boolean;
+  /**
+   * Taarruz dalışına yatarak giriş (roll-in): alçakta sırtüstü dönme sınırı tam yarım döngüyü (split-S) değil, istenen dalış
+   * açısından çıkışı hesaba katar. Hızlı jet 1 km'de 3 km'lik split-S payını bulamıyor, 80° yatışta burnunu hedefe indiremiyordu.
+   */
+  rollIn: boolean;
+  /** Yatarak girilen dalışta burun hedefe gelince düzel (pike bombardımanı; taarruzun sığ dalışında gerekmez). */
+  rollOut: boolean;
   /** İniş konfigürasyonu (flap + takım). */
   flaps: boolean;
   /** Azami yatış açısı (rad); ağır uçaklarda sınırlı. */
@@ -68,6 +75,8 @@ export function newCommand(): FlyCommand {
     terrainAvoid: true,
     pushTheta: 0.45,
     forcePush: false,
+    rollIn: false,
+    rollOut: false,
     flaps: false,
     maxBank: Math.PI,
     wep: false,
@@ -89,6 +98,8 @@ export function resetCommand(c: FlyCommand, ac: Aircraft): void {
   c.terrainAvoid = true;
   c.pushTheta = 0.45;
   c.forcePush = false;
+  c.rollIn = false;
+  c.rollOut = false;
   c.flaps = false;
   // Bombardıman uçakları (ve G sınırı düşük ağır uçaklar) 55°'den fazla yatmaz
   c.maxBank = ac.spec.role === 'bomber' || ac.spec.nMax <= 4 ? 55 * (Math.PI / 180) : Math.PI;
@@ -355,7 +366,8 @@ export function fly(ac: Aircraft, cmd: FlyCommand, dt: number): void {
     const vLoop = Math.sqrt(v * v + 2.4 * G * loopR);
     const loopEnd = (vLoop * vLoop) / (G * Math.max(Math.min(availableG(ac, vLoop, fx.nMaxMul, false), s.nMax) - 1, 1));
     const judge = clamp(0.8 + 0.25 * ac.skill, 0.92, 1.15);
-    const needAlt = Math.max(700, (loopR + loopEnd) * 1.1 * judge);
+    // Taarruz dalışına yatarak giriş: yarım döngü yapılmaz, 400 m üstünde sırtüstü çekilebilir (çıkışı arazi koruması kollar)
+    const needAlt = cmd.rollIn ? 400 : Math.max(700, (loopR + loopEnd) * 1.1 * judge);
     if (!cmd.diveBrake && ac.pos.y - groundLevel(ac.pos.x, ac.pos.z) < needAlt) maxBank = Math.min(maxBank, 80 * (Math.PI / 180));
     // Yavaşken yerden kaçış: dik yatış kaldırmayı yer, sığ yatışla düzel
     const slowAvoid = ac.groundAvoid && v < stallSpeed(ac) * 1.6;
@@ -383,6 +395,16 @@ export function fly(ac: Aircraft, cmd: FlyCommand, dt: number): void {
     rollErr = Math.atan2(f.dot(_tmp.crossVectors(u, _desUp)), u.dot(_desUp));
   } else {
     nCmd = u.dot(_L) / G;
+  }
+  // Yatarak dalışa girişte burun hedefe gelince düzelir: sırtüstü kalan jet hızlanırken arazi koruması (düzelme payı) dalışı
+  // bozuyordu (2026-11-25, tools/sim/jet_yer)
+  if (cmd.rollOut && u.y < 0.7 && theta < 0.25) {
+    _upP.set(0, 1, 0).addScaledVector(f, -f.y);
+    if (_upP.lengthSq() > 1e-4) {
+      _upP.normalize();
+      rollErr = Math.atan2(f.dot(_tmp.crossVectors(u, _upP)), u.dot(_upP));
+      nCmd = u.dot(_L) / G;
+    }
   }
 
   // Yatış tamamlanmadan tam çekme: hizalandıkça G artar (yat → çek)

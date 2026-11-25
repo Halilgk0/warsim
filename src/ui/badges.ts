@@ -142,13 +142,14 @@ const COPPER: Tone = ['#f0a07a', '#c96b45', '#94462a', '#5e2a17'];
 const CRIMSON: Tone = ['#f08a7a', '#c4473a', '#8c2a22', '#561510'];
 const NAVY: Tone = ['#7fa3d6', '#3d63a3', '#26406f', '#152542'];
 
-type Emblem = 'wrench' | 'gear' | 'prop' | 'wings' | 'star' | 'starwings';
+type Emblem = 'wrench' | 'wrench2' | 'gear' | 'gear3' | 'prop' | 'wings' | 'star' | 'starwings';
 /** Rütbe başına: metal, amblem, şerit sayısı, amblem rengi. */
 const RANKS: [Tone, Emblem, number, string][] = [
   [STEEL, 'wrench', 0, '#f4f7f5'],
-  [STEEL, 'wrench', 1, '#f4f7f5'],
+  // 2026-11-25 kullanıcı kararı: Yer personeli çapraz iki anahtar, Kıdemli mekanisyen iç içe üç dişli (şeritsiz)
+  [STEEL, 'wrench2', 0, '#f4f7f5'],
   [BRONZE, 'gear', 0, '#fff1dc'],
-  [BRONZE, 'gear', 1, '#fff1dc'],
+  [BRONZE, 'gear3', 0, '#fff1dc'],
   [COPPER, 'prop', 0, '#4a1e0c'],
   [COPPER, 'prop', 1, '#4a1e0c'],
   [SILVER, 'wings', 0, '#3f4a50'],
@@ -190,8 +191,18 @@ function emblem(e: Emblem, ink: string): string {
     case 'wrench':
       // Çapraz sap ve açık ağızlı baş
       return f('23,37 27,41 39,27 35,23') + f('34,22 33,16 37,12 42,11 39,15 42,18 46,15 45,20 41,24 36,25');
+    case 'wrench2': {
+      // Çapraz iki anahtar: aynalanmış olan altta, öteki gölgesiyle üstte
+      const W = ['23,37 27,41 39,27 35,23', '34,22 33,16 37,12 42,11 39,15 42,18 46,15 45,20 41,24 36,25'];
+      const mirror = (pts: string, dx = 0, dy = 0) => pts.split(' ').map((q) => { const [x, y] = q.split(',').map(Number); return pt(64 - x + dx, y + dy); }).join(' ');
+      const shift = (pts: string, dx: number, dy: number) => pts.split(' ').map((q) => { const [x, y] = q.split(',').map(Number); return pt(x + dx, y + dy); }).join(' ');
+      return W.map((w) => f(mirror(w, 0, 4))).join('') + W.map((w) => poly(shift(w, 0.9, 4.9), '#00000055')).join('') + W.map((w) => f(shift(w, 0, 4))).join('');
+    }
     case 'gear':
       return f(ring(32, cy, 8, 12, 9.5, -Math.PI / 2 + Math.PI / 16)) + poly(ring(32, cy, 6, 4.2, 4.2), '#00000033');
+    case 'gear3':
+      // Birbirine geçmiş üç dişli (dişler komşunun boşluğuna denk gelecek biçimde döndürülmüş)
+      return [[24, 21, 0.1], [40, 21, 0.5], [32, 35, 0.3]].map(([x, y, rot]) => f(ring(x, y, 7, 8.2, 6.3, rot)) + poly(ring(x, y, 6, 2.6, 2.6), '#00000033')).join('');
     case 'prop':
       // Üç kürek: göbekte dar, ortada geniş, uçta sivri
       return [0, 1, 2].map((i) => {

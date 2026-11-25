@@ -94,6 +94,10 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       return;
     }
   }
+  // Jet taarruzu hızına göre büyük ölçekte uçulur (2026-11-25, oyuncu bildirimi: "jetler yapılara çok isabetsiz"): mesafeler
+  // pervaneliye (~190 m/sn'ye kadar) göreydi; jet dalışa geçtiğinde burnunu indirmeye vakit bulamıyor, 1 km'de düz geçip bombayı
+  // "son çare" kuralıyla 2–4 km öteye bırakıyordu. Pervanelide k = 1 (değişmez). Ölçüm tools/sim/jet_yer.
+  const k = ac.spec.engine.kind === 'jet' ? clamp(ac.spec.vMax / 190, 1, 1.7) : 1;
   const tp = gt.pos;
   const dx = tp.x - ac.pos.x;
   const dz = tp.z - ac.pos.z;
@@ -111,17 +115,17 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       cmd.speed = ac.spec.vMax * 0.92;
       cmd.minAlt = Math.min(agl * 0.7, 120);
       brain.status = `${L('Alçaktan sızma', 'Low-level ingress')}: ${(dh / 1000).toFixed(1)} km`;
-      if (dh < POPUP_DIST) st.phase = 'popup';
+      if (dh < POPUP_DIST * k) st.phase = 'popup';
       break;
     }
     case 'popup': {
-      headingWithAlt(cmd.dir, ac, dx, dz, tp.y + POPUP_AGL, 0.004);
+      headingWithAlt(cmd.dir, ac, dx, dz, tp.y + POPUP_AGL * k, 0.004);
       cmd.throttle = 1;
       cmd.speed = null;
       cmd.maxG = 3.5;
       brain.status = L('Pop-up: hedef için tırmanış', 'Pop-up: climbing for the target');
       const depression = Math.atan2(h, dh);
-      if (depression > 20 * DEG || dh < 1800) {
+      if (depression > 20 * DEG || dh < 1800 * k) {
         st.phase = 'dive';
         world.log(L(`${ac.callsign} ${gt.name} hedefine dalışa geçti`, `${ac.callsign} dives on ${gt.name}`), ac.team, 'strike');
       }
@@ -137,31 +141,33 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
         _aim.add(st.aimOffset);
       }
       cmd.dir.subVectors(_aim, ac.pos);
+      // Jet dalışa yatarak girer (pilot.ts rollIn) ve gazı keser: hız artınca nişan ve çıkış payı kaçıyordu
+      cmd.rollIn = k > 1;
       cmd.maxG = 4;
       cmd.turnGain = 2.4;
-      cmd.throttle = 0.6;
+      cmd.throttle = k > 1 ? 0.25 : 0.6;
       cmd.speed = null;
       cmd.minAlt = 50;
       _to.subVectors(tp, ac.pos);
       const slant = _to.length();
       const err = angleBetween(ac.fwd, _to.normalize());
       brain.status = `${L('Taarruz dalışı', 'Attack dive')}: ${Math.round(slant)} m`;
-      if (st.rocketsPass > 0 && slant < 1500 && slant > 550 && err < 3 * DEG && t - st.lastShot > 0.3) {
+      if (st.rocketsPass > 0 && slant < 1500 * k && slant > 550 * k && err < 3 * DEG && t - st.lastShot > 0.3) {
         brain.fireRocket = true;
         st.rocketsPass -= 2;
         st.lastShot = t;
       }
-      if (gunsLeft && slant < 900 && slant > 220 && err < 2.2 * DEG) brain.fireGuns = true;
-      if (st.bombsPass > 0 && h < 420) {
+      if (gunsLeft && slant < 900 * k && slant > 220 * k && err < 2.2 * DEG) brain.fireGuns = true;
+      if (st.bombsPass > 0 && h < 420 * k) {
         predictImpact(ac, tp.y, _p);
         const miss = Math.hypot(_p.x - tp.x, _p.z - tp.z);
-        if ((miss < gt.def.radius + 20 || h < 260) && t - st.lastBomb > 0.18) {
+        if ((miss < gt.def.radius + 20 || h < 260 * k) && t - st.lastBomb > 0.18) {
           brain.releaseBomb = true;
           st.bombsPass--;
           st.lastBomb = t;
         }
       }
-      if (h < 170 || slant < 260) st.phase = 'pullout';
+      if (h < 170 * k || slant < 260 * k) st.phase = 'pullout';
       break;
     }
     case 'pullout': {
@@ -190,7 +196,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       cmd.speed = ac.spec.vMax;
       cmd.minAlt = Math.min(agl * 0.7, 120);
       brain.status = jink ? L('Hedeften açılıyor: uçaksavara karşı kaçamak', 'Breaking off: jinking against flak') : L('Hedeften açılıyor', 'Breaking off the target');
-      if (dh > 3600 || t - st.phaseTime > 40) {
+      if (dh > 3600 * k || t - st.phaseTime > 40) {
         st.passes--;
         if (st.passes <= 0 || (!ac.hasOrdnance && !gunsLeft)) st.phase = 'rally';
         else {
@@ -210,7 +216,7 @@ export function attackCommand(ac: Aircraft, brain: Brain, world: World, dt: numb
       brain.status = L('Yeni geçiş için dönüyor', 'Turning for another pass');
       const fh = Math.hypot(ac.fwd.x, ac.fwd.z) || 1;
       const cos = (ac.fwd.x * dx + ac.fwd.z * dz) / (fh * Math.max(dh, 1));
-      if (cos > 0.85) st.phase = dh < POPUP_DIST ? 'popup' : 'approach';
+      if (cos > 0.85) st.phase = dh < POPUP_DIST * k ? 'popup' : 'approach';
       break;
     }
     default:

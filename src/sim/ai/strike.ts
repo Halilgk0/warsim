@@ -183,7 +183,12 @@ export function diveBombCommand(ac: Aircraft, brain: Brain, world: World, _dt: n
       cmd.turnGain = 2.2;
       cmd.throttle = 0.2;
       cmd.speed = null;
-      cmd.diveBrake = true;
+      // Pike freni olmayan jet sırtüstü dalıp düzelmiyordu (pilot frenli dik dalışta yatışı önemsiz sayar); 260 m/sn'yi geçince
+      // arazi koruması dalışı bozuyor, bomba 600–700 m öteye düşüyordu (2026-11-25, tools/sim/jet_yer). Jet dalışa yatarak girer.
+      const jet = ac.spec.engine.kind === 'jet' && !ac.spec.diveBrakes;
+      cmd.diveBrake = !jet;
+      cmd.rollIn = jet;
+      cmd.rollOut = jet;
       cmd.minAlt = 60;
       // Dalış bilerek yapılır: ağır uçak (Ju 88) da burnu sokabilir
       cmd.maxBank = Math.PI;
