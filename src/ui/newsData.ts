@@ -38,7 +38,7 @@ export const NEWS_TR: NewsItem[] = [
     date: '2026-11-25',
     title: 'Yeni harita: Kanyonlar (erken erişim)',
     summary: 'Üçüncü harita geliyor: basamaklı platolar, derin bir nehir kanyonu, yan kanyon labirenti ve kızıl kaya sütunlarıyla dolu vadiler. Kanyonlar yapım aşamasında; ana menüde herkes inceleyebilir, harekât şimdilik 3. seviye destekçilere açık.',
-    cover: img('kanyon-kapak.webp'),
+    cover: img('kanyon-kapak-p51.webp'),
     images: [
       { src: img('kanyon-plato.webp'), caption: 'Plato kenarı: katman katman inen yamaçlar ve ötede ana kanyon.' },
       { src: img('kanyon-nehir.webp'), caption: 'Ana kanyonun dibinde kıvrılan nehir, doğuda gölde biter.' },
