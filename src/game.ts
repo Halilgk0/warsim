@@ -1194,7 +1194,7 @@ export class Game {
     if (this.hangar.isOpen) this.hangar.close();
     else if (this.modals.isOpen) this.modals.close();
     else if (this.interaction.mode !== 'none') this.cancelStep();
-    else if (this.planner.isOpen) this.planner.close();
+    else if (this.planner.isOpen) this.planner.escape();
     else if (this.build.isOpen) this.build.close();
     else if (this.selectedAircraftId !== null || this.selectedStructureId !== null) {
       this.selectAircraft(null);

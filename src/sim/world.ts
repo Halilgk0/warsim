@@ -11,7 +11,8 @@ import type { BeltDef } from './aircraft/ammo';
 import { updateTurrets } from './ai/gunner';
 import { canTouchDown, touchDown } from './ai/ops';
 import { FlightGroup } from './ai/flightGroup';
-import { MISSION_NAMES, TASK_NAMES, TASK_SPLIT, defaultLoadout, type FlightTask, type MissionPlan, type MissionType, type Roe } from './ai/missions';
+import { MISSION_NAMES, TASK_NAMES, TASK_SPLIT, defaultLoadout, filletPath, type FlightTask, type MissionPlan, type MissionType, type Roe } from './ai/missions';
+import { updateStanding, type HistoryEntry, type StandingOrder } from './standing';
 import type { FormationType } from './ai/formation';
 import type { BeltId } from './aircraft/ammo';
 import { KEEP_KINDS, MOVABLE_KINDS, ROAD_KINDS, Structure, STRUCTURE_DEFS, flattenStructure, type StructureKind } from './structures/structure';
@@ -236,6 +237,8 @@ export interface LaunchGroup {
   roe?: Roe;
   /** Serbest yük düzeni (verilirse hazır yük yerine). */
   custom?: Loadout;
+  /** Bu tipin kalkış yakıtı (iç deponun payı; planlayıcı tip başına en azı hesaplar). Yoksa planınki. */
+  fuelFrac?: number;
   /**
    * Görev dağılımı: bu sayıda uçak görevin ikincil işine (önlemede bombardıman uçaklarına, eskortta yakın eskort,
    * taarruzda uçaksavar bastırma), kalanı birincil işine ayrı kollar olarak kalkar. Yoksa kol kendiliğinden dağıtır.
@@ -319,6 +322,11 @@ export class World {
   private acById = new Map<number, Aircraft>();
   private nextBombId = 1;
   private nextPackageId = 1;
+  /** Tekrarlanan görevler (standing.ts; kayda yazılır). */
+  readonly standing: StandingOrder[] = [];
+  nextStandingId = 1;
+  /** Oyuncunun görev geçmişi (standing.ts; kayda yazılır). */
+  readonly missionHistory: HistoryEntry[] = [];
   private nextChuteId = 1;
   private engageLogTimes = new Map<string, number>();
   private hitLogTimes = new Map<number, number>();
@@ -1390,6 +1398,7 @@ export class World {
       const lo = g.loadoutId && spec.loadouts.some((l) => l.id === g.loadoutId && loadoutAllowed(l, has)) ? g.loadoutId : null;
       p.loadoutId = custom ? custom.id : lo ?? defaultLoadout(spec, p.type, has, dist, targetIsAA);
       p.belt = g.belt ?? p.belt;
+      if (g.fuelFrac !== undefined) p.fuelFrac = g.fuelFrac;
       if (g.formation) p.formation = g.formation;
       if (g.roe) p.roe = g.roe;
       if (p.type === 'intercept') p.roe = 'free';
@@ -1508,6 +1517,8 @@ export class World {
       default:
         fl.route = [];
     }
+    // Ara noktalı rotanın köşeleri yay: kol kırılma noktasında keskin dönüp taşmasın (planlayıcının çizdiği yol)
+    if (wps.length && fl.route.length >= 2) fl.route = filletPath([origin, ...fl.route]).slice(1).map((q) => new Vector3(q.x, 0, q.z));
     fl.routeIndex = 0;
   }
 
@@ -1974,6 +1985,7 @@ export class World {
     if (this.slowTimer <= 0) {
       this.slowTimer = 3;
       for (const t of this.teams) alertScramble(this, t.id, t.ai, 3);
+      if (this.standing.length) updateStanding(this);
       for (const t of this.teams) t.intel.prune(this.time, (id) => !!this.aircraftById(id)?.airborne);
     }
     this.observeTimer -= dt;

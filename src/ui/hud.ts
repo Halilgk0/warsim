@@ -5,6 +5,8 @@ import type { Aircraft } from '../sim/aircraft/aircraft';
 import { ROLE_NAMES, generationInfo } from '../sim/aircraft/specs';
 import { MISSION_ICONS, MISSION_NAMES, TASK_NAMES } from '../sim/ai/missions';
 import { PHASE_NAMES } from '../sim/ai/flightGroup';
+import { standingOfFlight, standingStatus, stopStanding } from '../sim/standing';
+import type { MissionPlan } from '../sim/ai/missions';
 import { FORMATION_NAMES } from '../sim/ai/formation';
 import { currentFuelFlow, iasOf, machOf, WEP_LIMIT } from '../sim/aircraft/flightModel';
 import { TECH_BY_ID } from '../sim/tech';
@@ -95,6 +97,12 @@ export class Hud {
     });
     this.missions.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
+      const so = t.closest<HTMLElement>('[data-unrep]');
+      if (so) {
+        stopStanding(game.world, Number(so.dataset.unrep), L('oyuncu durdurdu', 'stopped by the player'));
+        this.lastMissionKey = '';
+        return;
+      }
       const row = t.closest<HTMLElement>('[data-fl]');
       if (!row) return;
       const fl = game.world.flightById(Number(row.dataset.fl));
@@ -334,7 +342,9 @@ export class Hud {
       return al.length ? Math.min(...al.map((a) => a.totalFuel / a.fuelCap)) : 0;
     };
     const reports = w.missionReports.filter((r) => r.team === g.playerTeam).slice(-6).reverse();
-    const key = flights.map((f) => `${f.id}:${f.phase}:${f.alive.length}:${f.engaged ? 1 : 0}:${Math.round(fuelOf(f) * 20)}`).join('|') + `#${selFl}#${reports[0]?.id ?? 0}`;
+    const standing = w.standing.filter((o) => o.team === g.playerTeam);
+    const waiting = standing.filter((o) => o.waitSince !== null);
+    const key = flights.map((f) => `${f.id}:${f.phase}:${f.alive.length}:${f.engaged ? 1 : 0}:${Math.round(fuelOf(f) * 20)}`).join('|') + `#${selFl}#${reports[0]?.id ?? 0}#${standing.map((o) => `${o.id}:${o.runs}:${o.waitSince === null ? 1 : 0}`).join(',')}`;
     this.missionCount.textContent = flights.length ? String(flights.length) : '';
     if (key === this.lastMissionKey) return;
     this.lastMissionKey = key;
@@ -345,12 +355,7 @@ export class Hud {
       return `<div class="mrep ${cls}"><span class="mrep-i">${icon}</span><div><div class="mrep-t"><b>${esc(r.flight)}</b> ${MISSION_NAMES[r.type]}${r.reward > 0 ? ` <b class="pos">+${fmtMoney(r.reward)}</b>` : ''}</div>
         <small>${esc(r.reason)} · ${esc(r.aircraft)} · ${fmtStamp(r)}</small></div></div>`;
     }).join('')}` : '';
-    if (!flights.length) {
-      this.missions.innerHTML = `<p class="muted small">${L('Havada görev yok. Bir hava üssünü seçip görev planla', 'No missions in the air. Select an airbase and plan one')}<span class="kbd"> (P)</span>.</p>` + done;
-      return;
-    }
-    const targetName = (f: (typeof flights)[number]): string => {
-      const p = f.plan;
+    const planTarget = (p: MissionPlan): string => {
       if (p.targetStructureId !== null) return w.structureById(p.targetStructureId)?.name ?? '';
       if (p.targetAircraftId !== null) {
         const a = w.aircraftById(p.targetAircraftId);
@@ -360,15 +365,25 @@ export class Hud {
       if (p.targetBaseId !== null) return w.structureById(p.targetBaseId)?.name ?? '';
       return p.targetPos ? L('devriye bölgesi', 'patrol area') : '';
     };
+    const targetName = (f: (typeof flights)[number]): string => planTarget(f.plan);
+    // Tekrarlanan görevlerden yerde bekleyenler: görev, hedef, durum, durdur
+    const waitRows = waiting.map((o) => `<div class="mrow rep-wait"><div class="mr-top"><span class="mi">${MISSION_ICONS[o.plan.type]}</span><b>↻ ${MISSION_NAMES[o.plan.type]}</b><span class="mr-n">${L(`${o.runs} tur`, `${o.runs} runs`)}</span></div>
+      <div class="mr-sub">${planTarget(o.plan) ? `→ ${esc(planTarget(o.plan))} · ` : ''}${esc(standingStatus(o))}</div>
+      <div class="mr-act"><button class="mini" data-unrep="${o.id}">${L('Tekrarı durdur', 'Stop repeating')}</button></div></div>`).join('');
+    if (!flights.length) {
+      this.missions.innerHTML = waitRows + (waitRows ? '' : `<p class="muted small">${L('Havada görev yok. Bir hava üssünü seçip görev planla', 'No missions in the air. Select an airbase and plan one')}<span class="kbd"> (P)</span>.</p>`) + done;
+      return;
+    }
     const row = (f: (typeof flights)[number]) => {
       const lead = f.members[0];
       const fuel = Math.round(fuelOf(f) * 100);
       const recall = f.phase !== 'landing' && f.phase !== 'rtb' && f.phase !== 'ground';
+      const so = standingOfFlight(w, f.id);
       return `<div class="mrow ${f.id === selFl ? 'sel' : ''} ${f.engaged ? 'hot' : ''}" data-fl="${f.id}">
-        <div class="mr-top"><span class="mi">${MISSION_ICONS[f.plan.type]}</span><b>${f.name}</b><span class="mr-n">${f.alive.length}/${f.expected} ${esc(lead?.spec.abbr ?? '')}</span><span class="ph ph-${f.phase}">${PHASE_NAMES[f.phase]}</span></div>
+        <div class="mr-top"><span class="mi">${MISSION_ICONS[f.plan.type]}</span><b>${so ? '↻ ' : ''}${f.name}</b><span class="mr-n">${f.alive.length}/${f.expected} ${esc(lead?.spec.abbr ?? '')}</span><span class="ph ph-${f.phase}">${PHASE_NAMES[f.phase]}</span></div>
         <div class="mr-sub">${MISSION_NAMES[f.plan.type]}${f.plan.task && f.plan.task !== 'auto' ? ` (${TASK_NAMES[f.plan.task]})` : ''}${targetName(f) ? ` → ${esc(targetName(f))}` : ''}${f.alive.length ? ` · ${L('yakıt', 'fuel')} ${pct(fuel / 100)}` : ''}${f.engaged ? ` · <b class="bad">${L('çatışmada', 'engaged')}</b>` : ''}</div>
         ${f.alive.length ? `<div class="mr-fuel">${bar(fuel, fuel < 30 ? 'var(--red)' : fuel < 50 ? 'var(--warn)' : 'var(--accent)', true)}</div>` : ''}
-        <div class="mr-act"><button class="mini" data-mact="follow">${L('Takip', 'Follow')}</button>${recall ? `<button class="mini" data-mact="rtb">${L('Geri çağır', 'Recall')}</button>` : ''}</div>
+        <div class="mr-act"><button class="mini" data-mact="follow">${L('Takip', 'Follow')}</button>${recall ? `<button class="mini" data-mact="rtb">${L('Geri çağır', 'Recall')}</button>` : ''}${so ? `<button class="mini" data-unrep="${so.id}" title="${L('Bu kol iner, görev yeniden kalkmaz', 'This flight lands and the mission does not take off again')}">${L('Tekrarı durdur', 'Stop repeating')}</button>` : ''}</div>
       </div>`;
     };
     // Paket kolları birlikte
@@ -379,7 +394,7 @@ export class Hud {
       list.push(f);
       groups.set(k, list);
     }
-    this.missions.innerHTML = [...groups.values()].map((list) => list.length > 1
+    this.missions.innerHTML = waitRows + [...groups.values()].map((list) => list.length > 1
       ? `<div class="mpk"><div class="mpk-h">${L('Paket', 'Package')} · ${MISSION_NAMES[list[0].plan.type]}${targetName(list[0]) ? ` → ${esc(targetName(list[0]))}` : ''}</div>${list.map(row).join('')}</div>`
       : row(list[0])).join('') + done;
   }

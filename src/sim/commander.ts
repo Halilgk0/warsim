@@ -100,7 +100,25 @@ export interface CommanderState {
   stageRaids?: number;
   stageStart?: number;
   focusId?: number | null;
+  /** Büyük akın: sıradakinin zamanı, toplanma başladıysa başlangıcı (eski kayıtlarda yok). */
+  massAt?: number;
+  massStart?: number | null;
 }
+
+/**
+ * Büyük akın (2026-11-25, oyuncu bildirimi: "botlar yoğun, kalabalık akın pek yapmıyor, ağır bombardıman uçağını neredeyse hiç
+ * kullanmıyor"): bot zaman zaman küçük baskınları keser, saldırı uçaklarını biriktirir, sonra bütün hazır saldırı uçakları eskortla
+ * aynı hedefe kalkar (bombardıman, pike ve taarruz ayrı paketler). İlk akın MASS_FIRST'ten sonra, sonra MASS_GAP aralıkla.
+ */
+const MASS_FIRST = 2700;
+const MASS_GAP: [number, number] = [1200, 1800];
+/** Toplanma bu kadar sürer; eşik dolmasa da en az MASS_MIN uçakla kalkılır, o da yoksa vazgeçilir. */
+const MASS_GATHER = 900;
+const MASS_MIN = 5;
+/** Akının istenen saldırı uçağı sayısı: 8'den başlar, her yarım saatte 2 artar (en çok 16). */
+const massWant = (t: number): number => Math.min(16, 8 + 2 * Math.floor(Math.max(0, t - MASS_FIRST) / 1800));
+/** Asgari filodaki bombardıman uçağı: 30. dakikadan sonra 2, her yarım saatte 1 artar (en çok 6). */
+const bomberWant = (t: number): number => (t < 1800 ? 0 : Math.min(6, 2 + Math.floor((t - 1800) / 1800)));
 
 /** Hedef ülkeye karşı baskın evresi: önce çevresi (savunma, radar, fabrika, madenler), sonra ana üssü. */
 type RaidStage = 'outer' | 'base';
@@ -144,6 +162,8 @@ const INVEST_SPARE = 18000;
 interface Fleet {
   fighters: number;
   strikers: number;
+  /** Saldırı uçaklarından bombardıman rolündekiler. */
+  bombers: number;
   /** Hangarda ve fabrika kuyruğunda yer (uçak sayısı). */
   room: number;
 }
@@ -218,6 +238,8 @@ export class Commander {
   private stageRaids = 0;
   private stageStart = 0;
   private focusId: number | null = null;
+  private massAt = MASS_FIRST;
+  private massStart: number | null = null;
 
   constructor(
     readonly team: number,
@@ -231,6 +253,7 @@ export class Commander {
     return {
       defenseFund: this.defenseFund, timer: this.timer, raidTimer: this.raidTimer, capCooldown: this.capCooldown, homeSeed: this.homeSeed, investFund: this.investFund, ferryTimer: this.ferryTimer,
       forceFund: this.forceFund, foe: this.foe, stage: this.stage, stageRaids: this.stageRaids, stageStart: this.stageStart, focusId: this.focusId,
+      massAt: this.massAt, massStart: this.massStart,
     };
   }
 
@@ -248,6 +271,8 @@ export class Commander {
     this.stageRaids = st.stageRaids ?? 0;
     this.stageStart = st.stageStart ?? 0;
     this.focusId = st.focusId ?? null;
+    this.massAt = st.massAt ?? MASS_FIRST;
+    this.massStart = st.massStart ?? null;
   }
 
   update(world: World, dt: number): void {
@@ -315,11 +340,36 @@ export class Commander {
     if (this.opts.upgrades) this.upgradeDefenses(world);
     if (this.opts.production) this.ensureDefenses(world);
     if (this.opts.cap && this.capCooldown <= 0) this.maintainCap(world);
-    if (this.opts.raids && this.raidTimer <= 0) {
+    if (this.opts.raids && this.massStart === null && world.time >= this.massAt) this.massStart = world.time;
+    if (this.opts.raids && this.massStart !== null) {
+      // Büyük akın için toplanma: küçük baskın yok, hazır saldırı uçakları birikir
+      const ready = this.readyStrikers(world);
+      const waited = world.time - this.massStart;
+      if ((ready >= massWant(world.time) || (waited > MASS_GATHER && ready >= MASS_MIN)) && this.launchMass(world)) {
+        this.massStart = null;
+        this.massAt = world.time + rand(MASS_GAP[0], MASS_GAP[1]);
+        this.raidTimer = 300 + rand(0, 180);
+      } else if (waited > MASS_GATHER * 1.5) {
+        this.massStart = null;
+        this.massAt = world.time + 600;
+      }
+    } else if (this.opts.raids && this.raidTimer <= 0 && world.time < MASS_FIRST) {
+      // Küçük baskınlar yalnız ilk büyük akına kadar: sonra saldırı uçakları akınlar arasında birikir (2–3 uçaklık baskınlar
+      // filoyu eritiyor, 240 dakikada en büyük akın 5–7 uçakta kalıyordu)
       // Hazır saldırı uçağı yoksa kısa süre sonra yeniden dene (eskiden 7–12 dk erteleniyordu)
       // Ana üsse yüklenirken hazır uçak birikmeden yeniden kalkılır
       this.raidTimer = this.launchRaid(world) ? (this.stage === 'base' ? 180 + rand(0, 120) : 420 + rand(0, 300)) : 60 + rand(0, 30);
     }
+  }
+
+  /** Kullanılabilir üslerde hazır bekleyen saldırı uçağı (avcı dışı). */
+  private readyStrikers(world: World): number {
+    let n = 0;
+    for (const b of world.airbasesOf(this.team)) {
+      if (!b.usable) continue;
+      for (const af of b.inventory) if (af.status === 'ready' && SPECS[af.specId].role !== 'fighter' && SPECS[af.specId].playable) n++;
+    }
+    return n;
   }
 
   /** Hava üssü kalmadıysa yenisini kur; üs yoksa true (o tur başka harcama yapılmaz). */
@@ -458,17 +508,20 @@ export class Commander {
   /** Asgari filo (zamanla büyür): avcı ve saldırı uçağı. */
   private minFleet(world: World): { fighters: number; strikers: number } {
     const t = world.time;
-    return { fighters: Math.min(12, 6 + Math.floor(t / 1200)), strikers: Math.min(10, 2 + Math.floor(t / 720)) };
+    // Saldırı uçağı 10 → 14 (2026-11-25): büyük akınlar için
+    return { fighters: Math.min(12, 6 + Math.floor(t / 1200)), strikers: Math.min(14, 2 + Math.floor(t / 600)) };
   }
 
   /** Hangarlardaki ve fabrika kuyruklarındaki uçaklar. */
   private fleet(world: World): Fleet {
     let fighters = 0;
     let strikers = 0;
+    let bombers = 0;
     let room = 0;
     const count = (specId: string) => {
       if (SPECS[specId].role === 'fighter') fighters++;
       else strikers++;
+      if (SPECS[specId].role === 'bomber') bombers++;
     };
     for (const b of world.airbasesOf(this.team)) {
       if (b.s.active) room += b.freeSlots;
@@ -479,7 +532,7 @@ export class Commander {
       for (const q of s.factory.queue) count(q.specId);
       room -= s.factory.queue.length;
     }
-    return { fighters, strikers, room };
+    return { fighters, strikers, bombers, room };
   }
 
   /** İstenen ve var olan (inşaattakiler dahil) uçaksavar bataryası ve radar sayısı (zamanla artar). */
@@ -512,6 +565,12 @@ export class Commander {
       const id = this.pickProduct(world, role);
       return id ? { kind: 'aircraft', specId: id, price: aircraftPrice(SPECS[id]) } : null;
     };
+    // Ağır bombardıman: asgari filonun bir payı (büyük akınların omurgası); açılmamışsa atlanır
+    const heavy = (): Need | null => {
+      if (fleet.room <= 0 || fleet.bombers >= bomberWant(world.time)) return null;
+      const sp = bestUnlocked(world.teams[this.team].research, 'bomber', 1)[0];
+      return sp ? { kind: 'aircraft', specId: sp.id, price: aircraftPrice(sp) } : null;
+    };
     const site = (kind: 'aa' | 'radar'): Need => ({ kind, price: world.structureCost(this.team, kind) });
     // Yakın zamanda bombardıman akını yedi: bombardıman uçağından önce avcı (filo büyümez, bileşim değişir)
     const raided = world.time - memoryOf(world, this.team).lastBomberRaid < RAID_ALERT_TIME;
@@ -522,7 +581,10 @@ export class Commander {
       (fleet.strikers < Math.min(2, min.strikers) ? plane('bomber') : null) ??
       (d.radar < d.radarWant ? site('radar') : null) ??
       (d.aa < d.aaWant ? site('aa') : null) ??
-      (fleet.strikers < min.strikers ? plane('bomber') : null) ??
+      // Saldırı uçağı açığı, bombardıman payı dolana kadar ağır bombardımanla kapanır (eskiden kayıplar yüzünden açık hep
+      // sürüyor, hep ucuz pike uçağı alınıyordu: 240 dakikada takım başına 0–1 bombardıman)
+      (fleet.strikers < min.strikers ? heavy() ?? plane('bomber') : null) ??
+      heavy() ??
       (fleet.fighters < min.fighters ? plane('fighter') : null)
     );
   }
@@ -840,12 +902,16 @@ export class Commander {
 
   private produce(world: World, fleet: Fleet): void {
     const tm = world.teams[this.team];
-    let { fighters, strikers, room } = fleet;
+    let { fighters, strikers, bombers, room } = fleet;
     for (const s of world.structures) {
       if (room <= 0) break;
       if (s.team !== this.team || !s.factory || !s.active || s.factory.queue.length >= 2) continue;
       const need = this.need?.kind === 'aircraft' ? this.need : null;
-      const id = need ? need.specId : this.pickProduct(world, fighters < strikers * 1.5 + 4 ? 'fighter' : 'bomber');
+      // Fazla parayla üretimde saldırı uçaklarının en az %40'ı bombardıman olsun (büyük akınlar)
+      const heavy = bestUnlocked(tm.research, 'bomber', 1)[0];
+      // Avcı payı (2026-11-25): saldırı uçağının 1,5 katı + 4 → eşit + 4 (büyük akınlar için saldırı uçağı birikebilsin)
+      const role: Role = fighters < strikers + 4 ? 'fighter' : 'bomber';
+      const id = need ? need.specId : role === 'bomber' && heavy && bombers < strikers * 0.4 ? heavy.id : this.pickProduct(world, role);
       if (!id) continue;
       // Araştırma para bekliyorsa asgari filo yalnız askeri fondan alır; fazla uçak ancak askeri ihtiyaç yoksa ve araştırma
       // beklemiyorsa (kayıplar yüzünden filo hep eksik kalıyor, üretim boştaki bütün parayı yiyip araştırmayı durduruyordu)
@@ -859,6 +925,7 @@ export class Commander {
       }
       if (SPECS[id].role === 'fighter') fighters++;
       else strikers++;
+      if (SPECS[id].role === 'bomber') bombers++;
       room--;
     }
   }
@@ -974,17 +1041,92 @@ export class Commander {
     return Commander.pick(outer, weights);
   }
 
+  /** Baskın hedefi: hedef ülkenin sırası, yoksa yakındaki düşman yapılarından ağırlıklı seçim. */
+  private strikeTarget(world: World): Structure | null {
+    const target = this.raidTarget(world);
+    if (target) return target;
+    const targets = world.structures.filter((s) => s.team !== this.team && !s.destroyed && s.build >= 1 && !world.teams[s.team]?.eliminated);
+    // Yakındaki düşmanlar öncelikli (çok taraflı oyunda haritanın öbür ucuna gidilmesin: 190 km ötedeki fabrikaya giden
+    // Ju 87 kolu tek yönde 50 dk uçuyor, eskortun yakıtı dönüşe zor yetiyordu)
+    const home = world.airbasesOf(this.team)[0]?.s.pos;
+    const near = (s: Structure) => (home ? 1 / (1 + (Math.hypot(s.pos.x - home.x, s.pos.z - home.z) / 45000) ** 4) : 1);
+    return Commander.pick(targets, targets.map((s) => near(s) * (s.kind === 'factory' ? 4 : s.kind === 'airbase' ? 3 : s.kind === 'radar' ? 2.5 : s.kind === 'mine' ? 2 : s.def.category === 'city' ? 0.3 : 1.5)));
+  }
+
+  /**
+   * Büyük akın: her üs bütün hazır saldırı uçaklarını aynı hedefe kaldırır; görev türü başına bir paket (bombardıman, pike, taarruz).
+   * Eskort: üste 2 avcı savunmaya kalır, kalanı (en çok 8) paketlere, ağır bombardıman paketi önce. En az 2 uçaklı paket kalkar.
+   */
+  private launchMass(world: World): boolean {
+    const tgt = this.strikeTarget(world);
+    if (!tgt) return false;
+    let total = 0;
+    const kindOf = (role: Role): MissionPlan['type'] | null => (role === 'bomber' ? 'levelBomb' : role === 'diveBomber' ? 'diveBomb' : role === 'attacker' ? 'attack' : null);
+    for (const b of world.airbasesOf(this.team)) {
+      if (!b.usable) continue;
+      const ready = [...new Set(b.inventory.filter((a) => a.status === 'ready' && SPECS[a.specId].playable).map((a) => a.specId))];
+      const families = new Map<MissionPlan['type'], string[]>();
+      for (const id of ready) {
+        const type = kindOf(SPECS[id].role);
+        if (type) families.set(type, [...(families.get(type) ?? []), id]);
+      }
+      const order = (['levelBomb', 'diveBomb', 'attack'] as const).filter((t) => (families.get(t) ?? []).reduce((a, id) => a + b.readyOf(id).length, 0) >= 2);
+      if (!order.length) continue;
+      // Eskort havuzu: bütün hazır avcı tipleri (en iyisi önce), üste 2 avcı kalır, en çok 10
+      const pool: { specId: string; n: number }[] = [];
+      let keep = 2;
+      for (const id of readyFighters(b)) {
+        let n = b.readyOf(id).length;
+        const k = Math.min(keep, n);
+        keep -= k;
+        n -= k;
+        if (n > 0) pool.push({ specId: id, n });
+      }
+      let escortLeft = Math.min(10, pool.reduce((a, p) => a + p.n, 0));
+      const takeEscort = (want: number): LaunchGroup[] => {
+        const out: LaunchGroup[] = [];
+        for (const p of pool) {
+          if (want <= 0) break;
+          const c = Math.min(p.n, want);
+          if (c <= 0) continue;
+          p.n -= c;
+          want -= c;
+          out.push({ specId: p.specId, count: c, split: c >= 4 ? Math.floor(c / 2) : 0 });
+        }
+        return out;
+      };
+      order.forEach((type, i) => {
+        const ids = families.get(type)!.sort((x, y) => SPECS[y].year - SPECS[x].year);
+        const lead = SPECS[ids[0]];
+        const plan = defaultPlan(type, lead);
+        plan.targetStructureId = tgt.id;
+        plan.altitude = type === 'attack' ? 1200 : Math.min(lead.cruiseAlt, 6000) + tgt.pos.y;
+        const groups: LaunchGroup[] = ids.map((id) => {
+          const op = defaultPlan(type, SPECS[id]);
+          return { specId: id, count: Math.min(12, b.readyOf(id).length), loadoutId: op.loadoutId, belt: op.belt, split: 0 };
+        });
+        const count = groups.reduce((a, g) => a + g.count, 0);
+        // Korunan hedefte pike ve taarruz kolunun üçte biri önce uçaksavarı bastırır
+        if ((type === 'attack' || type === 'diveBomb') && groups[0].count >= 3 && tgt.kind !== 'aa' && flakTarget(world, this.team, tgt.pos)) groups[0].split = Math.round(groups[0].count / 3);
+        // Eskort: ilk paket (ağır bombardıman varsa o) üçte ikisini alır
+        const ec = i === order.length - 1 ? escortLeft : Math.min(escortLeft, Math.ceil(escortLeft * 0.66));
+        escortLeft -= ec;
+        const escorts = ec >= 2 ? takeEscort(ec) : [];
+        if (world.launchPackage(b, plan, groups, escorts).length) total += count;
+      });
+    }
+    if (!total) return false;
+    world.log(L(`${world.teams[this.team].name} komuta: ${tgt.name} hedefine büyük akın (${total} uçak)`, `${world.teams[this.team].name} command: mass raid on ${tgt.name} (${total} aircraft)`), this.team, 'info');
+    if (tgt.team === this.foe) {
+      this.focusId = tgt.id;
+      this.stageRaids++;
+    }
+    return true;
+  }
+
   /** Baskın emri ver; hazır saldırı uçağı yoksa false. */
   private launchRaid(world: World): boolean {
-    let target = this.raidTarget(world);
-    if (!target) {
-      const targets = world.structures.filter((s) => s.team !== this.team && !s.destroyed && s.build >= 1 && !world.teams[s.team]?.eliminated);
-      // Yakındaki düşmanlar öncelikli (çok taraflı oyunda haritanın öbür ucuna gidilmesin: 190 km ötedeki fabrikaya giden
-      // Ju 87 kolu tek yönde 50 dk uçuyor, eskortun yakıtı dönüşe zor yetiyordu)
-      const home = world.airbasesOf(this.team)[0]?.s.pos;
-      const near = (s: Structure) => (home ? 1 / (1 + (Math.hypot(s.pos.x - home.x, s.pos.z - home.z) / 45000) ** 4) : 1);
-      target = Commander.pick(targets, targets.map((s) => near(s) * (s.kind === 'factory' ? 4 : s.kind === 'airbase' ? 3 : s.kind === 'radar' ? 2.5 : s.kind === 'mine' ? 2 : s.def.category === 'city' ? 0.3 : 1.5)));
-    }
+    const target = this.strikeTarget(world);
     if (!target) return false;
     const tgt = target;
     const big = this.stage === 'base' && tgt.kind === 'airbase';

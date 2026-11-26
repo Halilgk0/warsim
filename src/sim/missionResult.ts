@@ -11,7 +11,7 @@ import { AA_WEAPONS } from './structures/airDefense';
 import type { FlightGroup } from './ai/flightGroup';
 import type { MissionPlan, MissionType } from './ai/missions';
 import { SPECS, type Loadout, type Role } from './aircraft/specs';
-import { STORES } from './aircraft/stores';
+import { STORES, pylonsOf } from './aircraft/stores';
 import { defaultLoadout } from './ai/missions';
 import type { Structure } from './structures/structure';
 import { STRUCTURE_COST, aircraftPrice, fmtMoney } from './economy';
@@ -211,7 +211,7 @@ export function expectedStrikeDamage(
       const h = spec.hardpoints.find((x) => x.id === p.hp);
       const st = STORES[p.store];
       if (!h || !st || p.n <= 0) continue;
-      const n = p.n * h.pylons;
+      const n = p.n * pylonsOf(h, p);
       if (st.bomb) per += n * st.bomb.damage * hitYield(sigBomb, R, st.bomb.blastRadius);
       if (st.rocket) per += n * st.rocket.damage * hitYield(sigRocket, R, st.rocket.blastRadius);
     }

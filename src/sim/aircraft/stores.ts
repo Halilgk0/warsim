@@ -624,6 +624,11 @@ function ilTable(): AircraftStores {
 
 // ---------------------------------------------------------------- doğrulama ve yük özetleri
 
+/** Yerleşimin kapladığı askı sayısı: tek yana takılan yük çift askının yarısında. */
+export function pylonsOf(h: Hardpoint, p: Placement): number {
+  return p.side && h.kind !== 'bay' && h.pylons >= 2 ? h.pylons / 2 : h.pylons;
+}
+
 /** Askı başına izinli kg (ağır bomba askısı araştırılmışsa yüksek sınır). */
 export function capOf(h: Hardpoint, has: (id?: string) => boolean): number {
   return h.heavyCap && has('w_heavybomb') ? h.heavyCap : h.cap;
@@ -661,8 +666,9 @@ export function checkPlacement(spec: AircraftSpec, place: Placement[], has: (id?
       errors.push(L('Bilinmeyen askı ya da mühimmat', 'Unknown hardpoint or store'));
       continue;
     }
-    if (seen.has(h.id)) errors.push(`${h.name}: ${L('iki ayrı yük', 'two different stores')}`);
-    seen.add(h.id);
+    const key = `${h.id}:${p.side ?? 0}`;
+    if (seen.has(key) || (p.side ? seen.has(`${h.id}:0`) : seen.has(`${h.id}:1`) || seen.has(`${h.id}:-1`))) errors.push(`${h.name}: ${L('iki ayrı yük', 'two different stores')}`);
+    seen.add(key);
     if (!fits(spec, h, s)) errors.push(`${h.name}: ${L(`${s.short} takılamaz`, `${s.short} cannot be fitted`)}`);
     if (p.n > h.maxN) errors.push(`${h.name}: ${L('askı başına en fazla', 'at most per pylon:')} ${h.maxN}`);
     if (s.mass * p.n > capOf(h, has)) {
@@ -670,7 +676,7 @@ export function checkPlacement(spec: AircraftSpec, place: Placement[], has: (id?
       else errors.push(`${h.name}: ${L('askı başına en fazla', 'at most per pylon:')} ${capOf(h, has)} kg`);
     }
     for (const r of s.requires ?? []) if (!has(r)) missing.add(r);
-    kg += s.mass * p.n * h.pylons;
+    kg += s.mass * p.n * pylonsOf(h, p);
   }
   if (kg > spec.maxLoad) errors.push(`${L('Azami yük aşıldı', 'Maximum load exceeded')} (${Math.round(kg)} / ${spec.maxLoad} kg)`);
   return { ok: errors.length === 0 && missing.size === 0, kg, missing: [...missing], errors };
@@ -693,8 +699,8 @@ export function makeLoadout(spec: AircraftSpec, id: string, name: string, place:
     const h = spec.hardpoints.find((x) => x.id === p.hp);
     const s = STORES[p.store];
     if (!h || !s || p.n <= 0) continue;
-    clean.push({ hp: p.hp, store: p.store, n: p.n });
-    const total = p.n * h.pylons;
+    clean.push(p.side ? { hp: p.hp, store: p.store, n: p.n, side: p.side } : { hp: p.hp, store: p.store, n: p.n });
+    const total = p.n * pylonsOf(h, p);
     mass += s.mass * total;
     if (h.kind !== 'bay') drag += s.drag * total;
     for (const r of s.requires ?? []) reqs.add(r);
@@ -707,7 +713,7 @@ export function makeLoadout(spec: AircraftSpec, id: string, name: string, place:
     else if (s.kind === 'tank') tankFuel += (s.fuelKg ?? 0) * total;
     else if (s.kind === 'gunpod' && s.gun) {
       // Her gondol kendi askısında: iki yana dönüşümlü
-      for (let i = 0; i < total; i++) extraGuns.push({ ...s.gun, x: (i % 2 ? -1 : 1) * (h.at ?? 0.36) * (spec.span / 2) });
+      for (let i = 0; i < total; i++) extraGuns.push({ ...s.gun, x: (p.side ?? (i % 2 ? -1 : 1)) * (h.at ?? 0.36) * (spec.span / 2) });
     }
   }
   return {
@@ -718,11 +724,14 @@ export function makeLoadout(spec: AircraftSpec, id: string, name: string, place:
 
 /** Yük özeti metni (ör. "1 × SC 500 · 2 × SC 250"). */
 export function loadoutSummary(spec: AircraftSpec, lo: Loadout): string {
-  const parts = lo.place.map((p) => {
+  // Aynı mühimmat (iki yana ayrı takılmış olsa da) tek kalem
+  const byStore = new Map<string, number>();
+  for (const p of lo.place) {
     const h = spec.hardpoints.find((x) => x.id === p.hp);
     const s = STORES[p.store];
-    return h && s ? `${p.n * h.pylons} × ${s.short}` : '';
-  }).filter(Boolean);
+    if (h && s && p.n > 0) byStore.set(s.short, (byStore.get(s.short) ?? 0) + p.n * pylonsOf(h, p));
+  }
+  const parts = [...byStore].map(([s, n]) => `${n} × ${s}`);
   if (lo.replaceGuns) parts.unshift(lo.replaceGuns.map((g) => g.name).join(', '));
   return parts.join(' · ');
 }

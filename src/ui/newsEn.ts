@@ -15,6 +15,61 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'gorev-planlayici': {
+    title: 'The mission planner is redone',
+    summary: 'The mission plan has been rebuilt: targets are picked on a map, aircraft and escorts are added from a window with pictures, and every aircraft gets just enough fuel for the mission. Approach direction, custom loading with separate left and right pylons, repeating missions and a mission history are new too. Bots now launch large raids.',
+    cover: 'planlama-kapak-en.webp',
+    files: ['planlama-plan-en.webp', 'planlama-yuk-en.webp', 'planlama-onleme-en.webp', 'planlama-gecmis-en.webp'],
+    captions: [
+      'The new plan page: each aircraft has its load and fuel right below it, and the escort works the same way.',
+      'Custom loading: the aircraft seen from the front with its pylons; left and right pylons are loaded separately.',
+      'Intercept: enemy flights seen by radar, on the map and in a list.',
+      'Mission history: tap an earlier mission and its settings are applied to the plan.',
+    ],
+    sections: [
+      {
+        heading: 'A simpler plan',
+        bullets: [
+          'The plan page shows only the mission, the aircraft, the target and the flight; the details are in pop-up windows.',
+          'Aircraft and escorts are added from the "Add aircraft" and "Add escort" windows, with large picture cards. You can still change the numbers in the plan.',
+          'The left and right panels, the top bar and the hint line now have a dark, semi-transparent look.',
+          'Fighter sweep is gone: patrol and intercept did the same job. Base transfers are now in the base panel: "Send to another base".',
+        ],
+      },
+      {
+        heading: 'Targets on the map',
+        bullets: [
+          'Patrol: tap the centre of the area on the map, set the diameter with the slider and enter the number of laps. The map pans and zooms.',
+          'Intercept: enemy flights seen by your radar, observers and flights are red triangles on the map, with a list of their distance and altitude.',
+          'Bombing and ground attack: enemy structures are red squares, flak batteries orange diamonds with range rings. The list shows how much flak is near each structure.',
+          'Approach direction: tap the line from the base to the target and drag the handle. The flight runs in from that side, so you can take it around the flak.',
+        ],
+      },
+      {
+        heading: 'Loads and fuel',
+        bullets: [
+          'The load window shows each preset’s bomb weight, speed loss, range and effect on this mission’s chance of success.',
+          'Custom loading: the aircraft seen from the front with its pylons. Tap a pylon to see what fits there; left and right pylons are loaded separately. Each aircraft has its own pylons and load limits.',
+          'Fuel is on each aircraft’s row: it takes off with just enough for the mission, and you can add more. Bombers and escorts are worked out by their own tanks and consumption. If the tanks are not enough, take-off is blocked.',
+        ],
+      },
+      {
+        heading: 'Repeat and history',
+        bullets: [
+          '"Repeat when the mission ends": once the flight lands and the aircraft are serviced, the same mission takes off again. It stops when the target is destroyed or when you press "Stop repeating" under Active missions.',
+          '"History" at the top of the mission plan: tap one of your earlier missions and its aircraft, loads, fuel, target and approach come back into the plan as they were.',
+          'If the base does not have enough aircraft, that mission cannot be picked. If the target is gone, the settings still come back and you choose a new target.',
+        ],
+      },
+      {
+        heading: 'Bots launch large raids',
+        bullets: [
+          'As the war goes on, bots gather their strike aircraft every 20–30 minutes and send them from all their bases at the same target.',
+          'They now use heavy bombers too. Plan your air defence and patrols for it.',
+        ],
+      },
+    ],
+  },
   kanyonlar: {
     title: 'New map: Canyonlands (early access)',
     summary: 'A third map is coming: stepped plateaus, a deep river canyon, a maze of side canyons and valleys full of red rock pillars. Canyonlands is in development; anyone can look around it in the main menu, and campaigns are open to level 3 supporters for now.',

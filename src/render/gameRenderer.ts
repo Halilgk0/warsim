@@ -159,6 +159,8 @@ export class GameRenderer {
   routeFlightId: number | null = null;
   /** Görev planlayıcı önizlemesi. */
   plannerRoute: THREE.Vector3[] | null = null;
+  /** Planlayıcının devriye bölgesi (yoksa null). */
+  plannerArea: { x: number; z: number; r: number } | null = null;
   ghost: Ghost | null = null;
   /** Yol önizlemesi ve yerleşim ızgarası (inşa kipinde Game doldurur). */
   roadGhost: RoadPreview | null = null;
@@ -237,6 +239,8 @@ export class GameRenderer {
   private routeLine: THREE.Line;
   private plannerLine: THREE.Line;
   private missionCircle: THREE.LineLoop;
+  /** Planlayıcıdaki devriye bölgesi (merkez ve yarıçap). */
+  private plannerCircle: THREE.LineLoop;
   private ghostGroup = new THREE.Group();
   private roadLayer = new RoadLayer();
   private roadGhostView = new RoadGhost();
@@ -338,19 +342,26 @@ export class GameRenderer {
       this.scene.add(l);
       return l;
     };
-    this.routeLine = mkLine(0x4a4857, 0.6);
+    // Seçili kolun rotası planlayıcının önizlemesiyle aynı renkte (2026-11-25: soluk gri rota fark edilmiyordu)
+    this.routeLine = mkLine(0x2f5d4f, 0.85);
     this.plannerLine = mkLine(0x2f5d4f, 0.9);
     const circ: THREE.Vector3[] = [];
     for (let i = 0; i < 96; i++) {
       const a = (i / 96) * Math.PI * 2;
       circ.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
     }
-    this.missionCircle = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(circ),
-      new THREE.LineBasicMaterial({ color: 0x4a4857, transparent: true, opacity: 0.45, depthTest: false }),
-    );
-    this.missionCircle.visible = false;
-    this.scene.add(this.missionCircle);
+    const mkCircle = () => {
+      const c = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(circ),
+        new THREE.LineBasicMaterial({ color: 0x2f5d4f, transparent: true, opacity: 0.85, depthTest: false }),
+      );
+      c.visible = false;
+      c.renderOrder = 5;
+      this.scene.add(c);
+      return c;
+    };
+    this.missionCircle = mkCircle();
+    this.plannerCircle = mkCircle();
 
     // Genel amaçlı bomba: bantlar, tapa, kanatçık kutusu (munitions.ts)
     this.bombGeo = bombGeometry();
@@ -1226,18 +1237,20 @@ export class GameRenderer {
     this.missionCircle.visible = false;
     const fl = this.routeFlightId !== null ? w.flightById(this.routeFlightId) : undefined;
     if (fl && settings.map.routes) {
+      // Görevin bütün güzergâhı: kalkış üssü → rota → hedef → dönüş üssü (2026-11-25: eskiden yalnız uçaktan hedefe; gidip gelirken
+      // ve devriyedeyken yolun tamamı görünsün)
       const pts: THREE.Vector3[] = [];
-      const lead = fl.leader();
-      if (lead) pts.push(lead.pos.clone());
-      for (let i = fl.phase === 'enroute' ? fl.routeIndex : fl.route.length; i < fl.route.length; i++) {
-        const p = fl.route[i];
-        pts.push(new THREE.Vector3(p.x, fl.plan.lowLevel ? groundLevel(p.x, p.z) + fl.plan.agl : fl.plan.altitude, p.z));
-      }
+      const alt = (x: number, z: number) => (fl.plan.lowLevel ? groundLevel(x, z) + fl.plan.agl : Math.max(fl.plan.altitude, groundLevel(x, z) + 50));
+      const home = w.airbaseById(fl.baseId);
+      if (home) pts.push(home.s.pos.clone().setY(home.s.pos.y + 50));
+      for (const p of fl.route) pts.push(new THREE.Vector3(p.x, alt(p.x, p.z), p.z));
       const tp = w.missionTargetPos(fl);
-      if (tp) pts.push(new THREE.Vector3(tp.x, Math.max(tp.y, groundLevel(tp.x, tp.z)) + 20, tp.z));
-      if (fl.phase === 'rtb' || fl.phase === 'egress' || fl.phase === 'landing') {
-        const b = w.airbaseById(fl.returnBaseId);
-        if (b) pts.splice(1, pts.length - 1, b.s.pos.clone().setY(b.s.pos.y + 50));
+      if (tp) pts.push(new THREE.Vector3(tp.x, fl.plan.type === 'cap' || fl.plan.type === 'sweep' ? alt(tp.x, tp.z) : Math.max(tp.y, groundLevel(tp.x, tp.z)) + 20, tp.z));
+      const back = w.airbaseById(fl.returnBaseId);
+      if (back && fl.plan.type !== 'ferry') pts.push(back.s.pos.clone().setY(back.s.pos.y + 50));
+      if (pts.length < 2) {
+        const lead = fl.leader();
+        if (lead) pts.unshift(lead.pos.clone());
       }
       this.setLine(this.routeLine, pts);
       if ((fl.plan.type === 'cap' || fl.plan.type === 'sweep') && fl.plan.targetPos) {
@@ -1249,6 +1262,12 @@ export class GameRenderer {
     // Planlayıcı önizlemesi
     if (this.plannerRoute && this.plannerRoute.length >= 2) this.setLine(this.plannerLine, this.plannerRoute);
     else this.plannerLine.visible = false;
+    const pa = this.plannerArea;
+    this.plannerCircle.visible = !!pa;
+    if (pa) {
+      this.plannerCircle.position.set(pa.x, groundLevel(pa.x, pa.z) + 30, pa.z);
+      this.plannerCircle.scale.setScalar(pa.r);
+    }
 
     this.syncGhost();
     this.syncCoverage(w);

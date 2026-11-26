@@ -34,6 +34,62 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'gorev-planlayici',
+    date: '2026-11-26',
+    title: 'Görev planlayıcı yenilendi',
+    summary: 'Görev planı baştan düzenlendi: hedefler haritadan seçiliyor, uçaklar ve eskort resimli pencereden ekleniyor, yakıt her uçağa görevi yapmaya yetecek kadar konuyor. Yaklaşma yönü, sol ve sağ askıları ayrı serbest yükleme, görevi tekrarlama ve görev geçmişi de geldi. Botlar artık büyük akınlar yapıyor.',
+    cover: img('planlama-kapak.webp'),
+    images: [
+      { src: img('planlama-plan.webp'), caption: 'Yeni plan sayfası: her uçağın altında yükü ve yakıtı, eskort aynı düzende.' },
+      { src: img('planlama-yuk.webp'), caption: 'Serbest yükleme: uçağın önden görünüşü ve askıları; sol ve sağ askılar ayrı doldurulur.' },
+      { src: img('planlama-onleme.webp'), caption: 'Önleme: radarın gördüğü düşman kolları haritada ve listede.' },
+      { src: img('planlama-gecmis.webp'), caption: 'Görev geçmişi: önceki bir göreve dokun, ayarları plana uygulanır.' },
+    ],
+    sections: [
+      {
+        heading: 'Daha sade bir plan',
+        bullets: [
+          'Plan sayfasında yalnız görev, uçaklar, hedef ve uçuş var; ayrıntılar açılır pencerelerde.',
+          'Uçaklar ve eskort "Uçak ekle" ve "Eskort ekle" pencerelerinden, büyük resimli kartlarla eklenir. Sayıları planda da değişir.',
+          'Sol ve sağ paneller, üst çubuk ve ipucu satırı koyu, yarı saydam bir görünüme geçti.',
+          'Avcı taraması kalktı: devriye ve önleme aynı işi görüyordu. Üs transferi artık üs panelinde: "Başka üsse gönder".',
+        ],
+      },
+      {
+        heading: 'Hedef haritadan',
+        bullets: [
+          'Devriye: haritada bölgenin merkezine dokun, çapı kaydırıcıyla ayarla, tur sayısını gir. Harita kayar ve yakınlaşır.',
+          'Önleme: radarın, gözcülerin ve kollarının gördüğü düşman kolları haritada kırmızı üçgen; yanında uzaklık ve irtifalarıyla listesi.',
+          'Bombardıman ve taarruz: düşman yapıları kırmızı kare, uçaksavarlar menzil halkalı turuncu baklava. Listede her yapının yakınındaki uçaksavar sayısı yazar.',
+          'Yaklaşma yönü: üsten hedefe giden çizgiye dokun, tutamağı sürükle. Kol hedefe o yönden girer; uçaksavarların çevresinden dolaşabilirsin.',
+        ],
+      },
+      {
+        heading: 'Yük ve yakıt',
+        bullets: [
+          'Yük penceresinde her hazır yükün bomba ağırlığı, hız kaybı, menzili ve bu görevdeki başarıya etkisi görünür.',
+          'Serbest yükleme: uçağın önden görünüşü ve askıları. Askıya dokununca oraya takılabilecek yükler açılır; sol ve sağ askılar ayrı doldurulur. Her uçağın askısı ve taşıyabileceği yük kendine göre.',
+          'Yakıt her uçağın satırında: görevi yapmaya yetecek kadarla kalkar, istersen artırırsın. Bombardıman uçağı da eskort da kendi deposuna ve tüketimine göre hesaplanır. Depo yetmiyorsa kalkış kapalı.',
+        ],
+      },
+      {
+        heading: 'Tekrar ve geçmiş',
+        bullets: [
+          '"Görev bitince tekrarla": kol inip uçaklar bakımdan çıkınca aynı görev yeniden kalkar. Hedef yıkılınca ya da Aktif görevler\'de "Tekrarı durdur"a basınca biter.',
+          'Görev planının başındaki "Geçmiş": önceki görevlerinden birine dokun, uçakları, yükleri, yakıtı, hedefi ve yaklaşma yolu plana aynen gelir.',
+          'Üste yeterli uçak yoksa o görev seçilemez. Hedef artık yoksa ayarlar yine gelir, hedefi yeniden seçersin.',
+        ],
+      },
+      {
+        heading: 'Botlar büyük akın yapıyor',
+        bullets: [
+          'Savaş ilerledikçe botlar 20–30 dakikada bir saldırı uçaklarını toplayıp bütün üslerinden aynı hedefe birlikte kalkıyor.',
+          'Ağır bombardıman uçaklarını da artık kullanıyorlar. Hava savunmanı ve devriyelerini buna göre kur.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'kanyonlar',
     date: '2026-11-25',
     title: 'Yeni harita: Kanyonlar (erken erişim)',

@@ -7,7 +7,7 @@ import type { Airframe } from '../structures/airbase';
 import { BASE_MODS, type ModEffects } from '../mods';
 import { newDamage, type DamageState } from './damage';
 import { BELTS, type BeltDef, type BeltId } from './ammo';
-import { STORES, type StoreDef } from './stores';
+import { STORES, pylonsOf, type StoreDef } from './stores';
 import { DEG, clamp } from '../../core/math';
 
 export type AircraftStatus = 'flying' | 'falling' | 'dead' | 'recovered';
@@ -62,6 +62,8 @@ export interface StoreSlot {
   n0: number;
   /** Bomba bölmesinde (sürükleme yok). */
   internal: boolean;
+  /** Yalnız bir yanda (çift askı). */
+  side?: 1 | -1;
 }
 
 export interface Stores {
@@ -214,8 +216,8 @@ export class Aircraft {
       const h = spec.hardpoints.find((x) => x.id === p.hp);
       const st = STORES[p.store];
       if (!h || !st || p.n <= 0) continue;
-      const n = p.n * h.pylons;
-      slots.push({ hp: p.hp, store: st, n, n0: n, internal: h.kind === 'bay' });
+      const n = p.n * pylonsOf(h, p);
+      slots.push({ hp: p.hp, store: st, n, n0: n, internal: h.kind === 'bay', side: p.side });
     }
     // Ağır bombalar önce bırakılır (pike ve taarruzda asıl yük)
     slots.sort((a, b) => b.store.mass - a.store.mass);

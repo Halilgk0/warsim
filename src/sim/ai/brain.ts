@@ -471,7 +471,10 @@ export class Brain {
           orbitDir(cmd.dir, ac, center, p.patrolRadius, p.altitude);
           cmd.speed = speedFor(s, 'eco');
           const left = Math.max(0, p.stationTime - (world.time - fl.stationStart));
-          this.status = `${p.type === 'cap' ? L('Devriye', 'Patrol') : L('Tarama', 'Sweep')}: ${Math.ceil(left / 60)} ${L('dk kaldı', 'min left')}`;
+          const laps = p.laps && p.stationTime > 0 ? Math.ceil((left / p.stationTime) * p.laps - 1e-6) : 0;
+          this.status = laps
+            ? `${L('Devriye', 'Patrol')}: ${L(`${laps} tur kaldı`, `${laps} ${laps === 1 ? 'lap' : 'laps'} left`)}`
+            : `${p.type === 'cap' ? L('Devriye', 'Patrol') : L('Tarama', 'Sweep')}: ${Math.ceil(left / 60)} ${L('dk kaldı', 'min left')}`;
         }
         break;
       }

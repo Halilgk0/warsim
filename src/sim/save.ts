@@ -17,6 +17,7 @@ import { foundTown, maintHousing } from './campaign';
 import type { MissionReport } from './missionResult';
 import { SLOT_ORDER, type Slot } from './tech';
 import { loadMap } from './terrain';
+import { loadHistory, loadStanding, saveHistory, saveStanding, type HistorySave, type StandingSave } from './standing';
 import { MAP_BASE } from './mapData';
 import { L, count } from '../i18n';
 
@@ -132,6 +133,10 @@ export interface SaveData {
   /** Görev sonuçları (yoksa boş: eski kayıt). */
   missionReports?: MissionReport[];
   missionTally?: [string, { success: number; fail: number; none: number }][];
+  /** Tekrarlanan görevler (2026-11-26 öncesi kayıtlarda yok). */
+  standing?: StandingSave[];
+  /** Görev geçmişi (2026-11-26 öncesi kayıtlarda yok). */
+  history?: HistorySave[];
   camera?: { x: number; z: number; distance: number; yaw: number; pitch: number };
 }
 
@@ -215,6 +220,8 @@ export function serializeWorld(w: World, scenarioId: string): SaveData {
     logs: w.logs.map((l) => ({ ...l })),
     missionReports: w.missionReports.map((r) => ({ ...r })),
     missionTally: [...w.missionTally].map(([k, v]) => [k, { ...v }]),
+    standing: w.standing.map(saveStanding),
+    history: w.missionHistory.map(saveHistory),
   };
 }
 
@@ -353,6 +360,9 @@ export function deserializeWorld(d: SaveData): World {
   w.logs.push(...d.logs);
   if (d.missionReports) w.missionReports.push(...d.missionReports);
   for (const [k, v] of d.missionTally ?? []) w.missionTally.set(k, { ...v });
+  for (const s of d.standing ?? []) w.standing.push(loadStanding(s, d.time));
+  w.nextStandingId = Math.max(1, ...w.standing.map((s) => s.id + 1));
+  for (const h of d.history ?? []) w.missionHistory.push(loadHistory(h));
   // Bakım personeli kuralından önceki harekât kaydı: her tarafa eksik konut bedava (campaign.ts maintHousing); oyuncuya
   // oyun bir kez söyler (game.ts applySave). Ad sayaçları ve günlük yüklendikten sonra: yeni evlerin adı çakışmasın
   if (!d.maintRule && d.setup && d.personnelEnabled) {

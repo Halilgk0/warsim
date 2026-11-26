@@ -5976,7 +5976,8 @@ const unitPod = mergeGeometries([
 unitPod.computeVertexNormals();
 
 /** Bir askıdaki her mühimmatın konumu (çift askıda sıra sol-sağ dönüşümlü: bırakılınca dengeli eksilir). */
-function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, rad: number): THREE.Vector3[] {
+function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, rad: number, side?: 1 | -1): THREE.Vector3[] {
+  const sides = side ? [side] : [-1, 1];
   const out: THREE.Vector3[] = [];
   const half = c.bb.max.x;
   if (h.kind === 'bay') return out;
@@ -5997,6 +5998,7 @@ function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, ra
       const col = n > 1 ? (k % 2 === 0 ? -1 : 1) * rad * 1.25 : 0;
       const row = Math.floor(k / 2) - (Math.ceil(n / 2) - 1) / 2;
       for (let p = 0; p < h.pylons; p++) {
+        if (side && h.pylons === 2 && (p === 0 ? -1 : 1) !== side) continue;
         const sx = h.pylons > 1 ? (p === 0 ? -sideX : sideX) : 0;
         out.push(new THREE.Vector3(sx + col, y0, z0 - row * len * 1.05));
       }
@@ -6005,7 +6007,7 @@ function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, ra
   }
   if (h.kind === 'tip') {
     const w = wingAt(half * 0.96);
-    for (const sgn of [-1, 1]) out.push(new THREE.Vector3(sgn * (half + rad * 0.6), w.y + rad * 0.9, w.z + len * 0.15));
+    for (const sgn of sides) out.push(new THREE.Vector3(sgn * (half + rad * 0.6), w.y + rad * 0.9, w.z + len * 0.15));
     return out;
   }
   const at = h.at ?? 0.36;
@@ -6013,7 +6015,7 @@ function hardpointSlots(c: CachedModel, h: Hardpoint, n: number, len: number, ra
     // Ray: roketler kanat boyunca yan yana; kanat altı: aynı askıda arka arkaya / yan yana
     const dx = h.kind === 'rail' ? (k - (n - 1) / 2) * Math.max(0.42, half * 0.06) : n > 1 ? (k % 2 === 0 ? -1 : 1) * rad * 1.2 : 0;
     const dz = h.kind === 'rail' ? 0 : n > 1 ? -Math.floor(k / 2) * len * 0.6 : 0;
-    for (const sgn of [-1, 1]) {
+    for (const sgn of sides) {
       const x = sgn * (half * at + dx);
       const w = wingAt(x);
       out.push(new THREE.Vector3(x, w.y - rad - 0.1, w.z + len * 0.12 + dz));
@@ -6042,7 +6044,7 @@ function withPylon(geo: Geo, name: string, rad: number, gap: number): Geo {
 
 /** Uçağın askılarındaki mühimmat: askı (yuva) başına örnekli ağ; count kalan adede eşitlenir. */
 export function buildStoreMeshes(
-  kind: string, spec: AircraftSpec, slots: { hp: string; store: StoreDef; n0: number }[], detail = 1,
+  kind: string, spec: AircraftSpec, slots: { hp: string; store: StoreDef; n0: number; side?: 1 | -1 }[], detail = 1,
 ): (THREE.InstancedMesh | null)[] {
   const c = cached(kind, detail);
   const m = new THREE.Matrix4();
@@ -6054,7 +6056,7 @@ export function buildStoreMeshes(
     // Uç tankları gövdenin parçası olan modelde (F-84) yük ayrıca çizilmez
     if (h.kind === 'tip' && c.joints.some((j) => j.name === 'ucTank')) return null;
     const st = slot.store;
-    const perPylon = Math.max(1, Math.round(slot.n0 / h.pylons));
+    const perPylon = Math.max(1, Math.round(slot.n0 / (slot.side && h.pylons >= 2 ? h.pylons / 2 : h.pylons)));
     let geo: Geo;
     let len: number;
     let rad: number;
@@ -6077,7 +6079,7 @@ export function buildStoreMeshes(
       rad = 0.16;
       geo = unitPod;
     }
-    const pos = hardpointSlots(c, h, perPylon, len, rad);
+    const pos = hardpointSlots(c, h, perPylon, len, rad, slot.side);
     if (!pos.length) return null;
     // Kanat ucu tankı dışında her yükün üstünde askısı (merkez yükte boşluk 0,12, kanat altı ve rayda 0,1 m)
     if (h.kind !== 'tip') geo = withPylon(geo, st.kind, rad, h.kind === 'center' ? 0.12 : 0.1);

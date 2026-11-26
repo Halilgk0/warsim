@@ -129,9 +129,12 @@ const TOPICS: Topic[] = [
       ['base', () => L('Hava üssünü seçme', 'Selecting your airbase')],
       ['hangar', () => L('Hangar ve pilotlar', 'Hangar and pilots')],
       ['plan', () => L('Görev planı', 'Mission plan')],
-      ['force', () => L('Uçak sayısı ve tipi', 'Number and type of aircraft')],
-      ['pick', () => L('Haritadan bölge seçme', 'Picking an area on the map')],
-      ['point', () => L('Devriye noktası', 'Patrol point')],
+      ['force', () => L('Uçak ekleme', 'Adding aircraft')],
+      ['pickac', () => L('Uçak sayısı ve tipi', 'Number and type of aircraft')],
+      ['pick', () => L('Devriye bölgesini açma', 'Opening the patrol area')],
+      ['point', () => L('Devriye merkezi', 'Patrol centre')],
+      ['area', () => L('Devriye çapı', 'Patrol diameter')],
+      ['laps', () => L('Tur ve yakıt', 'Laps and fuel')],
       ['launch', () => L('Kalkış ve mürettebat', 'Take-off and crews')],
       ['missions', () => L('Aktif görevler', 'Active missions')],
       ['follow', () => L('Uçağı takip etme', 'Following an aircraft')],
@@ -738,7 +741,17 @@ export class Tutorial {
       else if (hole.top >= bh + m * 2) [x, y] = [cx, hole.top - bh - m];
       else if (W - hole.right >= bw + m * 2) [x, y] = [hole.right + m, cy];
       else if (hole.left >= bw + m * 2) [x, y] = [hole.left - bw - m, cy];
-      else [x, y] = [W - bw - m, H - bh - m];
+      else {
+        // Hiçbir yana sığmıyor (telefonda açılır pencere): köşeler arasında vurguyla en az çakışanı (2026-11-25: hep sağ alt köşeye
+        // konuyordu, uçak ekleme penceresinin "Ekle" düğmesini örtüyordu)
+        const over = (px: number, py: number) => {
+          const ox = Math.max(0, Math.min(px + bw, hole.right) - Math.max(px, hole.left));
+          const oy = Math.max(0, Math.min(py + bh, hole.bottom) - Math.max(py, hole.top));
+          return ox * oy;
+        };
+        const spots: [number, number][] = [[m, m], [W - bw - m, m], [m, H - bh - m], [W - bw - m, H - bh - m]];
+        [x, y] = spots.reduce((a, s) => (over(s[0], s[1]) < over(a[0], a[1]) ? s : a));
+      }
     }
     x = Math.min(Math.max(m, x), W - bw - m);
     y = Math.min(Math.max(m, y), H - bh - m);
@@ -1000,26 +1013,65 @@ export class Tutorial {
         ),
       },
       {
+        // Uçaklar "Uçak ekle" penceresinden (2026-11-25)
         id: 'force', ch: 'mission',
-        target: () => [...document.querySelectorAll('#planner .psec')].slice(0, 2),
+        target: () => visible('#planner [data-act="addac"]') ?? [...document.querySelectorAll('#planner .psec')].slice(0, 2),
+        done: () => g.planner.pickerOpen() || g.planner.forceCount() > 0,
         text: () => L(
-          'Hava devriyesi seçili: avcılar bir bölgenin üstünde dolaşır, bölgeye giren düşmanla çatışır. Kaç uçağın gideceğini + ve − ile seçersin.',
-          'Combat air patrol is selected: fighters circle an area and engage any enemy that enters it. Choose how many aircraft go with + and −.',
+          `Hava devriyesi seçili: avcılar bir bölgenin üstünde dolaşır, bölgeye giren düşmanla çatışır. Gidecek uçakları seçmek için "Uçak ekle"ye ${tap()}.`,
+          `Combat air patrol is selected: fighters circle an area and engage any enemy that enters it. ${Tap()} "Add aircraft" to choose who goes.`,
+        ),
+      },
+      {
+        id: 'pickac', ch: 'mission',
+        target: () => {
+          const els = [...document.querySelectorAll<HTMLElement>('#planner .pl-pklist, #planner [data-act="pkok"]')];
+          return els.length ? els : visible('#planner [data-act="addac"]');
+        },
+        done: () => !g.planner.pickerOpen() && g.planner.forceCount() > 0,
+        text: () => L(
+          `Üssündeki kalkmaya hazır uçaklar. Kaç uçağın gideceğini + ve − ile seç, sonra "Ekle"ye ${tap()}. Sayıyı planda da değiştirebilirsin.`,
+          `The aircraft at your base that are ready to fly. Choose how many go with + and −, then ${tap()} "Add". You can change the number in the plan too.`,
         ),
       },
       {
         id: 'pick', ch: 'mission',
         target: () => visible('#planner [data-act="pick"]'),
-        done: () => g.interaction.mode === 'pickTarget' || g.planner.hasTarget(),
-        text: () => L(`Şimdi devriye bölgesi: "Haritadan seç"e ${tap()}.`, `Now the patrol area: ${tap()} "Pick on map".`),
+        done: () => g.planner.areaOpen() || g.interaction.mode === 'pickTarget' || g.planner.hasTarget(),
+        text: () => L(`Şimdi devriye bölgesi: "Devriye bölgesini seç"e ${tap()}.`, `Now the patrol area: ${tap()} "Choose the patrol area".`),
       },
       {
+        // Devriye bölgesi penceresi (2026-11-25): haritada merkez, kaydırıcıyla çap
         id: 'point', ch: 'mission',
-        target: () => this.freeMap(),
+        target: () => visible('#planner .pl-map') ?? this.freeMap(),
         done: () => g.planner.hasTarget(),
         text: () => L(
-          `Haritada devriye bölgesinin merkezine ${tap()}; üssünün yakını iyi bir yer.`,
-          `${Tap()} the map where the patrol should be; near your base is a good spot.`,
+          `Haritada devriye bölgesinin merkezine ${tap()}; üssünün (halkalı mavi nokta) yakını iyi bir yer.`,
+          `${Tap()} the map where the patrol should be; near your base (the ringed blue dot) is a good spot.`,
+        ),
+      },
+      {
+        id: 'area', ch: 'mission',
+        target: () => {
+          // Kaydırıcı ve "Tamam" birlikte (Tamam vurgunun dışında kalınca dokunulamıyordu)
+          const els = [...document.querySelectorAll<HTMLElement>('#planner .pl-areactl, #planner .pl-card-f [data-act="popclose"]')];
+          return els.length ? els : visible('#planner [data-act="pick"]');
+        },
+        done: () => !g.planner.areaOpen(),
+        text: () => L(
+          `Çapı kaydırıcıyla ayarlarsın; büyük çember daha geniş bir alanı korur ama daha çok yakıt ister. Bitince "Tamam"a ${tap()}.`,
+          `Set the diameter with the slider; a bigger circle covers more ground but needs more fuel. ${Tap()} "Done" when ready.`,
+        ),
+      },
+      {
+        id: 'laps', ch: 'mission',
+        target: () => {
+          const els = [...document.querySelectorAll<HTMLElement>('#planner .pl-laps, #planner .pl-acfuel')].filter((e) => e.offsetParent);
+          return els.length ? els : visible('#planner .pl-laps');
+        },
+        text: () => L(
+          'Tur sayısı devriyenin ne kadar süreceğini belirler. Yakıt her uçağın satırında: görevi yapmaya yetecek kadar kendiliğinden ayarlanır; istersen artırırsın.',
+          'The number of laps decides how long the patrol lasts. Fuel is on each aircraft row: it is set to just enough for the mission; you can add more.',
         ),
       },
       {

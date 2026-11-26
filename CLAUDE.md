@@ -100,6 +100,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
       savunma ve yatırım payı tehdide göre (`threat`: son 30 dk vurulduysa savunma ×1,6, 60 dk sakinse savunma ×0,6 ve
       yatırım ×1,3); ağır hasarlı maden varken yeni maden yok; itfaiyenin alanındaki maden, batarya ve radar yola bağlanır
       (`linkToRoads`). 240 dk ölçümünde maden 2 → 4, kazanç +%46, filo 15 → 18.
+    - Büyük akın ve ağır bombardıman (2026-11-25, oyuncu bildirimi: "botlar kalabalık akın yapmıyor, ağır bombardımanı neredeyse hiç kullanmıyor"):
+      45. dakikadan sonra küçük baskın yok; 20–30 dakikada bir saldırı uçakları birikir, 8–16 olunca (15 dk sonra en az 5) bütün üslerden
+      aynı hedefe kalkar (`launchMass`: bombardıman, pike, taarruz ayrı paket; eskort bütün avcı tiplerinden, 2 avcı üste kalır).
+      Asgari filoda bombardıman payı (`bomberWant`, 30. dk 2 → en çok 6); saldırı uçağı açığı önce onunla kapanır, fazla üretimde
+      saldırı uçaklarının %40'ı bombardıman. Asgari saldırı uçağı 10 → 14, avcı payı (1,5× + 4 → 1× + 4). 6 tohum × 240 dk
+      (`tools/sim/bot_akin`): en büyük akın 3–4 → 8–12 saldırı uçağı (eskortla 15'e kadar), takım başına bombardıman siparişi ~0 → ~8,
+      yıkılan yapı (ortanca) ~3 → ~25, elenen taraf 0–1 → 0–2.
     - Bot dengesi (`commander.ts`) en az 240 dakikalık harekâtla denenir; görev kayıpları dönüş dahil ve kaynağına göre ölçülür. Kısa ölçüm iki kez yanılttı.
     - İniş `ops.ts`: her denemenin tarzı `LandingStyle` (yaklaşma uzunluğu, hız, teker koyma, fren), uçak kimliği ve deneme
       sayısından türer; ortak `Math.random` akışına dokunmaz. Pas geçen uçak (`missed`) sırasını bırakır, pistin yanından döner.
@@ -482,6 +489,65 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     birinden fazlası 70 ms üstüyse grafik ayarını bir basamak düşürmeyi önerir (`game.ts` `offerPerfHint`); kabul edilince ayarlar
     Grafik sekmesinde, önerilen seçenek işaretli açılır, oyuncu istediğini seçer. İlk 30 sn, pencere açıkken, sekme gizliyken,
     öğreticide ve 4×'te sayılmaz; öneriden sonra 10 dk susar; "Bir daha sorma" `warsim.perfHint`. Senaryolarda kapalı (testler).
+  - Görev planlayıcı (2026-11-25, `planner.ts`; koyu yarı saydam `.slate`, çelik temanın sadesi): ana sayfada yalnız görev, uçak sayısı, hedef ve
+    irtifa/süre; altta başarı ve kalkış. Ayrıntılar açılır pencerede (`Pop`): tip başına yük, ayrıntılı ayarlar, başarı ayrıntısı, uyarılı kalkışta
+    onay (öğreticide sormaz). Esc önce pencereyi kapatır (`planner.escape`). Öğretici `.psec` (ilk ikisi görev ve uçaklar), `pick`, `launch`
+    seçicilerine bağlı. Deneme: scratchpad `plan_dene.cjs`.
+    Ayrıntılı ayarlar penceresi yok (hız, kurallar, dağılım, geçiş göreve göre kendiliğinden); taarruz ve bombardımanda yalnız "Alçak uçuş".
+    Eskort görevi ve üs transferi kartlarda yok: transfer üs panelinden ("Başka üsse gönder", `planner.open(base, undefined, 'ferry')`).
+    Hava devriyesi (kullanıcı tasarımı): bölge penceresinde (`areaPop`, ana menünün harita önizlemesi) dokunarak merkez, kaydırıcıyla çap
+    (2–24 km); ana sayfada irtifa, tur (`plan.laps`, süre turdan: tur = çevre ÷ ekonomik hız), yakıt. Hız hep seyir. Yakıt görevi yapmaya
+    yetecek en aza kendiliğinden ayarlanır (`capFuel`: tırmanış verisiyle tam gaz, yol ve tur %20 paylı, dönüş simin `fuelToReturn`'ü);
+    oyuncu artırabilir; depoyu aşarsa kalkış kapalı. Ölçüm (scratchpad `cap_yakit.cjs`): yakın, orta, uzak devriye turlarını bitirip %4–12
+    yakıtla iniyor (paysız hesapta uzak devriye bölgeye varmadan dönüyordu). Öğretici adımları `pick` → `point` (harita) → `area` → `laps`.
+    Avcı taraması planlayıcıdan kalktı (2026-11-26, kullanıcı: devriye ve önlemeyle aynı işi görüyor; `TYPES`), sim türü eski kayıtlar ve
+    senaryolar için duruyor. Önleme hedefi aynı harita penceresinden: haritada oyuncunun gördüğü (radar, gözcü, kollarımız; savaş sisi
+    kapalıysa hepsi) düşman kolları kırmızı üçgen, altta liste (`enemyContacts`: oyuncunun bildiği konum, kol başına bir kayıt, lider hedef);
+    seçili temasa üsten kesik çizgi, izlenme durumu (`trackInfo`). "Oyun haritasından seç" eski yol. Deneme: scratchpad `onleme_dene.cjs`.
+    Bombardıman ve taarruz hedefi de aynı pencereden (2026-11-26, `structTargets`): önemli düşman yapıları (`MAJOR_KINDS`) kırmızı kare ve
+    kısa adıyla, uçaksavar turuncu baklava ve 4 km'lik soluk halka, evler nokta; adlar çakışırsa öncelikliler yazılır. Listede yapı, uzaklık
+    ve 5 km içindeki uçaksavar sayısı. Seçilince harita hedefin ~30 km çevresine yaklaşır (`focusOn`). Deneme: scratchpad `hedef_dene.cjs`.
+    Eskort uçaklar gibi (2026-11-26): eklenen satırlar ve "Eskort ekle" (`addesc`, `Pop` pick `escort: true`; yalnız avcılar, kuvvette
+    kullanılanlar ve onların personeli düşülür: `pickerMax(…, escort)`). Deneme: scratchpad `yatay_dene.cjs`.
+    Yaklaşma yönü (2026-11-26, kullanıcı tasarımı): hedef haritasında üsten hedefe çizgiye dokununca dokunulan yerde tutamak çıkar
+    (`bendEdit`), sürüklenince yol kırılır; kırılma planın tek ara noktası (`plan.waypoints[0]`; sim yaklaşma yönünü son ara noktadan alır).
+    Hedefe en az giriş noktası + 4 km (`bendMin`: yatay 24, taarruz 16, pike 13 km). "Düz yola dön" kaldırır; hedef değişince sıfırlanır.
+    Görev tekrarı (2026-11-26, `sim/standing.ts`): Uçuş bölümünde "Görev bitince tekrarla" (devriye, bombardımanlar, taarruz). Kollar bitince
+    uçaklar hazır olunca (en çok 15 dk beklenir, sonra hazır olanlarla) aynı plan yeniden kalkar; hedef yıkılınca, üs düşünce, uçak
+    kalmayınca ya da Aktif görevler'deki "Tekrarı durdur" ile biter. Kayda yazılır (`SaveData.standing`). Deneme: scratchpad `yon_dene.cjs`.
+    Yaklaşma çizgisi koyu kahve, beyaz kenarlıklı (kanyonda seçilsin); köşeler `missions.ts` `filletPath` ile 3 km yarıçaplı yay, sim rotası
+    da aynı işlevle (`world.prepareFlight`, ara noktalı rotalar).
+    Yakıt tip başına (2026-11-26; devriye, önleme, bombardımanlar, taarruz: `FUEL_TYPES`): her seçim (eskort dahil) kendi en azıyla kalkar
+    (`Pick.fuel`/`fuelAuto`, `syncFuel`, `LaunchGroup.fuelFrac`); kaydırıcı uçağın kendi satırında, yükün altında (`acRow`, `.pl-acfuel`;
+    kullanıcı: Uçuş bölümünde ayrı liste karışıyordu); oyuncu artırabilir, depo yetmezse kalkış kapalı. Devriye hesabı eskisi;
+    ötekiler simle ölçülerek: varış `pkgTime` (toplanma 120 sn + 25 sn × en büyük kol, tırmanışta yatay hız %70), asıl uçak toplanma ve
+    tırmanışta tam gaz, eskort bütün yolda %90 gaz. He 111 + Hurricane + P-51D eskortlu 92 km yatay: hepsi döndü, %6–21 yakıtla indi
+    (eski hesapta eskort yolda "yakıt azaldı" diye dönüyordu). Ölçüm scratchpad `yakit_olc.cjs`, `yakit_sim4.cjs`. Gözlem: 8 × SC 250 ve dolu
+    depolu He 111 kalkışta 150 km/sa ile zor tırmanıyor, bir koşuda kol 10. dakikada düştü (yakıt ayarından önce de varsayılan dolu depoydu).
+    Görev geçmişi (2026-11-26, `standing.ts` `HistoryEntry`, kayıtta `history`): plan başlığında "Geçmiş"; takım başına son 30 görev. Seçilen
+    görevin uçakları, yükleri, yakıtı, hedefi, yaklaşma yolu, turu ve tekrarı plana uygulanır (`applyHist`). Bu üste yeterli hazır uçak ya da
+    personel yoksa seçilemez; hedef artık yoksa seçilir, hedef boş gelir (`histCheck`). Deneme: scratchpad `gecmis_dene.cjs`.
+    Devriye haritası kaydırılır ve yakınlaşır (sürükle, iki parmak, tekerlek, +/−, ⌂; `View`, `mapDown/Move/Up`; dokunuş merkezi seçer,
+    sürükleme seçmez): resim oyunun arazi ızgarasından tepe gölgeli (`mapPreview.ts` `terrainImage`, harita başına bir kez), işaretler
+    görünüme göre svg. Oyun haritasında planlarken devriye çemberi (`renderer.plannerArea`); seçili kolun rotası gidiş-dönüş (kalkış üssü →
+    hedef → dönüş üssü) ve çemberi planlayıcıyla aynı koyu yeşil. Ara nokta kaldırıldı. Uçaklar "Uçak ekle" penceresinden (`pickPop`:
+    üsteki hazır tipler, göreve uymayan soluk; sayı hazır uçak ve personelle sınırlı), planda da sayısı değişir. Öğretici `force` →
+    `pickac`; balon hiçbir yana sığmazsa vurguyla en az çakışan köşeye (`placeBubble`). Deneme: scratchpad `cap2_dene.cjs`, `tut_gorev.cjs`.
+    Uçak resimleri (pencerede kart ızgarası, planda satır) ansiklopedinin kart görselinden: `public/uretim/kart-<uçak>.webp` (320×140, saydam;
+    `node tools/uretim/kartlar.mjs`; ansiklopedi görselleri yeniden üretilince bunu da çalıştır). Dosyası yoksa kodla çizilen küçük resim.
+    Yük ve silah penceresi (`loadPop`): üstte uçak resmi ve seçili yük; hazır yük kartlarında üç çubuk (bomba/roket, hız kaybı, menzil) ve
+    görevdeki etkisi (`loadImpact`: devriyede en az yakıt, öteki görevlerde başarı tahmini ve farkı). Göreve uymayan yük listede yok, araştırma
+    isteyen kilitli (dokununca araştırma ağacı). Mermi göreve göre, tek satır + "Değiştir". Formasyon göreve göre kendiliğinden (seçim yok).
+    Serbest yükleme (`customEditor`, kullanıcı çizimi): uçağın önden görünüşü, altında soldan sağa askı kutuları ve kanattaki yerlerine çizgiler
+    (kanat çifti iki kutu, bölme ortada tek kutu; yer `Hardpoint.at`); kutuya dokununca o askıya uyan yükler. Sınırlar uçak başına `stores.ts`
+    askı tanımından (pylons, maxN, cap, heavyCap, accepts); büyük bombardımanın bölmesi bu sınırlarla belirlenir.
+    Çift askının iki yanı ayrı yüklenir (2026-11-26): `Placement.side` (1 = sol kanat, modelde +x; −1 sağ; yoksa iki yan), adet
+    `stores.ts` `pylonsOf` ile (sim, isabet tahmini, çizim `hardpointSlots` hep bundan). Hazır yük serbest kipe geçince iki yana bölünür
+    (`splitSides`); "öbür yana da aynısı" düğmesi. Üstte başarı (devriyede en az yakıt) ve boş yüke göre farkı, bomba/roket, hız kaybı, menzil.
+  - Sol ve sağ oyun panelleri de aynı görünümde (`index.html` `.panel.slate`, kenar düğmeleri dahil); üst çubuk, ipucu satırı (`#hint`) ve
+    inşa çubuğu da (değişkenler `#topbar, #hint, #buildbar` kuralında). Zemin %88 opak (%75 bazen okunmuyordu). İpucu satırı açık panellerin
+    arasındaki boşlukta ortalanır (`--hint-l`/`--hint-r`), telefonda düğmeliyse iki satır olur ve inşa çubuğu üstüne çıkar. Açık renk sabit yazan yeni bir parça
+    eklerken `style.css` sonundaki `.panel.slate` karşılığını da ekle. Deneme: scratchpad `panel_dene.cjs`.
   - `production.ts`: üretim menüsü (fabrika; uçak ve top satırları) ve yuva penceresi (bataryada top takma). Pencere açıkken yalnız `data-cell` hücreleri güncellenir; tam çizim düğmeyi kaçırıyordu. Resimler hazır dosya (`public/uretim`; araştırma dosyası ve `plan/` altındaki siluetler de): telefon bu pencereler için model kurmaz, liste metni kısa kalır. Yeni uçak ya da top eklenince, model değişince `npm run uretim:gorsel [ac-<uçak> gun-<top>]`.
   - `tutorial.ts`: öğretici. "Oyuna başla"da sorar; "Bir daha sorma" hesapta ya da misafirde tarayıcıda saklanır.
     Oyunun içinden konu listesi (2026-11-13, `openTopics`): üst çubuktaki düğmelerin en solundaki Öğretici (telefonda yalnız

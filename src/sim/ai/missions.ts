@@ -80,12 +80,12 @@ export const MISSION_DESCS: Record<MissionType, string> = {
     'Heads for the chosen enemy aircraft and its flight by the shortest route at full power. The course updates while radar or observers track it; if the track is lost, it searches where the enemy was last seen.'),
   escort: L('Dost bir kolu korur: ona yaklaşan avcılara saldırır ama uzağa kovalamaz. İrtifa ve rota korunan koldan alınır.',
     'Protects a friendly flight: attacks fighters that approach it but does not chase far. Altitude and route follow the escorted flight.'),
-  levelBomb: L('Başlangıç noktasından (IP) düz ve sabit bombardıman koşusu. Kol liderin bıraktığı anda bırakır.',
-    'A straight, steady bomb run from the initial point (IP). The flight releases when the leader does.'),
-  diveBomb: L('Sırayla dik dalış: tek hedefe yüksek isabet. Uçaksavara karşı açıktır.',
-    'Steep dives one after another: high accuracy on a single target. Exposed to flak.'),
-  attack: L('Alçaktan sızma, yükselip sığ dalışla roket, top ve bombalarla birden çok geçiş.',
-    'Low-level ingress, then pop-up and shallow dives for several passes with rockets, cannon and bombs.'),
+  levelBomb: L('Başlangıç noktasından (IP) düz ve sabit bombardıman koşusu; kol liderin bıraktığı anda bırakır. En çok bombayı taşır: büyük ve geniş hedefler (üs, fabrika, kasaba) için.',
+    'A straight, steady bomb run from the initial point (IP); the flight releases when the leader does. Carries the most bombs: for large, spread-out targets (bases, factories, towns).'),
+  diveBomb: L('Yüksekten gelip sırayla dik dalış: küçük tek hedefe (uçaksavar, radar) en iyi isabet. Yüksekten geldiği için radar görür; dalışta uçaksavara açıktır.',
+    'Comes in high and dives steeply one after another: the best accuracy on a small single target (flak, radar). Radar sees it coming in high, and it is exposed to flak in the dive.'),
+  attack: L('Alçaktan, radarın altından sızar; hedefe yakın kısa yükselip sığ dalışla roket, top ve bombayla birkaç geçiş yapar. Düşman avcılarına yakalanmadan vurmak ya da hedefi tekrar tekrar dövmek için. Taarruz uçakları, avcı-bombardıman ve pike uçakları katılır; isabet pikeden düşüktür.',
+    'Slips in low, under the radar; pops up near the target and makes several shallow-dive passes with rockets, cannon and bombs. Use it to strike before enemy fighters can react, or to hit a target again and again. Attack aircraft, fighter-bombers and dive bombers can fly it; accuracy is lower than a dive-bombing attack.'),
   ferry: L('Uçakları başka bir dost hava üssüne taşır.', 'Moves aircraft to another friendly airbase.'),
 };
 
@@ -172,6 +172,8 @@ export interface MissionPlan {
   patrolRadius: number;
   /** İstasyonda kalma süresi (s). */
   stationTime: number;
+  /** Hava devriyesinde tur sayısı (2026-11-25; süre bundan hesaplanır, panelde kalan tur; eski kayıtlarda yok). */
+  laps?: number;
   /** Taarruz geçiş sayısı. */
   passes: number;
   /** Kolun görevdeki işi (görev dağılımı). */
@@ -270,6 +272,34 @@ export function speedFor(spec: AircraftSpec, s: SpeedSetting): number {
 }
 
 /** Hedef türü gereksinimi (planlayıcı için). */
+/**
+ * Rotanın köşelerini yumuşat (2026-11-26, kullanıcı isteği: yaklaşma çizgisinin açıları uçağın rahat izleyeceği kavis olsun): her ara
+ * köşe yarıçapı `radius` olan yaya (ikinci derece Bezier ile, köşe başına `steps` nokta) çevrilir; kısa parçada yarıçap küçülür. İlk ve
+ * son nokta aynen kalır. Planlayıcının çizgisi ve simin rotası aynı işlevle.
+ */
+export function filletPath<T extends { x: number; z: number }>(pts: T[], radius = 3000, steps = 6): { x: number; z: number }[] {
+  if (pts.length < 3) return pts.map((p) => ({ x: p.x, z: p.z }));
+  const out: { x: number; z: number }[] = [{ x: pts[0].x, z: pts[0].z }];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1], p = pts[i], b = pts[i + 1];
+    const l1 = Math.hypot(a.x - p.x, a.z - p.z), l2 = Math.hypot(b.x - p.x, b.z - p.z);
+    if (l1 < 1 || l2 < 1) { out.push({ x: p.x, z: p.z }); continue; }
+    const u1x = (a.x - p.x) / l1, u1z = (a.z - p.z) / l1, u2x = (b.x - p.x) / l2, u2z = (b.z - p.z) / l2;
+    const cos = Math.max(-1, Math.min(1, u1x * u2x + u1z * u2z));
+    const th = Math.acos(cos); // iç açı: 180° düz
+    if (th > Math.PI - 0.05) { out.push({ x: p.x, z: p.z }); continue; }
+    const t = Math.min(radius / Math.tan(th / 2), 0.45 * Math.min(l1, l2));
+    const s0 = { x: p.x + u1x * t, z: p.z + u1z * t }, s1 = { x: p.x + u2x * t, z: p.z + u2z * t };
+    for (let k = 0; k <= steps; k++) {
+      const q = k / steps, m = 1 - q;
+      out.push({ x: m * m * s0.x + 2 * m * q * p.x + q * q * s1.x, z: m * m * s0.z + 2 * m * q * p.z + q * q * s1.z });
+    }
+  }
+  const e = pts[pts.length - 1];
+  out.push({ x: e.x, z: e.z });
+  return out;
+}
+
 export function targetKind(type: MissionType): 'point' | 'structure' | 'aircraft' | 'flight' | 'base' {
   switch (type) {
     case 'cap':

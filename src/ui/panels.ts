@@ -374,6 +374,7 @@ export class LeftPanel {
         <button class="primary" data-act="plan" ${canPlan ? '' : 'disabled'}>${L('Görev planla', 'Plan mission')}<span class="kbd"> (P)</span></button>
         <button data-act="research" title="${L('Araç ağacı ve modifikasyonlar (T)', 'Aircraft tree and upgrades (T)')}">${L('Araştırma ağacı', 'Research tree')}</button>
       </div>
+      ${w.airbasesOf(s.team).some((b) => b !== ab && b.s.active) ? `<button class="wide ferry-btn" data-act="ferry" ${canPlan ? '' : 'disabled'}>⇄ ${L('Başka üsse gönder', 'Send to another base')}</button>` : ''}
       <div class="kv">
         <span>${L('Pist', 'Runway')}</span><span>${runway}</span>
         <span>${L('İniş yönü', 'Landing heading')}</span><span>${String(Math.round((ab.landingHeading() * 180) / Math.PI) % 360).padStart(3, '0')}° · ${L('süzülüş', 'glide slope')} ${(Math.atan(apr.glideTan) * 180 / Math.PI).toFixed(1)}°</span>
@@ -548,6 +549,10 @@ export class LeftPanel {
       }
       case 'plan':
         if (s?.airbase) g.planner.open(s.airbase);
+        break;
+      case 'ferry':
+        // Üs transferi görev kartlarında yok: üs panelinden (2026-11-25)
+        if (s?.airbase) g.planner.open(s.airbase, undefined, 'ferry');
         break;
       case 'research':
         g.modals.open('research', 'arac');

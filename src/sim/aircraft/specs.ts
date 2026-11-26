@@ -141,6 +141,8 @@ export interface Placement {
   hp: string;
   store: string;
   n: number;
+  /** Yalnız bir yan (çift askıda; 1 = sol kanat, modelde +x; −1 = sağ). Yoksa iki yan da. */
+  side?: 1 | -1;
 }
 
 /** Dış yük düzeni (hazır ya da oyuncunun serbest seçtiği) ve özetleri. */
