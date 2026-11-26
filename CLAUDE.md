@@ -485,6 +485,14 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     - Hata raporunda "Teknik bilgileri ekle" kutusu (varsayılan işaretli): kare hızı, ekran kartı, tarayıcı, ekran, grafik ayarları,
       oyun süresi ve dünyanın kalabalığı (`diag.ts` `diagText`, `game.diag()`) yönetici e-postasına gider (`feedbackMail` `diag`).
       Gizlilik ve KVKK metninde yazar; eklenen bilgi değişirse metni de güncelle.
+  - Tanıtım arası ("reklam", 2026-11-27, `ui/ads.ts`): oyunun kendi tanıtımları, sırayla (`KINDS`): destekçi paketi, geri bildirim
+    (katkı puanı, rütbe), Kanyonlar erken erişimi, ansiklopedi (görselde rastgele bir uçak, düğme ana sayfayı açar); reklam ağı ve veri toplama yok. Ekranı kaplar, arka plan buğulu, en çok 10 sn; ücretsiz oyuncu 5 sn sonra, destekçi (1. seviye ve üstü)
+    hemen kapatır. Maça girişte (harekât başlatma ya da kayıt açma, yükleme bitince), maçtan çıkışta ve gerçek oynama süresiyle 30 dk'da bir
+    (2. seviye 45 dk; 3. seviye hiç). Sayaç kalıcı (`warsim.reklam`: toplam ve son reklamdan beri, yalnız harekâtta hız > 0 iken sayar).
+    İlk 1 saat, öğretici, senaryo ve kayıt kipi reklamsız; Google Play uygulamasında (`IN_PLAY_APP`) yalnız satın almaya yönlendirmeyenler
+    (geri bildirim, ansiklopedi). Açıkken simülasyon durur (`game.ts`
+    tick: `scale` 0), seçilen hız, planlayıcı ve açık pencereler olduğu gibi kalır; tuş, dokunuş ve geri tuşu reklamda kalır (`keyGuard`,
+    `onBack`). Destekçi tablosunda "Tanıtım arası" satırı. Deneme: scratchpad `reklam_dene.cjs`.
   - Takılma önerisi (2026-11-20, `perfWatch.ts`): harekâtta 20 sn'lik dilimde ortalama 24 kare/sn altı ya da karelerin dörtte
     birinden fazlası 70 ms üstüyse grafik ayarını bir basamak düşürmeyi önerir (`game.ts` `offerPerfHint`); kabul edilince ayarlar
     Grafik sekmesinde, önerilen seçenek işaretli açılır, oyuncu istediğini seçer. İlk 30 sn, pencere açıkken, sekme gizliyken,

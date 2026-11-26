@@ -2575,3 +2575,39 @@ button.active, button.active:hover, .seg button.active, .mm-tabs button.active, 
 
 /* Planlayıcı pencerelerindeki küçük düğmeler de telefonda en az 32 px (2026-11-26 dar ekran denemesi) */
 #planner .sw-game, #planner .hp-mir, #planner [data-act="bendreset"] { min-height: max(32px, calc(28px * var(--ui))); }
+
+/* Tanıtım penceresi (ui/ads.ts, 2026-11-27): ekranı kaplar, arka plan buğulu; yatayda görsel solda, metin sağda; dikeyde alt alta.
+   Alttaki ince çubuk kalan süreyi (10 sn) gösterir. */
+.ad-wrap {
+  position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 12px;
+  background: rgba(10, 14, 12, 0.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.ad-card {
+  width: min(100%, calc(720px * var(--ui))); max-height: calc(var(--vh100) - 24px); overflow: hidden;
+  display: grid; grid-template-columns: 46% 1fr; grid-template-rows: 1fr auto auto;
+  color: #e6ece8; background: #151b18; border-radius: var(--wing); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+.ad-art { grid-row: 1 / span 2; position: relative; min-height: calc(200px * var(--ui)); background: #2a2420 center / cover no-repeat; }
+.ad-tag {
+  position: absolute; left: calc(10px * var(--ui)); top: calc(10px * var(--ui)); padding: calc(3px * var(--ui)) calc(9px * var(--ui));
+  border-radius: var(--wing-s); background: rgba(20, 26, 23, 0.8); color: #ffd99a; font-size: calc(12px * var(--ui)); font-weight: 800;
+}
+.ad-badges { position: absolute; left: calc(10px * var(--ui)); bottom: calc(10px * var(--ui)); display: flex; gap: calc(6px * var(--ui)); filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5)); }
+.ad-text { padding: calc(16px * var(--ui)) calc(18px * var(--ui)) calc(6px * var(--ui)); overflow-y: auto; min-height: 0; }
+.ad-text h2 { margin: 0 0 calc(8px * var(--ui)); font-size: calc(19px * var(--ui)); line-height: 1.2; color: #ffffff; }
+.ad-text p { margin: 0 0 calc(8px * var(--ui)); font-size: calc(13.5px * var(--ui)); line-height: 1.45; color: #c9d4ce; }
+.ad-text .ad-lead { color: #dfe7e2; }
+.ad-text b { color: #ffffff; }
+.ad-list { margin: 0 0 calc(8px * var(--ui)); padding-left: calc(18px * var(--ui)); font-size: calc(13px * var(--ui)); line-height: 1.5; color: #c9d4ce; }
+.ad-thanks { font-weight: 700; color: #a9dcbb !important; }
+.ad-foot { display: flex; gap: calc(8px * var(--ui)); justify-content: flex-end; padding: calc(6px * var(--ui)) calc(18px * var(--ui)) calc(14px * var(--ui)); }
+.ad-foot button { min-height: max(32px, calc(36px * var(--ui))); padding: 0 calc(16px * var(--ui)); font-size: calc(14px * var(--ui)); font-weight: 700; border-radius: var(--wing-s); }
+.ad-close { background: #2a3430; color: #e6ece8; }
+.ad-close:hover { background: #34413b; }
+.ad-close:disabled, .ad-close:disabled:hover { opacity: 0.55; cursor: default; background: #2a3430; }
+.ad-bar { grid-column: 1 / -1; height: 3px; background: #26302b; }
+.ad-bar i { display: block; height: 100%; background: #7fc79a; transform-origin: left center; }
+@media (max-aspect-ratio: 1/1) {
+  .ad-card { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; }
+  .ad-art { grid-row: auto; min-height: calc(var(--vh100) * 0.28); }
+}

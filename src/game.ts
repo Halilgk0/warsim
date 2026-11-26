@@ -33,6 +33,7 @@ import type { SiteDef } from './sim/mapData';
 export interface StartLayout { key: string; sites: SiteDef[] }
 import { StatsTracker } from './net/stats';
 import { THANKS_PLAY_SEC } from './ui/thanks';
+import { AdBox } from './ui/ads';
 import { MainMenu } from './ui/mainMenu';
 import { PauseMenu } from './ui/pauseMenu';
 import { EndScreen } from './ui/endScreen';
@@ -105,6 +106,11 @@ export class Game {
   readonly profile = new ProfileBox((notice) => this.showMainMenu(notice), () => this.menu.scoresChanged(), () => this.support.open());
   /** Destekçi paketi penceresi (Google Play uygulamasında kapalı). */
   readonly support = new SupportBox(this);
+  /** Tanıtım penceresi (ui/ads.ts): açıkken simülasyon durur, alttaki hiçbir şey değişmez. */
+  readonly ads = new AdBox({
+    support: () => this.support.open(),
+    feedback: () => this.feedback.open(),
+  });
   readonly news = new NewsView();
   readonly feedback = new FeedbackBox({
     login: () => this.login.open((a, created) => {
@@ -433,7 +439,9 @@ export class Game {
     // Skor bildirimi dakikada birdi: misafir oynayıp hesap açan, kaydedip bir dakika dolmadan menüye dönen oyuncunun hiç
     // bildirimi gitmiyordu (2026-11-13). Menüye dönerken hemen bildir
     if (this.mode === 'play' && currentAccount()) this.stats.flush(this.world, this.playerTeam);
+    const campaign = this.mode === 'play' && this.scenarioId === 'kampanya';
     this.showMainMenu();
+    if (campaign) this.ads.leftMatch();
   }
 
   private enterPlay(w: World, scenarioId: string): void {
@@ -449,6 +457,7 @@ export class Game {
     this.feedback.close();
     this.autosaveClock = 0;
     this.setTimeScale(1);
+    if (scenarioId === 'kampanya') this.ads.enteredMatch();
   }
 
   /** Dünyayı render ve arayüze bağla (seçimler ve açık pencereler sıfırlanır). */
@@ -1260,6 +1269,11 @@ export class Game {
 
   /** Geri tuşu: bir şey kapandıysa ya da yok sayıldıysa true; ana menüde boştaysa false (sonraki basış çıkar). */
   private onBack(): boolean {
+    // Tanıtım penceresi en üstte: kapatılabiliyorsa kapanır, yoksa geri tuşu yok sayılır (alttaki pencereler kapanmaz)
+    if (this.ads.isOpen) {
+      this.ads.tryClose();
+      return true;
+    }
     if (this.tutorial.back()) return true;
     // Ödeme penceresi (Polar) en üstte
     if (this.support.closeEmbed()) return true;
@@ -1409,7 +1423,7 @@ export class Game {
 
   /** Oyunun önünde pencere var mı (arka plan buğulu ya da örtülü). */
   private get windowOpen(): boolean {
-    return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen;
+    return this.modals.isOpen || this.hangar.isOpen || this.pause.isOpen || this.news.isOpen || this.feedback.isOpen || this.login.isOpen || this.profile.isOpen || this.ads.isOpen;
   }
 
   private tick(now: number): void {
@@ -1417,9 +1431,17 @@ export class Game {
     const real = Math.min(raw, 0.1);
     this.last = now;
     // Oyunun bu karedeki hızı: seçilen hız, 1× seçiliyken boş yolda 2×
-    const scale = this.mode === 'play'
+    // Tanıtım penceresi açıkken simülasyon durur; seçilen hız (timeScale) ve açık pencereler olduğu gibi kalır
+    const scale = this.ads.isOpen ? 0 : this.mode === 'play'
       ? this.autoFast.update(this.world, this.playerTeam, this.timeScale, real, settings.game.autoFast)
       : this.timeScale;
+    {
+      const campaign = this.mode === 'play' && this.scenarioId === 'kampanya';
+      const shown = document.visibilityState === 'visible';
+      const canShow = shown && $('loading').classList.contains('hidden') && !this.tutorial.busy
+        && !this.end.isOpen && !this.support.paying && (this.mode !== 'play' || campaign);
+      this.ads.update(real, campaign && shown && scale > 0 && !this.pause.isOpen, canShow);
+    }
     if (this.autoFast.active && !this.autoFastTold && this.mode === 'play') {
       this.autoFastTold = true;
       this.toast(L('Boş yol: kolların yoldayken oyun 2× akar; çatışma ve görevde 1×\'e döner.', 'Open road: while your flights travel the game runs at 2×; it drops to 1× for combat and missions.'));
@@ -1446,7 +1468,7 @@ export class Game {
     // Sesler render'dan önce: dünya olaylarını render tüketip siler. Sesteki bir hata görüntüyü durdurmasın.
     const rig = this.renderer.rig;
     try {
-      const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0;
+      const playing = this.mode === 'play' && !this.pause.isOpen && this.timeScale > 0 && !this.ads.isOpen;
       const listener = rig.following && this.followId !== null ? this.world.aircraftById(this.followId) ?? null : null;
       if (draw) this.battle.frame(this.world, this.renderer.camera, rig.distance, playing, scale, listener, (ac) => this.renderer.isVisible(ac));
       if (this.mode === 'play') {

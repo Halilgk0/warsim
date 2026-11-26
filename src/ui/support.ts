@@ -110,6 +110,7 @@ export class SupportBox {
       ${row(L('Özel rozet', 'Special badge'), (t) => (tier >= t ? `<b>${badgeName(t)}</b>` : yes))}
       ${row(L('Kayıt yeri', 'Save slots'), (t) => `<b>${slotsFor(LEVEL_PRICES[t - 1])}</b>${extraSlots(t) ? ` <small>(+${extraSlots(t)})</small>` : ''}`)}
       ${row(L('Günlük geri bildirim', 'Feedback per day'), (t) => `<b>${feedbackPerDay(LEVEL_PRICES[t - 1])}</b>`)}
+      ${row(L('Tanıtım arası', 'Promo breaks'), (t) => (t >= 3 ? `<b>${L('Yok', 'None')}</b>` : t === 2 ? `<b>${L('45 dk', '45 min')}</b> <small>${L('hemen kapat', 'skip now')}</small>` : `<b>${L('30 dk', '30 min')}</b> <small>${L('hemen kapat', 'skip now')}</small>`))}
       ${row(L('Erken erişim: yapım aşamasındaki harita ve özellikler', 'Early access: maps and features in development'), (t) => (t >= EARLY_ACCESS_TIER ? yes : no))}
     </tbody></table>`;
     const now = tier
