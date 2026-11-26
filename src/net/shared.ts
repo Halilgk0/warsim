@@ -48,7 +48,7 @@ export function emailKey(e: string): string {
 }
 
 /** Gizlilik Politikası ve KVKK metninin sürümü (yürürlük günü): metin değişince bu da değişir, hesapta saklanır. */
-export const LEGAL_VERSION = '2026-11-25';
+export const LEGAL_VERSION = '2026-11-27';
 
 /**
  * Kayıt yerleri (2026-11-10; 2026-11-21'de 4 → 3, 2026-11-25'te 3 → 2): hesap başına SAVE_SLOTS_BASE yer, destekçi paketiyle bir ya da iki fazla

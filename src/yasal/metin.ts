@@ -64,7 +64,7 @@ const privacyTr: LegalText = {
 <p>Toplu gönderim için başka bir e-posta hizmeti kullanırsak adresin o hizmete de aktarılır ve hizmet bu listeye eklenir. Veritabanımız şu an Cloudflare’in Doğu Avrupa bölgesinde çalışıyor; bu konum kesin bir taahhüt değildir. Site Cloudflare’in dünya genelindeki ağı üzerinden sunulur. Yani verilerin Türkiye dışında işlenir. Yasal bir zorunluluk olduğunda veriler yetkili kurumlarla da paylaşılabilir.</p>
 
 <h2>Tarayıcında saklananlar</h2>
-<p>Oturumun, ayarların, dil seçimin ve kayıtlarının bir kopyası tarayıcında (localStorage ve IndexedDB) durur. Bunlar oyunun çalışması için gereklidir ve tarayıcı verilerini temizlediğinde silinir. Destekçi rozetin ve kayıt yeri sayın da hesabının bu kopyasında durur.</p>
+<p>Oturumun, ayarların, dil seçimin ve kayıtlarının bir kopyası tarayıcında (localStorage ve IndexedDB) durur. Bunlar oyunun çalışması için gereklidir ve tarayıcı verilerini temizlediğinde silinir. Destekçi rozetin ve kayıt yeri sayın da hesabının bu kopyasında durur. Tanıtım aralarının ne zaman gösterileceğini belirleyen sayaç (oynama süresi ve son tanıtım arasından beri geçen süre) da yalnız tarayıcında tutulur, bize gönderilmez. Tanıtım araları için reklam ağı kullanılmaz ve hiçbir veri paylaşılmaz.</p>
 
 <h2>Ne kadar saklıyoruz</h2>
 <p>Hesap ve oyun verilerin, hesabın açık kaldığı sürece saklanır. Her hesapta 2 oyun kaydı yeri vardır; destekçi paketiyle 3 ya da 4 olur. 25 Kasım 2026’dan önce açılmış hesaplarda üçüncü kayıt silinmez: yüklenebilir ama üstüne yazılamaz, silinince bu yer kalkar. Yeni kayıt, seçilen yerdeki eski kaydın yerini alır. Kayıt sayın tutabileceğin sayıyı aşarsa (yer sayısı azaldığında ya da bir ödeme iade edildiğinde) oyunda uyarı gösterilir; kural değişikliğinin yayınlandığı ya da iadenin yapıldığı günden 7 gün sonra hâlâ fazlaysa en eski kayıtların silinir; bunun için oyuna girmen beklenmez. Destekçi paketi sipariş kayıtların hesabınla birlikte saklanır ve hesabınla birlikte silinir; Polar’ın tuttuğu satış kayıtları Polar’ın kurallarına tabidir. Hesabını Profil’den kendin silebilirsin (şifren sorulur). Şifreni kaybettiysen bize yaz; başvurunu en geç 30 gün içinde sonuçlandırırız. Yasal olarak saklanması gereken veriler bunun dışındadır. Hesabın, kayıtların, skorların ve oturumların veritabanından birlikte silinir. Silinen veriler veritabanı yedeklerinde en çok 30 gün daha kalabilir; bu sürenin sonunda kendiliğinden yok olur. Oturumlar 90 gün sonra kapanır ve silinir. Sunucunun teknik kayıtları en çok 7 gün tutulur; Cloudflare’in kendi ağ kayıtları kendi kurallarına tabidir. İncelenmesini istediğin geri bildirimler ve katkı puanın hesabınla birlikte saklanır ve hesabınla birlikte silinir. Geri bildirimlerin e-posta kopyaları kutumuzda durur, hesabını silmek onları silmez: silinmesini istiyorsan bize hesabının adını belirt.</p>
@@ -128,7 +128,7 @@ const privacyEn: LegalText = {
 <p>If we use another email service for bulk sending, your address is also transferred to that service and it is added to this list. Our database currently runs in Cloudflare’s Eastern Europe region; this location is not a firm commitment. The site is served through Cloudflare’s global network. Your data is therefore processed outside Türkiye. Data may also be shared with competent authorities where the law requires it.</p>
 
 <h2>What is kept in your browser</h2>
-<p>Your session, settings, language and a copy of your saves are kept in your browser (localStorage and IndexedDB). The game needs them to work, and they are deleted when you clear your browser data. Your supporter badge and save slot count are also kept in this copy of your account.</p>
+<p>Your session, settings, language and a copy of your saves are kept in your browser (localStorage and IndexedDB). The game needs them to work, and they are deleted when you clear your browser data. Your supporter badge and save slot count are also kept in this copy of your account. The counter that decides when promo breaks are shown (play time and time since the last promo break) is also kept only in your browser and never sent to us. No ad network is used for promo breaks and no data is shared.</p>
 
 <h2>How long we keep it</h2>
 <p>Account and game data are kept for as long as your account exists. Each account has 2 game save slots, or 3 or 4 with the supporter pack; a new save replaces the old one in the slot you choose. Accounts created before 25 November 2026 keep a third save: it can be loaded but not overwritten, and the slot goes away once it is deleted. If you have more saves than you can keep (when the number of slots goes down or a payment is refunded), the game shows a notice; if you still have too many 7 days after the rule change was published or the refund was made, your oldest saves are deleted, whether or not you have logged in. Your supporter pack order records are kept with your account and deleted with it; the sales records kept by Polar follow Polar’s own rules. You can delete your account yourself in your Profile (your password is required). If you have lost your password, write to us and we conclude your request within 30 days at the latest. Data the law requires us to keep is excepted. Your account, saves, scores and sessions are deleted from the database together. Deleted data may remain in database backups for up to 30 more days, after which it disappears automatically. Sessions end and are deleted after 90 days. The server’s technical logs are kept for up to 7 days; Cloudflare’s own network logs follow its own rules. Feedback you asked to have reviewed and your contribution points are kept with your account and deleted with it. Email copies of your feedback stay in our mailbox and deleting your account does not delete them: to have them deleted, tell us your account name.</p>
@@ -369,11 +369,12 @@ const supportTr: LegalText = {
 <h2>Ne alıyorsun</h2>
 <p>WarSimBox hesabına bağlı dijital içerik, üç seviye:</p>
 <ul>
-<li><b>1. seviye:</b> profil rozeti ve günde 1 fazladan geri bildirim hakkı.</li>
-<li><b>2. seviye:</b> 2. seviye rozeti, 1 fazladan kayıt yeri ve günde 2 fazladan geri bildirim hakkı.</li>
-<li><b>3. seviye:</b> 3. seviye rozeti, 2 fazladan kayıt yeri, günde 3 fazladan geri bildirim hakkı ve erken erişim.</li>
+<li><b>1. seviye:</b> profil rozeti, günde 1 fazladan geri bildirim hakkı ve tanıtım aralarını beklemeden kapatma.</li>
+<li><b>2. seviye:</b> 2. seviye rozeti, 1 fazladan kayıt yeri, günde 2 fazladan geri bildirim hakkı; tanıtım araları 30 yerine 45 dakikada bir ve beklemeden kapatılır.</li>
+<li><b>3. seviye:</b> 3. seviye rozeti, 2 fazladan kayıt yeri, günde 3 fazladan geri bildirim hakkı, erken erişim ve tanıtım arası yok.</li>
 </ul>
 <p>Erken erişim, yapım aşamasındaki harita ve özellikleri herkese açılmadan önce oynayabilmendir. Bu içerik tamamlanmamıştır: değişebilir, hata içerebilir, kayıtları sonraki sürümlerde açılmayabilir; tamamlanınca herkese açılabilir. Erken erişim belirli bir içeriğin ne zaman ya da hangi biçimde geleceğine dair bir taahhüt değildir.</p>
+<p>Tanıtım araları, oyunun kendi içeriğini (destekçi paketi, yeni haritalar, ansiklopedi, geri bildirim) tanıtan kısa pencerelerdir; dışarıdan reklam gösterilmez. Sıklıkları ve biçimleri değişebilir; seviyelerin tanıtım arasıyla ilgili ayrıcalığı, tanıtım aralarının kendisi kaldırılırsa geçerliliğini yitirir.</p>
 <p>Rozet, kayıt yeri ve diğer ayrıcalıklar yalnız bu hesapta geçerlidir, başka hesaba aktarılamaz, paraya çevrilemez.</p>
 
 <h2>Fiyat</h2>
@@ -411,11 +412,12 @@ const supportEn: LegalText = {
 <h2>What you get</h2>
 <p>Digital content tied to your WarSimBox account, in three levels:</p>
 <ul>
-<li><b>Level 1:</b> a profile badge and 1 extra feedback message per day.</li>
-<li><b>Level 2:</b> the level 2 badge, 1 extra save slot and 2 extra feedback messages per day.</li>
-<li><b>Level 3:</b> the level 3 badge, 2 extra save slots, 3 extra feedback messages per day and early access.</li>
+<li><b>Level 1:</b> a profile badge, 1 extra feedback message per day and skipping promo breaks right away.</li>
+<li><b>Level 2:</b> the level 2 badge, 1 extra save slot, 2 extra feedback messages per day; promo breaks every 45 minutes instead of 30, skippable right away.</li>
+<li><b>Level 3:</b> the level 3 badge, 2 extra save slots, 3 extra feedback messages per day, early access and no promo breaks.</li>
 </ul>
 <p>Early access means you can play maps and features in development before they open to everyone. This content is unfinished: it may change, contain bugs, and its saves may not open in later versions; when finished it may open to everyone. Early access is no commitment about when or in what form any particular content arrives.</p>
+<p>Promo breaks are short windows that present the game’s own content (the supporter pack, new maps, the encyclopedia, feedback); no third-party ads are shown. Their frequency and form may change; if promo breaks are removed altogether, the related perk of each level no longer applies.</p>
 <p>The badge, save slots and other perks are valid only on this account; they cannot be transferred to another account or exchanged for money.</p>
 
 <h2>Price</h2>
