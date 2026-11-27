@@ -34,6 +34,25 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'bilinen-hata-ucak',
+    date: '2026-11-27',
+    title: 'Bilinen bir hata: kaybolan uçaklar',
+    summary: 'Bazı oyuncular, kayıt yüklerken ya da bir menüyü kapatırken hangarlarındaki bir türün uçaklarının kaybolduğunu bildirdi. Biz de sorunun farkındayız.',
+    cover: img('us-hangar.jpg'),
+    images: [],
+    noMail: true,
+    sections: [
+      {
+        heading: 'Ne yapıyoruz',
+        bullets: [
+          'Düzeltmesi biraz zaman alacak; bir süre bu hatayla idare etmek zorundayız, kusura bakma.',
+          'O zamana kadar sık kaydetmeni öneririz.',
+          'Bildiren oyunculara teşekkürler!',
+        ],
+      },
+    ],
+  },
+  {
     id: 'ucak-satisi',
     date: '2026-11-27',
     title: 'Uçaklarını satabilirsin',

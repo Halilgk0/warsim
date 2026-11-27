@@ -33,6 +33,9 @@ import type { SiteDef } from './sim/mapData';
 export interface StartLayout { key: string; sites: SiteDef[] }
 import { StatsTracker } from './net/stats';
 import { THANKS_PLAY_SEC } from './ui/thanks';
+
+/** Bilinen hata bildirisinin hesaptaki izi (bir kez gösterilir). */
+const BUG_NOTICE = 'bildiri-kaybolan-ucak';
 import { AdBox } from './ui/ads';
 import { MainMenu } from './ui/mainMenu';
 import { PauseMenu } from './ui/pauseMenu';
@@ -466,6 +469,22 @@ export class Game {
   private earlyNoticeDue = false;
 
   /** Erken erişim haritasına girişte: teşekkür, yapım aşaması uyarısı, geri bildirim çağrısı. */
+  /** Bilinen hata bildirisi: hangardan kaybolan uçaklar (haberi `bilinen-hata-ucak`). */
+  private showBugNotice(): void {
+    markThanksShown(BUG_NOTICE);
+    this.modals.openNotice(
+      L('Bilinen bir hata: kaybolan uçaklar', 'Known issue: vanishing aircraft'),
+      `<p>${L(
+        'Bazı oyuncular, kayıt yüklerken ya da bir menüyü kapatırken hangarlarındaki bir türün uçaklarının kaybolduğunu bildirdi. Biz de sorunun farkındayız.',
+        'Some players reported that aircraft of one type disappear from their hangars after loading a save or closing a menu. We know about it too.',
+      )}</p><p>${L(
+        'Düzeltmesi biraz zaman alacak; bir süre bu hatayla idare etmek zorundayız, kusura bakma. O zamana kadar sık kaydetmeni öneririz.',
+        'The fix will take a little while, so we will have to live with it for some time. Sorry about that! Until then, saving often helps.',
+      )}</p><p>${L('Bildiren oyunculara teşekkürler!', 'Thanks to everyone who reported it!')}</p>`,
+      [{ label: L('Tamam', 'OK'), primary: true, run: () => {} }],
+    );
+  }
+
   private showEarlyNotice(): void {
     this.modals.openNotice(
       L('Kanyonlar: erken erişim', 'Canyons: early access'),
@@ -1509,6 +1528,9 @@ export class Game {
       this.tutorial.update();
       // Fazla kayıt uyarısı: e-posta penceresi ya da öğretici açıksa onlar kapanınca
       if (this.cleanupDue && !this.login.isOpen && !this.modals.isOpen && !this.tutorial.busy) this.showCleanup();
+      // Bilinen hata bildirisi (2026-11-27): hesabı olana ana menüde bir kez (hesabın haber izi)
+      if (currentAccount() && !thanksShown(BUG_NOTICE) && !this.cleanupDue && !this.login.isOpen && !this.modals.isOpen && !this.tutorial.busy
+        && !this.ads.isOpen && $('loading').classList.contains('hidden')) this.showBugNotice();
       return;
     }
     const visible = document.visibilityState === 'visible';

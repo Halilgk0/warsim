@@ -15,6 +15,23 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'bilinen-hata-ucak': {
+    title: 'Known issue: vanishing aircraft',
+    summary: 'Some players reported that aircraft of one type disappear from their hangars after loading a save or closing a menu. We know about it too.',
+    cover: 'us-hangar.jpg',
+    files: [],
+    captions: [],
+    sections: [
+      {
+        heading: 'What we are doing',
+        bullets: [
+          'The fix will take a little while, so we will have to live with it for some time. Sorry about that!',
+          'Until then, saving often helps.',
+          'Thanks to everyone who reported it!',
+        ],
+      },
+    ],
+  },
   'ucak-satisi': {
     title: 'You can sell your aircraft',
     summary: 'Aircraft you no longer need can now be sold or scrapped from the Production menu. A third of the build cost goes back to your treasury for each one.',
