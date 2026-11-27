@@ -34,6 +34,26 @@ export const img = (file: string): string => `${BASE}news/${file}`;
 /** En yeni en üstte. */
 export const NEWS_TR: NewsItem[] = [
   {
+    id: 'ucak-satisi',
+    date: '2026-11-27',
+    title: 'Uçaklarını satabilirsin',
+    summary: 'Artık ihtiyacın olmayan uçakları Üretim menüsünden satabilir ya da parçalatabilirsin. Her uçak için üretim maliyetinin üçte biri hazineye döner.',
+    cover: img('satis-kapak.webp'),
+    images: [],
+    sections: [
+      {
+        heading: 'Nasıl satılır',
+        bullets: [
+          'Üretim menüsünde, hangarında hazır uçağı olan her türün Üret satırının altında Sat satırı var.',
+          'Kaç uçak satacağını − ve + ile seç ya da kutuya yaz, Sat\'a bas, sonra Onayla\'ya bas.',
+          'Her uçak için üretim maliyetinin üçte biri döner; hasarlı ya da yıpranmış olması fark etmez.',
+          'Yalnız hangarda hazır duran uçaklar satılır. Havadaki, kalkıştaki ve banttaki uçaklara dokunulmaz.',
+          'Uçağın bakım personeli hemen boşa çıkar ve başka uçağa geçebilir.',
+        ],
+      },
+    ],
+  },
+  {
     id: 'gorev-planlayici',
     date: '2026-11-26',
     title: 'Görev planlayıcı yenilendi',

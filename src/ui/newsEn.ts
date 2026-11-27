@@ -15,6 +15,25 @@ export interface NewsText {
 }
 
 export const NEWS_EN: Record<string, NewsText> = {
+  'ucak-satisi': {
+    title: 'You can sell your aircraft',
+    summary: 'Aircraft you no longer need can now be sold or scrapped from the Production menu. A third of the build cost goes back to your treasury for each one.',
+    cover: 'satis-kapak-en.webp',
+    files: [],
+    captions: [],
+    sections: [
+      {
+        heading: 'How to sell',
+        bullets: [
+          'In the Production menu, every type with ready aircraft in your hangars has a Sell row below its Build row.',
+          'Pick how many to sell with − and + or type the number, tap Sell, then tap Confirm.',
+          'A third of the build cost comes back for each aircraft; damage and wear make no difference.',
+          'Only aircraft standing ready in a hangar are sold. Aircraft in the air, taking off or on the production line are left alone.',
+          'The aircraft\'s ground crew is freed at once and can look after another aircraft.',
+        ],
+      },
+    ],
+  },
   'gorev-planlayici': {
     title: 'The mission planner is redone',
     summary: 'The mission plan has been rebuilt: targets are picked on a map, aircraft and escorts are added from a window with pictures, and every aircraft gets just enough fuel for the mission. Approach direction, custom loading with separate left and right pylons, repeating missions and a mission history are new too. Bots now launch large raids.',

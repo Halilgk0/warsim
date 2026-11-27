@@ -10,7 +10,7 @@ import { TECH_BY_ID } from '../sim/tech';
 import type { AAWeaponId } from '../sim/structures/airDefense';
 import { townBody, townTitle } from './town';
 import { marketBody, marketTitle, sellCandidate } from './market';
-import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf } from './production';
+import { type FactoryTab, changeQty, factoryBody, patchCells, pitBody, qtyOf, readyCount, sellArm, sellQty } from './production';
 import { $, esc } from './dom';
 import { L } from '../i18n';
 import { thanksBody, thanksTitle } from './thanks';
@@ -76,6 +76,14 @@ export class Modals {
       if (el.dataset.set !== 'sound') return;
       sound.setLevel(el.dataset.k as SoundLevel, Number(el.value));
       if (out) out.textContent = String(Math.round(Number(el.value) * 100));
+    });
+    // Satış adedi yazılırken: her tuşta kaydedilir (pencere yenilense de yazılan kalır), kırpma gösterirken
+    this.el.addEventListener('input', (e) => {
+      const el = e.target as HTMLInputElement;
+      if (el.dataset.act !== 'sell-n') return;
+      const v = Math.floor(Number(el.value));
+      if (v >= 1) sellQty.set(el.dataset.id!, v);
+      sellArm.spec = '';
     });
     this.el.addEventListener('scroll', () => (this.lastScroll = performance.now()), true);
   }
@@ -410,6 +418,34 @@ export class Modals {
             g.world.cancelOrder(s, i);
             break;
           }
+        }
+        this.next = 0;
+        this.update();
+        return;
+      }
+      case 'sell-qty': {
+        const id = b.dataset.id!;
+        const max = readyCount(g, g.playerTeam, id);
+        sellQty.set(id, Math.max(1, Math.min(max, (sellQty.get(id) ?? 1) + Number(b.dataset.d))));
+        sellArm.spec = '';
+        this.next = 0;
+        this.update();
+        return;
+      }
+      case 'fab-sell': {
+        // Üretim menüsünden satış: iki dokunuş (ilki "Onayla"ya çevirir); seçilen adet kadar hazır uçak gider, her biri için
+        // maliyetin üçte biri döner
+        const id = b.dataset.id!;
+        if (sellArm.spec === id && performance.now() - sellArm.at < 4000) {
+          sellArm.spec = '';
+          const want = Math.max(1, Math.min(readyCount(g, g.playerTeam, id), sellQty.get(id) ?? 1));
+          let sold = 0;
+          while (sold < want && g.world.disposeAircraft(g.playerTeam, id)) sold++;
+          sellQty.set(id, 1);
+          if (sold) g.toast(L(`${sold} uçak satıldı.`, `${sold} aircraft sold.`));
+        } else {
+          sellArm.spec = id;
+          sellArm.at = performance.now();
         }
         this.next = 0;
         this.update();

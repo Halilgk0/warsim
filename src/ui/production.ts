@@ -8,7 +8,7 @@ import type { Structure } from '../sim/structures/structure';
 import { SPEC_LIST, type AircraftSpec } from '../sim/aircraft/specs';
 import { AA_WEAPONS, AA_WEAPON_ORDER, type AAWeaponDef, type AAWeaponId, gunBuildTime, practicalPerMin } from '../sim/structures/airDefense';
 import { aircraftNode } from '../sim/tech';
-import { MAINT_CREW, aircraftPrice, fmtMoney } from '../sim/economy';
+import { MAINT_CREW, aircraftPrice, disposeRefund, fmtMoney } from '../sim/economy';
 import { QUEUE_MAX } from '../sim/structures/factory';
 import { settings } from './settings';
 import { bar, esc, fmtDur, nf } from './dom';
@@ -85,6 +85,30 @@ function progressCell(progress: number, left: number, waiting: boolean): string 
   return `${bar(progress * 100, 'var(--accent)', true)}<small>${L(`${fmtDur(left)} kaldı`, `${fmtDur(left)} left`)}</small>`;
 }
 
+/** Satış onayı bekleyen tür (ilk dokunuş "Onayla"ya çevirir, 4 sn içinde ikincisi satar). */
+export const sellArm = { spec: '', at: 0 };
+
+/** Satış adedi (satır başına; yazılır ya da −/+ ile değişir; gösterirken hazır uçak sayısına kırpılır). */
+export const sellQty = new Map<string, number>();
+
+/** Hangarda hazır duran uçak sayısı (satılabilecek). */
+export function readyCount(game: Game, team: number, specId: string): number {
+  return game.world.airbasesOf(team).reduce((a, b) => a + b.inventory.filter((x) => x.specId === specId && x.status === 'ready').length, 0);
+}
+
+/**
+ * Satış satırı (2026-11-27): −, adet kutusu (yazılabilir), +, "Sat · +kr" düğmesi; iki dokunuşla onay. Yalnız hangarda hazır
+ * uçak varsa. Geri dönen para üretim maliyetinin üçte biri (hasar ve yıpranma fark etmez).
+ */
+function sellControls(game: Game, team: number, sp: AircraftSpec): string {
+  const ready = readyCount(game, team, sp.id);
+  if (!ready) return '';
+  const n = Math.max(1, Math.min(ready, sellQty.get(sp.id) ?? 1));
+  const armed = sellArm.spec === sp.id && performance.now() - sellArm.at < 4000;
+  return `<div class="prd-qty"><button class="mini" data-act="sell-qty" data-id="${sp.id}" data-d="-1" title="${L('Azalt', 'Fewer')}">−</button><input class="prd-num" type="number" inputmode="numeric" min="1" max="${ready}" value="${n}" data-act="sell-n" data-id="${sp.id}" aria-label="${L('Satılacak adet', 'Number to sell')}"><button class="mini" data-act="sell-qty" data-id="${sp.id}" data-d="1" title="${L('Artır', 'More')}">+</button></div>
+    <button class="mini prd-sellb${armed ? ' armed' : ''}" data-act="fab-sell" data-id="${sp.id}" title="${L('Hangarda hazır uçakları satar ya da parçalar: her biri için üretim maliyetinin üçte biri döner', 'Sells or scraps ready aircraft from your hangars: a third of the build cost comes back for each')}">${armed ? L('Onayla', 'Confirm') : L('Sat', 'Sell')} · +${fmtMoney(disposeRefund(sp) * n)}</button>`;
+}
+
 function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
   const w = game.world;
   const team = w.teams[s.team];
@@ -115,7 +139,8 @@ function aircraftRow(game: Game, s: Structure, sp: AircraftSpec): string {
     ${cell(`${key}-svc`, 'prd-n', counter(L('Serviste', 'In service'), service))}
     ${cell(`${key}-q`, 'prd-n', lineCell(queued, 'fab-del', sp.id))}
     ${cell(`${key}-bar`, 'prd-prog', progressCell(first?.progress ?? 0, first ? ((1 - first.progress) * sp.buildTime) / factor : 0, !first && queued > 0))}
-    ${cell(`${key}-act`, 'prd-act', buildControls(sp.id, 'fab-add', price, team.money, w.economyEnabled, QUEUE_MAX - f.queue.length, w.crewFree(s.team)))}
+    <div class="prd-acts">${cell(`${key}-act`, 'prd-act', buildControls(sp.id, 'fab-add', price, team.money, w.economyEnabled, QUEUE_MAX - f.queue.length, w.crewFree(s.team)))}
+    ${cell(`${key}-sell`, 'prd-act prd-sellrow', sellControls(game, s.team, sp))}</div>
   </div>`;
 }
 

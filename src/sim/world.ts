@@ -26,7 +26,7 @@ import { TeamIntel } from './intel';
 import { Commander, alertScramble } from './commander';
 import type { MaintGift } from './campaign';
 import {
-  BASE_UPGRADE_COST, HOUSE_INCOME, KILL_REWARD, MAINT_CREW, MARKET_ON, MINE_RATE, PARK_BONUS, PARK_RANGE, ROAD_COST, SELLERS, SELL_RATE, STRUCTURE_COST, STRUCTURE_REWARD, aircraftPrice, fmtMoney,
+  BASE_UPGRADE_COST, HOUSE_INCOME, KILL_REWARD, MAINT_CREW, MARKET_ON, MINE_RATE, PARK_BONUS, PARK_RANGE, ROAD_COST, SELLERS, SELL_RATE, STRUCTURE_COST, STRUCTURE_REWARD, aircraftPrice, disposeRefund, fmtMoney,
   oreRichness, researchCost, type LedgerEntry, type MarketOffer, type MoneyCat,
 } from './economy';
 import { footprintStats, groundLevel, lineOfSight, resetTerrainEdits, terrainHeight } from './terrain';
@@ -687,6 +687,29 @@ export class World {
     base.removeAirframe(af);
     this.earn(base.s.team, Math.round(aircraftPrice(spec) * SELL_RATE * (1 - af.wear * 0.3)), `${L('Satış', 'Sale')}: ${spec.abbr}`, 'refund');
     this.log(L(`${base.s.name}: ${spec.name} pazarda satıldı`, `${base.s.name}: ${spec.name} sold on the market`), base.s.team, 'build');
+    return true;
+  }
+
+  /**
+   * Üretim menüsünden satış ya da parçalama (2026-11-27): türün hangarda hazır duran bir uçağı (o türden en çok hazır uçağı olan
+   * üsten, en yıpranmışı) elden çıkar, üretim maliyetinin üçte biri döner. Havadaki, kalkıştaki ve bandaki uçaklara dokunulmaz;
+   * bakım personeli kendiliğinden boşa çıkar. Hasar ve yıpranma fiyatı değiştirmez.
+   */
+  disposeAircraft(team: number, specId: string): boolean {
+    let base: Airbase | null = null;
+    let most = 0;
+    for (const b of this.airbasesOf(team)) {
+      const n = b.inventory.filter((x) => x.specId === specId && x.status === 'ready').length;
+      if (n > most) [base, most] = [b, n];
+    }
+    if (!base) return false;
+    let af: Airframe | null = null;
+    for (const x of base.inventory) if (x.specId === specId && x.status === 'ready' && (!af || x.wear > af.wear)) af = x;
+    if (!af) return false;
+    const spec = SPECS[specId];
+    base.removeAirframe(af);
+    this.earn(team, disposeRefund(spec), `${L('Satış', 'Sale')}: ${spec.abbr}`, 'refund');
+    this.log(L(`${base.s.name}: ${spec.name} satıldı`, `${base.s.name}: ${spec.name} sold`), team, 'build');
     return true;
   }
 

@@ -154,6 +154,11 @@ export const STRUCTURE_REWARD = 0.15;
 /** Pazarda satış oranı (fiyatın). */
 export const SELL_RATE = 0.45;
 
+/** Üretim menüsünden satış ya da parçalama: üretim maliyetinin üçte biri (hasar ve yıpranma fark etmez). */
+export function disposeRefund(s: AircraftSpec): number {
+  return Math.round(aircraftPrice(s) / 3);
+}
+
 // ---------------------------------------------------------------- maden
 
 /**

@@ -2611,3 +2611,17 @@ button.active, button.active:hover, .seg button.active, .mm-tabs button.active, 
   .ad-card { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; }
   .ad-art { grid-row: auto; min-height: calc(var(--vh100) * 0.28); }
 }
+
+/* Üretim menüsünde satış (2026-11-27): üret satırının altında −, adet kutusu, +, "Sat" (koyu; onay beklerken turuncu). Dokunma
+   hedefleri en az 32 px. */
+.prd-acts { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: calc(5px * var(--ui)); }
+.prd-sellrow:empty { display: none; }
+.prd-num {
+  width: max(40px, calc(44px * var(--ui))); height: max(32px, calc(30px * var(--ui))); padding: 0; text-align: center;
+  font: 800 calc(14px * var(--ui)) / 1 inherit; font-variant-numeric: tabular-nums; color: #f1f5f2;
+  background: #1c2522; border: 1px solid #55615b; border-radius: calc(4px * var(--ui)); -moz-appearance: textfield;
+}
+.prd-num::-webkit-outer-spin-button, .prd-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.prd-sellb { min-height: max(32px, calc(30px * var(--ui))); background: #3a3330; color: #f3e6dc; border: 1px solid #6d5a4e; }
+.prd-sellb:hover { background: #4a3f39; }
+.prd-sellb.armed { background: #8a5a2c; border-color: #d18a45; color: #fff; }
