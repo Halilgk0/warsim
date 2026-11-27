@@ -349,7 +349,7 @@ export function missionOdds(
         const d = -Math.min(15, Math.round((km - 60) / 8));
         if (d < 0) {
           pct += d;
-          factors.push({ label: `Uzak hedef (${Math.round(km)} km)`, delta: d });
+          factors.push({ label: L(`Uzak hedef (${Math.round(km)} km)`, `Distant target (${Math.round(km)} km)`), delta: d });
         }
       }
     }
