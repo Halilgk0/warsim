@@ -8,7 +8,7 @@ import { TERRAIN_CELL, TERRAIN_N, groundLevel, terrainHeight, terrainMap } from 
 import { mapById } from '../sim/maps';
 import { monumentShare } from '../sim/mapKanyon';
 import { pillarList } from '../sim/pillars';
-import { buildPillarGroup, pillarMaterial } from './pillars';
+import { PillarView } from './pillars';
 import { chunkCells } from './terrain';
 import { clamp, mulberry32, smoothstep } from '../core/math';
 import { cleared, clearingsVersion, fieldGrid, forestGrid, sampleGrid, sampleSmooth, slopeGrid, urbanGrid } from './landcover';
@@ -220,9 +220,12 @@ export class Scenery {
   /** Çöl haritası (Kanyonlar): ardıç ve kavak (harita değişince güncellenir). */
   private desert = false;
   /** Taş sütunların ağları (yalnız sütunlu haritada). */
-  private pillars: THREE.Group | null = null;
-  private readonly pillarMat = pillarMaterial();
+  private pillars: PillarView | null = null;
+  /** Kaya sütunlarının kalitesi (0 Düşük, 1 Orta, 2 Yüksek). */
+  private pillarLevel = 0;
   readonly group = new THREE.Group();
+  /** Kaya sütunları (arazinin parçası: süs kapalıyken de çizilir, uçak çarpar). */
+  private readonly pillarRoot = new THREE.Group();
   /** Kayalar: yüz yüz ton (köşe rengi) ve taş dokusu. */
   private readonly vegMat = ((): THREE.MeshLambertMaterial => {
     const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -310,7 +313,7 @@ export class Scenery {
       freeze(m);
       return m;
     });
-    scene.add(this.group);
+    scene.add(this.group, this.pillarRoot);
     this.rebuild();
   }
 
@@ -400,8 +403,10 @@ export class Scenery {
   }
 
   /** Grafik kalitesi: ağaç ve yerleşim uzaklıkları (yakın ağaç halkası yeniden toplanır). */
-  setQuality(near: number, thin: number, fade: [number, number], settle: number): void {
+  setQuality(near: number, thin: number, fade: [number, number], settle: number, pillars = 0): void {
     this.q = { near, thin, fade, settle };
+    this.pillarLevel = pillars;
+    this.pillars?.setQuality(pillars);
     this.treeU.treeParams.value.set(near, thin);
     this.treeU.treeFade.value.set(fade[0], fade[1]);
     this.nearDirty = true;
@@ -414,11 +419,15 @@ export class Scenery {
     this.desert = mapById(terrainMap.id).biome === 'desert';
     // Taş sütunlar (Kanyonlar): harita başına bir kez, kaya malzemesiyle
     if (this.pillars) {
-      this.group.remove(this.pillars);
-      this.pillars.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+      this.pillarRoot.remove(this.pillars.group);
+      this.pillars.dispose();
       this.pillars = null;
     }
-    if (pillarList().length) this.group.add((this.pillars = buildPillarGroup(pillarList(), this.pillarMat)));
+    if (pillarList().length) {
+      this.pillars = new PillarView(pillarList());
+      this.pillars.setQuality(this.pillarLevel);
+      this.pillarRoot.add(this.pillars.group);
+    }
     // Harita büyüklüğü değişmiş olabilir: parça boyu ve sayısı yeniden (arazi parçalarıyla aynı)
     const cells = chunkCells();
     CHUNK = SETTLE_BLOCK = cells * TERRAIN_CELL;
@@ -466,6 +475,7 @@ export class Scenery {
   /** Kameraya göre ağaç/kaya parçalarını üret, göster, gizle; yakın ağaç halkasını kameranın konumuna göre topla. */
   update(camDist: number, enabled: boolean, cam: THREE.Vector3): void {
     this.group.visible = enabled;
+    this.pillars?.update(cam);
     if (!enabled) return;
     this.refreshSettlements();
     // Uzakta ağaçlar piksel altına düşer ve kaydırırken kıvılcım gibi titrer: yalnız yakın/orta görünümde

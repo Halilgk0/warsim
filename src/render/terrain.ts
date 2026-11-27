@@ -83,6 +83,7 @@ function isDesert(): boolean {
     desertFor = terrainMap.version;
     desert = mapById(terrainMap.id).biome === 'desert';
     waterU.terrDesert.value = desert ? 1 : 0;
+    syncRock();
   }
   return desert;
 }
@@ -274,7 +275,46 @@ export const waterU = {
   terrGrass: groundU.terrGrass,
   /** Çöl haritası (Kanyonlar): kaya ve toprak piksel başına (desertRock.ts), yumuşak gölgelendirme. */
   terrDesert: { value: 0 },
+  /**
+   * Yamaç dokuları (2026-11-27, Blender: tools/blender/yamac.py): dik yerde katmanlı kaya duvarı (yandan, 64 m karo), kaide ve
+   * molozda köşeli taşlar (üstten, 24 m karo); RG normal, B ton × ortam gölgesi. Yalnız çöl haritasında, Orta ve Yüksek kalitede.
+   */
+  terrRockOn: { value: 0 },
+  terrRockTex: { value: null as THREE.Texture | null },
+  terrScreeTex: { value: null as THREE.Texture | null },
 };
+
+/** Yamaç dokuları istenir mi (kalite) ve yüklendi mi. */
+let rockWanted = false;
+let rockLoading = false;
+let rockReady = false;
+
+/** Kalite: Orta ve Yüksek'te yamaç dokuları (çöl haritası açılınca bir kez iner). */
+export function setRockDetail(on: boolean): void {
+  rockWanted = on;
+  syncRock();
+}
+
+function syncRock(): void {
+  const want = rockWanted && desert;
+  if (want && !rockReady && !rockLoading) {
+    rockLoading = true;
+    const loader = new THREE.TextureLoader();
+    const load = (f: string) => loader.loadAsync(`${import.meta.env.BASE_URL}kaya/${f}`).then((t) => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.NoColorSpace;
+      t.anisotropy = 4;
+      return t;
+    });
+    Promise.all([load('yamac_duvar.webp'), load('yamac_moloz.webp')]).then(([a, b]) => {
+      waterU.terrRockTex.value = a;
+      waterU.terrScreeTex.value = b;
+      rockReady = true;
+      syncRock();
+    }).catch(() => { /* internetsiz: dokusuz */ }).finally(() => (rockLoading = false));
+  }
+  waterU.terrRockOn.value = want && rockReady ? 1 : 0;
+}
 
 /**
  * Arazi dokusu (renk köşelerde; doku gölgelendiricide, dünya ekseninde): büyük ölçekli renk dalgası; yakında çim ve
@@ -287,6 +327,9 @@ const LAND_PARS = /* glsl */ `
   uniform float terrDetail;
   uniform float terrDesert;
   uniform sampler2D terrGrass;
+  uniform float terrRockOn;
+  uniform sampler2D terrRockTex;
+  uniform sampler2D terrScreeTex;
   float tHash( vec2 c ) { return fract( sin( dot( c, vec2( 41.13, 289.71 ) ) ) * 43758.5453 ); }
   /**
    * Dönemli değer gürültüsü: konum 8.192 m'lik kareye indirgenir (hassasiyet), k: bu karede kaç hücre (tam sayı);
@@ -305,6 +348,30 @@ ${DESERT_GLSL}
 `;
 
 const LAND_FS = /* glsl */ `
+  // Yamaç dokusunun normal bükmesi (dünya ekseninde; normal_fragment_maps'ten sonra uygulanır)
+  vec3 rockNw = vec3( 0.0 );
+  if ( vWater < 0.5 && terrDesert > 0.5 && terrRockOn > 0.5 ) {
+    vec3 rn = normalize( vTN );
+    float rfade = 1.0 - smoothstep( 2.0, 14.0, length( fwidth( vCloudW ) ) );
+    if ( rfade > 0.0 ) {
+      float rslope = 1.0 - clamp( rn.y, 0.0, 1.0 );
+      float cliffK = smoothstep( 0.16, 0.36, rslope ) * rfade;
+      float screeK = max( smoothstep( 0.04, 0.16, rslope ), smoothstep( 0.45, 0.7, vLand.y ) ) * ( 1.0 - cliffK / max( rfade, 1e-3 ) ) * rfade;
+      vec2 rw = pow( abs( rn.xz ) + 1e-4, vec2( 4.0 ) );
+      rw /= rw.x + rw.y;
+      vec2 rxz = mod( vCloudW.xz, 8192.0 );
+      // Yandan: x yüzünde u = dünya z, z yüzünde u = dünya x; v = yükseklik. Üstten: u = x, v = z
+      vec3 tX = texture2D( terrRockTex, vec2( rxz.y, vCloudW.y ) / 64.0 ).rgb;
+      vec3 tZ = texture2D( terrRockTex, vec2( rxz.x, vCloudW.y ) / 64.0 ).rgb;
+      vec3 tS = texture2D( terrScreeTex, rxz / 24.0 ).rgb;
+      float toneC = ( tX.b * rw.x + tZ.b * rw.y ) * 2.0;
+      diffuseColor.rgb *= mix( 1.0, toneC, cliffK ) * mix( 1.0, tS.b * 2.0, screeK );
+      vec2 nX = tX.rg * 2.0 - 1.0;
+      vec2 nZ = tZ.rg * 2.0 - 1.0;
+      vec2 nS = tS.rg * 2.0 - 1.0;
+      rockNw = ( vec3( 0.0, nX.y, nX.x ) * rw.x + vec3( nZ.x, nZ.y, 0.0 ) * rw.y ) * cliffK + vec3( nS.x, 0.0, nS.y ) * screeK;
+    }
+  }
   if ( vWater < 0.5 && terrDesert > 0.5 ) {
     diffuseColor.rgb = dDesert( diffuseColor.rgb, vCloudW, normalize( vTN ), length( fwidth( vCloudW.xz ) ) );
     // Taş sütun kaidesi: kızılımsı gri şeyl, yamaçtan aşağı oyuklar, düşmüş kaya benekleri (katman bantları yok)
@@ -459,7 +526,8 @@ function terrainMaterial(flat: boolean): THREE.MeshLambertMaterial {
           normal = normalize( mix( flatN, normal, smoothK ) );
         #endif
         vec3 nonPerturbedNormal = normal;
-      `);
+      `)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nif ( terrRockOn > 0.5 ) normal = normalize( normal + ( viewMatrix * vec4( rockNw, 0.0 ) ).xyz );');
   };
   m.customProgramCacheKey = () => (flat ? 'terrainFlat' : 'terrain');
   return m;

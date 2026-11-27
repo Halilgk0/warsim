@@ -46,6 +46,7 @@ const ICONS: Record<string, string> = {
   alerts: '<path d="M6 17h12l-1.6-2.2V11a4.4 4.4 0 0 0-8.8 0v3.8z"/><path d="M10 20h4"/>',
   ui: '<path d="M9 13V5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M12 11.5a1.5 1.5 0 0 1 3 0V13"/><path d="M15 12.5a1.5 1.5 0 0 1 3 0V16a5.5 5.5 0 0 1-5.5 5.5H12a5 5 0 0 1-4-2l-2.8-3.7a1.5 1.5 0 0 1 2.3-1.9L9 15.5"/>',
   labels: '<path d="M3.5 11.5V4h7.5l9.5 9.5-7.5 7.5z"/><circle cx="7.8" cy="8.3" r="1.2"/>',
+  buildingLabels: '<path d="M4 20V9l8-5 8 5v11z"/><path d="M9 20v-6h6v6"/>',
   icons: '<path d="M12 3l7 18-7-4.2L5 21z"/>',
   trails: '<path d="M3 19c4.5 0 4.5-7 9-7s4.5-7 9-7" stroke-dasharray="2.5 2.5"/><path d="M19 3l2 2-2 2"/>',
   dropLines: '<path d="M7 4.5l5 3.5 5-3.5"/><path d="M12 8v11" stroke-dasharray="2 2"/><path d="M7 20h10"/>',
@@ -128,7 +129,7 @@ function soundTab(): string {
 function mapTab(): string {
   return [
     head(L('Uçaklar', 'Aircraft')),
-    mapRow('labels'), mapRow('icons'), mapRow('trails'), mapRow('dropLines'), mapRow('shadows', 'shadows_ac'),
+    mapRow('labels'), mapRow('buildingLabels'), mapRow('icons'), mapRow('trails'), mapRow('dropLines'), mapRow('shadows', 'shadows_ac'),
     head(L('Mermiler', 'Rounds')),
     mapRow('tracers'),
     range('tracerScale', null, settings.tracerScale, 0.4, 2.5, 0.1, `${settings.tracerScale.toFixed(1)}×`, L('Mermi izi kalınlığı', 'Tracer thickness'),

@@ -14,7 +14,7 @@ import { groundLevel, loadMap, terrainEdits, terrainMap } from '../sim/terrain';
 import { gearHeight } from '../sim/aircraft/flightModel';
 import { MAPS } from '../sim/maps';
 import { CameraRig } from './camera';
-import { TerrainView, waterU } from './terrain';
+import { TerrainView, setRockDetail, waterU } from './terrain';
 import { StructureView, placeKeyOf, structureRing, viewRadius } from './structures';
 import { WRECK_PARTS, buildAircraftModel, buildStoreMeshes, fractureModel, propU, requestSkin, type AircraftModel, type WreckPart } from './models';
 import { Wrecks } from './wreck';
@@ -377,7 +377,8 @@ export class GameRenderer {
   /** Grafik kalitesi ve çözünürlük ayarını uygula (ayar değişince de çağrılır). */
   applyGraphics(): void {
     const q = quality();
-    this.scenery.setQuality(q.treeNear, q.treeThin, q.treeFade, q.settle);
+    this.scenery.setQuality(q.treeNear, q.treeThin, q.treeFade, q.settle, q.models ? (q.ground ? 2 : 1) : 0);
+    setRockDetail(q.models > 0);
     this.effects.setLimit(q.puffs);
     this.clouds.setDensity(settings.graphics.clouds ? q.clouds : 0);
     this.shadows.setEnabled(settings.graphics.shadows && q.shadows);
@@ -1185,7 +1186,13 @@ export class GameRenderer {
     this.decor.updateLabels(this.camera, r, settings.map.labels, this.rig.distance);
     // Yakında ad, uzakta yalnız yapı simgesi
     const named = this.rig.distance < 45000;
+    // Yapı etiketleri ayarı kapalıysa ya da harita uzaktan (bütün harita) görülüyorsa hiç çizilmez (seçili yapı hariç)
+    const showStruct = settings.map.buildingLabels && this.rig.distance < 90000;
     for (const [id, lbl] of this.structLabels) {
+      if (!showStruct && id !== this.selectedStructureId) {
+        if (lbl.style.display !== 'none') lbl.style.display = 'none';
+        continue;
+      }
       const s = w.structureById(id);
       // Şehir binaları kalabalık: yalnız yakında ya da seçiliyken etiketli
       if (!s || (s.def.category === 'city' && this.rig.distance > 7000 && id !== this.selectedStructureId)) {

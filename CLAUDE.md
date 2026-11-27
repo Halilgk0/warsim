@@ -252,7 +252,13 @@ Yerel yönetici anahtarı `.dev.vars` (git dışı).
     açar, ötekiler ana menüde önizler, başlatınca `game.showEarlyAccess` penceresi seviye yükseltmeye götürür): basamaklı platolar
     (820–1.300 m), kıvrılan derin ana kanyon (nehir, doğuda göl), yan kanyon labirenti, anıt vadisi havzaları (`monumentShare`: ~240 m
     alçak, kızıl kumlu, sık kaya). Kayalar (`sim/pillars.ts`): kaide yükseklik haritasında (`pedestalAt`), dik kaya ayrı model
-    (`render/pillars.ts`; sim zemine katar: `groundLevel`, `footprintStats`); mesa, kule öbeği, parmak. Çöl görünümü `biome: 'desert'`:
+    (`render/pillars.ts`; sim zemine katar: `groundLevel`, `footprintStats`). 2026-11-27'den beri Blender'da oyulmuş 9 çeşit
+    (`tools/blender/kaya.py`: plan görünüşünde eklem hücreli yükseklik alanı, kopmuş kenar blokları, seyrek derin yarık, katman sekileri,
+    oluk, kapak kayası, basamaklı etek → voksel birleştirme → ~1.500–2.800 üçgen + ~300 uzak; boya, normal, AO pişirilir). Sim biçimi
+    modelden: `pillarShapes.ts` (üretilir; 64×64 daire uzayı yükseklik kalıbı ve uzak görünüş ağı), `Pillar.shape` (`pickShape`).
+    Düşük: her yerde uzak ağ + 512 atlas; Orta 6 km / Yüksek 9 km içinde `public/kaya/kaya.glb` + 1024/2048 atlas ve normal (yalnız
+    Kanyonlar açılınca iner). Yeniden üretim: `kaya.py` → `kaya_doku.mjs`, glb ve `pillarShapes.ts` kopyalanır; denetim
+    `tools/sim/kaya_kalibi`. Çöl görünümü `biome: 'desert'`:
     kaya ve zemin piksel başına (`desertRock.ts`), arazi kapalılığı (`terrain.ts` `desertOcc`), ardıç ve adaçayı çalıları (`scenery.ts`).
     Önizleme `MapDef.preview` (sütunsuz; sütun listesi kurmak birkaç saniye). Düzleştirme aralığı `MapDef.flat`. Görüntü aracı
     `tools/sim/harita_bak`. Haritanın ötesi deniz değil, kaba çöl halkası (`render/terrain.ts` `desertOuter`: ~14 bin üçgen + kenar perdesi;

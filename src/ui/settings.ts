@@ -29,12 +29,13 @@ export const INFO_FIELDS: { id: InfoField; name: string; desc: string }[] = [
 ];
 
 export type MapLayer =
-  | 'scenery' | 'labels' | 'icons' | 'trails' | 'dropLines' | 'shadows' | 'tracers' | 'effects' | 'routes'
+  | 'scenery' | 'labels' | 'buildingLabels' | 'icons' | 'trails' | 'dropLines' | 'shadows' | 'tracers' | 'effects' | 'routes'
   | 'aaRanges' | 'radarCoverage' | 'fogOfWar' | 'contacts';
 
 export const MAP_LAYERS: { id: MapLayer; name: string; desc: string }[] = [
   { id: 'scenery', name: L('Ağaç, kaya ve yerleşimler', 'Trees, rocks and settlements'), desc: L('Orman, kaya, çiftlik ve köyler (yavaş cihazda kapat)', 'Forests, rocks, farms and villages (turn off on slow devices)') },
   { id: 'labels', name: L('Uçak etiketleri', 'Aircraft labels'), desc: L('Çağrı adı ve tip', 'Callsign and type') },
+  { id: 'buildingLabels', name: L('Yapı etiketleri', 'Building labels'), desc: L('Üs, fabrika ve binaların adı (kapalıyken hiç çizilmez)', 'Names of bases, factories and buildings (not drawn at all when off)') },
   { id: 'icons', name: L('Uzak görünüm simgeleri', 'Distant view icons'), desc: L('Uzaklaşınca uçaklar takım renginde okla gösterilir', 'When zoomed out, aircraft show as arrows in team colours') },
   { id: 'trails', name: L('Uçuş izleri', 'Flight trails'), desc: L('Son ~10 saniyelik yol', 'The last ~10 seconds of the path') },
   { id: 'dropLines', name: L('İrtifa çizgileri', 'Altitude lines'), desc: L('Uçaktan yere dikey çizgi', 'A vertical line from aircraft to ground') },

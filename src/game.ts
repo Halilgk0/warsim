@@ -377,7 +377,8 @@ export class Game {
       const d = await readSave(id);
       if (d.v !== 2 || !d.mapId) throw new Error(L('bu kayıt eski bir harita sürümüne ait; yeni haritalarda açılamaz', 'this save belongs to an old map version and cannot be opened on the new maps'));
       // Yapım aşamasındaki haritanın kaydı yalnız erken erişimle açılır (seviye iade edildiyse)
-      if (mapById(d.mapId).earlyAccess && !earlyAccess(currentAccount()?.support ?? 0)) {
+      // Geliştirme sunucusunda (npm run dev) erken erişim kilidi yok: yerelde deneme için; derlemede bu yol yoktur
+      if (mapById(d.mapId).earlyAccess && !import.meta.env.DEV && !earlyAccess(currentAccount()?.support ?? 0)) {
         this.showEarlyAccess(mapById(d.mapId).name);
         return;
       }
@@ -458,6 +459,28 @@ export class Game {
     this.autosaveClock = 0;
     this.setTimeScale(1);
     if (scenarioId === 'kampanya') this.ads.enteredMatch();
+    // Erken erişim haritası (Kanyonlar): her girişte teşekkür ve "yapım aşamasında" uyarısı (yükleme bitince)
+    this.earlyNoticeDue = scenarioId === 'kampanya' && !!mapById(terrainMap.id).earlyAccess;
+  }
+
+  private earlyNoticeDue = false;
+
+  /** Erken erişim haritasına girişte: teşekkür, yapım aşaması uyarısı, geri bildirim çağrısı. */
+  private showEarlyNotice(): void {
+    this.modals.openNotice(
+      L('Kanyonlar: erken erişim', 'Canyons: early access'),
+      `<p>${L(
+        'Erken erişimi açtığın için çok teşekkür ederiz! Desteğin WarSimBox’ın daha hızlı gelişmesini sağlıyor.',
+        'Thank you so much for unlocking early access! Your support helps WarSimBox grow faster.',
+      )}</p><p>${L(
+        'Bu harita henüz yapım aşamasında: ani kare hızı düşüşleri, görüntü hataları ve başka hatalar görebilirsin. Bunlar şimdilik normal; harita bitene kadar sık sık güncellenecek.',
+        'This map is still in development: you may see sudden frame rate drops, visual glitches and other bugs. That is normal for now; the map will be updated often until it is finished.',
+      )}</p><p>${L(
+        'Gözüne bir şey çarparsa Menü → Geri bildirim’den yazarsan çok yardımcı olur.',
+        'If something catches your eye, writing to us from Menu → Feedback helps a lot.',
+      )}</p>`,
+      [{ label: L('Uçalım', 'Let’s fly'), primary: true, run: () => {} }],
+    );
   }
 
   /** Dünyayı render ve arayüze bağla (seçimler ve açık pencereler sıfırlanır). */
@@ -1492,6 +1515,10 @@ export class Game {
     if (currentAccount()) this.stats.update(real, this.world, this.playerTeam, visible);
     else this.stats.guest(real, this.world, visible);
     if (this.thanksDue && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen) this.showThanks();
+    if (this.earlyNoticeDue && !this.windowOpen && !this.tutorial.busy && $('loading').classList.contains('hidden')) {
+      this.earlyNoticeDue = false;
+      this.showEarlyNotice();
+    }
     // Takılma: yalnız harekâtta (senaryolar test ve kayıt içindir), oyunun önünde pencere yokken, sekme görünürken ve 4× dışında
     // sayılır (4×'te yavaş kare simülasyondan gelir, grafikten değil)
     const slow = this.perf.update(raw, this.scenarioId === 'kampanya' && visible && !this.windowOpen && !this.tutorial.busy && !this.end.isOpen && this.timeScale < 4);

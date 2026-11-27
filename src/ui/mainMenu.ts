@@ -200,7 +200,8 @@ export class MainMenu {
 
   /** Seçili harita yapım aşamasında ve hesapta erken erişim yok. */
   private locked(): boolean {
-    return !!mapById(this.mapId).earlyAccess && !earlyAccess(currentAccount()?.support ?? 0);
+    // Geliştirme sunucusunda (npm run dev) kilit yok: yerelde deneme için; derlemede bu yol yoktur
+    return !!mapById(this.mapId).earlyAccess && !import.meta.env.DEV && !earlyAccess(currentAccount()?.support ?? 0);
   }
 
   /** Komutan adı geçerli mi; değilse hata yazılır ve alana odaklanılır. */

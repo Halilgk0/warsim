@@ -8,7 +8,7 @@
 import { makeFbm } from '../core/noise';
 import { clamp, smoothstep } from '../core/math';
 import { LAND_POINTS, MAP_BASE } from './mapData';
-import { pillarLocal, type Pillar } from './pillars';
+import { pickShape, pillarLocal, type Pillar } from './pillars';
 
 const HALF = MAP_BASE / 2;
 
@@ -161,14 +161,15 @@ function buildPillars(k: number): Pillar[] {
         if (hi - lo > 70 || lo < 450) continue;
         if (out.some((o) => Math.hypot(o.x - x, o.z - z) < (o.r * o.ped + r * ped) * 0.8)) continue;
         const ph = hash2(i, j, 43 + q) * 6.28;
-        out.push({ x, z, r, ax, tall, ground: lo - 2, base: lo - 2 + pedH, ped, ph, rot, core: 1, shoulder: 1 });
+        const shape = pickShape(mesa ? 'mesa' : spire ? 'spire' : 'broad', ax, hash2(i, j, 61 + q));
+        out.push({ x, z, r, ax, tall, ground: lo - 2, base: lo - 2 + pedH, ped, ph, rot, shape });
         // Kule öbeği (üç kız kardeş gibi): aynı kaideden yükselen iki ince kule daha
         if (spire && hash2(i, j, 51 + q) < 0.45) {
           for (let m = 1; m <= 2; m++) {
             const a = rot + m * 2.1;
             const sx = x + Math.cos(a) * r * 2.1;
             const sz = z + Math.sin(a) * r * 2.1;
-            out.push({ x: sx, z: sz, r: r * (0.7 + hash2(i, j, 53 + m) * 0.3), ax, tall: tall * (0.75 + hash2(i, j, 55 + m) * 0.35), ground: lo - 2, base: lo - 2 + pedH * 0.92, ped: ped * 0.75, ph: ph + m, rot, core: 1, shoulder: 1 });
+            out.push({ x: sx, z: sz, r: r * (0.7 + hash2(i, j, 53 + m) * 0.3), ax, tall: tall * (0.75 + hash2(i, j, 55 + m) * 0.35), ground: lo - 2, base: lo - 2 + pedH * 0.92, ped: ped * 0.75, ph: ph + m, rot, shape: pickShape('spire', ax, hash2(i, j, 63 + m)) });
           }
         }
       }
