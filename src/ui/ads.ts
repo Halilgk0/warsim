@@ -271,12 +271,12 @@ export class AdBox {
   /** Gizli dosya (2026-11-27): ülkelere ayrılacak araştırma ağacına üstü kapalı, şakacı bir merak reklamı. */
   private teaser(): string {
     const img = `${import.meta.env.BASE_URL}news/${EN ? 'gizli-dosya-en' : 'gizli-dosya'}.webp`;
-    return `<div class="ad-art" style="background-image:url('${img}');background-position:30% center"><span class="ad-tag">${L('Çok gizli', 'Top secret')}</span></div>
+    return `<div class="ad-art" style="background-image:url('${img}');background-position:45% center"><span class="ad-tag">${L('Çok gizli', 'Top secret')}</span></div>
       <div class="ad-text">
         <h2>${L('Gizli bir dosya bulundu', 'A secret file was found')}</h2>
         <p class="ad-lead">${L(
-          'Araştırma dairesinin arşivinde, üstünde yalnız beş bayrak çizili bir dosya bulduk. İçinde ne var bilmiyoruz; açmaya çalışan stajyer üç gündür ağlıyor.',
-          'In the research office archive we found a file with nothing on it but five flags. We don’t know what’s inside; the intern who tried to open it has been crying for three days.',
+          'Araştırma dairesinin arşivinde, beş ismin hepsi karartılmış bir dosya bulduk. İçinde ne var bilmiyoruz; açmaya çalışan stajyer üç gündür ağlıyor.',
+          'In the research office archive we found a file with five names, all of them blacked out. We don’t know what’s inside; the intern who tried to open it has been crying for three days.',
         )}</p>
         <ul class="ad-list">
           <li>${L('Araştırma ağacı yakında eskisi gibi olmayacak.', 'The research tree won’t stay the way it is for long.')}</li>
